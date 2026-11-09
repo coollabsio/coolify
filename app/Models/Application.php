@@ -2649,9 +2649,9 @@ class Application extends BaseModel
      * One shell command that clones the repository without a checkout into $checkoutDir on the server,
      * with the same credentials (GitHub App token, GitLab token, or deploy key) as a deployment.
      */
-    public function serverCheckoutCommand(string $uuid, string $checkoutDir): string
+    public function serverCheckoutCommand(string $uuid, string $checkoutDir, ?string $commit = null): string
     {
-        return $this->serverCheckout($uuid, $checkoutDir)['command'];
+        return $this->serverCheckout($uuid, $checkoutDir, $commit)['command'];
     }
 
     /**
@@ -2659,9 +2659,9 @@ class Application extends BaseModel
      *
      * @return array{command: string, git: string}
      */
-    private function serverCheckout(string $uuid, string $checkoutDir): array
+    private function serverCheckout(string $uuid, string $checkoutDir, ?string $commit = null): array
     {
-        ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+        ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir, commit: $commit);
 
         // Callers read data from stdout after the checkout, so progress lines of the checkout go to stderr.
         return [

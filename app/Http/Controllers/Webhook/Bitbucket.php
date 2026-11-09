@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -20,6 +21,7 @@ class Bitbucket extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
@@ -81,6 +83,13 @@ class Bitbucket extends Controller
                     'status' => 'failed',
                     'message' => 'Nothing to do. Invalid repository.',
                 ]);
+            }
+            if ($x_bitbucket_event === 'repo:push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, function (string $secret) use ($request, $x_bitbucket_token): bool {
+                    $parts = explode('=', (string) $x_bitbucket_token, 2);
+
+                    return count($parts) === 2 && $parts[0] === 'sha256' && hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $parts[1]);
+                });
             }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
             // A redelivery of the same signed payload is one guess.

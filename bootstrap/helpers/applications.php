@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Services\Dns\ResourceDnsRecords;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,9 @@ use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null)
 {
+    if ($is_webhook && (int) $pull_request_id === 0 && ! $rollback && app(ConfigPushRouter::class)->hold($application)) {
+        return ['status' => 'skipped', 'message' => 'The deployment waits until coolify.json of this push is applied.', 'deployment_uuid' => null];
+    }
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
     $application_id = $application->id;

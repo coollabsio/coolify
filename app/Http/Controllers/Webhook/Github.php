@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
@@ -35,6 +36,7 @@ class Github extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
 
     public function manual(Request $request)
     {
@@ -95,6 +97,9 @@ class Github extends Controller
                 $action === 'closed' => null,
                 default => $base_branch,
             };
+            if ($x_github_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $x_hub_signature_256));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'github', $full_name, $matched_branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
@@ -478,6 +483,12 @@ class Github extends Controller
             }
             if ($x_github_event === 'push' && $this->isWebhookBranchDeletionPush($payload)) {
                 return response('Nothing to do. Branch deleted.');
+            }
+            if ($x_github_event === 'push') {
+                $this->beginConfigPush($github_app, data_get($payload, 'repository.full_name'), $branch, $commit);
+            }
+            if ($x_github_event === 'pull_request' && ! $is_fork_pull_request && in_array($action, ['opened', 'synchronize', 'reopened'], true) && $base_branch) {
+                $this->commentConfigPlans($github_app, $full_name, $base_branch, (int) $pull_request_id, (string) $commit_sha);
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
