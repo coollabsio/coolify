@@ -1324,8 +1324,8 @@ class ServerTransferImporter
         }
 
         $application = new Application($attributes);
-        // Maintenance mode is not fillable.
-        $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page'])->all());
+        // Maintenance mode and the coolify.json key are not fillable.
+        $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'config_key'])->all());
         $application->save();
         // The created hook gives a new application the newest compose parser and default variables. A transferred
         // application keeps its parser, which names its volumes and domains, and gets only the variables of the bundle.
@@ -1442,8 +1442,8 @@ class ServerTransferImporter
         $attributes['destination_type'] = $destination->getMorphClass();
 
         $service = new Service($attributes);
-        // Maintenance mode and the Coolify default variables switch are not fillable.
-        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'])->all());
+        // Maintenance mode, the Coolify default variables switch, and the coolify.json fields are not fillable.
+        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables', 'config_key', 'config_meta'])->all());
         $service->save();
         // The created hook gives a new service the newest compose parser; a transferred service keeps its own.
         $service->forceFill(collect($attributes)->only('compose_parsing_version')->filter()->all())->saveQuietly();
@@ -1573,6 +1573,7 @@ class ServerTransferImporter
                     // Exports from older versions have no flag; their values use the old escaping.
                     'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
                     'preserve_compose_null' => (bool) data_get($variable, 'preserve_compose_null', false),
+                    'config_meta' => data_get($variable, 'config_meta'),
                     'comment' => data_get($variable, 'comment'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
