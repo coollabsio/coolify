@@ -53,8 +53,11 @@ class ScanHostPackages
         try {
             $databaseBuiltAt = ScanImage::databaseBuiltAt($commands);
 
-            $packagesKiB = (int) trim((string) instant_remote_process($commands->hostPackagesSize(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT));
-            ScanImage::checkDiskSpace($commands, $packagesKiB * 1024);
+            $packages = ScanImage::runStep($server, $commands->hostPackagesSize(), 'packages-size', self::TIMEOUT_DEFAULT);
+            if ($packages['code'] !== 0 || $packages['size'] === null) {
+                throw new ScanFailed(ImageScanErrorCode::Unknown);
+            }
+            ScanImage::checkDiskSpace($commands, $packages['size'] * 1024);
 
             $sbom = ScanImage::runStep($server, $commands->sbomFromHost(), 'sbom', self::TIMEOUT_SBOM);
             $copy = $sbom['exit_codes']['copy'] ?? 2;
@@ -97,7 +100,7 @@ class ScanHostPackages
         $relevant = array_values(array_filter($report['findings'], fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $rules)));
         usort($relevant, fn (Finding $a, Finding $b): int => $this->rank($a, $runningKernel) <=> $this->rank($b, $runningKernel));
 
-        $summary = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0, 'fixable' => 0, 'exploited' => 0, 'likely' => 0, 'other_kernels' => 0, 'total' => count($report['findings'])];
+        $summary = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0, 'fixable' => 0, 'exploited' => 0, 'likely' => 0, 'other_kernels' => 0, 'total' => count($report['findings']), 'running_kernel' => $runningKernel !== '' ? $runningKernel : null];
         foreach ($relevant as $finding) {
             if (CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel)) {
                 $summary['other_kernels']++;

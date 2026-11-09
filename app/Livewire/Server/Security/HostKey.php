@@ -122,7 +122,7 @@ class HostKey extends Component
                 'fingerprints' => ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key),
             ]);
 
-            SshMultiplexingHelper::removeMuxFile($this->server);
+            SshMultiplexingHelper::removeMuxFileAfterHostKeyChange($this->server);
             // The check can take up to a minute on a slow server, so it runs in the queue and the page polls for the result.
             ServerConnectionCheckJob::dispatch($this->server);
             $this->dispatch('hostKeySettingsChanged')->to(Index::class);

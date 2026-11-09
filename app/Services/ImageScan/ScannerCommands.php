@@ -131,6 +131,18 @@ class ScannerCommands
     }
 
     /**
+     * Checks that all scanner images are on the server. `docker image inspect` fails when one of them is missing.
+     *
+     * @return list<string>
+     */
+    public function scannerImages(): array
+    {
+        $images = implode(' ', array_map(fn (string $tool) => escapeshellarg($this->image($tool)), ['syft', 'grype', 'regctl', 'init']));
+
+        return [$this->removeContainer(), $this->step('scanner-images', "docker image inspect {$images} >/dev/null 2>&1")];
+    }
+
+    /**
      * @return list<string>
      */
     public function dbUpdate(?string $dbUrl): array
@@ -251,8 +263,8 @@ class ScannerCommands
     }
 
     /**
-     * Prints the size of the host package databases that `sbomFromHost()` copies, in KiB (`du -k`: BusyBox has no `-b`).
-     * Missing paths are skipped.
+     * Prints `coolify-scan-exit packages-size {code} {KiB}`: the size of the host package databases that `sbomFromHost()`
+     * copies (`du -k`: BusyBox has no `-b`). Missing paths are skipped; the code is 1 when a path that exists cannot be measured.
      *
      * @return list<string>
      */
@@ -260,7 +272,7 @@ class ScannerCommands
     {
         $paths = implode(' ', array_map(escapeshellarg(...), self::HOST_PACKAGE_PATHS));
 
-        return ["du -skLc {$paths} 2>/dev/null | tail -n 1 | awk '{print \$1}'"];
+        return [$this->shell('total=0; failed=0; for p in '.$paths.'; do if [ -e "$p" ]; then if out=$(du -skL "$p" 2>/dev/null); then total=$((total + ${out%%[[:space:]]*})); else failed=1; fi; fi; done; echo "'.self::MARKER.' packages-size $failed $total"')];
     }
 
     /**
@@ -602,12 +614,15 @@ class ScannerCommands
      * Runs a tool whose stdout is the payload: stdout goes to a root-owned file in the work directory
      * (not mounted into the container), then at most 10485761 bytes of it are printed.
      *
-     * With $hostFilter the output keeps one line per vulnerability ID, package version, fix state, and fix versions (the
-     * binary packages of one kernel repeat the same thousands of problems; each installed kernel keeps its own line, so a
-     * problem of the running kernel is not hidden behind the same problem of an old one, and a fixed match is never
-     * hidden behind an unfixed match of another package) and drops the problems that the distribution will not fix, before the size is
-     * counted. Grype's own `--ignore-states` needs more than the memory limit. In the JSON lines a quote inside a value
-     * is escaped, so the `"id":"…"` and `"fix":"wont-fix"` matches only find keys. The filter runs in the pipe, before
+     * With $hostFilter the output keeps one line per vulnerability ID, package, package version, fix state, and fix
+     * versions, and drops the problems that the distribution will not fix, before the size is counted. All packages of
+     * the kernel source (`linux*`, `kernel*`) count as one package: the binary packages of one kernel repeat the same
+     * thousands of problems. Of these, the line of the kernel image (`linux-image-*`, `linux-modules-*`, `kernel`,
+     * `kernel-core`) is kept, because only that package has the kernel update and the kernel state. Each installed kernel
+     * keeps its own line (the version is in the key), so a problem of the running kernel is not hidden behind the same
+     * problem of an old one, and a fixed match is never hidden behind an unfixed one. The kept lines stay in the order
+     * of the output. Grype's own `--ignore-states` needs more than the memory limit. In the JSON lines a quote inside a
+     * value is escaped, so the `"id":"…"`, `"pkg":"…"`, and `"fix":"wont-fix"` matches only find keys. The filter runs in the pipe, before
      * the file limit, because the raw output of a host can be larger than the limit (57 MB on CentOS Stream 9); the exit
      * code of the run goes through `out.rc`, as `sh` has no `pipefail`. When the run succeeded, the exit code of `awk` is
      * the exit code of the step, so a write failure (a full disk) fails the scan instead of storing a short report; a stop
@@ -619,8 +634,20 @@ class ScannerCommands
     private function capture(string $step, string $dockerRun, ?string $template = null, ?array $auth = null, bool $hostFilter = false): array
     {
         $out = escapeshellarg($this->workDir().'/out');
+        $dedupe = implode(' ', [
+            '{ if (!match($0, /"id":"[^"]*"/)) { line[++n] = $0; next }',
+            'k = substr($0, RSTART, RLENGTH); image = 0;',
+            'if (match($0, /"pkg":"[^"]*"/)) { p = substr($0, RSTART, RLENGTH);',
+            'if (p ~ /^"pkg":"(linux|kernel)[-"]/) { image = (p ~ /^"pkg":"(linux-(image|modules)-[^"]*|kernel(-core)?)"$/); p = "kernel" } k = k p }',
+            'if (match($0, /"ver":"[^"]*"/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (match($0, /"fix":"[^"]*"/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (match($0, /"fixv":\[[^]]*\]/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (k in at) { if (image && !isImage[k]) { line[at[k]] = $0; isImage[k] = 1 } next }',
+            'at[k] = ++n; isImage[k] = image; line[n] = $0 }',
+            'END { for (i = 1; i <= n; i++) print line[i] }',
+        ]);
         $run = $hostFilter
-            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{ if (match(\$0, /\"id\":\"[^\"]*\"/)) { k = substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"ver\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"fix\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"fixv\":\[[^]]*\]/)) k = k substr(\$0, RSTART, RLENGTH); if (seen[k]++) next } print }' > {$out}; frc=\$?; rc=\$(cat {$out}.rc 2>/dev/null || echo 1); if [ \"\$rc\" -eq 0 ]; then rc=\$frc; fi"
+            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{$dedupe}' > {$out}; frc=\$?; rc=\$(cat {$out}.rc 2>/dev/null || echo 1); if [ \"\$rc\" -eq 0 ]; then rc=\$frc; fi"
             : "{$dockerRun} > {$out} 2>/dev/null; rc=\$?";
         $commands = [...$this->start($template === null ? ['scratch'] : ['scratch', 'tpl'])];
         if ($template !== null) {

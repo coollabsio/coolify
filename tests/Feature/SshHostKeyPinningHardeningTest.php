@@ -226,6 +226,18 @@ it('quotes the host key alias in the ssh command', function () {
     expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain("-o HostKeyAlias='coolify-{$server->uuid}' ");
 });
 
+it('uses the saved host key settings in a job that loaded the server before they changed', function () {
+    fakeHardeningSsh(null);
+    $server = makeHardeningServer();
+    expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain('-o StrictHostKeyChecking=no ');
+
+    ServerSetting::query()->whereKey($server->settings->id)->update(['is_ssh_host_key_check_enforced' => true, 'ssh_host_key' => HARDENING_KEY_B]);
+
+    expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain('-o StrictHostKeyChecking=yes ')
+        ->and($server->settings->ssh_host_key)->toBe(HARDENING_KEY_B)
+        ->and($server->settings->isDirty())->toBeFalse();
+});
+
 it('deletes the known_hosts file of an old host key', function () {
     fakeHardeningSsh(null);
     $server = makeHardeningServer();

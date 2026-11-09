@@ -60,8 +60,9 @@ trait ManagesServerPackageUpdates
 
     /**
      * @param  list<string>  $packages
+     * @return bool True when the update started.
      */
-    private function runUpdate(bool $all = false, array $packages = []): void
+    private function runUpdate(bool $all = false, array $packages = []): bool
     {
         $this->ensureManagedHere();
         $savedResult = $this->server->settings->patch_check_result;
@@ -70,14 +71,14 @@ trait ManagesServerPackageUpdates
         if (! $packageManager || ! $osId) {
             $this->dispatch('error', message: 'Run "Check for updates" first.');
 
-            return;
+            return false;
         }
 
         $activity = UpdatePackage::run(server: $this->server, osId: $osId, packages: $packages, packageManager: $packageManager, all: $all);
         if (is_array($activity)) {
             $this->dispatch('error', message: $activity['error'] ?? 'Something went wrong.');
 
-            return;
+            return false;
         }
         $this->auditPatchAction('packages_update_requested', [
             'packages' => $all ? 'all' : $packages,
@@ -86,6 +87,8 @@ trait ManagesServerPackageUpdates
         ]);
         $this->dispatch('startupdate');
         $this->dispatch('activityMonitor', $activity->id);
+
+        return true;
     }
 
     /**

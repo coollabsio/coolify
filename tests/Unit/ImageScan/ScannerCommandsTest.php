@@ -35,6 +35,7 @@ function scannerCommandLists(ScannerCommands $commands): array
         'dbUpdate' => $commands->dbUpdate(null),
         'dbUpdate with url' => $commands->dbUpdate('https://mirror.example.com/grype/databases'),
         'dbStatus' => $commands->dbStatus(),
+        'scannerImages' => $commands->scannerImages(),
         'inspect' => $commands->inspect('localhost:5000/team/app:1.2'),
         'pull' => $commands->pull('localhost:5000/team/app:1.2'),
         'diskFree' => $commands->diskFree(),
@@ -542,6 +543,28 @@ it('keeps a fixed host match when an unfixed match of another package has the sa
         ->and(explode("\n", trim($result->output())))->toBe([$lines[0], $lines[2], $lines[4]]);
 });
 
+it('keeps one host match per package, and one line of the kernel image per kernel', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+    preg_match("/\\| (grep -v -F .*?) > '/", $script, $filter);
+    $lines = [
+        '{"eol":null}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"libssl3","ver":"3.0.14-1"}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"openssl","ver":"3.0.14-1"}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"openssl","ver":"3.0.14-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-headers-6.1.0-18-common","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-image-6.1.0-18-amd64","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-libc-dev","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernel-core","ver":"5.14.0-503.el9"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernel-modules","ver":"5.14.0-503.el9"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernelshark","ver":"5.14.0-503.el9"}',
+    ];
+
+    $result = Process::input(implode("\n", $lines)."\n")->run(['sh', '-c', $filter[1]]);
+
+    expect($result->successful())->toBeTrue()
+        ->and(explode("\n", trim($result->output())))->toBe([$lines[0], $lines[1], $lines[2], $lines[5], $lines[7], $lines[9]]);
+});
+
 it('runs the host grype step and prints the exit code of the run, or of the filter when the run succeeded', function (int $grypeExit, bool $writeFails, string $marker, array $kept) {
     $dir = sys_get_temp_dir().'/coolify-scan-test-'.bin2hex(random_bytes(4));
     mkdir($dir);
@@ -592,6 +615,6 @@ it('keeps one line per vulnerability and drops the problems that the distributio
     $host = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
 
     expect($host)->toContain('grep -v -F \'"fix":"wont-fix"\'')
-        ->toContain('if (seen[k]++) next')
-        ->and(implode("\n", scannerUnwrapped($this->commands->grype(SCANNER_TEST_HEX))))->not->toContain('grep -v')->not->toContain('seen[k]');
+        ->toContain('if (k in at)')
+        ->and(implode("\n", scannerUnwrapped($this->commands->grype(SCANNER_TEST_HEX))))->not->toContain('grep -v')->not->toContain('k in at');
 });

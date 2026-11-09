@@ -370,14 +370,14 @@
                     <x-status-badge :status="count($heldUpdates) . ' held'" type="warning" />
                 </x-slot:badges>
                 <div class="data-table">
-                    <div class="data-table-header package-updates-table-grid">
+                    <div class="data-table-header held-updates-table-grid">
                         <span>Package</span>
                         <span>New version</span>
                         <span class="text-right">Reason</span>
                     </div>
                     @foreach ($heldUpdates as $update)
                         <div wire:key="held-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"
-                            class="data-table-row package-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
+                            class="data-table-row held-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
                             <span class="min-w-0 truncate font-mono text-[12px] text-neutral-950 dark:text-fg">
                                 {{ data_get($update, 'package') }}
                             </span>

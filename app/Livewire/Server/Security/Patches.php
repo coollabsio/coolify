@@ -127,8 +127,9 @@ class Patches extends Component
 
                 return;
             }
-            $this->runUpdate(packages: $packages);
-            $this->selectedPackages = [];
+            if ($this->runUpdate(packages: $packages)) {
+                $this->selectedPackages = [];
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

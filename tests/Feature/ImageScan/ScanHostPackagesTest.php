@@ -41,14 +41,14 @@ beforeEach(function () {
 });
 
 /**
- * @param  array<string, string>  $overrides
+ * @param  array<string, string|Closure(): string>  $overrides
  */
 function hostScanTestFake(array $overrides = []): void
 {
     $payload = file_get_contents(base_path('tests/Fixtures/image-scan/grype-host.ndjson'));
     $outputs = array_merge([
         'db-status' => "coolify-scan-exit db-status 0 180\ncoolify-scan-payload\n".json_encode(['built' => now()->subDay()->format('Y-m-d\TH:i:s\Z'), 'valid' => true]),
-        'packages-size' => '204800',
+        'packages-size' => 'coolify-scan-exit packages-size 0 204800',
         'disk' => '107374182400 107374182400',
         'sbom' => "coolify-scan-exit copy 0\ncoolify-scan-exit sbom 0",
         'grype' => 'coolify-scan-exit grype 0 '.strlen($payload)."\ncoolify-scan-payload\n{$payload}",
@@ -59,7 +59,7 @@ function hostScanTestFake(array $overrides = []): void
         $script = remoteProcessScript($process);
         $key = match (true) {
             str_contains($script, 'coolify-scan-exit db-status') => 'db-status',
-            str_contains($script, 'du -skLc') => 'packages-size',
+            str_contains($script, 'coolify-scan-exit packages-size') => 'packages-size',
             str_contains($script, 'df -P') => 'disk',
             str_contains($script, 'dir:/in/host') => 'sbom',
             str_contains($script, 'coolify-scan-exit grype') => 'grype',
@@ -67,7 +67,7 @@ function hostScanTestFake(array $overrides = []): void
             default => null,
         };
 
-        return Process::result(output: $key === null ? '' : $outputs[$key]);
+        return Process::result(output: $key === null ? '' : value($outputs[$key]));
     });
 }
 
@@ -80,7 +80,7 @@ it('saves the relevant host findings, exploited and fixable ones first', functio
     expect($scan->error_code)->toBeNull()
         ->and($scan->scanned_at)->not->toBeNull()
         ->and($scan->findings_truncated)->toBeFalse()
-        ->and($scan->summary)->toBe(['critical' => 2, 'high' => 1, 'medium' => 0, 'low' => 1, 'unknown' => 0, 'fixable' => 2, 'exploited' => 2, 'likely' => 1, 'other_kernels' => 0, 'total' => 5])
+        ->and($scan->summary)->toBe(['critical' => 2, 'high' => 1, 'medium' => 0, 'low' => 1, 'unknown' => 0, 'fixable' => 2, 'exploited' => 2, 'likely' => 1, 'other_kernels' => 0, 'total' => 5, 'running_kernel' => null])
         ->and(array_map(fn ($finding) => [$finding->displayId, $finding->package, $finding->fixedIn], $scan->findingList()))->toBe([
             ['CVE-2026-111497', 'libbrotli-dev', '1.1.0-2+deb13u1'],
             ['CVE-2023-5217', 'firefox-esr', null],
@@ -133,7 +133,7 @@ it('saves the database age when the vulnerability database is too old and clears
 
 it('does not copy the package databases when the disk has not enough free space', function () {
     $previous = ServerHostScan::factory()->create(['server_id' => $this->server->id, 'findings' => [['id' => 'CVE-2024-0001', 'package' => 'curl']]]);
-    hostScanTestFake(['packages-size' => '512000', 'disk' => '107374182400 1500000000']);
+    hostScanTestFake(['packages-size' => 'coolify-scan-exit packages-size 0 512000', 'disk' => '107374182400 1500000000']);
 
     expect(ScanHostPackages::run($this->server))->toBeTrue();
 
@@ -142,6 +142,21 @@ it('does not copy the package databases when the disk has not enough free space'
         ->and($scan->findings)->toBe([['id' => 'CVE-2024-0001', 'package' => 'curl']]);
     Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'dir:/in/host'));
 });
+
+it('does not copy the package databases when their size cannot be measured', function (string $output) {
+    $previous = ServerHostScan::factory()->create(['server_id' => $this->server->id, 'findings' => [['id' => 'CVE-2024-0001', 'package' => 'curl']]]);
+    hostScanTestFake(['packages-size' => $output]);
+
+    expect(ScanHostPackages::run($this->server))->toBeTrue();
+
+    $scan = $previous->fresh();
+    expect($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
+        ->and($scan->findings)->toBe([['id' => 'CVE-2024-0001', 'package' => 'curl']]);
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'dir:/in/host'));
+})->with([
+    'du failed' => ['coolify-scan-exit packages-size 1 0'],
+    'no output' => [''],
+]);
 
 it('returns false without scanning when another scan holds the server lock', function () {
     hostScanTestFake();
@@ -182,6 +197,24 @@ it('retries a busy host scan and records lock_busy after the last try', function
     expect($this->server->hostScan()->first()->error_code)->toBe(ImageScanErrorCode::LockBusy)
         ->and(Cache::has(ScanHostPackagesJob::runningCacheKey($this->server)))->toBeFalse();
     Process::assertNothingRan();
+});
+
+it('keeps the running marker of a scan requested while a scan runs', function () {
+    Queue::fake([ScanHostPackagesJob::class]);
+    $payload = file_get_contents(base_path('tests/Fixtures/image-scan/grype-host.ndjson'));
+    hostScanTestFake(['grype' => function () use ($payload) {
+        ScanHostPackagesJob::dispatchManual($this->server);
+
+        return 'coolify-scan-exit grype 0 '.strlen($payload)."\ncoolify-scan-payload\n{$payload}";
+    }]);
+    ScanHostPackagesJob::dispatchManual($this->server);
+
+    (new ScanHostPackagesJob($this->server))->withFakeQueueInteractions()->handle();
+    expect(Cache::has(ScanHostPackagesJob::runningCacheKey($this->server)))->toBeTrue();
+
+    hostScanTestFake();
+    (new ScanHostPackagesJob($this->server))->withFakeQueueInteractions()->handle();
+    expect(Cache::has(ScanHostPackagesJob::runningCacheKey($this->server)))->toBeFalse();
 });
 
 it('does not scan a server with image scanning off', function () {
@@ -247,6 +280,30 @@ describe('vulnerabilities page', function () {
             ->assertSet('hostScanRunning', true);
 
         Queue::assertPushed(ScanHostPackagesJob::class, fn ($job) => $job->server->is($this->server));
+    });
+
+    it('classifies kernel findings by the kernel that ran during the scan, not by an older patch check', function () {
+        $this->server->hostScan()->firstOrFail()->update([
+            'summary' => ['critical' => 1, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0, 'fixable' => 0, 'exploited' => 0, 'likely' => 0, 'other_kernels' => 1, 'total' => 2, 'running_kernel' => '6.8.0-140-generic'],
+            'findings' => [
+                ['id' => 'CVE-2026-1001', 'severity' => 'critical', 'package' => 'linux-image-6.8.0-140-generic', 'version' => '6.8.0-140.140'],
+                ['id' => 'CVE-2026-1002', 'severity' => 'high', 'package' => 'linux-image-6.8.0-139-generic', 'version' => '6.8.0-139.139'],
+            ],
+        ]);
+        $this->server->settings->forceFill(['patch_check_result' => ['osId' => 'ubuntu', 'package_manager' => 'apt', 'updates' => [], 'kernels' => [
+            'running' => '6.8.0-139-generic',
+            'installed' => [
+                ['package' => 'linux-image-6.8.0-139-generic', 'version' => '6.8.0-139.139', 'release' => '6.8.0-139-generic'],
+                ['package' => 'linux-image-6.8.0-140-generic', 'version' => '6.8.0-140.140', 'release' => '6.8.0-140-generic'],
+            ],
+        ]]])->saveQuietly();
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(HostVulnerabilities::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('CVE-2026-1001')
+            ->assertDontSee('CVE-2026-1002')
+            ->assertDontSee('starts after a reboot');
     });
 
     it('refuses the page to a member', function () {

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\ScanHostPackages;
+use App\Actions\ImageScan\ScanImage;
 use App\Enums\ImageScanErrorCode;
 use App\Events\ServerPatchCheckFinished;
 use App\Models\Server;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 /**
  * Scans the OS packages of a server. A busy image scan lock runs the job again later; after the last try it records
@@ -32,9 +34,10 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
 
     public $maxExceptions = 1;
 
-    public $timeout = 2400;
+    /** A run never takes longer than the server scan lock lives, so the worker does not stop it before the cleanup. */
+    public $timeout = ScanImage::LOCK_TTL;
 
-    public $uniqueFor = 3600;
+    public $uniqueFor = ScanImage::LOCK_TTL;
 
     public function __construct(public Server $server)
     {
@@ -53,11 +56,13 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
     }
 
     /**
-     * Queues a scan and marks it as running, so the patches page shows the progress after a reload.
+     * Queues a scan and marks it as running, so the patches page shows the progress after a reload. The mark lasts
+     * for the longest wait in the queue and the longest run. Each request writes a new token, so a scan that started
+     * before this request cannot clear the marker of this request.
      */
     public static function dispatchManual(Server $server): void
     {
-        Cache::put(self::runningCacheKey($server), true, now()->addHour());
+        Cache::put(self::runningCacheKey($server), (string) Str::uuid(), now()->addSeconds(2 * ScanImage::LOCK_TTL));
         self::dispatch($server);
     }
 
@@ -68,6 +73,8 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
             return;
         }
 
+        $request = Cache::get(self::runningCacheKey($server));
+
         if (! ScanHostPackages::run($server)) {
             if ($this->attempts() < $this->tries) {
                 $this->release(self::RETRY_DELAY_SECONDS);
@@ -77,7 +84,10 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
             ScanHostPackages::recordFailure($server, ImageScanErrorCode::LockBusy);
         }
 
-        Cache::forget(self::runningCacheKey($server));
+        // A request made during this scan queued a new scan, which clears the marker when it ends.
+        if (Cache::get(self::runningCacheKey($server)) === $request) {
+            Cache::forget(self::runningCacheKey($server));
+        }
         ServerPatchCheckFinished::dispatch($server->team_id, $server->uuid);
     }
 

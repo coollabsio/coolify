@@ -233,6 +233,23 @@ describe('patches page', function () {
             ->call('updatePackage', 'curl; reboot')
             ->assertDispatched('error', message: 'This package has no update in the last check.');
     });
+
+    it('keeps the selected packages when the update does not start, and clears them when it starts', function () {
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(2), 'patch_checked_at' => now()])->saveQuietly();
+        $activity = Activity::query()->create(['log_name' => 'default', 'description' => '', 'properties' => []]);
+        UpdatePackage::shouldRun()->twice()->andReturn(['error' => 'Server is not reachable.'], $activity);
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('selectedPackages', ['openssl', 'curl'])
+            ->call('updateSelectedPackages')
+            ->assertDispatched('error', message: 'Server is not reachable.')
+            ->assertSet('selectedPackages', ['openssl', 'curl'])
+            ->call('updateSelectedPackages')
+            ->assertDispatched('activityMonitor', $activity->id)
+            ->assertSet('selectedPackages', []);
+    });
 });
 
 describe('patches authorization', function () {

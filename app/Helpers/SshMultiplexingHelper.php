@@ -795,13 +795,46 @@ class SshMultiplexingHelper
         return true;
     }
 
+    /**
+     * Read the saved host key settings into the settings in memory. A job that loaded the server before an admin
+     * enforced the check, trusted a new key, or reset the key must not connect with the old settings.
+     * Only the host key page changes these columns, and it saves them before it connects.
+     */
+    private static function loadSavedHostKeySettings(Server $server): void
+    {
+        if (! $server->settings->exists) {
+            return;
+        }
+        $columns = ['ssh_host_key', 'ssh_host_key_source', 'ssh_host_key_trusted_at', 'ssh_host_key_pending', 'is_ssh_host_key_check_disabled', 'is_ssh_host_key_check_enforced'];
+        $stored = ServerSetting::query()->whereKey($server->settings->getKey())->first($columns);
+        if ($stored !== null) {
+            $server->settings->forceFill($stored->getAttributes())->syncOriginalAttributes($columns);
+        }
+    }
+
+    /**
+     * Stop the multiplexed connection after a change of the host key settings. The lock makes sure that no other
+     * process opens a connection with the old settings in the same moment: it opens it before the stop, or after it with the saved settings.
+     */
+    public static function removeMuxFileAfterHostKeyChange(Server $server): void
+    {
+        try {
+            Cache::lock(self::connectionLockKey($server), config('constants.ssh.mux_lock_ttl'))
+                ->block(config('constants.ssh.mux_lock_timeout'), fn () => self::removeMuxFile($server));
+        } catch (LockTimeoutException) {
+            self::removeMuxFile($server);
+        }
+    }
+
+    /** The key has the mode, so a failure of a warn mode scan does not stop an enforce mode scan for its longer retry time. */
     private static function hostKeyScanFailedCacheKey(Server $server): string
     {
-        return 'ssh_host_key_scan_failed_'.$server->uuid;
+        return 'ssh_host_key_scan_failed_'.self::hostKeyCheckingMode($server).'_'.$server->uuid;
     }
 
     private static function hostKeyOptions(Server $server): string
     {
+        self::loadSavedHostKeySettings($server);
         self::learnHostKey($server);
         $mode = self::hostKeyCheckingMode($server);
 
