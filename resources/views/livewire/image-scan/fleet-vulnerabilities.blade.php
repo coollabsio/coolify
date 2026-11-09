@@ -110,6 +110,8 @@
                     @endforeach
                 @endif
             </x-table.filter>
+
+            <x-image-scan.export-menu :count="$shownCount" noun="resource" :with-ids="false" />
         </x-table.toolbar>
 
         <div class="relative">

@@ -6,16 +6,21 @@ use App\Actions\Server\CheckUpdates;
 use App\Jobs\ImageRescanJob;
 use App\Jobs\ScanHostPackagesJob;
 use App\Livewire\Concerns\ManagesServerPackageUpdates;
+use App\Livewire\ImageScan\Vulnerabilities;
 use App\Models\Server;
+use App\Models\ServerHostScan;
 use App\Services\ImageScan\Finding;
+use App\Services\ImageScan\FindingsExport;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Vulnerabilities in the operating system packages of a server (ScanHostPackages).
@@ -173,7 +178,13 @@ class HostVulnerabilities extends Component
         }
     }
 
-    public function render(): View
+    /**
+     * The host scan, the patch check with the kernel that ran during the scan, and the findings: in the running kernel
+     * (active), in other installed kernels, and the ones that the list shows on all pages (search and sort).
+     *
+     * @return array{hostScan: ?ServerHostScan, patchResult: mixed, runningKernel: ?string, active: list<Finding>, otherKernels: list<Finding>, shown: list<Finding>}
+     */
+    private function findingSets(): array
     {
         $hostScan = $this->server->hostScan()->first();
         $patchResult = $this->server->settings->patch_check_result;
@@ -186,15 +197,89 @@ class HostVulnerabilities extends Component
             ->partition(fn ($finding) => CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel))
             ->map(fn ($findings) => $findings->values()->all());
         $hostFindings = $this->showOtherKernels ? [...$activeFindings, ...$otherKernelFindings] : $activeFindings;
-        $installedKernels = collect(data_get($patchResult, 'kernels.installed', []));
-        $runningKernelVersion = data_get($installedKernels->firstWhere('release', $runningKernel), 'version');
         $search = trim($this->search);
         $sortedFindings = $this->sortedFindings($hostFindings);
-        $matchingFindings = $search === '' ? $sortedFindings : array_values(array_filter(
+        $shown = $search === '' ? $sortedFindings : array_values(array_filter(
             $sortedFindings,
             fn ($finding) => str(implode(' ', [$finding->displayId, $finding->id, ...$finding->aliases, $finding->package, $finding->title]))
                 ->contains($search, ignoreCase: true),
         ));
+
+        return [
+            'hostScan' => $hostScan,
+            'patchResult' => $patchResult,
+            'runningKernel' => $runningKernel,
+            'active' => $activeFindings,
+            'otherKernels' => $otherKernelFindings,
+            'shown' => $shown,
+        ];
+    }
+
+    /**
+     * The shown findings as export rows, with the ID that the page shows.
+     *
+     * @return list<array{finding: Finding, state: string, ignore: null, image: string, id: string}>
+     */
+    private function exportRows(): array
+    {
+        $this->authorize('viewSecurity', $this->server);
+
+        return array_map(fn (Finding $finding): array => [
+            'finding' => $finding,
+            'state' => filled($finding->fixedIn) ? 'fixed' : 'no_fix',
+            'ignore' => null,
+            'image' => '',
+            'id' => $finding->displayId !== '' ? $finding->displayId : $finding->id,
+        ], $this->findingSets()['shown']);
+    }
+
+    /**
+     * The shown findings as text for the clipboard: a Markdown table or the IDs.
+     */
+    public function copyList(string $format): string
+    {
+        abort_unless(in_array($format, ['markdown', 'ids'], true), 404);
+        $this->skipRender();
+        $rows = $this->exportRows();
+        if ($format === 'ids') {
+            return FindingsExport::ids($rows);
+        }
+
+        $count = trans_choice('{1} 1 finding|[2,*] :count findings', count($rows), ['count' => number_format(count($rows))]);
+
+        return FindingsExport::markdown("Vulnerabilities of the server {$this->server->name} ({$count})", $rows, false, false);
+    }
+
+    /**
+     * Downloads the shown findings as CSV or JSON.
+     */
+    public function downloadList(string $format): StreamedResponse
+    {
+        abort_unless(in_array($format, ['csv', 'json'], true), 404);
+        $rows = $this->exportRows();
+        $content = $format === 'csv'
+            ? FindingsExport::csv($rows, Vulnerabilities::FIX_STATES)
+            : FindingsExport::json(['type' => 'server', 'name' => (string) $this->server->name, 'uuid' => (string) $this->server->uuid], $rows, Vulnerabilities::FIX_STATES);
+        $name = (Str::slug((string) $this->server->name) ?: 'server').'-host-vulnerabilities-'.now()->toDateString().'.'.$format;
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, $name, ['Content-Type' => $format === 'csv' ? 'text/csv; charset=UTF-8' : 'application/json']);
+    }
+
+    public function render(): View
+    {
+        [
+            'hostScan' => $hostScan,
+            'patchResult' => $patchResult,
+            'runningKernel' => $runningKernel,
+            'active' => $activeFindings,
+            'otherKernels' => $otherKernelFindings,
+            'shown' => $matchingFindings,
+        ] = $this->findingSets();
+        $hostFindings = $this->showOtherKernels ? [...$activeFindings, ...$otherKernelFindings] : $activeFindings;
+        $installedKernels = collect(data_get($patchResult, 'kernels.installed', []));
+        $runningKernelVersion = data_get($installedKernels->firstWhere('release', $runningKernel), 'version');
 
         $this->perPage = max(1, min(100, $this->perPage));
         $lastPage = max(1, (int) ceil(count($matchingFindings) / $this->perPage));
@@ -216,6 +301,7 @@ class HostVulnerabilities extends Component
             'bootKernel' => data_get(CheckUpdates::bootKernel($patchResult), 'release'),
             'hostScan' => $hostScan,
             'hostFindings' => $hostFindings,
+            'shownCount' => count($matchingFindings),
             'shownHostFindings' => new LengthAwarePaginator(
                 collect($matchingFindings)->forPage($page, $this->perPage)->values(),
                 count($matchingFindings),

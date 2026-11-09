@@ -806,3 +806,57 @@ describe('sidebar', function () {
     });
 
 });
+
+describe('export', function () {
+    beforeEach(function () {
+        vulnerabilitiesScan($this->application, [
+            vulnerabilitiesFinding(['id' => 'CVE-2024-0001', 'severity' => 'critical', 'kev' => true]),
+            vulnerabilitiesFinding(['id' => 'CVE-2024-0002', 'package' => 'curl', 'severity' => 'low']),
+            vulnerabilitiesFinding(['id' => 'CVE-2024-0003', 'package' => 'zlib', 'fixedIn' => null, 'fixState' => 'not-fixed']),
+        ]);
+    });
+
+    it('copies the findings of the current tab and filters from all pages', function () {
+        $page = vulnerabilitiesPage($this->admin, $this->application)->set('perPage', 1);
+
+        $markdown = $page->instance()->copyList('markdown');
+        expect($markdown)->toContain('CVE-2024-0001')->toContain('CVE-2024-0002')->not->toContain('CVE-2024-0003')
+            ->toContain('2 findings, Fix available upstream')
+            ->toContain('| [CVE-2024-0001](https://nvd.nist.gov/vuln/detail/CVE-2024-0001) | Critical, known exploited | openssl | 3.0.1 | 3.0.2 |');
+
+        $page->call('toggleSeverity', 'low');
+        expect($page->instance()->copyList('ids'))->toBe("CVE-2024-0002\n");
+
+        $page->call('toggleSeverity', 'low')->call('setFixState', 'no_fix');
+        expect($page->instance()->copyList('ids'))->toBe("CVE-2024-0003\n");
+    });
+
+    it('downloads the shown findings as CSV and JSON', function () {
+        $page = vulnerabilitiesPage($this->admin, $this->application);
+        $name = Str::slug($this->application->name).'-vulnerabilities-'.now()->toDateString();
+
+        $page->call('downloadList', 'csv')->assertFileDownloaded($name.'.csv');
+        $page->call('downloadList', 'json')->assertFileDownloaded($name.'.json');
+
+        $csv = $page->instance()->downloadList('csv');
+        ob_start();
+        $csv->sendContent();
+        $content = (string) ob_get_clean();
+        expect(str_getcsv(explode("\n", $content)[1], escape: ''))->toContain('CVE-2024-0001', 'Critical', 'yes', 'Fix available upstream')
+            ->and($content)->not->toContain('CVE-2024-0003');
+    });
+
+    it('refuses an unknown export format', function () {
+        vulnerabilitiesPage($this->admin, $this->application)->call('copyList', 'html')->assertStatus(404);
+    });
+
+    it('stops exporting when the user loses access to the resource after the page opened', function () {
+        $member = vulnerabilitiesMember($this->team);
+        $page = vulnerabilitiesPage($member, $this->application);
+        $member->teams()->detach($this->team);
+        // A new request loads the user again.
+        $member->unsetRelation('teams');
+
+        $page->call('copyList', 'markdown')->assertStatus(404);
+    });
+});

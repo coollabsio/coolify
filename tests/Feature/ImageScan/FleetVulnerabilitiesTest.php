@@ -213,10 +213,11 @@ describe('page', function () {
 
         $page = fleetPage($this->admin)
             ->assertSee('Update to 1.28.')
-            ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($now).'#security-section"')
-            ->assertDontSeeHtml('<button type="button" class="button');
+            ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($now).'#security-section"');
 
-        expect(substr_count($page->html(), '#security-section'))->toBe(1);
+        // The rows have no buttons; the page-level Export menu is not a row action.
+        expect(str($page->html())->after('class="data-table"')->toString())->not->toContain('<button type="button" class="button')
+            ->and(substr_count($page->html(), '#security-section'))->toBe(1);
     });
 
     it('reads only the stored status, not the findings', function () {
@@ -858,5 +859,50 @@ describe('images of a resource', function () {
 
         expect($entry['images'])->toBe(['update' => 1, 'total' => 2])
             ->and($entry['security']->checkReason)->toBe('images_unchecked');
+    });
+});
+
+describe('export', function () {
+    it('copies the shown resources with their status and action', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+        fleetScan(fleetApplication('ok-app'), 'ok');
+
+        $page = fleetPage($this->admin)->set('perPage', 1);
+        $markdown = $page->instance()->copyList('markdown');
+
+        expect($markdown)->toContain('Security of '.$this->team->name.' (2 resources)')
+            ->toContain('| Resource | Project / Environment | Server | Status | Action |')
+            ->toContain('now-app')->toContain('Update now')->toContain('ok-app');
+
+        $page->call('toggleStatus', 'update_now');
+        expect($page->instance()->copyList('markdown'))->toContain('(1 resource)')->not->toContain('ok-app');
+    });
+
+    it('exports the match of each resource in search mode', function () {
+        fleetScan(fleetApplication('now-app'), 'update_now');
+
+        $page = fleetPage($this->admin)->set('search', 'openssl');
+
+        expect($page->instance()->copyList('markdown'))->toContain('Resources with openssl (1 resource)')
+            ->toContain('| Match | State |')
+            ->toContain('CVE-2024-0001 (High) openssl 3.0.1 | Fix available upstream → 3.0.2 |');
+
+        $page->call('downloadList', 'csv')->assertFileDownloaded(Str::slug($this->team->name).'-security-'.now()->toDateString().'.csv');
+    });
+
+    it('never exports resources of another team', function () {
+        fleetScan(fleetApplication('own-app'), 'update_available');
+        $otherTeam = Team::factory()->create();
+        $otherServer = fleetServer($otherTeam, 'other-server');
+        $otherEnvironment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $otherTeam->id])->id]);
+        fleetScan(fleetApplication('foreign-app', $otherEnvironment, StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail()), 'update_now', ['server' => $otherServer]);
+        $user = fleetMember($this->team);
+        $otherTeam->members()->attach($user->id, ['role' => 'owner']);
+
+        expect(fleetPage($user)->instance()->copyList('markdown'))->toContain('own-app')->not->toContain('foreign-app');
+    });
+
+    it('refuses copying IDs, which a resource list does not have', function () {
+        fleetPage($this->admin)->call('copyList', 'ids')->assertStatus(404);
     });
 });
