@@ -25,6 +25,9 @@ class SshMultiplexingHelper
     /** After a failed scan (server offline), commands and the connection check do not scan again for this time. */
     private const HOST_KEY_SCAN_RETRY_SECONDS = 600;
 
+    /** Enforce mode cannot connect without a pinned key, so it scans again sooner. The scan only reads the key, it trusts nothing more. */
+    private const HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS = 60;
+
     /**
      * The warning that OpenSSH prints at the start of its own stderr when the server sends a host key that is not
      * the pinned key: the banner, the fingerprint, the known_hosts lines, and the "is disabled to avoid
@@ -720,7 +723,7 @@ class SshMultiplexingHelper
 
     /**
      * Pin the host key that the server sends on the first connection (trust on first use).
-     * Nothing scans again within HOST_KEY_SCAN_RETRY_SECONDS of a failed scan. Commands also do not scan a server
+     * Nothing scans again within HOST_KEY_SCAN_RETRY_SECONDS (enforce mode: HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS) of a failed scan. Commands also do not scan a server
      * that is unreachable, so they do not wait for the scan timeout. The connection check passes
      * $evenIfUnreachable, so the server learns its key when it is back. In enforce mode the check then fails with
      * the scan error until the next scan.
@@ -740,7 +743,8 @@ class SshMultiplexingHelper
             }
             $scan = self::readHostKey($server);
             if ($scan['key'] === null) {
-                Cache::put(self::hostKeyScanFailedCacheKey($server), $scan['error'], self::HOST_KEY_SCAN_RETRY_SECONDS);
+                $retrySeconds = self::hostKeyCheckingMode($server) === 'enforce' ? self::HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS : self::HOST_KEY_SCAN_RETRY_SECONDS;
+                Cache::put(self::hostKeyScanFailedCacheKey($server), $scan['error'], $retrySeconds);
 
                 return;
             }
