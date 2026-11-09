@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.2] - 2026-11-09
+
+### Security
+
+- Restricted the `Redeploy` and `Stop` actions of an application destination to the servers that the application runs on
+
+### Changed
+
+- Names in the top breadcrumb, which now link to their page
+  - The section name, such as `Servers`, opens the list page of the section
+  - The project, environment, resource, server, storage, source, destination, and tag names open their own page
+  - The arrow next to a name still opens the switch list
+
+### Fixed
+
+- Closed root account setup window right after a fresh install, so the first account could not be created on the `Register` page
+- Image scans of large images that stopped because the scanner ran out of memory
+  - The scanner frees memory sooner when it gets close to its limit. Set a higher limit with `Scanner memory limit` on the `Vulnerabilities` page of a server, or with `image_scan_memory_mb` in the server image scanning API. The default stays 1 GB
+- Missing scanner disk usage on the `Image Scanning` page of a server and in the `scanner_disk_used_bytes` API field
+  - The `Delete scanner data` button also stays hidden now after the scanner data is deleted
+- The `Nightly` update channel was hard to find, because only the `Channel` list in `Settings` > `Updates` named it ([#12492](https://github.com/coollabsio/coolify/issues/12492))
+  - On the `Stable` channel, `Settings` > `Updates` shows a hint about `Nightly`. The upgrade dialog shows the update channel and links to `Settings` > `Updates`
+
 ## [v4.7.1] - 2026-11-09
 
 ### Added
