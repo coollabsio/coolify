@@ -11,12 +11,15 @@ use App\Models\PersonalAccessToken;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -193,6 +196,74 @@ describe('token scoped to one resource', function () {
         ])->assertForbidden();
 
         expect(Application::withoutGlobalScope(VisibleThroughAccessGrants::class)->where('environment_id', $this->shopProduction->id)->count())->toBe(2);
+    });
+});
+
+describe('server secrets in resource responses', function () {
+    beforeEach(function () {
+        $this->server->settings->forceFill([
+            'sentinel_token' => 'sentinel-token-canary',
+            'logdrain_axiom_api_key' => 'axiom-key-canary',
+        ])->save();
+        $this->server->proxy->last_saved_proxy_configuration = 'proxy-config-canary';
+        $this->server->validation_logs = 'validation-logs-canary';
+        $this->server->save();
+
+        $this->shopService = Service::factory()->create([
+            'environment_id' => $this->shopProduction->id,
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+        ]);
+        $this->shopDatabase = StandalonePostgresql::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'shop-db',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'db',
+            'image' => 'postgres:17',
+            'environment_id' => $this->shopProduction->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->endpoints = [
+            '/api/v1/applications',
+            "/api/v1/applications/{$this->shopApi->uuid}",
+            '/api/v1/services',
+            "/api/v1/services/{$this->shopService->uuid}",
+            '/api/v1/databases',
+            "/api/v1/databases/{$this->shopDatabase->uuid}",
+        ];
+        $this->canaries = ['sentinel-token-canary', 'axiom-key-canary', 'proxy-config-canary', 'validation-logs-canary'];
+    });
+
+    test('a project-scoped token with read:sensitive does not get the secrets of the server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'read:sensitive'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+
+        foreach ($this->endpoints as $endpoint) {
+            $body = scopedTokenTestApi($token, 'GET', $endpoint)->assertOk()->getContent();
+            foreach ($this->canaries as $canary) {
+                expect($body)->not->toContain($canary);
+            }
+        }
+
+        // The secrets of the resources in the scope stay readable.
+        expect(scopedTokenTestApi($token, 'GET', "/api/v1/databases/{$this->shopDatabase->uuid}")->json('postgres_password'))->toBe('password');
+    });
+
+    test('a team-wide token with read:sensitive still gets the secrets of the server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'read:sensitive'], null);
+
+        foreach ($this->endpoints as $endpoint) {
+            $body = scopedTokenTestApi($token, 'GET', $endpoint)->assertOk()->getContent();
+            foreach ($this->canaries as $canary) {
+                expect($body)->toContain($canary);
+            }
+        }
     });
 });
 

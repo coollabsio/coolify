@@ -150,7 +150,9 @@ class ApplicationsController extends Controller
                 'value',
                 'real_value',
             ]);
-            $this->exposeNestedServerSecrets($application);
+            if (canReadServerSecretsFromApi()) {
+                $this->exposeNestedServerSecrets($application);
+            }
         } else {
             $application->makeHidden([
                 'private_key_id',
@@ -272,7 +274,7 @@ class ApplicationsController extends Controller
 
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
-     * relations for callers with the `read:sensitive` or `root` token ability.
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
      * Models hide these by default via $hidden; this re-exposes them per-request.
      */
     private function exposeNestedServerSecrets($model): void
@@ -350,7 +352,7 @@ class ApplicationsController extends Controller
         }
 
         $tagName = $request->query('tag');
-        $applicationRelations = $request->attributes->get('can_read_sensitive', false) === true
+        $applicationRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
