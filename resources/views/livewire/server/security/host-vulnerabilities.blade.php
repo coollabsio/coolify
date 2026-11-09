@@ -108,9 +108,9 @@
                                     @if (($kernelStatusCounts['fixed_after_reboot'] ?? 0) > 0)
                                         The server runs kernel <span class="font-mono">{{ $runningKernel }}</span>, which has {{ $kernelStatusCounts['fixed_after_reboot'] }}
                                         listed {{ Str::plural('vulnerability', $kernelStatusCounts['fixed_after_reboot']) }}. The fixed kernel
-                                        <span class="font-mono">{{ $newestKernel }}</span> is installed. Reboot the server to start it.
-                                    @elseif ($runningKernel && $newestKernel && $newestKernel !== $runningKernel)
-                                        Kernel <span class="font-mono">{{ $newestKernel }}</span> is installed and starts after a reboot. The server now runs
+                                        <span class="font-mono">{{ $bootKernel }}</span> is installed and is the boot kernel. Reboot the server to start it.
+                                    @elseif ($runningKernel && $bootKernel && $bootKernel !== $runningKernel)
+                                        Kernel <span class="font-mono">{{ $bootKernel }}</span> is installed and starts after a reboot. The server now runs
                                         <span class="font-mono">{{ $runningKernel }}</span>. No listed vulnerability needs this reboot.
                                     @else
                                         Some installed updates apply only after a reboot.
@@ -230,7 +230,7 @@
                                         @if ($kernelStatus === 'fixed_after_reboot')
                                             <x-status-badge status="Fix installed, reboot needed" type="warning" />
                                         @elseif ($isOldKernel)
-                                            <x-status-badge status="Old kernel, not running" type="neutral" />
+                                            <x-status-badge status="Kernel not running" type="neutral" />
                                         @elseif ($kernelStatus === 'runs_after_reboot')
                                             <x-status-badge status="Runs after the reboot" type="neutral" />
                                         @endif
@@ -295,9 +295,9 @@
                                         <dt class="text-neutral-500 dark:text-fg-faint">Kernel</dt>
                                         <dd class="min-w-0 break-words">
                                             @if ($kernelStatus === 'fixed_after_reboot')
-                                                The server runs kernel <span class="font-mono">{{ data_get($result, 'kernels.running') }}</span>. A newer kernel with the fix is installed. Reboot the server to use it.
+                                                The server runs kernel <span class="font-mono">{{ $runningKernel }}</span>. The kernel that starts after a reboot has the fix. Reboot the server to use it.
                                             @elseif ($isOldKernel)
-                                                No risk: the server does not run this old kernel (it runs <span class="font-mono">{{ $runningKernel }}</span>). Remove old kernels with the button above.
+                                                No risk now: the server does not run this kernel (it runs <span class="font-mono">{{ $runningKernel }}</span>).
                                             @else
                                                 This kernel is installed, but the server runs it only after a reboot.
                                             @endif

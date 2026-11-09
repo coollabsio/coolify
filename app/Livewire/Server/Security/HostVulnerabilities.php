@@ -177,7 +177,11 @@ class HostVulnerabilities extends Component
     {
         $hostScan = $this->server->hostScan()->first();
         $patchResult = $this->server->settings->patch_check_result;
-        $runningKernel = data_get($patchResult, 'kernels.running');
+        // The kernel that ran during the scan; the patch check can be older, for example from before a reboot.
+        $runningKernel = data_get($hostScan?->summary, 'running_kernel') ?? data_get($patchResult, 'kernels.running');
+        if (is_array($patchResult) && $runningKernel !== null) {
+            data_set($patchResult, 'kernels.running', $runningKernel);
+        }
         [$otherKernelFindings, $activeFindings] = collect($hostScan?->findingList() ?? [])
             ->partition(fn ($finding) => CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel))
             ->map(fn ($findings) => $findings->values()->all());
@@ -209,7 +213,7 @@ class HostVulnerabilities extends Component
             'otherKernelCount' => max(count($otherKernelFindings), (int) data_get($hostScan?->summary, 'other_kernels', 0)),
             'hasOldKernels' => $runningKernelVersion !== null && $installedKernels->contains(fn ($kernel) => version_compare($kernel['version'], $runningKernelVersion, '<')),
             'runningKernel' => $runningKernel,
-            'newestKernel' => collect(data_get($patchResult, 'kernels.installed', []))->pluck('release')->sort(fn ($a, $b) => version_compare($a, $b))->last(),
+            'bootKernel' => data_get(CheckUpdates::bootKernel($patchResult), 'release'),
             'hostScan' => $hostScan,
             'hostFindings' => $hostFindings,
             'shownHostFindings' => new LengthAwarePaginator(

@@ -85,11 +85,16 @@ sh -c 'if [ -f /var/run/reboot-required ]; then echo REBOOT=yes; exit 0; fi; if 
 SH;
 
     /**
-     * Prints the running kernel (`RUNNING|<uname -r>`) and each installed kernel (`KERNEL|<package>|<version>[|<arch>]`),
-     * so the vulnerability list can tell an installed fix that waits for a reboot from an old kernel that does not run.
+     * Prints the running kernel (`RUNNING|<uname -r>`), each installed kernel (`KERNEL|<package>|<version>[|<arch>]`),
+     * and the kernel that boots next (`BOOT|<uname -r>`, or `BOOT|newest`) when the boot loader tells it, so the
+     * vulnerability list can tell an installed fix that waits for a reboot from a kernel that does not run.
+     * The boot kernel comes from `grubby --default-kernel` (RHEL family), else from GRUB_DEFAULT and the saved entry
+     * of GRUB: entry 0 is the newest kernel, a menu title or an entry ID contains the release. Other values print nothing.
+     *
+     * @see https://www.gnu.org/software/grub/manual/grub/html_node/Simple-configuration.html
      */
     public const KERNELS_COMMAND = <<<'SH'
-sh -c 'echo "RUNNING|$(uname -r)"; if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f="\${db:Status-Abbrev}|\${Package}|\${Version}\n" "linux-image-[0-9]*" 2>/dev/null | sed -n "s/^ii *|/KERNEL|/p"; fi; if command -v rpm >/dev/null 2>&1; then rpm -q --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" kernel-core kernel kernel-uek-core 2>/dev/null | grep "^KERNEL|"; fi; exit 0'
+sh -c 'echo "RUNNING|$(uname -r)"; if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f="\${db:Status-Abbrev}|\${Package}|\${Version}\n" "linux-image-[0-9]*" 2>/dev/null | sed -n "s/^ii *|/KERNEL|/p"; fi; if command -v rpm >/dev/null 2>&1; then rpm -q --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" kernel-core kernel kernel-uek-core 2>/dev/null | grep "^KERNEL|"; fi; if command -v grubby >/dev/null 2>&1; then b=$(grubby --default-kernel 2>/dev/null); case "$b" in */vmlinuz-*) echo "BOOT|${b##*/vmlinuz-}";; esac; elif [ -f /etc/default/grub ]; then d=$(cat /etc/default/grub /etc/default/grub.d/*.cfg 2>/dev/null | sed -n "s/^[[:space:]]*GRUB_DEFAULT=//p" | tail -n 1 | tr -d "\042\047"); if [ "$d" = saved ]; then d=$(grub-editenv list 2>/dev/null | sed -n "s/^saved_entry=//p"); fi; case "$d" in ""|0) echo "BOOT|newest";; *) r=$(printf "%s\n" "$d" | sed -n -e "s/.*with Linux \([^ ]*\).*/\1/p" -e "s/.*gnulinux-\([0-9][^>]*\)-\(advanced\|recovery\)-.*/\1/p" | head -n 1); if [ -n "$r" ]; then echo "BOOT|$r"; fi;; esac; fi; exit 0'
 SH;
 
     /**
@@ -299,8 +304,9 @@ SH;
 
     /**
      * Updates of a saved check result that fix a vulnerable package: its own update, or for a kernel package that
-     * has the version in its name (Debian, Ubuntu: linux-modules-6.8.0-139-generic) all kernel updates, because the
-     * fixed kernel comes as a new package of the kernel meta packages. Empty on systems that only do full upgrades.
+     * has the version in its name (Debian, Ubuntu: linux-modules-6.8.0-139-generic) the kernel updates of the same
+     * flavor, because the fixed kernel comes as a new package of the kernel meta packages. Empty on systems that only
+     * do full upgrades.
      *
      * @param  array<string, mixed>|null  $patchResult
      * @return list<array<string, mixed>>
@@ -316,11 +322,31 @@ SH;
         if ($ownUpdate !== null) {
             return [$ownUpdate];
         }
-        if (self::riskFor($packageManager, $package) !== 'kernel') {
+        $flavor = self::kernelFlavor($package);
+        if ($flavor === null || self::riskFor($packageManager, $package) !== 'kernel') {
             return [];
         }
 
-        return $updates->filter(fn ($update) => data_get($update, 'risk') === 'kernel')->values()->all();
+        return $updates
+            ->filter(fn ($update) => data_get($update, 'risk') === 'kernel' && self::kernelFlavor((string) data_get($update, 'package')) === $flavor)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Flavor of a Debian or Ubuntu kernel package, so that an update of another flavor (linux-aws for a generic
+     * kernel) is not offered as the fix: the suffix after the version (linux-modules-6.8.0-139-generic: generic),
+     * or the meta package name without the part and the HWE/LTS suffix (linux-image-generic-hwe-24.04: generic).
+     * Ubuntu's virtual meta packages install the generic kernel. Null when the name has no flavor.
+     */
+    private static function kernelFlavor(string $package): ?string
+    {
+        if (preg_match('/^linux-.*?-\d+\.\d+\.\d+[^-]*(?:-\d+)?-([a-z].*)$/', $package, $matches) === 1
+            || preg_match('/^linux-(?:(?:signed-|unsigned-)?image-|headers-|modules-(?:extra-)?|tools-)?([a-z][a-z0-9-]*?)(?:-(?:hwe|lts)-[\d.]+(?:-edge)?)?$/', $package, $matches) === 1) {
+            return $matches[1] === 'virtual' ? 'generic' : $matches[1];
+        }
+
+        return null;
     }
 
     /**
@@ -368,16 +394,19 @@ SH;
 
     /**
      * @param  string  $output  Output of KERNELS_COMMAND.
-     * @return array{running: string, installed: list<array{package: string, version: string, release: string}>}|null
+     * @return array{running: string, boot: ?string, installed: list<array{package: string, version: string, release: string}>}|null
      */
     public function parseKernels(string $output): ?array
     {
         $running = null;
+        $boot = null;
         $installed = [];
         foreach (preg_split('/\R/', $output) as $line) {
             $parts = explode('|', trim($line));
             if ($parts[0] === 'RUNNING' && filled($parts[1] ?? null)) {
                 $running = $parts[1];
+            } elseif ($parts[0] === 'BOOT' && filled($parts[1] ?? null)) {
+                $boot = $parts[1];
             } elseif ($parts[0] === 'KERNEL' && filled($parts[1] ?? null) && filled($parts[2] ?? null)) {
                 $installed[] = [
                     'package' => $parts[1],
@@ -388,14 +417,33 @@ SH;
             }
         }
 
-        return $running === null ? null : ['running' => $running, 'installed' => $installed];
+        if ($boot === 'newest') {
+            $boot = collect($installed)->reduce(fn (?array $carry, array $kernel) => $carry === null || self::versionAtLeast($kernel['version'], $carry['version']) ? $kernel : $carry)['release'] ?? null;
+        }
+
+        return $running === null ? null : ['running' => $running, 'boot' => $boot, 'installed' => $installed];
+    }
+
+    /**
+     * The installed kernel that the boot loader starts at the next reboot, or null when the last patch check
+     * could not tell.
+     *
+     * @param  array<string, mixed>|null  $patchResult
+     * @return array{package: string, version: string, release: string}|null
+     */
+    public static function bootKernel(?array $patchResult): ?array
+    {
+        $boot = data_get($patchResult, 'kernels.boot');
+
+        return is_string($boot) ? collect(data_get($patchResult, 'kernels.installed', []))->firstWhere('release', $boot) : null;
     }
 
     /**
      * Kernel state of a vulnerable package, from the kernels of the last patch check:
-     * - fixed_after_reboot: the package belongs to the running kernel, and an installed newer kernel has the fix.
-     * - runs_after_reboot: the package belongs to an installed kernel that is newer than the running one.
-     * Other kernels that the server does not run: see isOtherKernelPackage().
+     * - fixed_after_reboot: the package belongs to the running kernel, and the kernel that boots next has the fix.
+     * - runs_after_reboot: the package belongs to the kernel that boots next, which is not the running one.
+     * Both need the boot kernel (bootKernel()); without it, there is no claim. Other kernels that the server does
+     * not run: see isOtherKernelPackage().
      *
      * @param  array<string, mixed>|null  $patchResult
      * @return 'fixed_after_reboot'|'runs_after_reboot'|null
@@ -412,15 +460,15 @@ SH;
         if ($kernel === null || $runningKernel === null) {
             return null;
         }
-        if ($kernel['release'] !== $running) {
-            return self::versionAtLeast($kernel['version'], $runningKernel['version']) ? 'runs_after_reboot' : null;
+        $bootKernel = self::bootKernel($patchResult);
+        if ($bootKernel === null || $bootKernel['release'] === $running) {
+            return null;
         }
-        $newest = $installed->reduce(fn (?array $carry, array $kernel) => $carry === null || self::versionAtLeast($kernel['version'], $carry['version']) ? $kernel : $carry);
-        if ($fixedIn !== null && $newest['release'] !== $running && self::versionAtLeast($newest['version'], $fixedIn)) {
-            return 'fixed_after_reboot';
+        if ($kernel['release'] !== $running) {
+            return $kernel['release'] === $bootKernel['release'] ? 'runs_after_reboot' : null;
         }
 
-        return null;
+        return $fixedIn !== null && self::versionAtLeast($bootKernel['version'], $fixedIn) ? 'fixed_after_reboot' : null;
     }
 
     /**
@@ -438,8 +486,25 @@ SH;
                 && $packageKernel[1] !== $runningKernel[1];
         }
 
-        return str_starts_with($package, 'kernel')
-            && self::withoutEpoch($version) !== (string) preg_replace('/\.[^.]+$/', '', $runningRelease);
+        if (! self::isRpmKernelPackage($package)) {
+            return false;
+        }
+        $version = self::withoutEpoch($version);
+        // SUSE: uname -r 6.4.0-150600.23.17-default for kernel-default 6.4.0-150600.23.17.1 (the last number is the rebuild).
+        if (preg_match('/^(.+)-[a-z][a-z0-9_]*$/', $runningRelease, $suseRelease) === 1) {
+            return (string) preg_replace('/\.\d+$/', '', $version) !== $suseRelease[1];
+        }
+
+        return $version !== (string) preg_replace('/\.[^.]+$/', '', $runningRelease);
+    }
+
+    /**
+     * Packages of a bootable RPM kernel (dnf, zypper). Userspace packages such as kernel-tools or kernel-headers have
+     * their own version and are not part of a kernel.
+     */
+    private static function isRpmKernelPackage(string $package): bool
+    {
+        return self::riskFor('dnf', $package) === 'kernel' || self::riskFor('zypper', $package) === 'kernel';
     }
 
     /**
