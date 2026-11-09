@@ -154,7 +154,7 @@ class ServerImageScanning extends Component
         $state = Cache::get(PrepareImageScannerJob::stateCacheKey($this->server));
         $builtAt = Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server));
         $failedStep = Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server));
-        $diskUsed = Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server));
+        $diskUsed = PrepareImageScannerJob::diskUsedBytes($this->server);
 
         return view('livewire.image-scan.server-image-scanning', [
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
@@ -169,7 +169,7 @@ class ServerImageScanning extends Component
                 ->map(fn (array $image) => ImageRef::parse($image['repo'])->registry)
                 ->unique()
                 ->implode(', '),
-            'diskUsed' => is_int($diskUsed) ? formatBytes($diskUsed, 1) : null,
+            'diskUsed' => $diskUsed !== null ? formatBytes($diskUsed, 1) : null,
             // Hide the delete action only when the server is known to be empty. Missing cache data can still mean data on disk.
             'hasScannerData' => is_string($state) || $diskUsed !== 0,
             'toolVersions' => collect(['syft' => 'Syft', 'grype' => 'Grype', 'regctl' => 'regctl'])

@@ -27,7 +27,6 @@ class ServerImageScanningController extends Controller
         $state = Cache::get(PrepareImageScannerJob::stateCacheKey($server));
         $failedStep = Cache::get(PrepareImageScannerJob::failedStepCacheKey($server));
         $builtAt = Cache::get(PrepareImageScannerJob::builtAtCacheKey($server));
-        $diskUsed = Cache::get(PrepareImageScannerJob::diskUsedCacheKey($server));
 
         return [
             'is_image_scan_enabled' => (bool) $server->settings->is_image_scan_enabled,
@@ -35,7 +34,7 @@ class ServerImageScanningController extends Controller
             'scanner_state' => is_string($state) ? $state : null,
             'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
             'scanner_built_at' => is_string($builtAt) ? CarbonImmutable::parse($builtAt)->toIso8601String() : null,
-            'scanner_disk_used_bytes' => is_int($diskUsed) ? $diskUsed : null,
+            'scanner_disk_used_bytes' => PrepareImageScannerJob::diskUsedBytes($server),
         ];
     }
 

@@ -86,6 +86,16 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         return self::stateCacheKey($server).':disk-used';
     }
 
+    /**
+     * The Redis store returns numbers as strings, so the cached value is not always an int.
+     */
+    public static function diskUsedBytes(Server $server): ?int
+    {
+        $bytes = Cache::get(self::diskUsedCacheKey($server));
+
+        return is_numeric($bytes) ? (int) $bytes : null;
+    }
+
     public static function failedStepCacheKey(Server $server): string
     {
         return self::stateCacheKey($server).':failed-step';

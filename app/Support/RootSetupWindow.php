@@ -28,11 +28,14 @@ class RootSetupWindow
         Cache::forever(self::CACHE_KEY, now()->addMinutes(self::MINUTES)->getTimestamp());
     }
 
+    /**
+     * The Redis store returns numbers as strings, so the value is not always an int.
+     */
     public static function isOpen(): bool
     {
         $closesAt = Cache::get(self::CACHE_KEY);
 
-        return is_int($closesAt) && now()->getTimestamp() < $closesAt;
+        return is_numeric($closesAt) && now()->getTimestamp() < (int) $closesAt;
     }
 
     public static function isPending(): bool
