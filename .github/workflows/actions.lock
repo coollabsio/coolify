@@ -16,23 +16,23 @@ workflows:
     '.github/workflows/main.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
-        - 'docker/login-action@v4.7.0'
+        - 'docker/login-action@v4.8.0'
     '.github/workflows/merge-forward.yaml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/nightly.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
-        - 'docker/login-action@v4.7.0'
+        - 'docker/login-action@v4.8.0'
     '.github/workflows/pr-quality.yaml':
         - 'peakoss/anti-slop@v0.3.0'
     '.github/workflows/pull-request.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
-        - 'docker/login-action@v4.7.0'
+        - 'docker/login-action@v4.8.0'
     '.github/workflows/release.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
-        - 'docker/login-action@v4.7.0'
+        - 'docker/login-action@v4.8.0'
     '.github/workflows/request-docs-update.yaml': []
     '.github/workflows/stale.yaml':
         - 'actions/stale@v11.0.0'
@@ -70,9 +70,9 @@ dependencies:
         commit: 'sha1-c3c9e263c25d99ce0380d002d59b67737d91b0dc'
         owner_id: 5429470
         repo_id: 241092383
-    'docker/login-action@v4.7.0':
-        ref: 'v4.7.0'
-        commit: 'sha1-81c6f93d4bc991e510b342a00b419b3bb4efc5c6'
+    'docker/login-action@v4.8.0':
+        ref: 'v4.8.0'
+        commit: 'sha1-8aa5831fb8d48d8f76594c7ddde61ae58019f550'
         owner_id: 5429470
         repo_id: 287743349
     'docker/setup-buildx-action@v4.4.1':
