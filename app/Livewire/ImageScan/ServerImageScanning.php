@@ -100,7 +100,7 @@ class ServerImageScanning extends Component
         try {
             SetServerImageScanning::ensureManagedHere($this->server);
             if (! ScanImage::acquireServerLock($lock, $this->server, 0)) {
-                $this->dispatch('error', message: 'A scan is running on this server. Try again when it is complete.');
+                $this->dispatch('error', message: 'A scan or a scanner update is running on this server. Try again when it is complete.');
 
                 return;
             }

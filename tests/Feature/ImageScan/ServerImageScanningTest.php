@@ -288,7 +288,8 @@ describe('prepare image scanner job', function () {
         (new PrepareImageScannerJob($this->server))->handle();
 
         expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('ready')
-            ->and(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBe('2026-10-25T08:15:00Z');
+            ->and(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBe('2026-10-25T08:15:00Z')
+            ->and(ScanImage::serverLock($this->server)->get())->toBeTrue();
         Event::assertDispatched(ImageScanUpdated::class, 3);
         Event::assertDispatched(ImageScanUpdated::class, fn ($event) => $event->resourceUuid === $this->server->uuid && $event->scanUuid === 'prepare' && $event->teamId === $this->team->id);
     });
@@ -301,7 +302,7 @@ describe('prepare image scanner job', function () {
         expect(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1234);
     });
 
-    it('updates the database under the scan lock and runs again later when it is busy', function () {
+    it('prepares the scanner under the scan lock and runs again later when it is busy', function () {
         fakeScannerPreparation();
         $lock = ScanImage::serverLock($this->server);
         $lock->get();
@@ -314,8 +315,8 @@ describe('prepare image scanner job', function () {
         $job->handle();
         $lock->release();
 
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
-        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('updating_database');
+        Process::assertNothingRan();
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('pulling');
     });
 
     it('is unique per server', function () {
