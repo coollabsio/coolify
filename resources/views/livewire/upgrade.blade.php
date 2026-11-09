@@ -54,6 +54,15 @@
                                     {{ $currentVersion }} <span class="mx-0.5">&rarr;</span>
                                     {{ $latestVersion }}
                                 </p>
+                                <p class="mt-0.5 text-[12px] leading-4"
+                                    style="color: var(--coollabs-subtle)">
+                                    {{ $updateChannel === 'custom' ? 'Custom image' : ucfirst($updateChannel) . ' channel' }}
+                                    <span class="mx-0.5">&middot;</span>
+                                    <a href="{{ route('settings.updates') }}" {{ wireNavigate() }}
+                                        @click="modalOpen=false"
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light">Change
+                                        channel</a>
+                                </p>
                             </div>
                             <button type="button" x-show="!showProgress || upgradeError"
                                 @click="upgradeError ? closeErrorModal() : modalOpen=false"

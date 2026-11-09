@@ -22,6 +22,8 @@ class Upgrade extends Component
 
     public bool $fullButton = false;
 
+    public string $updateChannel = 'stable';
+
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
@@ -43,6 +45,8 @@ class Upgrade extends Component
         $this->currentVersion = config('constants.coolify.version');
         $this->latestVersion = get_latest_version_of_coolify();
         $this->devMode = isDev();
+        $settings = InstanceSettings::find(0);
+        $this->updateChannel = (string) data_get($settings, 'update_channel', 'stable');
 
         if ($this->devMode) {
             $this->isUpgradeAvailable = true;
@@ -50,7 +54,6 @@ class Upgrade extends Component
             return;
         }
 
-        $settings = InstanceSettings::find(0);
         if (data_get($settings, 'update_channel') === 'custom') {
             $this->latestVersion = (string) $settings->update_custom_tag;
             $this->isUpgradeAvailable = $this->fullButton && $this->latestVersion !== '';
