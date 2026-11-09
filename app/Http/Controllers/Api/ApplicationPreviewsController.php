@@ -106,7 +106,7 @@ class ApplicationPreviewsController extends Controller
 
     #[OA\Post(
         summary: 'Create Preview Deployment',
-        description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview or changing its pull request URL, git type, or docker tag also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.',
+        description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview, changing its pull request URL, git type, or docker tag, or choosing a commit also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.',
         path: '/applications/{uuid}/previews',
         operationId: 'create-preview-deployment-by-application-uuid',
         security: [['bearerAuth' => []]],
@@ -120,7 +120,7 @@ class ApplicationPreviewsController extends Controller
                 new OA\Property(property: 'pull_request_id', type: 'integer', minimum: 1, maximum: 2147483647, example: 42),
                 new OA\Property(property: 'pull_request_html_url', type: 'string', nullable: true, example: 'https://github.com/org/repo/pull/42'),
                 new OA\Property(property: 'git_type', type: 'string', nullable: true, enum: self::GIT_TYPES, description: 'Git provider that hosts the pull request. Sets the ref Coolify fetches (pull/{id}/head or merge-requests/{id}/head).'),
-                new OA\Property(property: 'commit', type: 'string', nullable: true, description: 'Commit SHA to deploy. Required for Bitbucket.'),
+                new OA\Property(property: 'commit', type: 'string', nullable: true, description: 'Commit SHA to deploy. Required for a new Bitbucket preview. Needs the write permission.'),
                 new OA\Property(property: 'docker_tag', type: 'string', nullable: true, description: 'Docker image tag. Docker Image applications only.'),
                 new OA\Property(property: 'force', type: 'boolean', default: false, description: 'Rebuild without cache.'),
                 new OA\Property(property: 'instant_deploy', type: 'boolean', default: true, description: 'Queue a deployment. Set to false to only create the preview, for example to set its domains first.'),
@@ -230,11 +230,12 @@ class ApplicationPreviewsController extends Controller
         $changesPreview = ! $preview
             || ($pullRequestHtmlUrl !== null && $pullRequestHtmlUrl !== $preview->pull_request_html_url)
             || ($request->input('git_type') !== null && $request->input('git_type') !== $preview->git_type)
-            || ($dockerTag !== null && $dockerTag !== $preview->docker_registry_image_tag);
+            || ($dockerTag !== null && $dockerTag !== $preview->docker_registry_image_tag)
+            || $request->filled('commit');
         if ($changesPreview) {
             if (! $request->user()->tokenCan('write') && ! $request->user()->tokenCan('root')) {
                 return response()->json([
-                    'message' => 'Missing required permissions: write. Opening a preview or changing its pull request URL, git type, or docker tag needs the write permission. The deploy permission only redeploys an existing preview.',
+                    'message' => 'Missing required permissions: write. Opening a preview, changing its pull request URL, git type, or docker tag, or choosing a commit needs the write permission. The deploy permission only redeploys an existing preview.',
                 ], 403);
             }
             $this->authorize('update', $application);

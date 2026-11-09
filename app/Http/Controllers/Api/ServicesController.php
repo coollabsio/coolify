@@ -72,7 +72,9 @@ class ServicesController extends Controller
                 'value',
                 'real_value',
             ]);
-            $this->exposeNestedServerSecrets($service);
+            if (canReadServerSecretsFromApi()) {
+                $this->exposeNestedServerSecrets($service);
+            }
         }
 
         if ($service->is_shown_once ?? false) {
@@ -84,7 +86,7 @@ class ServicesController extends Controller
 
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
-     * relations for callers with the `read:sensitive` or `root` token ability.
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
      * Handles both single models and Eloquent Collections (the listing endpoint
      * passes a Collection of Services per project to removeSensitiveData()).
      */
@@ -270,7 +272,7 @@ class ServicesController extends Controller
         }
         $projects = Project::where('team_id', $teamId)->get();
         $services = collect();
-        $serviceRelations = $request->attributes->get('can_read_sensitive', false) === true
+        $serviceRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
@@ -886,7 +888,7 @@ class ServicesController extends Controller
         $this->authorize('view', $service);
 
         $serviceRelations = ['applications', 'databases'];
-        if ($request->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadServerSecretsFromApi()) {
             $serviceRelations[] = 'destination.server.settings';
         }
 

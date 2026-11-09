@@ -718,6 +718,7 @@ describe('POST /api/v1/applications/{uuid}/previews', function () {
     })->with([
         'git type' => [['git_type' => 'gitlab']],
         'pull request url' => [['pull_request_html_url' => 'https://github.com/other/repo/pull/42']],
+        'commit' => [['commit' => 'abcdef1234567']],
     ]);
 
     test('a deploy-only token can redeploy an existing preview without changes', function () {

@@ -79,15 +79,25 @@ class StopService
 
     private function stopContainersInParallel(array $containersToStop, Server $server): void
     {
-        $timeout = count($containersToStop) > 5 ? 10 : 30;
-        $commands = [];
-        $containerList = implode(' ', array_map('escapeshellarg', $containersToStop));
-        $commands[] = dockerStopCommand($timeout, $containerList, $server);
-        $commands[] = "docker rm -f $containerList";
         instant_remote_process(
-            command: $commands,
+            command: self::stopContainersCommands($containersToStop, $server),
             server: $server,
             throwError: false
         );
+    }
+
+    /**
+     * @param  list<string>  $containersToStop
+     * @return list<string>
+     */
+    public static function stopContainersCommands(array $containersToStop, Server $server): array
+    {
+        $timeout = count($containersToStop) > 5 ? 10 : 30;
+        $containerList = implode(' ', array_map('escapeshellarg', $containersToStop));
+
+        return [
+            dockerStopCommand($timeout, $containerList, $server),
+            "docker rm -f $containerList",
+        ];
     }
 }

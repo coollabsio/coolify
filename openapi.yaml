@@ -42,7 +42,7 @@ paths:
       tags:
         - Applications
       summary: 'Create Preview Deployment'
-      description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview or changing its pull request URL, git type, or docker tag also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.'
+      description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview, changing its pull request URL, git type, or docker tag, or choosing a commit also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.'
       operationId: create-preview-deployment-by-application-uuid
       parameters:
         -
@@ -73,7 +73,7 @@ paths:
                   type: [string, 'null']
                   enum: [github, gitlab, gitea, bitbucket]
                 commit:
-                  description: 'Commit SHA to deploy. Required for Bitbucket.'
+                  description: 'Commit SHA to deploy. Required for a new Bitbucket preview. Needs the write permission.'
                   type: [string, 'null']
                 docker_tag:
                   description: 'Docker image tag. Docker Image applications only.'
