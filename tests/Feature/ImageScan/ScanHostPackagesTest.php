@@ -48,16 +48,22 @@ function hostScanTestFake(array $overrides = []): void
     $payload = file_get_contents(base_path('tests/Fixtures/image-scan/grype-host.ndjson'));
     $outputs = array_merge([
         'db-status' => "coolify-scan-exit db-status 0 180\ncoolify-scan-payload\n".json_encode(['built' => now()->subDay()->format('Y-m-d\TH:i:s\Z'), 'valid' => true]),
+        'packages-size' => '204800',
+        'disk' => '107374182400 107374182400',
         'sbom' => "coolify-scan-exit copy 0\ncoolify-scan-exit sbom 0",
         'grype' => 'coolify-scan-exit grype 0 '.strlen($payload)."\ncoolify-scan-payload\n{$payload}",
+        'containers' => '',
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
         $script = remoteProcessScript($process);
         $key = match (true) {
             str_contains($script, 'coolify-scan-exit db-status') => 'db-status',
+            str_contains($script, 'du -skLc') => 'packages-size',
+            str_contains($script, 'df -P') => 'disk',
             str_contains($script, 'dir:/in/host') => 'sbom',
             str_contains($script, 'coolify-scan-exit grype') => 'grype',
+            str_contains($script, 'coolify-scan-exit containers') => 'containers',
             default => null,
         };
 
@@ -74,7 +80,7 @@ it('saves the relevant host findings, exploited and fixable ones first', functio
     expect($scan->error_code)->toBeNull()
         ->and($scan->scanned_at)->not->toBeNull()
         ->and($scan->findings_truncated)->toBeFalse()
-        ->and($scan->summary)->toBe(['critical' => 2, 'high' => 1, 'medium' => 0, 'low' => 1, 'unknown' => 0, 'fixable' => 2, 'exploited' => 2, 'likely' => 1, 'total' => 5])
+        ->and($scan->summary)->toBe(['critical' => 2, 'high' => 1, 'medium' => 0, 'low' => 1, 'unknown' => 0, 'fixable' => 2, 'exploited' => 2, 'likely' => 1, 'other_kernels' => 0, 'total' => 5])
         ->and(array_map(fn ($finding) => [$finding->displayId, $finding->package, $finding->fixedIn], $scan->findingList()))->toBe([
             ['CVE-2026-111497', 'libbrotli-dev', '1.1.0-2+deb13u1'],
             ['CVE-2023-5217', 'firefox-esr', null],
@@ -96,6 +102,47 @@ it('keeps the last findings and saves the error when the server has no package d
         ->and($scan->scanned_at->equalTo($previous->scanned_at))->toBeTrue();
 });
 
+it('keeps the last findings when a package database copy fails', function () {
+    $previous = ServerHostScan::factory()->create(['server_id' => $this->server->id, 'findings' => [['id' => 'CVE-2024-0001', 'package' => 'curl']]]);
+    hostScanTestFake(['sbom' => "coolify-scan-exit copy 2\ncoolify-scan-exit sbom 0"]);
+
+    ScanHostPackages::run($this->server);
+
+    $scan = $previous->fresh();
+    expect($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
+        ->and($scan->findings)->toBe([['id' => 'CVE-2024-0001', 'package' => 'curl']])
+        ->and($scan->scanned_at->equalTo($previous->scanned_at))->toBeTrue();
+    Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit grype'));
+});
+
+it('saves the database age when the vulnerability database is too old and clears it after a later scan', function () {
+    hostScanTestFake(['db-status' => "coolify-scan-exit db-status 0 180\ncoolify-scan-payload\n".json_encode(['built' => now()->subDays(9)->format('Y-m-d\TH:i:s\Z'), 'valid' => true])]);
+
+    ScanHostPackages::run($this->server);
+
+    $scan = $this->server->hostScan()->first();
+    expect($scan->error_code)->toBe(ImageScanErrorCode::DbTooOld)
+        ->and($scan->error_context)->toBe(['n' => 9])
+        ->and($scan->error_code->message($scan->error_context))->toStartWith('The vulnerability database is 9 days old.');
+
+    hostScanTestFake();
+    ScanHostPackages::run($this->server);
+
+    expect($scan->fresh())->error_code->toBeNull()->error_context->toBeNull();
+});
+
+it('does not copy the package databases when the disk has not enough free space', function () {
+    $previous = ServerHostScan::factory()->create(['server_id' => $this->server->id, 'findings' => [['id' => 'CVE-2024-0001', 'package' => 'curl']]]);
+    hostScanTestFake(['packages-size' => '512000', 'disk' => '107374182400 1500000000']);
+
+    expect(ScanHostPackages::run($this->server))->toBeTrue();
+
+    $scan = $previous->fresh();
+    expect($scan->error_code)->toBe(ImageScanErrorCode::DiskSpace)
+        ->and($scan->findings)->toBe([['id' => 'CVE-2024-0001', 'package' => 'curl']]);
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'dir:/in/host'));
+});
+
 it('returns false without scanning when another scan holds the server lock', function () {
     hostScanTestFake();
     $lock = ScanImage::serverLock($this->server);
@@ -111,6 +158,32 @@ it('returns false without scanning when another scan holds the server lock', fun
     Process::assertNothingRan();
 });
 
+it('retries a busy host scan and records lock_busy after the last try', function () {
+    hostScanTestFake();
+    $lock = ScanImage::serverLock($this->server);
+    $lock->get();
+    Cache::put(ScanHostPackagesJob::runningCacheKey($this->server), true);
+
+    try {
+        $job = (new ScanHostPackagesJob($this->server))->withFakeQueueInteractions();
+        $job->handle();
+        $job->assertReleased(300);
+        expect($this->server->hostScan()->exists())->toBeFalse()
+            ->and(Cache::has(ScanHostPackagesJob::runningCacheKey($this->server)))->toBeTrue();
+
+        $lastTry = (new ScanHostPackagesJob($this->server))->withFakeQueueInteractions();
+        $lastTry->job->attempts = $lastTry->tries;
+        $lastTry->handle();
+        $lastTry->assertNotReleased();
+    } finally {
+        $lock->release();
+    }
+
+    expect($this->server->hostScan()->first()->error_code)->toBe(ImageScanErrorCode::LockBusy)
+        ->and(Cache::has(ScanHostPackagesJob::runningCacheKey($this->server)))->toBeFalse();
+    Process::assertNothingRan();
+});
+
 it('does not scan a server with image scanning off', function () {
     hostScanTestFake();
     $this->server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly();
@@ -121,12 +194,23 @@ it('does not scan a server with image scanning off', function () {
     Process::assertNothingRan();
 });
 
-it('queues a host scan after the daily rescan', function () {
+it('queues a host scan after a daily rescan that cannot list the containers', function () {
     Queue::fake([ScanHostPackagesJob::class]);
     hostScanTestFake();
 
     (new ImageRescanJob($this->server))->handle();
 
+    expect(ImageRescanJob::failedDays($this->server))->toBe(1);
+    Queue::assertPushed(ScanHostPackagesJob::class, fn ($job) => $job->server->is($this->server));
+});
+
+it('queues a host scan after a completed daily rescan', function () {
+    Queue::fake([ScanHostPackagesJob::class]);
+    hostScanTestFake(['containers' => "coolify-scan-exit containers 0\ncoolify-scan-payload\n"]);
+
+    (new ImageRescanJob($this->server))->handle();
+
+    expect(ImageRescanJob::failedDays($this->server))->toBe(0);
     Queue::assertPushed(ScanHostPackagesJob::class, fn ($job) => $job->server->is($this->server));
 });
 

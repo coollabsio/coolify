@@ -44,6 +44,9 @@ class Patches extends Component
 
     public string $autoSecurityUpdatesTime = '03:00';
 
+    /** Package names are short, so a longer search can match nothing. */
+    private const SEARCH_MAX_LENGTH = 100;
+
     public int $perPage = 10;
 
     public string $search = '';
@@ -53,6 +56,7 @@ class Patches extends Component
 
     public function updatedSearch(): void
     {
+        $this->search = mb_substr($this->search, 0, self::SEARCH_MAX_LENGTH);
         $this->resetPage();
     }
 

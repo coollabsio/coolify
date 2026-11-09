@@ -2,6 +2,7 @@
 
 use App\Models\Server;
 use App\Services\ImageScan\ScannerCommands;
+use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -524,6 +525,54 @@ it('keeps the volume setup as one sudo shell line for a non-root SSH user', func
     expect($parsed)->toBe(['sudo '.$setup]);
 });
 
+it('keeps a fixed host match when an unfixed match of another package has the same vulnerability and version', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+    preg_match("/\| (grep -v -F .*?) > '/", $script, $filter);
+    $lines = [
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-headers","ver":"6.1"}',
+        '{"fix":"fixed","fixv":["6.2"],"id":"CVE-1","pkg":"linux-libc-dev","ver":"6.1"}',
+        '{"fix":"wont-fix","fixv":[],"id":"CVE-2","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.0"}',
+    ];
+
+    $result = Process::input(implode("\n", $lines)."\n")->run(['sh', '-c', $filter[1]]);
+
+    expect($result->successful())->toBeTrue()
+        ->and(explode("\n", trim($result->output())))->toBe([$lines[0], $lines[2], $lines[4]]);
+});
+
+it('runs the host grype step and prints the exit code of the run, or of the filter when the run succeeded', function (int $grypeExit, bool $writeFails, string $marker, array $kept) {
+    $dir = sys_get_temp_dir().'/coolify-scan-test-'.bin2hex(random_bytes(4));
+    mkdir($dir);
+    $lines = [
+        '{"eol":null}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-headers","ver":"6.1"}',
+        '{"fix":"wont-fix","fixv":[],"id":"CVE-2","pkg":"linux-image","ver":"6.1"}',
+    ];
+    file_put_contents("{$dir}/fixture", implode("\n", $lines)."\n");
+    file_put_contents("{$dir}/grype", "#!/bin/sh\ncat '{$dir}/fixture'\nexit {$grypeExit}\n");
+    chmod("{$dir}/grype", 0755);
+    if ($writeFails) {
+        mkdir("{$dir}/out");
+    }
+    $step = collect(scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit grype'));
+    $script = str_replace('/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID, $dir, preg_replace('/timeout -k 10 \d+ docker run .*? 2>\/dev\/null; echo \$\? > /', "{$dir}/grype 2>/dev/null; echo \$? > ", $step, 1, $replaced));
+
+    $result = Process::run(['sh', '-c', $script]);
+    $output = is_file("{$dir}/out") ? file_get_contents("{$dir}/out") : '';
+    Process::run(['rm', '-rf', $dir]);
+
+    expect($replaced)->toBe(1)
+        ->and(trim($result->output()))->toMatch($marker)
+        ->and($output === '' ? [] : explode("\n", trim($output)))->toBe(array_map(fn (int $index) => $lines[$index], $kept));
+})->with([
+    'run and write succeed' => [0, false, '/coolify-scan-exit grype 0 88$/', [0, 1]],
+    'run fails' => [2, false, '/coolify-scan-exit grype 2 88$/', [0, 1]],
+    'write fails' => [0, true, '/coolify-scan-exit grype [1-9]\\d* 0$/', []],
+]);
+
 it('copies only the package databases of the host and scans the copy with the OS catalogers', function () {
     $script = implode("\n", scannerUnwrapped($this->commands->sbomFromHost()));
 
@@ -534,6 +583,8 @@ it('copies only the package databases of the host and scans the copy with the OS
         ->toContain('type=bind,src=/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/in,dst=/in,readonly')
         ->toContain("mv -f '/data/coolify/image-scans/sboms/host.json.tmp-".SCANNER_TEST_RUN_ID."' '/data/coolify/image-scans/sboms/host.json'")
         ->toContain("echo 'coolify-scan-exit copy 1'")
+        ->toContain("echo 'coolify-scan-exit copy 2'")
+        ->not->toContain('|| true; fi')
         ->not->toContain('src=/,');
 });
 

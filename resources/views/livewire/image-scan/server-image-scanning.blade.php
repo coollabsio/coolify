@@ -46,7 +46,8 @@
                                     {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
                                 </x-forms.button>
                             @endif
-                            @if ($enabled && $hasScannerData)
+                            {{-- Disabling forgets the cached state, but the files stay on the server. --}}
+                            @if (! $enabled || $hasScannerData)
                                 <x-modal-confirmation title="Delete scanner data?" buttonTitle="Delete scanner data"
                                     isErrorButton submitAction="deleteScannerData" temporaryDisableTwoStepConfirmation
                                     :confirmWithText="false" :confirmWithPassword="false" :actions="[

@@ -251,9 +251,23 @@ class ScannerCommands
     }
 
     /**
+     * Prints the size of the host package databases that `sbomFromHost()` copies, in KiB (`du -k`: BusyBox has no `-b`).
+     * Missing paths are skipped.
+     *
+     * @return list<string>
+     */
+    public function hostPackagesSize(): array
+    {
+        $paths = implode(' ', array_map(escapeshellarg(...), self::HOST_PACKAGE_PATHS));
+
+        return ["du -skLc {$paths} 2>/dev/null | tail -n 1 | awk '{print \$1}'"];
+    }
+
+    /**
      * Writes the SBOM of the OS packages of the server to `sboms/host.json`. Only the package databases are copied
      * (`cp -RL`, so the copy has no links), then Syft reads the copy without network with the OS package catalogers.
-     * Prints `coolify-scan-exit copy {code}` (1 when no package database was found) and the `sbom` marker.
+     * Prints `coolify-scan-exit copy {code}` (1 when no package database was found, 2 when a copy failed, so a partial
+     * database never reads as a complete scan) and the `sbom` marker.
      *
      * @return list<string>
      */
@@ -265,10 +279,10 @@ class ScannerCommands
             $target = escapeshellarg($host.$path);
             $skipLink = $path === '/var/lib/rpm' ? " && [ ! -L {$source} ]" : '';
 
-            return "if [ -e {$source} ]{$skipLink}; then mkdir -p \"\$(dirname {$target})\" && cp -RL {$source} {$target} 2>/dev/null || true; fi";
+            return "if [ -e {$source} ]{$skipLink}; then mkdir -p \"\$(dirname {$target})\" && cp -RL {$source} {$target} 2>/dev/null || failed=1; fi";
         }, self::HOST_PACKAGE_PATHS);
         $found = implode(' ', array_map(fn (string $path) => escapeshellarg($host.$path), self::HOST_PACKAGE_DATABASES));
-        $copied = "found=0; for p in {$found}; do if [ -e \"\$p\" ]; then found=1; fi; done; if [ \$found -eq 1 ]; then echo '".self::MARKER." copy 0'; else echo '".self::MARKER." copy 1'; fi";
+        $copied = "found=0; for p in {$found}; do if [ -e \"\$p\" ]; then found=1; fi; done; if [ \$failed -eq 1 ]; then echo '".self::MARKER." copy 2'; elif [ \$found -eq 1 ]; then echo '".self::MARKER." copy 0'; else echo '".self::MARKER." copy 1'; fi";
 
         return [
             $this->removeContainer(),
@@ -276,7 +290,7 @@ class ScannerCommands
             ...$this->sbomDirectory(),
             'rm -f '.escapeshellarg($this->sbomTmpPath(self::HOST_SBOM)).' || true',
             'mkdir -p -m 0700 '.escapeshellarg($host).' '.escapeshellarg($this->workDir().'/scratch'),
-            $this->shell(implode('; ', [...$copies, $copied])),
+            $this->shell(implode('; ', ['failed=0', ...$copies, $copied])),
             ...$this->ownWorkDir(),
             $this->writeSbom(self::HOST_SBOM, $this->dockerRun('syft', self::TIMEOUT_SBOM, false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'dir:/in/host', '--override-default-catalogers', self::HOST_CATALOGERS, '-o', 'syft-json', '-q'])),
             ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath(self::HOST_SBOM)).' || true']),
@@ -588,13 +602,16 @@ class ScannerCommands
      * Runs a tool whose stdout is the payload: stdout goes to a root-owned file in the work directory
      * (not mounted into the container), then at most 10485761 bytes of it are printed.
      *
-     * With $hostFilter the output keeps one line per vulnerability ID and package version (the binary packages of one
-     * kernel repeat the same thousands of problems; each installed kernel keeps its own line, so a problem of the running
-     * kernel is not hidden behind the same problem of an old one) and drops the problems that the distribution will not fix, before the size is
+     * With $hostFilter the output keeps one line per vulnerability ID, package version, fix state, and fix versions (the
+     * binary packages of one kernel repeat the same thousands of problems; each installed kernel keeps its own line, so a
+     * problem of the running kernel is not hidden behind the same problem of an old one, and a fixed match is never
+     * hidden behind an unfixed match of another package) and drops the problems that the distribution will not fix, before the size is
      * counted. Grype's own `--ignore-states` needs more than the memory limit. In the JSON lines a quote inside a value
      * is escaped, so the `"id":"…"` and `"fix":"wont-fix"` matches only find keys. The filter runs in the pipe, before
      * the file limit, because the raw output of a host can be larger than the limit (57 MB on CentOS Stream 9); the exit
-     * code of the run goes through `out.rc`, as `sh` has no `pipefail`.
+     * code of the run goes through `out.rc`, as `sh` has no `pipefail`. When the run succeeded, the exit code of `awk` is
+     * the exit code of the step, so a write failure (a full disk) fails the scan instead of storing a short report; a stop
+     * at the file limit still reads as cut output.
      *
      * @param  array<string, mixed>|null  $auth
      * @return list<string>
@@ -603,7 +620,7 @@ class ScannerCommands
     {
         $out = escapeshellarg($this->workDir().'/out');
         $run = $hostFilter
-            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{ if (match(\$0, /\"id\":\"[^\"]*\"/)) { k = substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"ver\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (seen[k]++) next } print }' > {$out}; rc=\$(cat {$out}.rc 2>/dev/null || echo 1)"
+            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{ if (match(\$0, /\"id\":\"[^\"]*\"/)) { k = substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"ver\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"fix\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"fixv\":\[[^]]*\]/)) k = k substr(\$0, RSTART, RLENGTH); if (seen[k]++) next } print }' > {$out}; frc=\$?; rc=\$(cat {$out}.rc 2>/dev/null || echo 1); if [ \"\$rc\" -eq 0 ]; then rc=\$frc; fi"
             : "{$dockerRun} > {$out} 2>/dev/null; rc=\$?";
         $commands = [...$this->start($template === null ? ['scratch'] : ['scratch', 'tpl'])];
         if ($template !== null) {

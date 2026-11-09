@@ -31,7 +31,7 @@ enum ImageScanErrorCode: string
         $n = (string) ($context['n'] ?? '?');
 
         return match ($this) {
-            self::DiskSpace => "Not enough disk space on {$server}: {$n} GB needed.",
+            self::DiskSpace => isset($context['n']) ? "Not enough disk space on {$server}: {$n} GB needed." : "Not enough disk space on {$server}.",
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
             self::Timeout => 'The scan took too long and was stopped.',

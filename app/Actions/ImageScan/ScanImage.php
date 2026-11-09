@@ -530,7 +530,8 @@ class ScanImage
 
     /**
      * `docker save` and the SBOM need image size × 2 + 1 GiB on the Docker root and on the scan directory.
-     * Candidate scans from a registry use the same rule (Syft writes the layers to the scratch directory).
+     * Candidate scans from a registry use the same rule (Syft writes the layers to the scratch directory), and host scans
+     * use it with the size of the copied package databases.
      *
      * @throws ScanFailed
      */

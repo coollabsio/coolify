@@ -3,11 +3,12 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\ScanHostPackages;
+use App\Enums\ImageScanErrorCode;
 use App\Events\ServerPatchCheckFinished;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,10 +16,13 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Scans the OS packages of a server. A busy image scan lock runs the job again later. When it ends, the patches page
- * reloads through `ServerPatchCheckFinished`.
+ * Scans the OS packages of a server. A busy image scan lock runs the job again later; after the last try it records
+ * `LockBusy`. When it ends, the patches page reloads through `ServerPatchCheckFinished`.
+ *
+ * The unique lock ends when the job starts, so a scan requested during a running scan (for example, after a package
+ * update) is queued and runs after it, instead of being dropped.
  */
-class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
+class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -64,10 +68,13 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQu
             return;
         }
 
-        if (! ScanHostPackages::run($server) && $this->attempts() < $this->tries) {
-            $this->release(self::RETRY_DELAY_SECONDS);
+        if (! ScanHostPackages::run($server)) {
+            if ($this->attempts() < $this->tries) {
+                $this->release(self::RETRY_DELAY_SECONDS);
 
-            return;
+                return;
+            }
+            ScanHostPackages::recordFailure($server, ImageScanErrorCode::LockBusy);
         }
 
         Cache::forget(self::runningCacheKey($server));

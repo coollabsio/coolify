@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('server_id')->unique()->constrained()->cascadeOnDelete();
             $table->string('error_code')->nullable();
+            $table->jsonb('error_context')->nullable();
             $table->jsonb('eol')->nullable();
             $table->jsonb('summary')->nullable();
             $table->jsonb('findings')->nullable();

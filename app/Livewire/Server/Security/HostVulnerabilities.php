@@ -101,7 +101,7 @@ class HostVulnerabilities extends Component
         $this->resetPage();
     }
 
-    public function getListeners()
+    public function getListeners(): array
     {
         return $this->teamChannelListeners([
             'ServerPatchCheckFinished' => 'scanFinished',
@@ -130,7 +130,7 @@ class HostVulnerabilities extends Component
         $this->loadResult();
     }
 
-    public function scanHostPackages()
+    public function scanHostPackages(): mixed
     {
         try {
             $this->authorize('update', $this->server);
@@ -140,10 +140,12 @@ class HostVulnerabilities extends Component
             if (! ImageRescanJob::canRunOn($this->server)) {
                 $this->dispatch('error', message: 'Turn on image scanning for this server first.');
 
-                return;
+                return null;
             }
             ScanHostPackagesJob::dispatchManual($this->server);
             $this->hostScanRunning = true;
+
+            return null;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -152,7 +154,7 @@ class HostVulnerabilities extends Component
     /**
      * Updates the package of a host finding with the updates that the last patch check found for it.
      */
-    public function updateVulnerablePackage(string $package)
+    public function updateVulnerablePackage(string $package): mixed
     {
         try {
             $this->authorize('update', $this->server);
@@ -161,9 +163,11 @@ class HostVulnerabilities extends Component
             if (! $isFinding || $packages === []) {
                 $this->dispatch('error', message: 'This package has no update in the last check. Run "Check for updates" on the Patching page.');
 
-                return;
+                return null;
             }
             $this->runUpdate(packages: $packages);
+
+            return null;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

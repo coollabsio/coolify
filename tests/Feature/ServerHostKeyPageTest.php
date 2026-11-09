@@ -95,15 +95,12 @@ it('enables the host key check again', function () {
 
 it('enforces the host key check on one server from the dropdown and stops enforcing it again', function () {
     config(['constants.ssh.host_key_checking' => 'warn']);
-    $this->server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
 
     Livewire::test(HostKey::class, ['server_uuid' => $this->server->uuid])
         ->call('setHostKeyCheckMode', 'enforce')
         ->assertReturned(true);
 
-    expect($this->server->settings->fresh())
-        ->is_ssh_host_key_check_enforced->toBeTrue()
-        ->is_ssh_host_key_check_disabled->toBeFalse();
+    expect($this->server->settings->fresh()->is_ssh_host_key_check_enforced)->toBeTrue();
     expect(SshMultiplexingHelper::hostKeyCheckingMode($this->server->fresh()))->toBe('enforce');
     expect(AuditEvent::query()->where('event', 'ui.server.ssh_host_key.check_enforced')->exists())->toBeTrue();
 
@@ -112,6 +109,19 @@ it('enforces the host key check on one server from the dropdown and stops enforc
         ->assertReturned(true);
 
     expect(SshMultiplexingHelper::hostKeyCheckingMode($this->server->fresh()))->toBe('warn');
+});
+
+it('does not turn a disabled host key check back on from a stale dropdown', function () {
+    config(['constants.ssh.host_key_checking' => 'warn']);
+    $component = Livewire::test(HostKey::class, ['server_uuid' => $this->server->uuid]);
+    $this->server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
+
+    $component->call('setHostKeyCheckMode', 'enforce');
+
+    expect($this->server->settings->fresh())
+        ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->is_ssh_host_key_check_enforced->toBeFalse();
+    expect(AuditEvent::query()->where('event', 'ui.server.ssh_host_key.check_enforced')->exists())->toBeFalse();
 });
 
 it('ignores a host key check mode that the dropdown does not offer', function () {

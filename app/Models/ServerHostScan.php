@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * The last scan of the OS packages of a server, one row per server. A failed scan sets `error_code` and keeps the
- * findings of the last completed scan (`scanned_at`).
+ * findings of the last completed scan (`scanned_at`). `error_context` holds the values of the error message.
  *
  * @property ?array{critical: int, high: int, medium: int, low: int, unknown: int, fixable: int, exploited: int, likely: int, other_kernels?: int, total: int} $summary
  */
@@ -24,6 +24,7 @@ class ServerHostScan extends Model
     protected $fillable = [
         'server_id',
         'error_code',
+        'error_context',
         'eol',
         'summary',
         'findings',
@@ -36,6 +37,7 @@ class ServerHostScan extends Model
     {
         return [
             'error_code' => ImageScanErrorCode::class,
+            'error_context' => 'array',
             'eol' => 'array',
             'summary' => 'array',
             'findings' => 'array',

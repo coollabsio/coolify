@@ -244,7 +244,7 @@
                 </x-slot:badges>
                 <x-slot:actions>
                     <div class="w-56">
-                        <x-table.search placeholder="Search packages" loading-target="search"
+                        <x-table.search placeholder="Search packages" loading-target="search" maxlength="100"
                             wire:model.live.debounce.300ms="search" />
                     </div>
                     @can('update', $server)

@@ -53,9 +53,13 @@ class ScanHostPackages
         try {
             $databaseBuiltAt = ScanImage::databaseBuiltAt($commands);
 
+            $packagesKiB = (int) trim((string) instant_remote_process($commands->hostPackagesSize(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT));
+            ScanImage::checkDiskSpace($commands, $packagesKiB * 1024);
+
             $sbom = ScanImage::runStep($server, $commands->sbomFromHost(), 'sbom', self::TIMEOUT_SBOM);
-            if (($sbom['exit_codes']['copy'] ?? 1) !== 0) {
-                throw new ScanFailed(ImageScanErrorCode::NoPackageDatabase);
+            $copy = $sbom['exit_codes']['copy'] ?? 2;
+            if ($copy !== 0) {
+                throw new ScanFailed($copy === 1 ? ImageScanErrorCode::NoPackageDatabase : ImageScanErrorCode::Unknown);
             }
             ScanImage::assertSucceeded($sbom, 'sbom');
 
@@ -65,10 +69,10 @@ class ScanHostPackages
             $runningKernel = trim((string) instant_remote_process(['uname -r'], $server, throwError: false, timeout: self::TIMEOUT_DEFAULT));
             $this->complete($server, $grype, $databaseBuiltAt, $runningKernel);
         } catch (ScanFailed $e) {
-            $this->fail($server, $e->errorCode);
+            self::recordFailure($server, $e->errorCode, $e->context);
         } catch (Throwable $e) {
             report($e);
-            $this->fail($server, ImageScanErrorCode::Unknown);
+            self::recordFailure($server, ImageScanErrorCode::Unknown);
         } finally {
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
             $lock->release();
@@ -109,6 +113,7 @@ class ScanHostPackages
 
         ServerHostScan::query()->updateOrCreate(['server_id' => $server->id], [
             'error_code' => null,
+            'error_context' => null,
             'eol' => $report['eol'],
             'summary' => $summary,
             'findings' => array_map(fn (Finding $finding): array => $finding->toArray(), array_slice($relevant, 0, ServerHostScan::MAX_STORED_FINDINGS)),
@@ -135,9 +140,11 @@ class ScanHostPackages
 
     /**
      * Keeps the findings of the last completed scan.
+     *
+     * @param  array<string, int|string>  $context  The values of the error message.
      */
-    private function fail(Server $server, ImageScanErrorCode $code): void
+    public static function recordFailure(Server $server, ImageScanErrorCode $code, array $context = []): void
     {
-        ServerHostScan::query()->updateOrCreate(['server_id' => $server->id], ['error_code' => $code]);
+        ServerHostScan::query()->updateOrCreate(['server_id' => $server->id], ['error_code' => $code, 'error_context' => $context ?: null]);
     }
 }

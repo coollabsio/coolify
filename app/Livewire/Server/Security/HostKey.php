@@ -78,6 +78,7 @@ class HostKey extends Component
     /**
      * Refuses a changed host key on this server ("enforce"), also when the instance only warns, or follows the instance
      * again ("warn"). Saved at once from the dropdown, without a password: warn still reports a changed key.
+     * Refused while the check is disabled, so that a page open in another tab cannot turn the check back on without a password.
      */
     public function setHostKeyCheckMode(string $mode): bool|string|Event
     {
@@ -86,10 +87,12 @@ class HostKey extends Component
         }
         $enforced = $mode === 'enforce';
 
-        return $this->changeHostKey(null, $enforced ? 'check_enforced' : 'check_not_enforced', fn (ServerSetting $settings) => $settings->forceFill([
-            'is_ssh_host_key_check_enforced' => $enforced,
-            'is_ssh_host_key_check_disabled' => $enforced ? false : $settings->is_ssh_host_key_check_disabled,
-        ]), confirmPassword: false);
+        return $this->changeHostKey(null, $enforced ? 'check_enforced' : 'check_not_enforced', function (ServerSetting $settings) use ($enforced) {
+            if ($settings->is_ssh_host_key_check_disabled) {
+                throw new \RuntimeException('The host key check is disabled for this server. Reload the page and enable the check first.');
+            }
+            $settings->forceFill(['is_ssh_host_key_check_enforced' => $enforced]);
+        }, confirmPassword: false);
     }
 
     /**
