@@ -66,14 +66,12 @@ class InviteLink extends Component
         $this->generateInviteLink(sendEmail: false);
     }
 
+    /**
+     * Build the link from the instance URL, not from the request host, which a client can set.
+     */
     private function invitationUrl(string $routeName, array $parameters): string
     {
-        $fqdn = instanceSettings()->fqdn;
-        if (filled($fqdn)) {
-            return rtrim($fqdn, '/').route($routeName, $parameters, false);
-        }
-
-        return route($routeName, $parameters);
+        return rtrim(base_url(), '/').route($routeName, $parameters, false);
     }
 
     private function generateInviteLink(bool $sendEmail = false)
