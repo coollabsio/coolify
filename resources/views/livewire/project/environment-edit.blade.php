@@ -8,6 +8,12 @@
                     Environment settings in {{ $project->name }}
                 </p>
             </div>
+            <div class="flex w-fit shrink-0 items-center gap-2">
+                <a class="button whitespace-nowrap" {{ wireNavigate() }}
+                    href="{{ route('project.environment.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
+                    coolify.json
+                </a>
+            </div>
             @can('createAnyResource')
                 <div class="flex w-fit shrink-0 items-center gap-2">
                     <a class="button whitespace-nowrap" {{ wireNavigate() }}

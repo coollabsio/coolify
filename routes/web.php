@@ -63,6 +63,7 @@ use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
 use App\Livewire\Project\EnvironmentCanvas;
+use App\Livewire\Project\EnvironmentConfiguration;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\ProjectCanvas;
@@ -420,6 +421,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
+        Route::get('/configuration', EnvironmentConfiguration::class)->name('project.environment.configuration');
         Route::get('/canvas', EnvironmentCanvas::class)->name('project.environment.canvas');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {

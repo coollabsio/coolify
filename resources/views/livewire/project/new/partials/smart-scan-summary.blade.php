@@ -71,3 +71,34 @@
         @endif
     </div>
 </div>
+
+@if ($detectedConfigFile || $configPlan || $configPlanError)
+    <div class="mt-3 overflow-hidden rounded-[10px] border border-neutral-200 dark:border-white/[0.08]">
+        <div class="flex min-h-10 items-center justify-between gap-3 border-b border-neutral-200 py-1.5 pr-1.5 pl-4 dark:border-white/[0.08]">
+            <p class="text-[13px] font-medium">coolify.json found</p>
+            <x-forms.button type="button" wire:click="previewConfigFile">Show plan</x-forms.button>
+        </div>
+        <div class="flex flex-col gap-3 p-4 text-[13px]">
+            <p class="text-neutral-500 dark:text-fg-dim">
+                Let the file manage this environment instead of the settings below. Coolify creates and updates every resource that the file describes.
+            </p>
+            @if ($configPlanError)
+                <p class="text-red-500">{{ $configPlanError }}</p>
+            @endif
+            @if ($configPlan)
+                @foreach ($configPlan['errors'] ?? [] as $error)
+                    <p class="text-red-500"><code>{{ $error['path'] }}</code>: {{ $error['message'] }}</p>
+                @endforeach
+                @include('livewire.project.partials.config-plan-changes', ['changes' => $configPlan['changes'] ?? []])
+                <x-callout type="warning" title="Who can change this environment">
+                    Anyone who can push to {{ $configPlan['link']['branch'] }} of {{ $configPlan['link']['repository'] }} can change these resources and use the team's shared variables.
+                </x-callout>
+                @if (empty($configPlan['errors']))
+                    <div>
+                        <x-forms.button type="button" isHighlighted wire:click="useConfigFile">Use coolify.json</x-forms.button>
+                    </div>
+                @endif
+            @endif
+        </div>
+    </div>
+@endif

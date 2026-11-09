@@ -3,13 +3,23 @@
 namespace App\Traits;
 
 use App\Data\RepositoryDetectionResult;
+use App\Jobs\PlanEnvironmentConfigJob;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
+use App\Models\Environment;
+use App\Models\EnvironmentConfigLink;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Rules\ValidGitBranch;
+use App\Services\ProjectConfig\ApplyContext;
+use App\Services\ProjectConfig\ConfigException;
+use App\Services\ProjectConfig\ConfigLinks;
+use App\Services\ProjectConfig\ConfigPlanner;
+use App\Services\ProjectConfig\ConfigRevisions;
+use App\Services\ProjectConfig\RepositoryFileReader;
 use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Log;
@@ -63,6 +73,18 @@ trait HasRepositoryDetection
     public bool $envImported = false;
 
     /**
+     * Path of a coolify.json file that the scan found, relative to the scanned directory.
+     */
+    #[Locked]
+    public ?string $detectedConfigFile = null;
+
+    #[Locked]
+    public ?array $configPlan = null;
+
+    #[Locked]
+    public ?string $configPlanError = null;
+
+    /**
      * Unsaved application with the repository, branch, and Git source or deploy key to scan.
      */
     abstract protected function applicationForDetection(): Application;
@@ -106,6 +128,113 @@ trait HasRepositoryDetection
             $this->dispatch('error', 'Smart Scan could not read the repository. Check the repository access and the branch.');
         }
         $this->detectionRan = true;
+    }
+
+    /**
+     * Reads the found coolify.json and shows its plan for this environment. Nothing is saved.
+     */
+    public function previewConfigFile(): void
+    {
+        $this->authorize('create', Application::class);
+        $this->configPlan = null;
+        $this->configPlanError = null;
+        try {
+            $data = $this->configLinkData();
+            $environment = $this->detectionEnvironment();
+            $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
+                ?? throw new \RuntimeException('Destination not found.');
+            $link = new EnvironmentConfigLink([
+                'environment_id' => $environment->id,
+                'mode' => EnvironmentConfigLink::MODE_GIT,
+                'repository' => $data['repository'],
+                'branch' => $data['branch'],
+                'file_path' => $data['file_path'],
+            ]);
+            $application = $this->applicationForDetection();
+            $link->forceFill(['private_key_id' => $application->private_key_id]);
+            $source = $application->getRelation('source');
+            if ($source !== null && ! ($source instanceof GithubApp && (int) $source->id === 0)) {
+                $link->forceFill(['source_type' => $source::class, 'source_id' => $source->id]);
+                $link->setRelation('source', $source);
+            }
+            $link->setRelation('environment', $environment);
+            $link->setRelation('readServer', $destination->server);
+
+            $file = app(RepositoryFileReader::class)->read($link);
+            if ($file->missing) {
+                throw new \RuntimeException('coolify.json was not found on this branch.');
+            }
+            $resolved = app(ConfigRevisions::class)->resolve($link, (string) $file->contents);
+            $this->configPlan = app(ConfigPlanner::class)->plan($resolved, ApplyContext::for($link, auth()->user()))->toArray()
+                + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]];
+        } catch (ConfigException $e) {
+            $this->configPlanError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->configPlanError = $e instanceof \RuntimeException ? $e->getMessage() : 'Coolify could not read coolify.json.';
+        }
+    }
+
+    /**
+     * Links this environment to coolify.json on the branch. Only a team admin can do this.
+     */
+    public function useConfigFile(): void
+    {
+        try {
+            $environment = $this->detectionEnvironment();
+            $teamId = (int) $environment->project->team_id;
+            abort_unless(auth()->user()->isAdminOfTeam($teamId), 403, 'Only a team admin can link coolify.json.');
+            $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
+                ?? throw new \RuntimeException('Destination not found.');
+
+            $link = app(ConfigLinks::class)->create(auth()->user(), $teamId, $this->configLinkData() + [
+                'project' => $environment->project->name,
+                'environment' => $environment->name,
+                'mode' => EnvironmentConfigLink::MODE_GIT,
+                'read_server_uuid' => $destination->server->uuid,
+            ]);
+            PlanEnvironmentConfigJob::dispatch($link, 'link');
+
+            $this->redirectRoute('project.environment.configuration', [
+                'project_uuid' => $environment->project->uuid,
+                'environment_uuid' => $environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Repository, branch, and git source of the form, in the shape of a link request.
+     *
+     * @return array{repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string}
+     */
+    private function configLinkData(): array
+    {
+        $application = $this->applicationForDetection();
+        $source = $application->getRelation('source');
+        [$type, $uuid] = match (true) {
+            $application->private_key_id !== null => ['deploy_key', PrivateKey::query()->find($application->private_key_id)?->uuid],
+            $source instanceof GitlabApp => throw new \RuntimeException('GitLab app sources cannot be linked to coolify.json yet. Use a deploy key.'),
+            $source instanceof GiteaApp => ['gitea_app', $source->uuid],
+            $source instanceof GithubApp && (int) $source->id !== 0 => ['github_app', $source->uuid],
+            default => ['public', null],
+        };
+        $directory = trim((string) ($this->base_directory ?? '/'), '/');
+
+        return [
+            'repository' => (string) $application->git_repository,
+            'branch' => (string) $application->git_branch,
+            'file_path' => ltrim(($directory === '' ? '' : $directory.'/').($this->detectedConfigFile ?? 'coolify.json'), '/'),
+            'source_type' => $type,
+            'source_uuid' => $uuid,
+        ];
+    }
+
+    private function detectionEnvironment(): Environment
+    {
+        $project = Project::ownedByCurrentTeam()->where('uuid', data_get($this->parameters, 'project_uuid'))->firstOrFail();
+
+        return $project->environments()->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail();
     }
 
     /**
@@ -156,6 +285,9 @@ trait HasRepositoryDetection
 
     protected function applyDetectionResult(RepositoryDetectionResult $result): void
     {
+        $this->detectedConfigFile = $result->configFile;
+        $this->configPlan = null;
+        $this->configPlanError = null;
         $this->detectedDockerfiles = $result->dockerfiles;
         $this->detectedDockerComposeFiles = $result->dockerComposeFiles;
         $this->dockerfilePorts = $result->dockerfilePorts;
