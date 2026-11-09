@@ -1,0 +1,5008 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://coolify.io/schemas/coolify.v1.json",
+    "title": "coolify.json",
+    "type": "object",
+    "required": [
+        "version",
+        "resources",
+        "environments"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+        "^x-": true
+    },
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "version": {
+            "const": 1
+        },
+        "minimum_coolify_version": {
+            "type": "string"
+        },
+        "project": {
+            "type": "string"
+        },
+        "resources": {
+            "type": "object",
+            "propertyNames": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+            },
+            "additionalProperties": {
+                "$ref": "#/$defs/resource"
+            }
+        },
+        "environments": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+                "type": "object",
+                "required": [
+                    "branch"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": true
+                },
+                "properties": {
+                    "branch": {
+                        "type": "string"
+                    },
+                    "resources": {
+                        "type": "object",
+                        "propertyNames": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                        }
+                    },
+                    "import": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "to",
+                                "uuid"
+                            ],
+                            "properties": {
+                                "to": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                                },
+                                "uuid": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "moved": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                    },
+                    "to": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                    }
+                }
+            }
+        },
+        "unmanage": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+            }
+        }
+    },
+    "$defs": {
+        "env": {
+            "type": "object",
+            "propertyNames": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "additionalProperties": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "required": {
+                                "const": true
+                            },
+                            "generate": {
+                                "enum": [
+                                    "password",
+                                    "base64",
+                                    "uuid"
+                                ]
+                            },
+                            "ref": {
+                                "type": "string"
+                            },
+                            "length": {
+                                "type": "integer",
+                                "minimum": 8,
+                                "maximum": 256
+                            },
+                            "rotation": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "buildtime": {
+                                "type": "boolean"
+                            },
+                            "runtime": {
+                                "type": "boolean"
+                            },
+                            "literal": {
+                                "type": "boolean"
+                            },
+                            "multiline": {
+                                "type": "boolean"
+                            },
+                            "preview": {
+                                "type": "object"
+                            }
+                        },
+                        "oneOf": [
+                            {
+                                "required": [
+                                    "value"
+                                ]
+                            },
+                            {
+                                "required": [
+                                    "required"
+                                ]
+                            },
+                            {
+                                "required": [
+                                    "generate"
+                                ]
+                            },
+                            {
+                                "required": [
+                                    "ref"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "null"
+                    }
+                ]
+            }
+        },
+        "application": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "additional_servers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "server"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "server": {
+                                "type": "string"
+                            },
+                            "destination": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "basic_auth": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "username": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "hash_algorithm": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "bcrypt_cost": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "argon2id_memory_cost": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "argon2id_time_cost": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "build": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "pack": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "static_image": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "install_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "build_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "start_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "base_directory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "publish_directory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "dockerfile": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "dockerfile_location": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "dockerfile_target": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "nginx_configuration": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "watch_paths": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "compose_location": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "compose_start_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "compose_build_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "compose": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "domains": {
+                            "type": "object"
+                        },
+                        "image_overrides": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "deployment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "pre_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "pre_command_container": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "post_command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "post_command_container": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "domain_port_overrides": {
+                    "type": "object"
+                },
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "type": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "command": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "path": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "host": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "method": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "return_code": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "scheme": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "response_text": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "name": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "tag": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "labels": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "maintenance": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "page": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "aliases": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "noindex_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "exposes": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "preview": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "url_template": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "redirect": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "restart": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "max_count": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "scheduled_tasks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "command",
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "command": {
+                                "type": "string"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "container": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "use_shell": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "is_static": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_git_submodules_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_git_lfs_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_auto_deploy_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_force_https_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_debug_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_preview_deployments_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_gpu_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_swarm_only_worker_nodes": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_raw_compose_deployment_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_build_server_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_consistent_container_name_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_gzip_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_stripprefix_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "connect_to_docker_network": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_container_label_escape_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_env_sorting_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_container_label_readonly_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_preserve_repository_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "disable_build_cache": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_spa": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_git_shallow_clone_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_pr_deployments_public_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "use_build_secrets": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "inject_build_args_to_dockerfile": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_source_commit_in_build": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_permanent_redirect_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_image_scan_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_auto_cancel_queued_deployments_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_auto_cancel_building_deployments_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_network_hosts_in_build": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "image_builds_by_team": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "gpu_driver": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "gpu_count": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "gpu_device_ids": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "gpu_options": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "custom_internal_name": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "docker_images_to_keep": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "stop_grace_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "custom_container_name_prefix": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "traefik_certificate_resolver": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "rolling_update_drain_seconds": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "repository": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "branch": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "commit": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "https_username": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "ssh_known_hosts": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "github_app": {
+                            "type": "string"
+                        },
+                        "gitlab_app": {
+                            "type": "string"
+                        },
+                        "gitea_app": {
+                            "type": "string"
+                        },
+                        "deploy_key": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "swarm": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "replicas": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "placement_constraints": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "application"
+                }
+            }
+        },
+        "service": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "compose": {
+                    "type": "string"
+                },
+                "connect_to_docker_network": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "maintenance": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "page": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scheduled_tasks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "command",
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "command": {
+                                "type": "string"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "container": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "use_shell": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "custom_type": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "domain_port_overrides": {
+                                "type": "object"
+                            },
+                            "domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "exclude_from_status": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "human_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_force_https_enabled": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_gzip_enabled": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_include_timestamps": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_log_drain_enabled": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_permanent_redirect_enabled": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_public": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "is_stripprefix_enabled": {
+                                "type": [
+                                    "boolean",
+                                    "null"
+                                ]
+                            },
+                            "max_restart_count": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "noindex_domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "public_port": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "public_port_timeout": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "redirect": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "traefik_certificate_resolver": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "is_container_label_escape_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "template": {
+                    "type": "string"
+                },
+                "type": {
+                    "const": "service"
+                }
+            }
+        },
+        "postgresql": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "initdb_args": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "host_auth_method": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "user": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "database": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "init_scripts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "mode": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "postgresql"
+                }
+            }
+        },
+        "mysql": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "user": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "database": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "mode": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "mysql"
+                }
+            }
+        },
+        "mariadb": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "user": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "database": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "mariadb"
+                }
+            }
+        },
+        "mongodb": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "user": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "database": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "mode": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "mongodb"
+                }
+            }
+        },
+        "redis": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "redis"
+                }
+            }
+        },
+        "keydb": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "keydb"
+                }
+            }
+        },
+        "dragonfly": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "ssl": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "dragonfly"
+                }
+            }
+        },
+        "clickhouse": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "credentials": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "user": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "database": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mappings": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "port": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "port_timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "clickhouse"
+                }
+            }
+        },
+        "sqlite": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "backups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "databases": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "description": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "dump_all": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "missing_backup_notification_days": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "s3_storage": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "databases": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "docker_run_options": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "env": {
+                    "$ref": "#/$defs/env"
+                },
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "content": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "is_directory": {
+                                "type": "boolean"
+                            },
+                            "is_host_file": {
+                                "type": "boolean"
+                            },
+                            "chown": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "chmod": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "health_check": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "interval": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "timeout": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "retries": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "start_period": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "image": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "limits": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "memory": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swap": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "memory_swappiness": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        },
+                        "memory_reservation": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpus": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpuset": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "cpu_shares": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "secret_manager": {
+                    "type": "object",
+                    "required": [
+                        "token"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                        "token": {
+                            "type": "string"
+                        },
+                        "settings": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "redact_all_env_values_in_logs": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "include_coolify_default_variables": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_log_drain_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_include_timestamps": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        }
+                    }
+                },
+                "storages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "mount"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "mount": {
+                                "type": "string"
+                            },
+                            "host_path": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "preview_suffix": {
+                                "type": "boolean"
+                            },
+                            "volume_name": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "const": "sqlite"
+                }
+            }
+        },
+        "resource": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "enum": [
+                        "application",
+                        "postgresql",
+                        "mysql",
+                        "mariadb",
+                        "mongodb",
+                        "redis",
+                        "keydb",
+                        "dragonfly",
+                        "clickhouse",
+                        "sqlite",
+                        "service"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "application"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/application"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "service"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/service"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "postgresql"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/postgresql"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "mysql"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/mysql"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "mariadb"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/mariadb"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "mongodb"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/mongodb"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "redis"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/redis"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "keydb"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/keydb"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "dragonfly"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/dragonfly"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "clickhouse"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/clickhouse"
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "sqlite"
+                            }
+                        }
+                    },
+                    "then": {
+                        "$ref": "#/$defs/sqlite"
+                    }
+                }
+            ]
+        }
+    }
+}

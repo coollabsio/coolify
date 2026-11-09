@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Service\CreateServiceFromCompose;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
@@ -524,12 +525,6 @@ class ServicesController extends Controller
         if ($serviceKeys->contains($request->type)) {
             $oneClickServiceName = $request->type;
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
-            $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
-            if ($oneClickDotEnvs) {
-                $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
-                    return ! empty($value);
-                });
-            }
             if ($oneClickService) {
                 $dockerComposeRaw = base64_decode($oneClickService);
 
@@ -545,50 +540,23 @@ class ServicesController extends Controller
                     ], 422);
                 }
 
-                $servicePayload = [
-                    'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => $dockerComposeRaw,
-                    'environment_id' => $environment->id,
-                    'service_type' => $oneClickServiceName,
-                    'server_id' => $server->id,
-                    'destination_id' => $destination->id,
-                    'destination_type' => $destination->getMorphClass(),
-                ];
-                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK) || $request->boolean('connect_to_docker_network')) {
-                    data_set($servicePayload, 'connect_to_docker_network', true);
-                }
-                $service = new Service($servicePayload);
-                $service->save();
-                $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
-                $service->description = $request->description;
+                $attributes = ['description' => $request->description];
                 if ($request->has('is_container_label_escape_enabled')) {
-                    $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
+                    $attributes['is_container_label_escape_enabled'] = $request->boolean('is_container_label_escape_enabled');
                 }
                 if ($request->has('redact_all_env_values_in_logs')) {
-                    $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
+                    $attributes['redact_all_env_values_in_logs'] = $request->boolean('redact_all_env_values_in_logs');
                 }
-                $service->save();
-                if ($oneClickDotEnvs?->count() > 0) {
-                    $oneClickDotEnvs->each(function ($value) use ($service) {
-                        $key = str()->before($value, '=');
-                        $value = str(str()->after($value, '='));
-                        $generatedValue = $value;
-                        if ($value->contains('SERVICE_')) {
-                            $command = $value->after('SERVICE_')->beforeLast('_');
-                            $generatedValue = generateEnvValue($command->value(), $service);
-                        }
-                        $service->environment_variables()->updateOrCreate(['key' => $key], [
-                            'value' => $generatedValue,
-                            'resourceable_id' => $service->id,
-                            'resourceable_type' => $service->getMorphClass(),
-                            'is_preview' => false,
-                        ]);
-                    });
-                }
-                $service->parse(isNew: true);
-
-                // Apply service-specific application prerequisites
-                applyServiceApplicationPrerequisites($service);
+                $service = app(CreateServiceFromCompose::class)->handle(
+                    environment: $environment,
+                    server: $server,
+                    destination: $destination,
+                    dockerComposeRaw: $dockerComposeRaw,
+                    templateKey: $oneClickServiceName,
+                    attributes: $attributes,
+                    connectToDockerNetwork: $request->boolean('connect_to_docker_network'),
+                    name: $request->name,
+                );
 
                 if ($request->has('urls') && is_array($request->urls)) {
                     $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));

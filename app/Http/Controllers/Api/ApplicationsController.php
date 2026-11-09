@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
+use App\Actions\Application\LookupGitAppRepository;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
@@ -35,9 +36,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -5352,29 +5351,12 @@ class ApplicationsController extends Controller
         if (! $githubApp) {
             return response()->json(['message' => 'Github App not found.'], 404);
         }
-        $token = generateGithubInstallationToken($githubApp);
-        if (! $token) {
-            return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+
+        try {
+            return app(LookupGitAppRepository::class)->github($githubApp, $gitRepository);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 400);
         }
-
-        $gitRepository = gitRepositorySlug($gitRepository);
-
-        // Use direct API call to verify repository access instead of loading all repositories
-        // This is much faster and avoids timeouts for GitHub Apps with many repositories
-        $response = Http::GitHub($githubApp->api_url, $token)
-            ->timeout(20)
-            ->retry(3, 200, throw: false)
-            ->get("/repos/{$gitRepository}");
-
-        if ($response->status() === 404 || $response->status() === 403) {
-            return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
-        }
-
-        if (! $response->successful()) {
-            return response()->json(['message' => 'Failed to verify repository access: '.($response->json()['message'] ?? 'Unknown error')], 400);
-        }
-
-        return ['source' => $githubApp, 'repository' => $gitRepository, 'repository_project_id' => data_get($response->json(), 'id')];
     }
 
     /**
@@ -5384,60 +5366,15 @@ class ApplicationsController extends Controller
      */
     private function giteaAppRepository(?GiteaApp $giteaApp, string $gitRepository): array|JsonResponse
     {
-        if (! $giteaApp?->isConnected()) {
-            return response()->json(['message' => 'Gitea App not found.'], 404);
-        }
-
-        $repositoryPath = $this->giteaRepositoryPath($giteaApp, $gitRepository);
-        if ($repositoryPath === null) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['git_repository' => 'The git_repository must be owner/name or a repository URL on the Gitea instance of the source.'],
-            ], 422);
-        }
-
         try {
-            refreshGiteaToken($giteaApp);
+            return app(LookupGitAppRepository::class)->gitea($giteaApp, $gitRepository);
         } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-
-        $response = Http::Gitea($giteaApp->apiUrlBase(), $giteaApp->access_token)
-            ->timeout(20)
-            ->retry(3, 200, throw: false)
-            ->get('/repos/'.collect(explode('/', $repositoryPath))->map(fn (string $part) => rawurlencode($part))->implode('/'));
-
-        if ($response->status() === 404 || $response->status() === 403
-            || ($response->successful() && ! $giteaApp->allowsRepositoryOwner(data_get($response->json(), 'owner.login')))) {
-            return response()->json(['message' => 'Repository not found or not accessible by the Gitea App.'], 404);
-        }
-
-        if (! $response->successful()) {
-            return response()->json(['message' => 'Failed to verify repository access: '.data_get($response->json(), 'message', 'Unknown error')], 400);
-        }
-
-        return ['source' => $giteaApp, 'repository' => $repositoryPath, 'repository_project_id' => data_get($response->json(), 'id')];
-    }
-
-    /**
-     * Get owner/name from owner/name, or from an HTTPS or SSH URL on the Gitea instance of the source.
-     */
-    private function giteaRepositoryPath(GiteaApp $giteaApp, string $gitRepository): ?string
-    {
-        $repository = sshGitUrlToHttps($gitRepository) ?? $gitRepository;
-        if (str_contains($repository, '://')) {
-            if (strtolower((string) parse_url($repository, PHP_URL_HOST)) !== strtolower((string) parse_url($giteaApp->html_url, PHP_URL_HOST))) {
-                return null;
+            if ($e->getCode() === 422) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['git_repository' => $e->getMessage()]], 422);
             }
-            $repository = Str::chopStart((string) parse_url($repository, PHP_URL_PATH), rtrim((string) parse_url($giteaApp->html_url, PHP_URL_PATH), '/'));
-        }
-        $repository = str($repository)->trim('/')->replaceEnd('.git', '')->toString();
 
-        if (! preg_match('#^[\w.-]+/[\w.-]+$#', $repository) || array_intersect(explode('/', $repository), ['.', '..']) !== []) {
-            return null;
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 400);
         }
-
-        return $repository;
     }
 
     private function validateDataApplications(Request $request, Server $server)
