@@ -160,6 +160,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             if ($this->resource instanceof Application) {
                 $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
@@ -187,6 +188,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
@@ -211,6 +213,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             if ($this->resource instanceof Application) {
                 $this->resource->settings->include_coolify_default_variables = $this->include_coolify_default_variables;

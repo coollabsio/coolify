@@ -6,6 +6,8 @@ use App\Enums\AccessLevel;
 use App\Models\Environment;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
+use Illuminate\Auth\Access\Response;
 
 class ServicePolicy
 {
@@ -36,9 +38,13 @@ class ServicePolicy
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Service $service): bool
+    public function update(User $user, Service $service): Response
     {
-        return $user->canAccess(AccessLevel::Write, $service);
+        if (ManagedResources::isManaged($service)) {
+            return Response::deny(ManagedResources::denyReason($service));
+        }
+
+        return $user->canAccess(AccessLevel::Write, $service) ? Response::allow() : Response::deny();
     }
 
     /**

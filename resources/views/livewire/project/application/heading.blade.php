@@ -21,6 +21,7 @@
                         {{ $application->name }}
                     </h1>
                     <div class="relative flex w-full min-w-0 items-center gap-2">
+                        <x-project-config.managed-badge :resource="$application" />
                         <x-status-summary :status="$application->status"
                             :healthcheck-url="route('project.application.healthcheck', $parameters)" />
                         <x-applications.links :application="$application" compact />
