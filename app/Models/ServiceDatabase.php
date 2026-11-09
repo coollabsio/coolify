@@ -171,6 +171,11 @@ class ServiceDatabase extends BaseModel
         return $this->belongsTo(Service::class);
     }
 
+    public function link(): ?string
+    {
+        return $this->service?->link();
+    }
+
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');

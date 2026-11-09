@@ -1159,7 +1159,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 failureEvent: 'backup_failure',
                 title: "Database backup for {$this->database->name} works again.",
                 webhookEvent: 'backup_recovered',
-                url: base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid,
+                url: $this->database->link() ?? base_url(),
                 webhookData: ['database_name' => $this->database->name, 'database_uuid' => $this->database->uuid, 'backup_uuid' => $this->backup->uuid],
             ));
         } catch (Throwable $e) {

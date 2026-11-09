@@ -226,7 +226,9 @@ it('denies a root team admin to update the instance database when the token does
     $database->id = 0;
 
     $user->shouldReceive('isAdminOfTeam')->with(0)->andReturn(true);
-    $user->shouldReceive('canAccess')->with(AccessLevel::Write, $database)->andReturn(false);
+    $resolver = Mockery::mock(AccessResolver::class);
+    $resolver->shouldReceive('allowsTeamWide')->with($user, AccessLevel::Write, 0)->andReturn(false);
+    Container::getInstance()->instance(AccessResolver::class, $resolver);
 
     $policy = new DatabasePolicy;
     expect($policy->update($user, $database)->allowed())->toBeFalse();

@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\AccessLevel;
 use App\Models\Environment;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use Illuminate\Auth\Access\Response;
 
 class DatabasePolicy
@@ -120,11 +121,12 @@ class DatabasePolicy
 
     /**
      * The instance database (coolify-db) belongs to the root team; only its owners and admins can change it.
+     * It has no environment, so the check uses the root team grants and the API token limits.
      */
     private function allows(User $user, AccessLevel $level, $database): bool
     {
         if ($this->isInstanceDatabase($database)) {
-            return $user->isAdminOfTeam(0) && $user->canAccess($level, $database);
+            return $user->isAdminOfTeam(0) && app(AccessResolver::class)->allowsTeamWide($user, $level, 0);
         }
 
         return $user->canAccess($level, $database);

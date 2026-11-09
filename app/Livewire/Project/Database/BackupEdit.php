@@ -8,7 +8,6 @@ use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
-use App\Models\StandalonePostgresql;
 use App\Services\Access\AccessResolver;
 use App\Traits\ListensToTeamChannel;
 use Exception;
@@ -421,8 +420,7 @@ class BackupEdit extends Component
     private function availableS3StorageIds(): Collection
     {
         $database = $this->backup->database;
-        // The instance database (id 0) has no project and belongs to the root team.
-        $teamId = $database instanceof StandalonePostgresql && $database->id === 0 ? 0 : $database?->team()?->id;
+        $teamId = $database?->team()?->id;
 
         if ($teamId === null) {
             return collect();
