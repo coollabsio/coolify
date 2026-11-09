@@ -10,13 +10,15 @@
 
 @php
     $bodyId = $collapsible ? ($attributes->get('id') ?: 'section-'.md5($title)).'-body' : null;
+    // A card with nothing in its body shows only its title row.
+    $hasBody = $collapsible || $slot->hasActualContent();
 @endphp
 
 <section {{ $attributes->merge(['class' => 'application-settings-section', 'data-settings-section-title' => $title]) }}
     @if ($collapsible) x-data="{ open: @js((bool) $open) }"
         x-on:open-settings-section.window="if ($event.detail?.id === $el.id) { open = true; $nextTick(() => $el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })) }" @endif>
-    <header @if ($collapsible) :class="open || 'is-collapsed'" @endif>
-        <div @class(['min-w-0 py-0.5', 'flex flex-wrap items-center gap-2' => isset($badges)])>
+    <header @if ($collapsible) :class="open || 'is-collapsed'" @elseif (! $hasBody) class="is-collapsed" @endif>
+        <div @class(['min-w-0 py-0.5', 'flex flex-wrap items-baseline gap-x-2 gap-y-1' => isset($badges)])>
             @if ($collapsible)
                 <h3 @class(['flex items-center gap-1.5' => filled($description ?? $helper)])>
                     <button type="button" class="settings-section-toggle" x-on:click="open = ! open"
@@ -48,8 +50,10 @@
             </div>
         @endisset
     </header>
-    <div @if ($collapsible) id="{{ $bodyId }}" x-show="open" x-cloak @endif
-        class="application-settings-section-body {{ $flush ? 'is-flush' : '' }}">
-        {{ $slot }}
-    </div>
+    @if ($hasBody)
+        <div @if ($collapsible) id="{{ $bodyId }}" x-show="open" x-cloak @endif
+            class="application-settings-section-body {{ $flush ? 'is-flush' : '' }}">
+            {{ $slot }}
+        </div>
+    @endif
 </section>

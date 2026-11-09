@@ -110,6 +110,7 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Registries as ServerRegistries;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Index as ServerSecurityIndex;
+use App\Livewire\Server\Security\Patches as ServerSecurityPatches;
 use App\Livewire\Server\Sentinel\Logs as SentinelLogs;
 use App\Livewire\Server\Sentinel\Show as SentinelShow;
 use App\Livewire\Server\Show as ServerShow;
@@ -564,9 +565,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
             Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
             Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
-            Route::get('/security/image-scanning', ServerImageScanning::class)->name('server.security.image-scanning')->middleware('can.update.resource');
+            Route::get('/security/patches', ServerSecurityPatches::class)->name('server.security.patches')->middleware('can.update.resource');
+            Route::get('/security/vulnerabilities', ServerImageScanning::class)->name('server.security.vulnerabilities')->middleware('can.update.resource');
             // Old sub pages. Links in sent notifications still use them.
-            foreach (['patches' => 'server-patching-overview-section', 'terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
+            Route::get('/security/image-scanning', fn (string $server_uuid) => redirect(route('server.security.vulnerabilities', ['server_uuid' => $server_uuid])))
+                ->name('server.security.image-scanning');
+            foreach (['terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
                 Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
                     ->name("server.security.{$page}");
             }

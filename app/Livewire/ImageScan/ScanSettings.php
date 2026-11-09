@@ -47,6 +47,10 @@ class ScanSettings extends Component
     #[Locked]
     public ?string $scopeUuid = null;
 
+    /** Renders the rules without their own card, for a page that puts them inside another card. */
+    #[Locked]
+    public bool $embedded = false;
+
     public ?string $gateMode = '';
 
     public ?string $onScanError = '';

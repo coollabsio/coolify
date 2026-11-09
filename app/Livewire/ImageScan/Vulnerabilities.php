@@ -61,7 +61,8 @@ class Vulnerabilities extends Component
 
     private const EXPIRES = ['30', '90', 'never'];
 
-    private const CHECKPOINTS = ['Get scanner', 'Update database', 'Read image', 'Find vulnerabilities'];
+    /** "Start scan" covers the wait in the queue and for the scan lock of the server; it does not get the scanner. */
+    private const CHECKPOINTS = ['Start scan', 'Update database', 'Read image', 'Find vulnerabilities'];
 
     /** Progress stage of ScanImage => index in CHECKPOINTS. */
     private const STAGE_CHECKPOINT = [ScanResourceImagesJob::QUEUED_STAGE => 0, 'database' => 1, 'pull' => 2, 'inspect' => 2, 'sbom' => 2, 'vulnerabilities' => 3];
@@ -959,7 +960,7 @@ class Vulnerabilities extends Component
             'offState' => $offState,
             'serverName' => (string) ($server?->name ?? 'this server'),
             'serverUrl' => $server instanceof Server && $user->can('update', $server)
-                ? route('server.security.image-scanning', ['server_uuid' => $server->uuid])
+                ? route('server.security.vulnerabilities', ['server_uuid' => $server->uuid])
                 : null,
             'canUpdate' => $canUpdate,
         ];

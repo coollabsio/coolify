@@ -61,7 +61,7 @@
                 'name' => $server->name,
                 'description' => $server->description,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
-                'patchesHref' => route('server.security', ['server_uuid' => $server->uuid]).'#server-patching-overview-section',
+                'patchesHref' => route('server.security.patches', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
                 'resourceCount' => $server->definedResources()->count(),

@@ -2386,6 +2386,7 @@ test('the pinned host key moves with the server', function () {
         'ssh_host_key_trusted_at' => '2026-01-01 12:00:00',
         'ssh_host_key_pending' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjaL3Lqt0tZl4iVZw8x1v2b9fM8r6Yq0nH0bUq3dQ0h',
         'is_ssh_host_key_check_disabled' => true,
+        'is_ssh_host_key_check_enforced' => true,
     ])->save();
     $bundle = json_decode(json_encode($this->exporter->export($this->server->fresh())), true);
     $this->service->forceDelete();
@@ -2401,5 +2402,6 @@ test('the pinned host key moves with the server', function () {
         ->ssh_host_key_source->toBe('transfer')
         ->ssh_host_key_pending->toBeNull()
         ->is_ssh_host_key_check_disabled->toBeTrue()
+        ->is_ssh_host_key_check_enforced->toBeTrue()
         ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
 });

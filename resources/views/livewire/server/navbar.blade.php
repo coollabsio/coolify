@@ -74,7 +74,7 @@
             [
                 'label' => 'Security',
                 'route' => 'server.security',
-                'active' => request()->routeIs('server.security'),
+                'active' => request()->routeIs('server.security*'),
                 // Also for a server that is not functional: a changed host key stops the connection, and the page to trust the new key is here.
                 'visible' => auth()->user()?->can('update', $server),
             ],

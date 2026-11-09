@@ -25,6 +25,9 @@ class SshMultiplexingHelper
     /** After a failed scan (server offline), commands and the connection check do not scan again for this time. */
     private const HOST_KEY_SCAN_RETRY_SECONDS = 600;
 
+    /** Enforce mode cannot connect without a pinned key, so it scans again sooner. The scan only reads the key, it trusts nothing more. */
+    private const HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS = 60;
+
     /**
      * The warning that OpenSSH prints at the start of its own stderr when the server sends a host key that is not
      * the pinned key: the banner, the fingerprint, the known_hosts lines, and the "is disabled to avoid
@@ -570,7 +573,8 @@ class SshMultiplexingHelper
             return 'off';
         }
 
-        return $mode === 'enforce' ? 'enforce' : 'warn';
+        // A team can make its own server stricter than the instance, never weaker than an instance "off".
+        return $mode === 'enforce' || data_get($server, 'settings.is_ssh_host_key_check_enforced') ? 'enforce' : 'warn';
     }
 
     /**
@@ -719,7 +723,7 @@ class SshMultiplexingHelper
 
     /**
      * Pin the host key that the server sends on the first connection (trust on first use).
-     * Nothing scans again within HOST_KEY_SCAN_RETRY_SECONDS of a failed scan. Commands also do not scan a server
+     * Nothing scans again within HOST_KEY_SCAN_RETRY_SECONDS (enforce mode: HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS) of a failed scan. Commands also do not scan a server
      * that is unreachable, so they do not wait for the scan timeout. The connection check passes
      * $evenIfUnreachable, so the server learns its key when it is back. In enforce mode the check then fails with
      * the scan error until the next scan.
@@ -739,7 +743,8 @@ class SshMultiplexingHelper
             }
             $scan = self::readHostKey($server);
             if ($scan['key'] === null) {
-                Cache::put(self::hostKeyScanFailedCacheKey($server), $scan['error'], self::HOST_KEY_SCAN_RETRY_SECONDS);
+                $retrySeconds = self::hostKeyCheckingMode($server) === 'enforce' ? self::HOST_KEY_SCAN_ENFORCE_RETRY_SECONDS : self::HOST_KEY_SCAN_RETRY_SECONDS;
+                Cache::put(self::hostKeyScanFailedCacheKey($server), $scan['error'], $retrySeconds);
 
                 return;
             }
@@ -790,13 +795,46 @@ class SshMultiplexingHelper
         return true;
     }
 
+    /**
+     * Read the saved host key settings into the settings in memory. A job that loaded the server before an admin
+     * enforced the check, trusted a new key, or reset the key must not connect with the old settings.
+     * Only the host key page changes these columns, and it saves them before it connects.
+     */
+    private static function loadSavedHostKeySettings(Server $server): void
+    {
+        if (! $server->settings->exists) {
+            return;
+        }
+        $columns = ['ssh_host_key', 'ssh_host_key_source', 'ssh_host_key_trusted_at', 'ssh_host_key_pending', 'is_ssh_host_key_check_disabled', 'is_ssh_host_key_check_enforced'];
+        $stored = ServerSetting::query()->whereKey($server->settings->getKey())->first($columns);
+        if ($stored !== null) {
+            $server->settings->forceFill($stored->getAttributes())->syncOriginalAttributes($columns);
+        }
+    }
+
+    /**
+     * Stop the multiplexed connection after a change of the host key settings. The lock makes sure that no other
+     * process opens a connection with the old settings in the same moment: it opens it before the stop, or after it with the saved settings.
+     */
+    public static function removeMuxFileAfterHostKeyChange(Server $server): void
+    {
+        try {
+            Cache::lock(self::connectionLockKey($server), config('constants.ssh.mux_lock_ttl'))
+                ->block(config('constants.ssh.mux_lock_timeout'), fn () => self::removeMuxFile($server));
+        } catch (LockTimeoutException) {
+            self::removeMuxFile($server);
+        }
+    }
+
+    /** The key has the mode, so a failure of a warn mode scan does not stop an enforce mode scan for its longer retry time. */
     private static function hostKeyScanFailedCacheKey(Server $server): string
     {
-        return 'ssh_host_key_scan_failed_'.$server->uuid;
+        return 'ssh_host_key_scan_failed_'.self::hostKeyCheckingMode($server).'_'.$server->uuid;
     }
 
     private static function hostKeyOptions(Server $server): string
     {
+        self::loadSavedHostKeySettings($server);
         self::learnHostKey($server);
         $mode = self::hostKeyCheckingMode($server);
 

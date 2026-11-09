@@ -131,26 +131,31 @@ it('learns the host key in the connection check of an unreachable server in enfo
         ->is_reachable->toBeTrue();
 });
 
-it('does not scan again in the connection check for ten minutes after a failed scan', function (string $mode) {
+it('scans again in the connection check only after the retry time of a failed scan', function (string $mode, int $retrySeconds) {
     config(['constants.ssh.host_key_checking' => $mode]);
-    fakeHardeningSsh(HARDENING_KEY_B);
+    fakeHardeningSsh(null);
     $server = makeHardeningServer(null);
     $server->forceFill(['unreachable_count' => 1])->save();
-    Cache::put('ssh_host_key_scan_failed_'.$server->uuid, 'Connection refused', 600);
 
     (new ServerConnectionCheckJob($server->fresh()))->handle();
-
-    Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'PubkeyAuthentication=no'));
-    expect($server->settings->fresh()->ssh_host_key)->toBeNull();
-
-    $this->travel(11)->minutes();
+    fakeHardeningSsh(HARDENING_KEY_B);
+    $this->travel($retrySeconds - 10)->seconds();
     (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     expect(hardeningScanCount())->toBe(1)
+        ->and($server->settings->fresh()->ssh_host_key)->toBeNull();
+
+    $this->travel(20)->seconds();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    expect(hardeningScanCount())->toBe(2)
         ->and($server->settings->fresh())
         ->ssh_host_key->toBe(HARDENING_KEY_B)
         ->is_reachable->toBeTrue();
-})->with(['warn', 'enforce']);
+})->with([
+    'warn' => ['warn', 600],
+    'enforce' => ['enforce', 60],
+]);
 
 it('reports a normal connection error when the host key check fails but the server sends the pinned key', function () {
     config(['constants.ssh.host_key_checking' => 'enforce']);
@@ -219,6 +224,18 @@ it('quotes the host key alias in the ssh command', function () {
     $server = makeHardeningServer();
 
     expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain("-o HostKeyAlias='coolify-{$server->uuid}' ");
+});
+
+it('uses the saved host key settings in a job that loaded the server before they changed', function () {
+    fakeHardeningSsh(null);
+    $server = makeHardeningServer();
+    expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain('-o StrictHostKeyChecking=no ');
+
+    ServerSetting::query()->whereKey($server->settings->id)->update(['is_ssh_host_key_check_enforced' => true, 'ssh_host_key' => HARDENING_KEY_B]);
+
+    expect(SshMultiplexingHelper::generateSshCommand($server, 'ls'))->toContain('-o StrictHostKeyChecking=yes ')
+        ->and($server->settings->ssh_host_key)->toBe(HARDENING_KEY_B)
+        ->and($server->settings->isDirty())->toBeFalse();
 });
 
 it('deletes the known_hosts file of an old host key', function () {

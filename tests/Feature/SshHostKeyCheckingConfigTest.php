@@ -2,6 +2,7 @@
 
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -67,3 +68,17 @@ it('does not log a warning for a known SSH host key checking mode', function (st
 
     Log::shouldNotHaveReceived('warning');
 })->with(['warn', 'enforce', 'off']);
+
+it('lets a server enforce the check when the instance warns, but never turns on an instance that is off', function (string $instanceMode, bool $disabled, bool $enforced, string $expected) {
+    config(['constants.ssh.host_key_checking' => $instanceMode]);
+    $server = new Server;
+    $server->setRelation('settings', (new ServerSetting)->forceFill(['is_ssh_host_key_check_disabled' => $disabled, 'is_ssh_host_key_check_enforced' => $enforced]));
+
+    expect(SshMultiplexingHelper::hostKeyCheckingMode($server))->toBe($expected);
+})->with([
+    'warn, server default' => ['warn', false, false, 'warn'],
+    'warn, server enforces' => ['warn', false, true, 'enforce'],
+    'enforce, server default' => ['enforce', false, false, 'enforce'],
+    'off, server enforces' => ['off', false, true, 'off'],
+    'warn, server disabled' => ['warn', true, false, 'off'],
+]);

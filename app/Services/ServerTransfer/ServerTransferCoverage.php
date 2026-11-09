@@ -52,6 +52,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
+use App\Models\ServerHostScan;
 use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -372,6 +373,7 @@ final class ServerTransferCoverage
         ApplicationDeploymentQueue::class => 'Deployment history.',
         ImageScan::class => 'Rebuilt by the next rescan.',
         ImageSbom::class => 'Rebuilt by the next rescan.',
+        ServerHostScan::class => 'Rebuilt by the next host scan on the target.',
         ImageScanNotificationState::class => 'Notification state restarts as a baseline after a transfer.',
         ScheduledTaskExecution::class => 'Execution history.',
         ScheduledDatabaseBackupExecution::class => 'Execution history.',

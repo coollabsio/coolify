@@ -17,6 +17,7 @@ enum ImageScanErrorCode: string
     case ImageMissing = 'image_missing';
     case PullFailed = 'pull_failed';
     case Truncated = 'truncated';
+    case NoPackageDatabase = 'no_package_database';
     case Unknown = 'unknown';
 
     /**
@@ -30,11 +31,11 @@ enum ImageScanErrorCode: string
         $n = (string) ($context['n'] ?? '?');
 
         return match ($this) {
-            self::DiskSpace => "Not enough disk space on {$server}: {$n} GB needed.",
+            self::DiskSpace => isset($context['n']) ? "Not enough disk space on {$server}: {$n} GB needed." : "Not enough disk space on {$server}.",
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
             self::Timeout => 'The scan took too long and was stopped.',
-            self::OutOfMemory => 'The scanner needed more than 1 GB of memory for this image and was stopped.',
+            self::OutOfMemory => 'The scanner ran out of memory and was stopped. It can use up to 1 GB, and the server must have that much free memory.',
             self::LockBusy => "Another scan is still running on {$server}.",
             self::RegistryAuth => "Coolify cannot read this image from its registry. Log in to the registry on {$server}.",
             self::BuildServerOff => 'Image scanning is off on the build server.',
@@ -43,6 +44,7 @@ enum ImageScanErrorCode: string
             self::ImageMissing => "The image is not on {$server}. Click Scan now to pull and scan it. An image that Coolify builds needs a new deploy.",
             self::PullFailed => "Coolify could not pull the image to {$server}. Check the image name, and log in to its registry on {$server} if it is private.",
             self::Truncated => 'The scan result was too large to read completely.',
+            self::NoPackageDatabase => "Coolify found no package database of a supported package manager (dpkg, rpm, apk, pacman) on {$server}.",
             self::Unknown => 'The scan could not run.',
         };
     }

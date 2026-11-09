@@ -127,6 +127,7 @@ function rescanTestFake(array $overrides = []): void
         'grype' => rescanTestPayload('grype', file_get_contents(base_path('tests/Fixtures/image-scan/grype.ndjson'))),
         'sbom-delete' => 'coolify-scan-exit sbom-delete 0',
         'disk-usage' => '',
+        'scanner-images' => 'coolify-scan-exit scanner-images 0',
     ], $overrides);
 
     Process::fake(function (PendingProcess $process) use ($outputs) {
@@ -160,6 +161,7 @@ function rescanTestCommandKey(string $command): ?string
         str_contains($command, 'coolify-scan-exit containers') => 'containers',
         str_contains($command, 'coolify-scan-exit sbom-delete') => 'sbom-delete',
         str_contains($command, 'coolify-scan-exit disk-db') => 'disk-usage',
+        str_contains($command, 'coolify-scan-exit scanner-images') => 'scanner-images',
         str_contains($command, 'docker image inspect') => 'inspect',
         str_contains($command, 'df -P') => 'disk',
         str_contains($command, 'docker save') => 'sbom',
@@ -433,6 +435,39 @@ describe('rescan', function () {
 
         expect(Cache::get(PrepareImageScannerJob::builtAtCacheKey($this->server)))->toBe($builtAt->toIso8601ZuluString())
             ->and(Cache::get(PrepareImageScannerJob::diskUsedCacheKey($this->server)))->toBe(1024);
+    });
+
+    it('marks the scanner as ready after a database update, so the server page does not ask to get it again', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subHours(3))]);
+        Cache::put(PrepareImageScannerJob::failedStepCacheKey($this->server), 'pulling');
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe(PrepareImageScannerJob::STATE_READY)
+            ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBeNull();
+    });
+
+    it('keeps the failed preparation after a database update when a scanner image is missing', function () {
+        rescanTestFake([
+            'db-status' => fn () => rescanTestDatabaseStatus(now()->subHours(3)),
+            'scanner-images' => 'coolify-scan-exit scanner-images 1',
+        ]);
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), PrepareImageScannerJob::STATE_FAILED);
+        Cache::put(PrepareImageScannerJob::failedStepCacheKey($this->server), 'pulling');
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe(PrepareImageScannerJob::STATE_FAILED)
+            ->and(Cache::get(PrepareImageScannerJob::failedStepCacheKey($this->server)))->toBe('pulling');
+    });
+
+    it('does not mark the scanner as ready while the scanner is being prepared', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subHours(3))]);
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), PrepareImageScannerJob::STATE_PULLING);
+
+        rescanTestRun();
+
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe(PrepareImageScannerJob::STATE_PULLING);
     });
 
     it('keeps the results and records the error for each resource when the database is too old', function () {

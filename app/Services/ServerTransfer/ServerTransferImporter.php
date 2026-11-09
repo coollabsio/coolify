@@ -750,6 +750,7 @@ class ServerTransferImporter
                 'ssh_host_key_source' => filled($sshHostKey) ? 'transfer' : null,
                 'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
                 'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
+                'is_ssh_host_key_check_enforced' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_enforced', false),
             ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
                 data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),

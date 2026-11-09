@@ -54,7 +54,7 @@ class Index extends Component
         }
         $this->refreshServer();
         if ($this->server->isFunctional() !== $this->wasFunctionalBeforeConnectionCheck) {
-            // Load the page again: the morph cannot insert the patching section, and the navbar shows the old status.
+            // Load the page again: the navbar and the sidebar show the old status.
             $this->redirectRoute('server.security', ['server_uuid' => $this->server->uuid], navigate: true);
 
             return;

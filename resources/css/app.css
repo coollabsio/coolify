@@ -3975,7 +3975,15 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .package-updates-table-grid {
-    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 6rem;
+    grid-template-columns: 1.25rem minmax(12rem, 1.4fr) minmax(10rem, 1fr);
+}
+
+.held-updates-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 7rem;
+}
+
+.host-vulnerabilities-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 6rem 6rem;
 }
 
 .scheduled-backups-table-grid {
@@ -4125,10 +4133,27 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .package-updates-table-grid {
-        grid-template-columns: minmax(0, 1fr) 5rem;
+        grid-template-columns: 1.25rem minmax(0, 1fr);
     }
 
-    .package-updates-table-grid > :nth-child(2) {
+    .package-updates-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .held-updates-table-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .held-updates-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .host-vulnerabilities-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem 5rem;
+    }
+
+    .host-vulnerabilities-table-grid > :nth-child(2),
+    .host-vulnerabilities-table-grid > :nth-child(3) {
         display: none;
     }
 
