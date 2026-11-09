@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * The last scan of the OS packages of a server, one row per server. A failed scan sets `error_code` and keeps the
  * findings of the last completed scan (`scanned_at`).
  *
- * @property ?array{critical: int, high: int, medium: int, low: int, unknown: int, fixable: int, exploited: int, likely: int, total: int} $summary
+ * @property ?array{critical: int, high: int, medium: int, low: int, unknown: int, fixable: int, exploited: int, likely: int, other_kernels?: int, total: int} $summary
  */
 class ServerHostScan extends Model
 {

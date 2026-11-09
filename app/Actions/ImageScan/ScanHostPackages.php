@@ -2,6 +2,7 @@
 
 namespace App\Actions\ImageScan;
 
+use App\Actions\Server\CheckUpdates;
 use App\Enums\ImageScanErrorCode;
 use App\Jobs\ImageRescanJob;
 use App\Models\Server;
@@ -61,7 +62,8 @@ class ScanHostPackages
             $grype = ScanImage::runStep($server, $commands->grype(ScannerCommands::HOST_SBOM), 'grype', self::TIMEOUT_GRYPE);
             ScanImage::assertSucceeded($grype, 'grype');
 
-            $this->complete($server, $grype, $databaseBuiltAt);
+            $runningKernel = trim((string) instant_remote_process(['uname -r'], $server, throwError: false, timeout: self::TIMEOUT_DEFAULT));
+            $this->complete($server, $grype, $databaseBuiltAt, $runningKernel);
         } catch (ScanFailed $e) {
             $this->fail($server, $e->errorCode);
         } catch (Throwable $e) {
@@ -77,20 +79,27 @@ class ScanHostPackages
 
     /**
      * Stores the relevant findings (spec 15.2), problems with an exploit signal first, then the ones an update fixes.
+     * Findings in installed kernels that the server does not run are no risk now: they are not counted (only as `other_kernels`)
+     * and come last, so they do not push out the others.
      *
      * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $grype
      */
-    private function complete(Server $server, array $grype, CarbonImmutable $databaseBuiltAt): void
+    private function complete(Server $server, array $grype, CarbonImmutable $databaseBuiltAt, string $runningKernel): void
     {
         [$payload, $cut] = ScanImage::readPayload($grype);
         $report = (new GrypeReportParser)->parse($payload, self::MAX_PARSED_FINDINGS);
         $rules = RelevanceRules::fromIgnores(collect());
 
         $relevant = array_values(array_filter($report['findings'], fn (Finding $finding): bool => SecurityRules::isRelevant($finding, $rules)));
-        usort($relevant, fn (Finding $a, Finding $b): int => $this->rank($a) <=> $this->rank($b));
+        usort($relevant, fn (Finding $a, Finding $b): int => $this->rank($a, $runningKernel) <=> $this->rank($b, $runningKernel));
 
-        $summary = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0, 'fixable' => 0, 'exploited' => 0, 'likely' => 0, 'total' => count($report['findings'])];
+        $summary = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'unknown' => 0, 'fixable' => 0, 'exploited' => 0, 'likely' => 0, 'other_kernels' => 0, 'total' => count($report['findings'])];
         foreach ($relevant as $finding) {
+            if (CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel)) {
+                $summary['other_kernels']++;
+
+                continue;
+            }
             $summary[$finding->severity]++;
             $summary['fixable'] += $finding->fixedIn !== null ? 1 : 0;
             $signal = SecurityRules::exploitSignal($finding);
@@ -110,17 +119,18 @@ class ScanHostPackages
     }
 
     /**
-     * @return array{0: int, 1: int, 2: float}
+     * @return array{0: int, 1: int, 2: int, 3: float}
      */
-    private function rank(Finding $finding): array
+    private function rank(Finding $finding, string $runningKernel): array
     {
+        $otherKernel = CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel) ? 1 : 0;
         $signal = match (SecurityRules::exploitSignal($finding)) {
             SecurityRules::EXPLOITED => 0,
             SecurityRules::LIKELY => 1,
             default => 2,
         };
 
-        return [$signal, $finding->fixedIn !== null ? 0 : 1, -($finding->risk ?? 0.0)];
+        return [$otherKernel, $signal, $finding->fixedIn !== null ? 0 : 1, -($finding->risk ?? 0.0)];
     }
 
     /**

@@ -62,28 +62,59 @@
                 </x-slot:badges>
                 <x-slot:actions>
                     <x-beta-badge />
-                    @if (isDev())
-                        <x-forms.button type="button" wire:click="sendTestEmail">
-                            Send test email
-                        </x-forms.button>
-                    @endif
                     @can('update', $server)
-                        @if ($rebootRequired)
-                            <x-modal-confirmation title="Reboot server?" buttonTitle="Reboot server" isErrorButton
-                                submitAction="rebootServer" :actions="[
-                                    'The server reboots in a few seconds.',
-                                    'All containers on this server stop, and the containers with a restart policy start again after the reboot.',
-                                    'The server is not reachable for a few minutes.',
-                                ]"
-                                confirmationText="{{ $server->name }}"
-                                confirmationLabel="Enter the server name to confirm"
-                                shortConfirmationLabel="Server name" :confirmWithPassword="false"
-                                step2ButtonText="Reboot server" />
-                        @endif
-                        <x-forms.button type="button" wire:click="checkForUpdates" :disabled="$checking">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            Check for updates
-                        </x-forms.button>
+                        <x-split-action id="server-patching-actions">
+                            <x-slot:main @click="open = ! open" aria-haspopup="menu">
+                                Actions
+                            </x-slot:main>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                @click="open = false" wire:click="checkForUpdates" @disabled($checking)>
+                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                Check for updates
+                            </button>
+                            @if (\App\Actions\Server\RemoveUnusedPackages::supports($packageManager))
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                    @click="open = false; document.getElementById('server-patching-remove-unused-trigger')?.click()">
+                                    <x-reicon name="trash" class="size-3.5 opacity-70" />
+                                    Remove unused packages
+                                </button>
+                            @endif
+                            @if ($rebootRequired)
+                                <button type="button" class="listbox-option justify-start! gap-2.5! text-red-500!" role="menuitem"
+                                    @click="open = false; document.getElementById('server-patching-reboot-trigger')?.click()">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Reboot server
+                                </button>
+                            @endif
+                            @if (isDev())
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                    @click="open = false" wire:click="sendTestEmail">
+                                    <x-reicon name="mail" class="size-3.5 opacity-70" />
+                                    Send test email
+                                </button>
+                            @endif
+                        </x-split-action>
+                        <div class="hidden" aria-hidden="true">
+                            <x-server.remove-unused-packages-button :packageManager="$packageManager"
+                                triggerId="server-patching-remove-unused-trigger" />
+                            @if ($rebootRequired)
+                                <x-modal-confirmation title="Reboot server?" buttonTitle="Reboot server"
+                                    submitAction="rebootServer"
+                                    warningMessage="The containers on this server stop until the server is back." :actions="[
+                                        'The server reboots in a few seconds.',
+                                        'All containers on this server stop, and the containers with a restart policy start again after the reboot.',
+                                        'The server is not reachable for a few minutes.',
+                                    ]"
+                                    confirmationText="{{ $server->name }}"
+                                    confirmationLabel="Enter the server name to confirm"
+                                    shortConfirmationLabel="Server name" :confirmWithPassword="false"
+                                    step2ButtonText="Reboot server">
+                                    <x-slot:trigger>
+                                        <button id="server-patching-reboot-trigger" type="button">Reboot server</button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
+                            @endif
+                        </div>
                     @endcan
                 </x-slot:actions>
 
@@ -217,6 +248,25 @@
                             wire:model.live.debounce.300ms="search" />
                     </div>
                     @can('update', $server)
+                        @if ($selectedPackages !== [])
+                            @php
+                                $selectedRisky = collect($updates)->whereIn('package', $selectedPackages)->filter(fn ($update) => filled(data_get($update, 'risk')))->count();
+                            @endphp
+                            <x-forms.button type="button" wire:click="$set('selectedPackages', [])">Clear selection</x-forms.button>
+                            {{-- The dialog has wire:ignore; a new key renders it again when the selection changes. --}}
+                            <div wire:key="update-selected-{{ md5(implode(',', $selectedPackages)) }}">
+                            <x-modal-confirmation title="Update selected packages?"
+                                buttonTitle="Update {{ count($selectedPackages) }} selected" isHighlightedButton
+                                submitAction="updateSelectedPackages" :actions="[
+                                    'Coolify updates ' . implode(', ', $selectedPackages) . '.',
+                                    $selectedRisky > 0
+                                        ? $selectedRisky . ' of them can restart Docker, the running containers, or core system services, or need a reboot.'
+                                        : 'Some services on the server can restart.',
+                                ]"
+                                warningMessage="Coolify cannot roll back a package update. Check the update logs when it is done."
+                                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Update" />
+                            </div>
+                        @else
                         <x-modal-confirmation title="Confirm package update?" buttonTitle="Update all packages"
                             isHighlightedButton submitAction="updateAllPackages" :actions="[
                                 'All packages will be updated to their latest available versions.',
@@ -228,6 +278,7 @@
                             confirmationLabel="Confirm by entering the text below"
                             shortConfirmationLabel="Confirmation" :confirmWithPassword="false"
                             step2ButtonText="Update All Packages" />
+                        @endif
                     @endcan
                 </x-slot:actions>
 
@@ -246,15 +297,32 @@
                     </div>
                 @else
                 <div class="data-table">
+                    @php
+                        $canSelect = ! $fullUpgradeOnly && auth()->user()?->can('update', $server);
+                    @endphp
                     <div class="data-table-header package-updates-table-grid">
+                        <span class="flex items-center">
+                            @if ($canSelect)
+                                <input type="checkbox" wire:click="toggleAllPackages" @checked($allMatchingSelected)
+                                    aria-label="Select all packages" wire:loading.attr="disabled"
+                                    class="size-4 cursor-pointer rounded-sm border-neutral-300 text-accent focus:ring-accent dark:border-white/20 dark:bg-transparent" />
+                            @endif
+                        </span>
                         <span>Package</span>
                         <span>New version</span>
-                        <span class="text-right">Action</span>
                     </div>
                     @foreach ($shownUpdates as $update)
                         <div wire:key="package-update-{{ data_get($update, 'package') }}-{{ data_get($update, 'architecture') }}"
                             class="data-table-row package-updates-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
-                            <div class="flex min-w-0 items-center gap-2">
+                            <div class="flex items-center">
+                                @if ($canSelect)
+                                    <input type="checkbox" wire:model.live="selectedPackages" value="{{ data_get($update, 'package') }}"
+                                        id="select-package-{{ data_get($update, 'package') }}"
+                                        aria-label="Select {{ data_get($update, 'package') }}"
+                                        class="size-4 cursor-pointer rounded-sm border-neutral-300 text-accent focus:ring-accent dark:border-white/20 dark:bg-transparent" />
+                                @endif
+                            </div>
+                            <label for="select-package-{{ data_get($update, 'package') }}" class="flex min-w-0 cursor-pointer items-center gap-2">
                                 @if (filled(data_get($update, 'risk')))
                                     <span class="shrink-0" data-tooltip="{{ \App\Actions\Server\CheckUpdates::RISK_LABELS[data_get($update, 'risk')] ?? '' }}">
                                         <x-reicon name="alert-triangle" class="size-4 text-red-500" />
@@ -267,7 +335,7 @@
                                 @if (data_get($update, 'security'))
                                     <x-status-badge status="Security" type="error" />
                                 @endif
-                            </div>
+                            </label>
                             <div class="min-w-0">
                                 <p class="truncate font-mono text-[12px] text-neutral-700 dark:text-fg-dim">
                                     {{ data_get($update, 'new_version') }}
@@ -276,16 +344,6 @@
                                     <p class="mt-0.5 truncate text-[10px] text-neutral-500 dark:text-fg-faint">
                                         Current: {{ data_get($update, 'current_version') }}
                                     </p>
-                                @endif
-                            </div>
-                            <div class="flex justify-end">
-                                @if (! $fullUpgradeOnly)
-                                    @can('update', $server)
-                                        <x-forms.button type="button"
-                                            wire:click="updatePackage({{ Js::from(data_get($update, 'package')) }})">
-                                            Update
-                                        </x-forms.button>
-                                    @endcan
                                 @endif
                             </div>
                         </div>

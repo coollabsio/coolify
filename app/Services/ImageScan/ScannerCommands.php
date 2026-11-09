@@ -588,8 +588,9 @@ class ScannerCommands
      * Runs a tool whose stdout is the payload: stdout goes to a root-owned file in the work directory
      * (not mounted into the container), then at most 10485761 bytes of it are printed.
      *
-     * With $hostFilter the output keeps one line per vulnerability ID (the kernel binary packages of one host repeat
-     * the same thousands of problems) and drops the problems that the distribution will not fix, before the size is
+     * With $hostFilter the output keeps one line per vulnerability ID and package version (the binary packages of one
+     * kernel repeat the same thousands of problems; each installed kernel keeps its own line, so a problem of the running
+     * kernel is not hidden behind the same problem of an old one) and drops the problems that the distribution will not fix, before the size is
      * counted. Grype's own `--ignore-states` needs more than the memory limit. In the JSON lines a quote inside a value
      * is escaped, so the `"id":"…"` and `"fix":"wont-fix"` matches only find keys. The filter runs in the pipe, before
      * the file limit, because the raw output of a host can be larger than the limit (57 MB on CentOS Stream 9); the exit
@@ -602,7 +603,7 @@ class ScannerCommands
     {
         $out = escapeshellarg($this->workDir().'/out');
         $run = $hostFilter
-            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{ if (match(\$0, /\"id\":\"[^\"]*\"/)) { k = substr(\$0, RSTART, RLENGTH); if (seen[k]++) next } print }' > {$out}; rc=\$(cat {$out}.rc 2>/dev/null || echo 1)"
+            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{ if (match(\$0, /\"id\":\"[^\"]*\"/)) { k = substr(\$0, RSTART, RLENGTH); if (match(\$0, /\"ver\":\"[^\"]*\"/)) k = k substr(\$0, RSTART, RLENGTH); if (seen[k]++) next } print }' > {$out}; rc=\$(cat {$out}.rc 2>/dev/null || echo 1)"
             : "{$dockerRun} > {$out} 2>/dev/null; rc=\$?";
         $commands = [...$this->start($template === null ? ['scratch'] : ['scratch', 'tpl'])];
         if ($template !== null) {

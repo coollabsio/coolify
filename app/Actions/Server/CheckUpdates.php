@@ -85,6 +85,14 @@ sh -c 'if [ -f /var/run/reboot-required ]; then echo REBOOT=yes; exit 0; fi; if 
 SH;
 
     /**
+     * Prints the running kernel (`RUNNING|<uname -r>`) and each installed kernel (`KERNEL|<package>|<version>[|<arch>]`),
+     * so the vulnerability list can tell an installed fix that waits for a reboot from an old kernel that does not run.
+     */
+    public const KERNELS_COMMAND = <<<'SH'
+sh -c 'echo "RUNNING|$(uname -r)"; if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f="\${db:Status-Abbrev}|\${Package}|\${Version}\n" "linux-image-[0-9]*" 2>/dev/null | sed -n "s/^ii *|/KERNEL|/p"; fi; if command -v rpm >/dev/null 2>&1; then rpm -q --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" kernel-core kernel kernel-uek-core 2>/dev/null | grep "^KERNEL|"; fi; exit 0'
+SH;
+
+    /**
      * Packages whose update can interrupt the server, per package manager. `*` matches like a shell glob.
      * docker: restarts the Docker daemon and with it the running containers. kernel: needs a reboot.
      * system: core libraries and services that are restarted or need a reboot to apply fully.
@@ -233,6 +241,7 @@ SH;
 
             $out = $this->addUpdateDetails($out, $packageManager, $securityPackages);
             $out['reboot_required'] = $this->parseRebootStatus((string) instant_remote_process([self::REBOOT_CHECK_COMMAND], $server, false));
+            $out['kernels'] = $this->parseKernels((string) instant_remote_process([self::KERNELS_COMMAND], $server, false));
             $out['osId'] = $osId;
             $out['package_manager'] = $packageManager;
 
@@ -289,6 +298,32 @@ SH;
     }
 
     /**
+     * Updates of a saved check result that fix a vulnerable package: its own update, or for a kernel package that
+     * has the version in its name (Debian, Ubuntu: linux-modules-6.8.0-139-generic) all kernel updates, because the
+     * fixed kernel comes as a new package of the kernel meta packages. Empty on systems that only do full upgrades.
+     *
+     * @param  array<string, mixed>|null  $patchResult
+     * @return list<array<string, mixed>>
+     */
+    public static function fixingUpdates(string $package, ?array $patchResult): array
+    {
+        $packageManager = data_get($patchResult, 'package_manager');
+        if (in_array($packageManager, self::FULL_UPGRADE_ONLY, true)) {
+            return [];
+        }
+        $updates = collect(data_get($patchResult, 'updates', []));
+        $ownUpdate = $updates->firstWhere('package', $package);
+        if ($ownUpdate !== null) {
+            return [$ownUpdate];
+        }
+        if (self::riskFor($packageManager, $package) !== 'kernel') {
+            return [];
+        }
+
+        return $updates->filter(fn ($update) => data_get($update, 'risk') === 'kernel')->values()->all();
+    }
+
+    /**
      * Package names from `dnf updateinfo list --security` (dnf4: "RLSA-2024:1234 Important/Sec. openssl-1:3.0.7-27.el9.x86_64",
      * dnf5: "FEDORA-2024-1 security Critical curl-8.6.0-1.fc40.x86_64 2024-01-01 00:00:00").
      *
@@ -329,6 +364,107 @@ SH;
         }
 
         return array_values(array_unique($packages));
+    }
+
+    /**
+     * @param  string  $output  Output of KERNELS_COMMAND.
+     * @return array{running: string, installed: list<array{package: string, version: string, release: string}>}|null
+     */
+    public function parseKernels(string $output): ?array
+    {
+        $running = null;
+        $installed = [];
+        foreach (preg_split('/\R/', $output) as $line) {
+            $parts = explode('|', trim($line));
+            if ($parts[0] === 'RUNNING' && filled($parts[1] ?? null)) {
+                $running = $parts[1];
+            } elseif ($parts[0] === 'KERNEL' && filled($parts[1] ?? null) && filled($parts[2] ?? null)) {
+                $installed[] = [
+                    'package' => $parts[1],
+                    'version' => $parts[2],
+                    // uname -r of this kernel: the package name without the prefix (dpkg), or version.arch (rpm).
+                    'release' => filled($parts[3] ?? null) ? "{$parts[2]}.{$parts[3]}" : (string) preg_replace('/^linux-image-/', '', $parts[1]),
+                ];
+            }
+        }
+
+        return $running === null ? null : ['running' => $running, 'installed' => $installed];
+    }
+
+    /**
+     * Kernel state of a vulnerable package, from the kernels of the last patch check:
+     * - fixed_after_reboot: the package belongs to the running kernel, and an installed newer kernel has the fix.
+     * - runs_after_reboot: the package belongs to an installed kernel that is newer than the running one.
+     * Other kernels that the server does not run: see isOtherKernelPackage().
+     *
+     * @param  array<string, mixed>|null  $patchResult
+     * @return 'fixed_after_reboot'|'runs_after_reboot'|null
+     */
+    public static function kernelStatus(string $package, string $version, ?string $fixedIn, ?array $patchResult): ?string
+    {
+        $running = data_get($patchResult, 'kernels.running');
+        $installed = collect(data_get($patchResult, 'kernels.installed', []));
+        if (! is_string($running) || $installed->isEmpty()) {
+            return null;
+        }
+        $runningKernel = $installed->firstWhere('release', $running);
+        $kernel = $installed->first(fn (array $kernel) => self::kernelHasPackage($kernel, $package, $version));
+        if ($kernel === null || $runningKernel === null) {
+            return null;
+        }
+        if ($kernel['release'] !== $running) {
+            return self::versionAtLeast($kernel['version'], $runningKernel['version']) ? 'runs_after_reboot' : null;
+        }
+        $newest = $installed->reduce(fn (?array $carry, array $kernel) => $carry === null || self::versionAtLeast($kernel['version'], $carry['version']) ? $kernel : $carry);
+        if ($fixedIn !== null && $newest['release'] !== $running && self::versionAtLeast($newest['version'], $fixedIn)) {
+            return 'fixed_after_reboot';
+        }
+
+        return null;
+    }
+
+    /**
+     * True for a package of an installed kernel that the server does not run (`uname -r`), older or newer. Its
+     * vulnerabilities are no risk now; a newer one runs after the next reboot and then replaces the running kernel. Debian kernel packages carry the release in the name
+     * (linux-modules-6.8.0-139-generic, linux-headers-6.8.0-139), RPM kernel packages the version.
+     */
+    public static function isOtherKernelPackage(string $package, string $version, ?string $runningRelease): bool
+    {
+        if (blank($runningRelease)) {
+            return false;
+        }
+        if (preg_match('/^linux-.*?-(\d+\.\d+(?:\.\d+)?-\d+)(?:-|$)/', $package, $packageKernel) === 1) {
+            return preg_match('/^(\d+\.\d+(?:\.\d+)?-\d+)/', $runningRelease, $runningKernel) === 1
+                && $packageKernel[1] !== $runningKernel[1];
+        }
+
+        return str_starts_with($package, 'kernel')
+            && self::withoutEpoch($version) !== (string) preg_replace('/\.[^.]+$/', '', $runningRelease);
+    }
+
+    /**
+     * Debian packages of a kernel have its release in the name (linux-modules-6.8.0-139-generic); RPM kernel packages
+     * have a fixed name and the version of the kernel.
+     *
+     * @param  array{package: string, version: string, release: string}  $kernel
+     */
+    private static function kernelHasPackage(array $kernel, string $package, string $version): bool
+    {
+        if (str_ends_with($package, '-'.$kernel['release'])) {
+            return true;
+        }
+
+        return str_starts_with($package, 'kernel') && self::withoutEpoch($version) === self::withoutEpoch($kernel['version']);
+    }
+
+    private static function versionAtLeast(string $version, string $minimum): bool
+    {
+        return version_compare(self::withoutEpoch($version), self::withoutEpoch($minimum), '>=');
+    }
+
+    private static function withoutEpoch(string $version): string
+    {
+        return (string) preg_replace('/^\d+:/', '', $version);
     }
 
     public function parseRebootStatus(string $output): ?bool

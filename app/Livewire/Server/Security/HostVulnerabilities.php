@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Server\Security;
 
+use App\Actions\Server\CheckUpdates;
 use App\Jobs\ImageRescanJob;
 use App\Jobs\ScanHostPackagesJob;
+use App\Livewire\Concerns\ManagesServerPackageUpdates;
 use App\Models\Server;
+use App\Services\ImageScan\Finding;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -21,6 +24,7 @@ class HostVulnerabilities extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use ManagesServerPackageUpdates;
     use WithPagination;
 
     public Server $server;
@@ -28,9 +32,63 @@ class HostVulnerabilities extends Component
     #[Locked]
     public bool $hostScanRunning = false;
 
+    private const SORT_COLUMNS = ['vulnerability', 'package', 'fixed', 'severity'];
+
+    private const SEVERITY_ORDER = ['unknown' => 0, 'low' => 1, 'medium' => 2, 'high' => 3, 'critical' => 4];
+
     public int $perPage = 10;
 
+    /** `<column>_<asc|desc>`, or empty for the stored order: exploited first, then fixable, then risk. */
+    #[Locked]
+    public string $sortBy = '';
+
     public string $search = '';
+
+    /** Shows the findings in installed kernels that the server does not run; they are no risk now, so they are hidden. */
+    public bool $showOtherKernels = false;
+
+    public function sortFindings(string $sortBy): void
+    {
+        [$column, $direction] = array_pad(explode('_', $sortBy, 2), 2, null);
+        if (! in_array($column, self::SORT_COLUMNS, true) || ! in_array($direction, ['asc', 'desc'], true)) {
+            return;
+        }
+        $this->sortBy = $sortBy;
+        $this->resetPage();
+    }
+
+    /**
+     * @param  list<Finding>  $findings
+     * @return list<Finding>
+     */
+    private function sortedFindings(array $findings): array
+    {
+        if ($this->sortBy === '') {
+            return $findings;
+        }
+        [$column, $direction] = explode('_', $this->sortBy, 2);
+        $compare = match ($column) {
+            'vulnerability' => fn (Finding $a, Finding $b): int => strnatcasecmp($a->displayId, $b->displayId),
+            'package' => fn (Finding $a, Finding $b): int => strnatcasecmp($a->package, $b->package),
+            'fixed' => fn (Finding $a, Finding $b): int => version_compare($a->fixedIn ?? '', $b->fixedIn ?? ''),
+            'severity' => fn (Finding $a, Finding $b): int => (self::SEVERITY_ORDER[$a->severity] ?? 0) <=> (self::SEVERITY_ORDER[$b->severity] ?? 0),
+        };
+        // Findings without a fix stay last in both directions; usort keeps the stored order for equal values.
+        usort($findings, function (Finding $a, Finding $b) use ($column, $compare, $direction): int {
+            if ($column === 'fixed' && ($a->fixedIn === null) !== ($b->fixedIn === null)) {
+                return $a->fixedIn === null ? 1 : -1;
+            }
+
+            return $direction === 'asc' ? $compare($a, $b) : $compare($b, $a);
+        });
+
+        return $findings;
+    }
+
+    public function updatedShowOtherKernels(): void
+    {
+        $this->resetPage();
+    }
 
     public function updatedSearch(): void
     {
@@ -91,13 +149,41 @@ class HostVulnerabilities extends Component
         }
     }
 
+    /**
+     * Updates the package of a host finding with the updates that the last patch check found for it.
+     */
+    public function updateVulnerablePackage(string $package)
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $isFinding = collect($this->server->hostScan()->first()?->findingList() ?? [])->contains(fn ($finding) => $finding->package === $package);
+            $packages = array_column(CheckUpdates::fixingUpdates($package, $this->server->settings->patch_check_result), 'package');
+            if (! $isFinding || $packages === []) {
+                $this->dispatch('error', message: 'This package has no update in the last check. Run "Check for updates" on the Patching page.');
+
+                return;
+            }
+            $this->runUpdate(packages: $packages);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function render(): View
     {
         $hostScan = $this->server->hostScan()->first();
-        $hostFindings = $hostScan?->findingList() ?? [];
+        $patchResult = $this->server->settings->patch_check_result;
+        $runningKernel = data_get($patchResult, 'kernels.running');
+        [$otherKernelFindings, $activeFindings] = collect($hostScan?->findingList() ?? [])
+            ->partition(fn ($finding) => CheckUpdates::isOtherKernelPackage($finding->package, $finding->version, $runningKernel))
+            ->map(fn ($findings) => $findings->values()->all());
+        $hostFindings = $this->showOtherKernels ? [...$activeFindings, ...$otherKernelFindings] : $activeFindings;
+        $installedKernels = collect(data_get($patchResult, 'kernels.installed', []));
+        $runningKernelVersion = data_get($installedKernels->firstWhere('release', $runningKernel), 'version');
         $search = trim($this->search);
-        $matchingFindings = $search === '' ? $hostFindings : array_values(array_filter(
-            $hostFindings,
+        $sortedFindings = $this->sortedFindings($hostFindings);
+        $matchingFindings = $search === '' ? $sortedFindings : array_values(array_filter(
+            $sortedFindings,
             fn ($finding) => str(implode(' ', [$finding->displayId, $finding->id, ...$finding->aliases, $finding->package, $finding->title]))
                 ->contains($search, ignoreCase: true),
         ));
@@ -109,7 +195,17 @@ class HostVulnerabilities extends Component
             $this->setPage($page);
         }
 
+        $kernelStatusCounts = collect($activeFindings)
+            ->map(fn ($finding) => CheckUpdates::kernelStatus($finding->package, $finding->version, $finding->fixedIn, $patchResult))
+            ->filter()
+            ->countBy();
+
         return view('livewire.server.security.host-vulnerabilities', [
+            'kernelStatusCounts' => $kernelStatusCounts,
+            'otherKernelCount' => max(count($otherKernelFindings), (int) data_get($hostScan?->summary, 'other_kernels', 0)),
+            'hasOldKernels' => $runningKernelVersion !== null && $installedKernels->contains(fn ($kernel) => version_compare($kernel['version'], $runningKernelVersion, '<')),
+            'runningKernel' => $runningKernel,
+            'newestKernel' => collect(data_get($patchResult, 'kernels.installed', []))->pluck('release')->sort(fn ($a, $b) => version_compare($a, $b))->last(),
             'hostScan' => $hostScan,
             'hostFindings' => $hostFindings,
             'shownHostFindings' => new LengthAwarePaginator(
@@ -119,7 +215,7 @@ class HostVulnerabilities extends Component
                 $page,
             ),
             'hostScanAvailable' => ImageRescanJob::canRunOn($this->server),
-            'result' => $this->server->settings->patch_check_result,
+            'result' => $patchResult,
         ]);
     }
 }

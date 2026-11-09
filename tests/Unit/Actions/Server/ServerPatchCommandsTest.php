@@ -44,7 +44,7 @@ it('allows only a full system upgrade on Arch Linux', function () {
     $server = Mockery::mock(Server::class)->makePartial();
     $server->shouldReceive('serverStatus')->andReturn(true);
 
-    expect(UpdatePackage::run($server, 'arch', 'curl', 'pacman'))
+    expect(UpdatePackage::run($server, 'arch', ['curl'], 'pacman'))
         ->toHaveKey('error', 'This operating system supports only a full system upgrade. Use "Update all packages".');
 });
 

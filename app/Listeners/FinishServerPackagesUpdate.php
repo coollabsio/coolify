@@ -31,7 +31,7 @@ class FinishServerPackagesUpdate
             'team_id' => $server->team_id,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
-            'packages' => $packages === [] ? 'all' : $packages,
+            'packages' => ($event->data['action'] ?? null) === 'remove_unused' ? 'unused' : ($packages === [] ? 'all' : $packages),
             'package_manager' => $event->data['package_manager'] ?? null,
             'activity_id' => $activity?->id,
             'result' => $status === ProcessStatus::FINISHED->value ? 'success' : 'failed',

@@ -3,9 +3,8 @@
 namespace App\Livewire\Server\Security;
 
 use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
-use App\Actions\Server\RebootServer;
-use App\Actions\Server\UpdatePackage;
 use App\Jobs\ServerPatchCheckJob;
+use App\Livewire\Concerns\ManagesServerPackageUpdates;
 use App\Models\Server;
 use App\Notifications\Server\ServerPatchCheck;
 use App\Traits\ListensToTeamChannel;
@@ -21,6 +20,7 @@ class Patches extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use ManagesServerPackageUpdates;
     use WithPagination;
 
     public Server $server;
@@ -47,6 +47,9 @@ class Patches extends Component
     public int $perPage = 10;
 
     public string $search = '';
+
+    /** @var list<string> Packages of the last check that the user selected to update. */
+    public array $selectedPackages = [];
 
     public function updatedSearch(): void
     {
@@ -87,6 +90,44 @@ class Patches extends Component
         $this->result = $this->server->settings->patch_check_result;
         $this->error = $this->server->settings->patch_check_error;
         $this->checking = Cache::has(ServerPatchCheckJob::runningCacheKey($this->server));
+        $this->selectedPackages = array_values(array_intersect($this->selectedPackages, $this->savedPackages()));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function savedPackages(): array
+    {
+        return collect(data_get($this->server->settings->patch_check_result, 'updates', []))->pluck('package')->all();
+    }
+
+    /**
+     * Selects all packages that match the search, or clears the selection when they are all selected.
+     */
+    public function toggleAllPackages(): void
+    {
+        $search = trim($this->search);
+        $matching = array_values(array_filter($this->savedPackages(), fn (string $package) => $search === '' || str($package)->contains($search, ignoreCase: true)));
+        $this->selectedPackages = array_diff($matching, $this->selectedPackages) === []
+            ? array_values(array_diff($this->selectedPackages, $matching))
+            : array_values(array_unique([...$this->selectedPackages, ...$matching]));
+    }
+
+    public function updateSelectedPackages()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $packages = array_values(array_intersect($this->savedPackages(), $this->selectedPackages));
+            if ($packages === []) {
+                $this->dispatch('error', message: 'Select the packages to update.');
+
+                return;
+            }
+            $this->runUpdate(packages: $packages);
+            $this->selectedPackages = [];
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function patchCheckFinished(array $event = []): void
@@ -124,31 +165,12 @@ class Patches extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            $savedPackages = collect(data_get($this->server->settings->patch_check_result, 'updates', []))->pluck('package');
-            if (! $savedPackages->contains($package)) {
+            if (! in_array($package, $this->savedPackages(), true)) {
                 $this->dispatch('error', message: 'This package has no update in the last check.');
 
                 return;
             }
-            $this->runUpdate(package: $package);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function rebootServer()
-    {
-        try {
-            $this->authorize('update', $this->server);
-            try {
-                RebootServer::run($this->server);
-            } catch (\Throwable $e) {
-                $this->auditPatchAction('reboot_requested', ['result' => 'failed', 'error' => class_basename($e)], 'error');
-
-                throw $e;
-            }
-            $this->auditPatchAction('reboot_requested', ['result' => 'started']);
-            $this->dispatch('success', 'Reboot started. The server is back in a few minutes, and Coolify then checks it again.');
+            $this->runUpdate(packages: [$package]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -255,56 +277,6 @@ class Patches extends Component
         return true;
     }
 
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    private function auditPatchAction(string $action, array $context, string $level = 'info'): void
-    {
-        auditLog("ui.server.{$action}", [
-            'team_id' => $this->server->team_id,
-            'server_uuid' => $this->server->uuid,
-            'server_name' => $this->server->name,
-            ...$context,
-        ], $level);
-    }
-
-    /**
-     * A transferred server is an archive: another instance manages the host.
-     */
-    private function ensureManagedHere(): void
-    {
-        if ($this->server->isTransferredAway()) {
-            throw new \RuntimeException('This server is managed by another Coolify instance.');
-        }
-    }
-
-    private function runUpdate(bool $all = false, ?string $package = null): void
-    {
-        $this->ensureManagedHere();
-        $savedResult = $this->server->settings->patch_check_result;
-        $packageManager = data_get($savedResult, 'package_manager');
-        $osId = data_get($savedResult, 'osId');
-        if (! $packageManager || ! $osId) {
-            $this->dispatch('error', message: 'Run "Check for updates" first.');
-
-            return;
-        }
-
-        $activity = UpdatePackage::run(server: $this->server, osId: $osId, package: $package, packageManager: $packageManager, all: $all);
-        if (is_array($activity)) {
-            $this->dispatch('error', message: $activity['error'] ?? 'Something went wrong.');
-
-            return;
-        }
-        $this->auditPatchAction('packages_update_requested', [
-            'packages' => $all ? 'all' : [$package],
-            'package_manager' => $packageManager,
-            'activity_id' => $activity->id,
-        ]);
-        $this->dispatch('startupdate');
-        $this->dispatch('activityMonitor', $activity->id);
-    }
-
     public function sendTestEmail()
     {
         if (! isDev()) {
@@ -359,6 +331,7 @@ class Patches extends Component
 
         return view('livewire.server.security.patches', [
             'updates' => $updates->all(),
+            'allMatchingSelected' => $matchingUpdates->isNotEmpty() && $matchingUpdates->pluck('package')->diff($this->selectedPackages)->isEmpty(),
             'shownUpdates' => new LengthAwarePaginator(
                 $matchingUpdates->forPage($page, $this->perPage)->values(),
                 $matchingUpdates->count(),
