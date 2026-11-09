@@ -214,8 +214,13 @@ update_version() {
 
 commit() {
 	git add --all -- "$VERSION_FILE" CHANGELOG.md "$CHANGE_DIRECTORY"
-	git commit --quiet -S --message "feat(release): bump $ARTIFACT version to v$new_version"
-	ok "signed commit $DIM$(git rev-parse --short HEAD)$RESET $(git log -1 --format=%s)"
+	local sign=-S kind=signed
+	if ! git commit-tree -S -m 'release signing check' 'HEAD^{tree}' > /dev/null 2>&1 < /dev/null; then
+		sign=--no-gpg-sign kind=unsigned
+		warn "git cannot sign a commit (no user.signingkey, or no agent that holds the key), the release commit is unsigned"
+	fi
+	git commit --quiet "$sign" --message "feat(release): bump $ARTIFACT version to v$new_version"
+	ok "$kind commit $DIM$(git rev-parse --short HEAD)$RESET $(git log -1 --format=%s)"
 }
 
 push() {

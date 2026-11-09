@@ -348,7 +348,7 @@ The summary reads as one sentence with the heading of its section, never in the 
 - A push that changes `release.json` publishes a release.
 - NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
 - `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.
-- `scripts/release.sh` is interactive and makes a signed commit. Do not run it, push a release commit, or start the release or nightly workflow yourself. Give the user the commands from `RELEASE.md` for the release type:
+- `scripts/release.sh` is interactive and makes a signed commit, or an unsigned commit when git cannot sign. Do not run it, push a release commit, or start the release or nightly workflow yourself. Give the user the commands from `RELEASE.md` for the release type:
 
 | Release | Branch | Command |
 | --- | --- | --- |
