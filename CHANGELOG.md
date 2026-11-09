@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.3] - 2026-11-09
+
+### Added
+
+- An `Export` menu on the vulnerability lists of a resource, of a server (`Security` > `Vulnerabilities`), and of the team `Security` page, to copy the list as a Markdown table or download it as CSV or JSON
+  - The export contains the rows that the list shows, with its tab, search, and filters, from all pages
+  - The finding lists can also copy the vulnerability IDs
+
+### Fixed
+
+- Broken links in backup notifications of the instance database and of service databases
+  - They link to `Settings` > `Backup` and to the service page
+- Denied root team owners and admins to change and download the instance backup on `Settings` > `Backup` ([#12503](https://github.com/coollabsio/coolify/issues/12503), [#12505](https://github.com/coollabsio/coolify/issues/12505))
+- Vulnerability scans of large images that stopped with a Syft or Grype timeout
+  - The default Grype time limit is 10 minutes. Set the `Syft time limit`, the `Grype time limit`, and the `Scanner CPU limit` on the `Vulnerabilities` page of a server, or with `image_scan_syft_timeout`, `image_scan_grype_timeout`, and `image_scan_cpus` in the server image scanning API
+  - The `Scanner CPU limit` and the `Scanner memory limit` offer only values that the server has. The API refuses higher values
+
 ## [v4.7.2] - 2026-11-09
 
 ### Security
