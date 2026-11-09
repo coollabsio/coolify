@@ -641,6 +641,22 @@ class Application extends BaseModel
     }
 
     /**
+     * The custom container labels, when the user edits them. Docker Compose applications
+     * take their labels from the compose file, so their domain routes apply.
+     *
+     * @return Collection<int, string>|null
+     */
+    public function maintenanceProxyLabels(): ?Collection
+    {
+        if ($this->build_pack === 'dockercompose' || $this->settings?->is_container_label_readonly_enabled !== false || blank($this->custom_labels)) {
+            return null;
+        }
+        $labels = decodeBase64EncodedLabels($this->custom_labels) ?? $this->custom_labels;
+
+        return collect(preg_split("/\r\n|\n|\r/", $labels));
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     public function maintenanceServers(): Collection
