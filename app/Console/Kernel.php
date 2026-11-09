@@ -99,6 +99,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
+            $this->scheduleInstance->command('project-config:release-stuck')->everyFiveMinutes()->onOneServer();
 
         } else {
             // Instance Jobs
@@ -121,6 +122,7 @@ class Kernel extends ConsoleKernel
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
+            $this->scheduleInstance->command('project-config:release-stuck')->everyFiveMinutes()->onOneServer();
 
             // Cleanup orphaned PR preview containers daily
             $this->scheduleInstance->job(new CleanupOrphanedPreviewContainersJob)->daily()->onOneServer();
