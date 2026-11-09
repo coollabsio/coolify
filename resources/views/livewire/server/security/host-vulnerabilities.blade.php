@@ -148,6 +148,9 @@
                     @if ($hostScanError)
                         <x-callout type="danger" title="The last scan failed">
                             {{ $hostScanError }}
+                            @can('update', $server)
+                                <x-image-scan.error-log :detail="data_get($hostScan->error_context, 'detail')" />
+                            @endcan
                         </x-callout>
                     @endif
                     @if ($hostScan?->eol)

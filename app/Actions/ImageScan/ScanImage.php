@@ -122,8 +122,11 @@ class ScanImage
 
         try {
             ImageRef::parse($imageRef);
-        } catch (InvalidArgumentException) {
-            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $context);
+        } catch (InvalidArgumentException $e) {
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference: {$e->getMessage()}");
+            $failure->log($server, $imageRef);
+
+            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $failure->errorContext($context));
         }
 
         $lock = self::serverLock($server);
@@ -202,7 +205,10 @@ class ScanImage
         }
 
         if (preg_match('/\Asha256:[a-f0-9]{64}\z/', $imageId) !== 1) {
-            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $context), $targets);
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: 'invalid image ID');
+            $failure->log($server, $imageId);
+
+            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $failure->errorContext($context)), $targets);
         }
 
         $lock = self::serverLock($server);
@@ -326,13 +332,16 @@ class ScanImage
 
             return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($grype), $image, $databaseBuiltAt, $isBaseline, $baseImageRef);
         } catch (ScanFailed $e) {
-            $errorContext = [...$context, ...$e->context];
+            $e->log($server, $imageRef);
+            $errorContext = $e->errorContext($context);
 
             return $image === null
                 ? $this->failBeforeRow($server, $resource, $imageRef, null, $e->errorCode, $errorContext)
                 : $this->failAfterInspect($server, $resource, $imageRef, $deployment, $image, $e->errorCode, $errorContext);
         } catch (Throwable $e) {
-            $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: $e::class.': '.$e->getMessage());
+            $failure->log($server, $imageRef);
+            $this->rememberError($resource, ImageScanErrorCode::Unknown, $failure->errorContext($context));
 
             throw $e;
         } finally {
@@ -374,14 +383,17 @@ class ScanImage
                 array_keys($targets),
             );
         } catch (ScanFailed $e) {
-            $errorContext = [...$context, ...$e->context];
+            $e->log($server, $imageId);
+            $errorContext = $e->errorContext($context);
 
             return array_map(fn (array $target) => $image === null
                 ? $this->failBeforeRow($server, $target[0], $target[1], null, $e->errorCode, $errorContext)
                 : $this->failAfterInspect($server, $target[0], $target[1], null, $image, $e->errorCode, $errorContext), $targets);
         } catch (Throwable $e) {
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: $e::class.': '.$e->getMessage());
+            $failure->log($server, $imageId);
             foreach ($resources as $resource) {
-                $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
+                $this->rememberError($resource, ImageScanErrorCode::Unknown, $failure->errorContext($context));
             }
 
             throw $e;
@@ -432,7 +444,7 @@ class ScanImage
 
         if ($builtAt === null) {
             self::updateDatabase($commands);
-            $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing);
+            $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing, detail: 'no valid vulnerability database after the update');
         }
 
         if ($builtAt->lt(now()->subDays(self::DB_MAX_AGE_DAYS))) {
@@ -457,7 +469,7 @@ class ScanImage
     {
         $result = self::runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
         if (in_array($result['code'], self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout);
+            throw new ScanFailed(ImageScanErrorCode::Timeout, detail: "step db-status exited with code {$result['code']}");
         }
 
         $status = $result['code'] === 0 ? json_decode($result['payload'], true) : null;
@@ -489,7 +501,7 @@ class ScanImage
         $this->progress($resource, 'pull');
         $result = self::runStep($commands->server, $commands->pull($imageRef), 'pull', self::TIMEOUT_PULL);
         if ($result['code'] !== 0) {
-            throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed);
+            throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed, detail: "step pull exited with code {$result['code']}");
         }
         $this->progress($resource, 'inspect');
 
@@ -503,7 +515,7 @@ class ScanImage
     {
         $result = self::runStep($commands->server, $commands->inspect($imageRef), 'inspect', self::TIMEOUT_DEFAULT);
         if ($result['code'] !== 0) {
-            throw new ScanFailed(ImageScanErrorCode::ImageMissing);
+            throw new ScanFailed(ImageScanErrorCode::ImageMissing, detail: "step inspect exited with code {$result['code']}");
         }
 
         $parts = explode('|', trim($result['payload']));
@@ -511,7 +523,7 @@ class ScanImage
             || preg_match('/\Asha256:([a-f0-9]{64})\z/', $parts[0], $id) !== 1
             || preg_match('#\A[a-z0-9]+/[a-z0-9_]+\z#', $parts[2]) !== 1
             || preg_match('/\A\d{1,18}\z/', $parts[3]) !== 1) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'unexpected docker image inspect output: '.ScanFailed::outputTail($result['payload']));
         }
 
         $repoDigest = Str::afterLast($parts[1], '@');
@@ -536,12 +548,12 @@ class ScanImage
     {
         $output = instant_remote_process($commands->diskFree(), $commands->server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         if (preg_match('/(\d+) +(\d+)\s*\z/', (string) $output, $free) !== 1) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'could not read the free disk space: '.ScanFailed::outputTail($output));
         }
 
         $needed = $imageSize * 2 + self::DISK_RESERVE_BYTES;
         if ((int) $free[1] < $needed || (int) $free[2] < $needed) {
-            throw new ScanFailed(ImageScanErrorCode::DiskSpace, ['n' => (int) ceil($needed / self::DISK_RESERVE_BYTES)]);
+            throw new ScanFailed(ImageScanErrorCode::DiskSpace, ['n' => (int) ceil($needed / self::DISK_RESERVE_BYTES)], "needed {$needed} bytes, free {$free[1]} and {$free[2]} bytes");
         }
     }
 
@@ -712,7 +724,7 @@ class ScanImage
      */
     private function upsert(Model $resource, string $imageId, array $values): ImageScan
     {
-        $scan = $this->firstOrCreateScan($resource, $imageId, $values) ?? throw new ScanFailed(ImageScanErrorCode::Unknown);
+        $scan = $this->firstOrCreateScan($resource, $imageId, $values) ?? throw new ScanFailed(ImageScanErrorCode::Unknown, detail: "could not save the scan row of image {$imageId}");
 
         if (! $scan->wasRecentlyCreated) {
             $scan->forceFill($values)->save();
@@ -920,7 +932,7 @@ class ScanImage
         $parsed = ScannerCommands::parseOutput($output);
 
         if ($output === null || trim($output) === '' || ! array_key_exists($step, $parsed['exit_codes'])) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: "step {$step} did not report an exit code (the command did not run or the SSH connection failed), output: ".ScanFailed::outputTail($output));
         }
 
         return [
@@ -942,13 +954,15 @@ class ScanImage
     {
         $code = $result['exit_codes'][$step] ?? null;
         if ($code !== 0 && $step !== 'save' && in_array($step, $result['oom'], true)) {
-            throw new ScanFailed(ImageScanErrorCode::OutOfMemory);
+            throw new ScanFailed(ImageScanErrorCode::OutOfMemory, detail: "step {$step} was killed because it ran out of memory");
         }
         if (in_array($code, self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout);
+            throw new ScanFailed(ImageScanErrorCode::Timeout, detail: "step {$step} exited with code {$code} (timeout)");
         }
         if ($code !== 0) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            $codes = json_encode($result['exit_codes']);
+
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'step '.$step.' exited with code '.($code ?? 'none').", all exit codes: {$codes}");
         }
     }
 

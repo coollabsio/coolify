@@ -722,23 +722,25 @@ class Vulnerabilities extends Component
     }
 
     /**
-     * The last scan errors of the owners, as their fixed messages.
+     * The last scan errors of the owners, as their fixed messages, with the error log for users who can update the resource.
      *
      * @param  Collection<int, Model>  $owners
-     * @return list<string>
+     * @return list<array{message: string, detail: ?string}>
      */
-    private function errorMessages(Collection $owners): array
+    private function errorMessages(Collection $owners, bool $showDetail): array
     {
         $messages = [];
         foreach ($owners as $owner) {
             $error = Cache::get(ScanImage::lastErrorCacheKey($owner));
             $code = is_array($error) ? ImageScanErrorCode::tryFrom((string) ($error['code'] ?? '')) : null;
             if ($code !== null) {
-                $messages[] = $code->message((array) ($error['context'] ?? []));
+                $context = (array) ($error['context'] ?? []);
+                $detail = $showDetail && is_string($context['detail'] ?? null) ? $context['detail'] : null;
+                $messages[$code->message($context)."\n".$detail] = ['message' => $code->message($context), 'detail' => $detail];
             }
         }
 
-        return array_values(array_unique($messages));
+        return array_values($messages);
     }
 
     /**
@@ -1003,7 +1005,7 @@ class Vulnerabilities extends Component
             'scans' => $scans,
             'progress' => $progress,
             'checkpoints' => $this->checkpoints($progress),
-            'errorMessages' => $this->errorMessages($owners),
+            'errorMessages' => $this->errorMessages($owners, $canUpdate),
             'card' => $security === null ? null : SecurityCard::for($resource, $security, $owners, $scans, $user, $imageStatuses, fn (Model $owner): RelevanceRules => $this->rulesFor($owner)),
             'isApplication' => $resource instanceof Application,
             'checkedAt' => $checkedAt === null ? null : Carbon::instance($checkedAt),

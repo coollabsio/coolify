@@ -51,8 +51,11 @@
             </x-slot:actions>
 
             <div class="flex flex-col gap-4">
-                @foreach ($errorMessages as $message)
-                    <x-callout type="danger" title="The last scan could not run">{{ $message }}</x-callout>
+                @foreach ($errorMessages as $error)
+                    <x-callout type="danger" title="The last scan could not run">
+                        {{ $error['message'] }}
+                        <x-image-scan.error-log :detail="$error['detail']" />
+                    </x-callout>
                 @endforeach
 
                 @if ($isScanning)
