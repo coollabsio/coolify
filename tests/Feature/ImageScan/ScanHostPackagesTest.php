@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -323,5 +324,34 @@ describe('vulnerabilities page', function () {
         session(['currentTeam' => $otherTeam]);
 
         expect(fn () => Livewire::test(HostVulnerabilities::class, ['server_uuid' => $this->server->uuid]))->toThrow(ModelNotFoundException::class);
+    });
+
+    it('exports the host findings that the list shows', function () {
+        $this->server->hostScan()->firstOrFail()->update(['findings' => [
+            ['id' => 'CVE-2026-111497', 'severity' => 'critical', 'package' => 'libbrotli-dev', 'version' => '1.1.0-2+b7', 'fixedIn' => '1.1.0-2+deb13u1', 'kev' => true],
+            ['id' => 'CVE-2026-2000', 'severity' => 'low', 'package' => 'curl', 'version' => '8.0.0'],
+        ]]);
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $page = Livewire::test(HostVulnerabilities::class, ['server_uuid' => $this->server->uuid]);
+
+        expect($page->instance()->copyList('markdown'))
+            ->toContain('Vulnerabilities of the server '.$this->server->name.' (2 findings)')
+            ->toContain('| [CVE-2026-111497](https://nvd.nist.gov/vuln/detail/CVE-2026-111497) | Critical, known exploited | libbrotli-dev | 1.1.0-2+b7 | 1.1.0-2+deb13u1 |');
+
+        $page->set('search', 'curl');
+        expect($page->instance()->copyList('ids'))->toBe("CVE-2026-2000\n");
+
+        $page->call('downloadList', 'csv')->assertFileDownloaded(Str::slug($this->server->name).'-host-vulnerabilities-'.now()->toDateString().'.csv');
+    });
+
+    it('stops the export when the user is no longer a team admin', function () {
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $page = Livewire::test(HostVulnerabilities::class, ['server_uuid' => $this->server->uuid]);
+        $this->team->members()->updateExistingPivot($this->admin->id, ['role' => 'member']);
+        $this->admin->unsetRelation('teams');
+
+        $page->call('copyList', 'markdown')->assertForbidden();
     });
 });

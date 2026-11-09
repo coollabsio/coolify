@@ -19551,6 +19551,38 @@
                                                 8192
                                             ]
                                         },
+                                        "image_scan_syft_timeout": {
+                                            "description": "Time limit of one Syft run (package list of an image), in seconds.",
+                                            "type": "integer",
+                                            "enum": [
+                                                300,
+                                                600,
+                                                1200,
+                                                1800,
+                                                3600
+                                            ]
+                                        },
+                                        "image_scan_grype_timeout": {
+                                            "description": "Time limit of one Grype run (vulnerability match), in seconds.",
+                                            "type": "integer",
+                                            "enum": [
+                                                300,
+                                                600,
+                                                1200,
+                                                1800,
+                                                3600
+                                            ]
+                                        },
+                                        "image_scan_cpus": {
+                                            "description": "CPU limit of each scanner step.",
+                                            "type": "number",
+                                            "enum": [
+                                                0.5,
+                                                1,
+                                                2,
+                                                4
+                                            ]
+                                        },
                                         "scanner_state": {
                                             "description": "State of the scanner on the server. Null when unknown.",
                                             "type": [
@@ -19616,7 +19648,7 @@
                     "Servers"
                 ],
                 "summary": "Update image scanning settings",
-                "description": "Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the memory limit of the scanner. Send at least one field. Turning it on gets the scanner on the server in the background. A new memory limit applies to the next scan.",
+                "description": "Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the limits of the scanner (memory, CPUs, and the Syft and Grype time limits). Send at least one field. Turning it on gets the scanner on the server in the background. A new limit applies to the next scan.",
                 "operationId": "update-server-image-scanning",
                 "parameters": [
                     {
@@ -19639,13 +19671,45 @@
                                         "type": "boolean"
                                     },
                                     "image_scan_memory_mb": {
-                                        "description": "Memory limit of each scanner step, in MB.",
+                                        "description": "Memory limit of each scanner step, in MB. A value above the memory of the server is refused.",
                                         "type": "integer",
                                         "enum": [
                                             1024,
                                             2048,
                                             4096,
                                             8192
+                                        ]
+                                    },
+                                    "image_scan_syft_timeout": {
+                                        "description": "Time limit of one Syft run (package list of an image), in seconds.",
+                                        "type": "integer",
+                                        "enum": [
+                                            300,
+                                            600,
+                                            1200,
+                                            1800,
+                                            3600
+                                        ]
+                                    },
+                                    "image_scan_grype_timeout": {
+                                        "description": "Time limit of one Grype run (vulnerability match), in seconds.",
+                                        "type": "integer",
+                                        "enum": [
+                                            300,
+                                            600,
+                                            1200,
+                                            1800,
+                                            3600
+                                        ]
+                                    },
+                                    "image_scan_cpus": {
+                                        "description": "CPU limit of each scanner step. A value above the CPU count of the server is refused.",
+                                        "type": "number",
+                                        "enum": [
+                                            0.5,
+                                            1,
+                                            2,
+                                            4
                                         ]
                                     }
                                 },

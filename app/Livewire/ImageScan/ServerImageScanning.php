@@ -27,6 +27,12 @@ class ServerImageScanning extends Component
 
     public string $scannerMemoryMb = '';
 
+    public string $scannerSyftTimeout = '';
+
+    public string $scannerGrypeTimeout = '';
+
+    public string $scannerCpus = '';
+
     public function getListeners()
     {
         return $this->teamChannelListeners([
@@ -38,22 +44,89 @@ class ServerImageScanning extends Component
     {
         $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
         $this->authorize('viewSecurity', $this->server);
-        $this->scannerMemoryMb = (string) $this->server->settings->image_scan_memory_mb;
+        $this->fillScannerLimits();
+    }
+
+    /**
+     * Scanner limits: Livewire property => [settings column, allowed values, audit action, saved message].
+     *
+     * @return array<string, array{0: string, 1: list<string>, 2: string, 3: string}>
+     */
+    private function scannerLimits(): array
+    {
+        $strings = fn (array $values): array => array_map('strval', $values);
+
+        return [
+            'scannerMemoryMb' => ['image_scan_memory_mb', $strings(ScannerCommands::memoryOptionsMb($this->server)), 'image_scanner_memory_changed', 'Scanner memory limit saved. It applies to the next scan.'],
+            'scannerSyftTimeout' => ['image_scan_syft_timeout', $strings(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS), 'image_scanner_syft_timeout_changed', 'Syft time limit saved. It applies to the next scan.'],
+            'scannerGrypeTimeout' => ['image_scan_grype_timeout', $strings(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS), 'image_scanner_grype_timeout_changed', 'Grype time limit saved. It applies to the next scan.'],
+            'scannerCpus' => ['image_scan_cpus', $strings(ScannerCommands::cpuOptions($this->server)), 'image_scanner_cpus_changed', 'Scanner CPU limit saved. It applies to the next scan.'],
+        ];
+    }
+
+    /**
+     * Listbox options for the values that fit the server. A saved value that no longer fits stays in the list, marked,
+     * so the field does not show an empty value; it cannot be saved again.
+     *
+     * @param  list<int|float>  $allowed
+     * @return list<array{value: string, label: string}>
+     */
+    private static function listboxOptions(array $allowed, int|float $current, \Closure $label): array
+    {
+        $values = in_array($current, $allowed) ? $allowed : [...$allowed, $current];
+        sort($values);
+
+        return array_map(fn (int|float $value): array => [
+            'value' => (string) $value,
+            'label' => $label($value).(in_array($value, $allowed) ? '' : ' (more than this server has)'),
+        ], $values);
+    }
+
+    private function fillScannerLimits(): void
+    {
+        foreach ($this->scannerLimits() as $property => [$column]) {
+            $this->{$property} = (string) $this->server->settings->{$column};
+        }
     }
 
     public function updatedScannerMemoryMb()
     {
+        return $this->saveScannerLimit('scannerMemoryMb');
+    }
+
+    public function updatedScannerSyftTimeout()
+    {
+        return $this->saveScannerLimit('scannerSyftTimeout');
+    }
+
+    public function updatedScannerGrypeTimeout()
+    {
+        return $this->saveScannerLimit('scannerGrypeTimeout');
+    }
+
+    public function updatedScannerCpus()
+    {
+        return $this->saveScannerLimit('scannerCpus');
+    }
+
+    private function saveScannerLimit(string $property)
+    {
+        [$column, $options, $action, $message] = $this->scannerLimits()[$property];
         $this->authorize('update', $this->server);
 
-        $this->validate(['scannerMemoryMb' => ['required', Rule::in(array_map('strval', ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB))]]);
+        $this->validate(
+            [$property => ['required', Rule::in($options)]],
+            [$property.'.in' => 'Choose one of the listed values. Values that are more than this server has are not allowed.'],
+        );
 
         try {
             SetServerImageScanning::ensureManagedHere($this->server);
-            $this->server->settings->update(['image_scan_memory_mb' => (int) $this->scannerMemoryMb]);
-            $this->auditImageScanning('image_scanner_memory_changed');
-            $this->dispatch('success', 'Scanner memory limit saved. It applies to the next scan.');
+            $this->server->settings->update([$column => $this->{$property}]);
+            $this->auditImageScanning($action);
+            $this->dispatch('success', $message);
         } catch (\Throwable $e) {
-            $this->scannerMemoryMb = (string) $this->server->settings->refresh()->image_scan_memory_mb;
+            $this->server->settings->refresh();
+            $this->fillScannerLimits();
 
             return handleError($e, $this);
         }
@@ -159,9 +232,19 @@ class ServerImageScanning extends Component
         return view('livewire.image-scan.server-image-scanning', [
             'enabled' => (bool) $this->server->settings->is_image_scan_enabled,
             'memoryLimit' => formatBytes($this->server->settings->image_scan_memory_mb * 1024 * 1024, 0),
-            'memoryOptions' => array_map(
-                fn (int $mb) => ['value' => (string) $mb, 'label' => formatBytes($mb * 1024 * 1024, 0)],
-                ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB,
+            'memoryOptions' => self::listboxOptions(
+                ScannerCommands::memoryOptionsMb($this->server),
+                (int) $this->server->settings->image_scan_memory_mb,
+                fn (int $mb): string => formatBytes($mb * 1024 * 1024, 0),
+            ),
+            'timeoutOptions' => array_map(
+                fn (int $seconds) => ['value' => (string) $seconds, 'label' => ($seconds / 60).' minutes'],
+                ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS,
+            ),
+            'cpuOptions' => self::listboxOptions(
+                ScannerCommands::cpuOptions($this->server),
+                (float) $this->server->settings->image_scan_cpus,
+                fn (float $cpus): string => $cpus.' '.str('CPU')->plural($cpus > 1 ? 2 : 1),
             ),
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,
@@ -176,6 +259,7 @@ class ServerImageScanning extends Component
                 ->map(fn (string $name, string $tool) => $name.' '.config("constants.image_scan.images.{$tool}.version"))
                 ->implode(', '),
             'builtAt' => is_string($builtAt) ? CarbonImmutable::parse($builtAt) : null,
+            'cpuLimit' => ScannerCommands::cpus($this->server),
         ]);
     }
 }

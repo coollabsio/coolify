@@ -2405,3 +2405,26 @@ test('the pinned host key moves with the server', function () {
         ->is_ssh_host_key_check_enforced->toBeTrue()
         ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
 });
+
+test('the image scanner limits move with the server', function () {
+    $this->server->settings->forceFill([
+        'image_scan_syft_timeout' => 1800,
+        'image_scan_grype_timeout' => 1200,
+        'image_scan_cpus' => 2.0,
+        'image_scan_memory_mb' => 4096,
+    ])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->first()->settings;
+    expect($settings->image_scan_syft_timeout)->toBe(1800)
+        ->and($settings->image_scan_grype_timeout)->toBe(1200)
+        ->and($settings->image_scan_cpus)->toBe(2.0)
+        ->and($settings->image_scan_memory_mb)->toBe(4096);
+});

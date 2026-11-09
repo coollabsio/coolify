@@ -8,6 +8,7 @@ use App\Jobs\PrepareImageScannerJob;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Services\ImageScan\ImageScanningRefused;
+use App\Services\ImageScan\ScannerCommands;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,10 +18,21 @@ use OpenApi\Attributes as OA;
 
 class ServerImageScanningController extends Controller
 {
-    private const ALLOWED_FIELDS = ['is_image_scan_enabled', 'image_scan_memory_mb'];
+    /** Scanner limits that the API can change; each one has fixed options in ServerSetting. */
+    private const LIMIT_FIELDS = ['image_scan_memory_mb', 'image_scan_syft_timeout', 'image_scan_grype_timeout', 'image_scan_cpus'];
+
+    private const ALLOWED_FIELDS = ['is_image_scan_enabled', ...self::LIMIT_FIELDS];
+
+    /** Audit action of each scanner limit. */
+    private const LIMIT_AUDIT_ACTIONS = [
+        'image_scan_memory_mb' => 'api.server.image_scanner_memory_changed',
+        'image_scan_syft_timeout' => 'api.server.image_scanner_syft_timeout_changed',
+        'image_scan_grype_timeout' => 'api.server.image_scanner_grype_timeout_changed',
+        'image_scan_cpus' => 'api.server.image_scanner_cpus_changed',
+    ];
 
     /**
-     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
+     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, image_scan_syft_timeout: int, image_scan_grype_timeout: int, image_scan_cpus: float, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
      */
     private function transform(Server $server): array
     {
@@ -31,6 +43,9 @@ class ServerImageScanningController extends Controller
         return [
             'is_image_scan_enabled' => (bool) $server->settings->is_image_scan_enabled,
             'image_scan_memory_mb' => (int) $server->settings->image_scan_memory_mb,
+            'image_scan_syft_timeout' => (int) $server->settings->image_scan_syft_timeout,
+            'image_scan_grype_timeout' => (int) $server->settings->image_scan_grype_timeout,
+            'image_scan_cpus' => (float) $server->settings->image_scan_cpus,
             'scanner_state' => is_string($state) ? $state : null,
             'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
             'scanner_built_at' => is_string($builtAt) ? CarbonImmutable::parse($builtAt)->toIso8601String() : null,
@@ -63,6 +78,9 @@ class ServerImageScanningController extends Controller
                     properties: [
                         new OA\Property(property: 'is_image_scan_enabled', type: 'boolean', description: 'Whether the server scans the images of its resources.'),
                         new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB.'),
+                        new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
+                        new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
+                        new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step.'),
                         new OA\Property(property: 'scanner_state', type: 'string', nullable: true, enum: ['pulling', 'updating_database', 'ready', 'failed'], description: 'State of the scanner on the server. Null when unknown.'),
                         new OA\Property(property: 'scanner_failed_step', type: 'string', nullable: true, description: 'The step that failed when scanner_state is failed.'),
                         new OA\Property(property: 'scanner_built_at', type: 'string', format: 'date-time', nullable: true, description: 'Time of the vulnerability database on the server.'),
@@ -95,7 +113,7 @@ class ServerImageScanningController extends Controller
 
     #[OA\Patch(
         summary: 'Update image scanning settings',
-        description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the memory limit of the scanner. Send at least one field. Turning it on gets the scanner on the server in the background. A new memory limit applies to the next scan.',
+        description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the limits of the scanner (memory, CPUs, and the Syft and Grype time limits). Send at least one field. Turning it on gets the scanner on the server in the background. A new limit applies to the next scan.',
         path: '/servers/{uuid}/image-scanning',
         operationId: 'update-server-image-scanning',
         security: [['bearerAuth' => []]],
@@ -108,7 +126,10 @@ class ServerImageScanningController extends Controller
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'is_image_scan_enabled', type: 'boolean'),
-                    new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB.'),
+                    new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB. A value above the memory of the server is refused.'),
+                    new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
+                    new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
+                    new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'),
                 ],
                 type: 'object',
             ),
@@ -143,8 +164,14 @@ class ServerImageScanningController extends Controller
         $this->authorize('update', $server);
 
         $validator = customApiValidator($request->all(), [
-            'is_image_scan_enabled' => 'required_without:image_scan_memory_mb|boolean',
-            'image_scan_memory_mb' => ['required_without:is_image_scan_enabled', 'integer', Rule::in(ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB)],
+            'is_image_scan_enabled' => ['required_without_all:'.implode(',', self::LIMIT_FIELDS), 'boolean'],
+            'image_scan_memory_mb' => ['integer', Rule::in(ScannerCommands::memoryOptionsMb($server))],
+            'image_scan_syft_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
+            'image_scan_grype_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
+            'image_scan_cpus' => ['numeric', Rule::in(ScannerCommands::cpuOptions($server))],
+        ], [
+            'image_scan_memory_mb.in' => 'This server allows: '.implode(', ', ScannerCommands::memoryOptionsMb($server)).'. A higher limit is more than the memory of the server.',
+            'image_scan_cpus.in' => 'This server allows: '.implode(', ', ScannerCommands::cpuOptions($server)).'. A higher limit is more than the CPU count of the server.',
         ]);
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -165,10 +192,13 @@ class ServerImageScanningController extends Controller
             'server_name' => $server->name,
         ];
         try {
-            if ($request->has('image_scan_memory_mb')) {
+            $limits = $request->only(self::LIMIT_FIELDS);
+            if ($limits !== []) {
                 SetServerImageScanning::ensureManagedHere($server);
-                $server->settings->update(['image_scan_memory_mb' => $request->integer('image_scan_memory_mb')]);
-                auditLog('api.server.image_scanner_memory_changed', $audit);
+                $server->settings->update($limits);
+                foreach (array_keys($limits) as $field) {
+                    auditLog(self::LIMIT_AUDIT_ACTIONS[$field], $audit);
+                }
             }
             if ($request->has('is_image_scan_enabled')) {
                 $enabled = $request->boolean('is_image_scan_enabled');

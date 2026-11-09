@@ -243,6 +243,81 @@ describe('scanner memory limit', function () {
     });
 });
 
+describe('scanner time and CPU limits', function () {
+    it('saves the Syft and Grype time limits and the CPU limit, and shows the CPUs in the cost text', function () {
+        imageScanningPage()
+            ->assertSet('scannerSyftTimeout', '600')
+            ->assertSet('scannerGrypeTimeout', '600')
+            ->assertSet('scannerCpus', '1')
+            ->set('scannerSyftTimeout', '1800')
+            ->assertDispatched('success', 'Syft time limit saved. It applies to the next scan.')
+            ->set('scannerGrypeTimeout', '1200')
+            ->set('scannerCpus', '0.5')
+            ->assertHasNoErrors()
+            ->assertSee('up to 0.5 CPU and 1 GB of memory');
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->image_scan_syft_timeout)->toBe(1800)
+            ->and($settings->image_scan_grype_timeout)->toBe(1200)
+            ->and($settings->image_scan_cpus)->toBe(0.5);
+    });
+
+    it('refuses a limit that is not one of the options', function (string $property, string $value) {
+        imageScanningPage()->set($property, $value)->assertHasErrors($property);
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->image_scan_syft_timeout)->toBe(600)
+            ->and($settings->image_scan_grype_timeout)->toBe(600)
+            ->and($settings->image_scan_cpus)->toBe(1.0);
+    })->with([
+        'syft time limit' => ['scannerSyftTimeout', '45'],
+        'grype time limit' => ['scannerGrypeTimeout', '99999'],
+        'cpus' => ['scannerCpus', '1; id'],
+    ]);
+
+    it('does not change the limits of a server that another instance manages', function () {
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+
+        imageScanningPage()->set('scannerGrypeTimeout', '3600')->assertNotDispatched('success')->assertSet('scannerGrypeTimeout', '600');
+
+        expect($this->server->settings->fresh()->image_scan_grype_timeout)->toBe(600);
+    });
+});
+
+describe('scanner limits that fit the server', function () {
+    beforeEach(function () {
+        $this->server->forceFill(['server_metadata' => ['memory_bytes' => 2 * 1024 ** 3, 'cpus' => 2]])->saveQuietly();
+    });
+
+    it('refuses memory and CPU limits above what the server has', function (string $property, string $value) {
+        imageScanningPage()->set($property, $value)->assertHasErrors($property);
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->image_scan_memory_mb)->toBe(1024)
+            ->and($settings->image_scan_cpus)->toBe(1.0);
+    })->with([
+        'memory' => ['scannerMemoryMb', '4096'],
+        'cpus' => ['scannerCpus', '4'],
+    ]);
+
+    it('saves the limits that the server has', function () {
+        imageScanningPage()->set('scannerMemoryMb', '2048')->set('scannerCpus', '2')->assertHasNoErrors();
+
+        $settings = $this->server->settings->fresh();
+        expect($settings->image_scan_memory_mb)->toBe(2048)
+            ->and($settings->image_scan_cpus)->toBe(2.0);
+    });
+
+    it('keeps a saved limit that no longer fits visible and marked', function () {
+        $this->server->settings->forceFill(['image_scan_memory_mb' => 8192])->saveQuietly();
+
+        imageScanningPage()
+            ->assertSet('scannerMemoryMb', '8192')
+            ->assertSee('8 GB (more than this server has)')
+            ->assertDontSee('4 GB');
+    });
+});
+
 describe('server image scanning authorization', function () {
     beforeEach(function () {
         Queue::fake();
@@ -267,6 +342,7 @@ describe('server image scanning authorization', function () {
         $components = collect(['enable', 'disable', 'deleteScannerData'])
             ->mapWithKeys(fn (string $action) => [$action => Livewire::test(ServerImageScanning::class, ['server_uuid' => $this->server->uuid])]);
         $memoryComponent = Livewire::test(ServerImageScanning::class, ['server_uuid' => $this->server->uuid]);
+        $timeoutComponent = Livewire::test(ServerImageScanning::class, ['server_uuid' => $this->server->uuid]);
 
         $this->member->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
         $this->member->unsetRelation('teams');
@@ -276,9 +352,11 @@ describe('server image scanning authorization', function () {
             $component->call($action)->assertForbidden();
         }
         $memoryComponent->set('scannerMemoryMb', '8192')->assertForbidden();
+        $timeoutComponent->set('scannerGrypeTimeout', '3600')->assertForbidden();
 
         expect($this->server->settings->fresh()->is_image_scan_enabled)->toBeFalse()
-            ->and($this->server->settings->fresh()->image_scan_memory_mb)->toBe(1024);
+            ->and($this->server->settings->fresh()->image_scan_memory_mb)->toBe(1024)
+            ->and($this->server->settings->fresh()->image_scan_grype_timeout)->toBe(600);
         Queue::assertNothingPushed();
     });
 

@@ -15,6 +15,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Services\ImageScan\Finding;
+use App\Services\ImageScan\FindingsExport;
 use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ImageScan\ImageUpdateRefused;
 use App\Services\ImageScan\RelevanceRules;
@@ -35,10 +36,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -942,6 +945,67 @@ class Vulnerabilities extends Component
     }
 
     /**
+     * The findings that the list shows on all its pages: the ignored ones, or the current fix state, with the filters,
+     * worst first. The By package view groups these rows.
+     *
+     * @return list<array{key: string, scan: string, finding: Finding, state: string, ignore: ?ImageScanIgnore, image: string, owner: string, base: ?string, never_allowed: bool, package_never_allowed: bool}>
+     */
+    private function shownRows(): array
+    {
+        $this->fixState = array_key_exists($this->fixState, self::FIX_STATES) ? $this->fixState : 'fixed';
+        $rows = array_values(array_filter($this->findingRows(), fn (array $row): bool => $this->showIgnored
+            ? $row['ignore'] !== null
+            : $row['ignore'] === null && $row['state'] === $this->fixState));
+
+        return $this->sortRows($this->filterRows($rows));
+    }
+
+    /**
+     * The shown findings as text for the clipboard: a Markdown table or the IDs.
+     */
+    public function copyList(string $format): string
+    {
+        abort_unless(in_array($format, ['markdown', 'ids'], true), 404);
+        abort_if($this->offState($this->resource(), ImageScanPolicyResolver::for($this->resource())->scanServer) !== null, 404);
+        $this->skipRender();
+
+        $rows = $this->shownRows();
+        if ($format === 'ids') {
+            return FindingsExport::ids($rows);
+        }
+
+        $count = trans_choice('{1} 1 finding|[2,*] :count findings', count($rows), ['count' => number_format(count($rows))]);
+        $scope = $this->showIgnored ? 'ignored' : self::FIX_STATES[$this->fixState];
+        $title = 'Vulnerabilities of '.$this->resource()->getAttribute('name')." ({$count}, {$scope})";
+
+        return FindingsExport::markdown($title, $rows, $this->currentScans()->pluck('image_ref')->unique()->count() > 1, $this->showIgnored);
+    }
+
+    /**
+     * Downloads the shown findings as CSV or JSON.
+     */
+    public function downloadList(string $format): StreamedResponse
+    {
+        abort_unless(in_array($format, ['csv', 'json'], true), 404);
+        $resource = $this->resource();
+        abort_if($this->offState($resource, ImageScanPolicyResolver::for($resource)->scanServer) !== null, 404);
+
+        $rows = $this->shownRows();
+        $content = $format === 'csv'
+            ? FindingsExport::csv($rows, self::FIX_STATES)
+            : FindingsExport::json([
+                'type' => $this->resourceType,
+                'name' => (string) $resource->getAttribute('name'),
+                'uuid' => $this->resourceUuid,
+            ], $rows, self::FIX_STATES);
+        $name = (Str::slug((string) $resource->getAttribute('name')) ?: 'resource').'-vulnerabilities-'.now()->toDateString().'.'.$format;
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, $name, ['Content-Type' => $format === 'csv' ? 'text/csv; charset=UTF-8' : 'application/json']);
+    }
+
+    /**
      * The page state before results: instance off, server off, or app scan off.
      */
     private function offState(Model $resource, ?Server $server): ?string
@@ -971,27 +1035,20 @@ class Vulnerabilities extends Component
             return view('livewire.image-scan.vulnerabilities', $base);
         }
 
-        $this->fixState = array_key_exists($this->fixState, self::FIX_STATES) ? $this->fixState : 'fixed';
         $this->view = in_array($this->view, self::VIEWS, true) ? $this->view : 'package';
 
         $scans = $this->currentScans();
         $allRows = $this->findingRows();
         $activeRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] === null));
-        $ignoredRows = array_values(array_filter($allRows, fn (array $row): bool => $row['ignore'] !== null));
+        $ignoredCount = count($allRows) - count($activeRows);
 
-        $filteredRows = $this->filterRows($activeRows);
         $stateCounts = array_fill_keys(array_keys(self::FIX_STATES), 0);
-        foreach ($filteredRows as $row) {
+        foreach ($this->filterRows($activeRows) as $row) {
             $stateCounts[$row['state']]++;
         }
 
-        if ($this->showIgnored) {
-            $listRows = $this->sortRows($this->filterRows($ignoredRows));
-            $items = $this->paginate($listRows);
-        } else {
-            $listRows = array_values(array_filter($filteredRows, fn (array $row): bool => $row['state'] === $this->fixState));
-            $items = $this->paginate($this->view === 'package' ? $this->packageGroups($listRows) : $this->sortRows($listRows));
-        }
+        $listRows = $this->shownRows();
+        $items = $this->paginate(! $this->showIgnored && $this->view === 'package' ? $this->packageGroups($listRows) : $listRows);
 
         $progress = $this->progress($owners);
         // One status per image, with the relevance rules of the findings table, shared by the resource status and the rows.
@@ -1013,7 +1070,8 @@ class Vulnerabilities extends Component
             'findingCount' => count($activeRows),
             'stateCounts' => $stateCounts,
             'fixStates' => self::FIX_STATES,
-            'ignoredCount' => count($ignoredRows),
+            'ignoredCount' => $ignoredCount,
+            'shownCount' => count($listRows),
             'items' => $items,
             'groupedFindingCount' => ! $this->showIgnored && $this->view === 'package' ? count($listRows) : null,
             'imageOptions' => count($imageOptions) > 1 ? $imageOptions : [],

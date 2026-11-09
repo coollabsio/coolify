@@ -44,6 +44,7 @@
                             <x-table.search placeholder="Search by ID or package" loading-target="search"
                                 wire:model.live.debounce.300ms="search" />
                         </div>
+                        <x-image-scan.export-menu :count="$shownCount" />
                     @endif
                     @if ($hostScanAvailable)
                         @can('update', $server)

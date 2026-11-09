@@ -92,9 +92,16 @@ class ScannerCommands
 
     private const SCANNER_USER = '65534:65534';
 
-    private const TIMEOUT_SBOM = 600;
+    /** `docker save` of a local image. Syft has a time limit per server, see syftTimeout(). */
+    private const TIMEOUT_SAVE = 600;
 
-    private const TIMEOUT_GRYPE = 300;
+    /** Syft `convert` of a stored SBOM. Grype has a time limit per server, see grypeTimeout(). */
+    private const TIMEOUT_PACKAGES = 300;
+
+    /** Highest Syft and Grype time limits a server can set (ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS). */
+    public const MAX_SYFT_TIMEOUT = 3600;
+
+    public const MAX_GRYPE_TIMEOUT = 3600;
 
     private const TIMEOUT_REGISTRY = 30;
 
@@ -105,6 +112,76 @@ class ScannerCommands
     private const TIMEOUT_PULL = 600;
 
     private const TIMEOUT_VOLUME_SETUP = 120;
+
+    /** Seconds that one Syft SBOM run may take on the server; a stored value outside the options is clamped. */
+    public static function syftTimeout(Server $server): int
+    {
+        return self::clampTimeout($server->settings?->image_scan_syft_timeout);
+    }
+
+    /** Seconds that one Grype run may take on the server. */
+    public static function grypeTimeout(Server $server): int
+    {
+        return self::clampTimeout($server->settings?->image_scan_grype_timeout);
+    }
+
+    /** CPUs of one scanner container, as the `docker run --cpus` value. */
+    public static function cpus(Server $server): string
+    {
+        $options = ServerSetting::IMAGE_SCAN_CPU_OPTIONS;
+        $cpus = min(max($options), max(min($options), (float) ($server->settings?->image_scan_cpus ?? ServerSetting::DEFAULT_IMAGE_SCAN_CPUS)));
+        // Docker refuses `--cpus` above the CPU count, for example after the server got smaller.
+        $cpus = min($cpus, max(self::cpuOptions($server)));
+
+        return rtrim(rtrim(number_format($cpus, 2, '.', ''), '0'), '.');
+    }
+
+    /**
+     * The memory options, in MB, that fit the total memory of the server. All options while Coolify does not know the
+     * memory yet; at least the smallest option.
+     *
+     * @return list<int>
+     */
+    public static function memoryOptionsMb(Server $server): array
+    {
+        $totalMb = intdiv((int) data_get($server->server_metadata, 'memory_bytes', 0), 1024 * 1024);
+
+        return self::optionsUpTo(ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, $totalMb);
+    }
+
+    /**
+     * The CPU options that fit the CPU count of the server: Docker refuses `--cpus` above it. All options while Coolify
+     * does not know the count yet; at least the smallest option.
+     *
+     * @return list<float>
+     */
+    public static function cpuOptions(Server $server): array
+    {
+        return self::optionsUpTo(ServerSetting::IMAGE_SCAN_CPU_OPTIONS, (int) data_get($server->server_metadata, 'cpus', 0));
+    }
+
+    /**
+     * @template T of int|float
+     *
+     * @param  list<T>  $options
+     * @return list<T>
+     */
+    private static function optionsUpTo(array $options, int $capacity): array
+    {
+        if ($capacity <= 0) {
+            return $options;
+        }
+        $fitting = array_values(array_filter($options, fn (int|float $option): bool => $option <= $capacity));
+
+        return $fitting === [] ? [min($options)] : $fitting;
+    }
+
+    private static function clampTimeout(mixed $seconds): int
+    {
+        $options = ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS;
+
+        return (int) min(max($options), max(min($options), (int) ($seconds ?? ServerSetting::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS)));
+    }
 
     public function __construct(public readonly Server $server, public readonly string $runId)
     {
@@ -253,9 +330,9 @@ class ScannerCommands
             ...$this->sbomDirectory(),
             'rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true',
             'mkdir -p -m 0700 '.escapeshellarg($this->workDir().'/in').' '.escapeshellarg($this->workDir().'/scratch'),
-            $this->step('save', 'timeout -k 10 '.self::TIMEOUT_SBOM.' docker save -o '.escapeshellarg($archive).' '.escapeshellarg('sha256:'.$imageIdHex).' >/dev/null 2>&1'),
+            $this->step('save', 'timeout -k 10 '.self::TIMEOUT_SAVE.' docker save -o '.escapeshellarg($archive).' '.escapeshellarg('sha256:'.$imageIdHex).' >/dev/null 2>&1'),
             ...$this->ownWorkDir(),
-            $this->writeSbom($imageIdHex, $this->dockerRun('syft', self::TIMEOUT_SBOM, false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'docker-archive:/in/image.tar', '-o', 'syft-json', '-q'])),
+            $this->writeSbom($imageIdHex, $this->dockerRun('syft', self::syftTimeout($this->server), false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'docker-archive:/in/image.tar', '-o', 'syft-json', '-q'])),
             ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true']),
         ];
     }
@@ -302,7 +379,7 @@ class ScannerCommands
             'mkdir -p -m 0700 '.escapeshellarg($host).' '.escapeshellarg($this->workDir().'/scratch'),
             $this->shell(implode('; ', ['failed=0', ...$copies, $copied])),
             ...$this->ownWorkDir(),
-            $this->writeSbom(self::HOST_SBOM, $this->dockerRun('syft', self::TIMEOUT_SBOM, false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'dir:/in/host', '--override-default-catalogers', self::HOST_CATALOGERS, '-o', 'syft-json', '-q'])),
+            $this->writeSbom(self::HOST_SBOM, $this->dockerRun('syft', self::syftTimeout($this->server), false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'dir:/in/host', '--override-default-catalogers', self::HOST_CATALOGERS, '-o', 'syft-json', '-q'])),
             ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath(self::HOST_SBOM)).' || true']),
         ];
     }
@@ -326,7 +403,7 @@ class ScannerCommands
             ...$this->sbomDirectory(),
             'rm -f '.escapeshellarg($this->sbomTmpPath($outName)).' || true',
             ...$this->workDirSetup($auth),
-            $this->writeSbom($outName, $this->dockerRun('syft', self::TIMEOUT_SBOM, true, $this->authEnv($auth), $this->authMounts($auth), ['scan', '--platform', $platform, 'registry:'.$ref, '-o', 'syft-json', '-q'])),
+            $this->writeSbom($outName, $this->dockerRun('syft', self::syftTimeout($this->server), true, $this->authEnv($auth), $this->authMounts($auth), ['scan', '--platform', $platform, 'registry:'.$ref, '-o', 'syft-json', '-q'])),
             ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath($outName)).' || true']),
         ];
     }
@@ -340,7 +417,7 @@ class ScannerCommands
     {
         $this->validSbomName($sbomName);
 
-        return $this->capture('grype', $this->dockerRun('grype', self::TIMEOUT_GRYPE, false, $this->grypeDatabaseEnv(), [
+        return $this->capture('grype', $this->dockerRun('grype', self::grypeTimeout($this->server), false, $this->grypeDatabaseEnv(), [
             $this->databaseMount(),
             $this->sbomMount($sbomName),
             'type=bind,src='.$this->workDir().'/tpl,dst=/tpl,readonly',
@@ -356,7 +433,7 @@ class ScannerCommands
     {
         $this->validSbomName($sbomName);
 
-        return $this->capture('packages', $this->dockerRun('syft', self::TIMEOUT_GRYPE, false, [], [
+        return $this->capture('packages', $this->dockerRun('syft', self::TIMEOUT_PACKAGES, false, [], [
             $this->sbomMount($sbomName),
             'type=bind,src='.$this->workDir().'/tpl,dst=/tpl,readonly',
         ], ['convert', '/sbom/sbom.json', '-o', 'template', '-t', '/tpl/syft.tmpl', '-q']), 'syft.tmpl');
@@ -592,7 +669,7 @@ class ScannerCommands
             "timeout -k 10 {$timeout} docker run",
             '--name '.$this->containerName(),
             '--cap-drop ALL --security-opt no-new-privileges --read-only --pids-limit 256',
-            '--user '.self::SCANNER_USER.' --cpus 1 --memory '.$this->memoryMb().'m --memory-swap '.$this->memoryMb().'m --log-driver none',
+            '--user '.self::SCANNER_USER.' --cpus '.self::cpus($this->server).' --memory '.$this->memoryMb().'m --memory-swap '.$this->memoryMb().'m --log-driver none',
         ];
         if (! $network) {
             $parts[] = '--network none';

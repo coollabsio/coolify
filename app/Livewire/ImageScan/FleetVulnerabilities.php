@@ -3,14 +3,17 @@
 namespace App\Livewire\ImageScan;
 
 use App\Enums\SecurityStatusType;
+use App\Services\ImageScan\FleetExport;
 use App\Services\ImageScan\TeamVulnerabilities;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The team Security page (spec 15.8): the resources of the session team the user can see with their stored security
@@ -173,12 +176,16 @@ class FleetVulnerabilities extends Component
             : [...$values, $value];
     }
 
-    public function render(): View
+    /**
+     * The resources in scope (server and project filters), the ones the table shows (status filter, or the search
+     * matches) on all its pages, and the filter options.
+     *
+     * @return array{fleet: TeamVulnerabilities, inScope: Collection<int, array<string, mixed>>, notScanned: Collection<int, array<string, mixed>>, rows: Collection<int, array<string, mixed>>, searching: bool, serverOptions: array<string, string>, projectOptions: array<string, string>}
+     */
+    private function listing(): array
     {
         $this->normalizeFilters();
-        $user = auth()->user();
-        $team = currentTeam();
-        $fleet = $this->fleet($team->id);
+        $fleet = $this->fleet(currentTeam()->id);
         $entries = $fleet->entries;
 
         $serverOptions = $entries->pluck('server')->filter()->unique('id')
@@ -190,24 +197,86 @@ class FleetVulnerabilities extends Component
 
         $inScope = $entries->filter(fn (array $entry): bool => ($this->servers === [] || in_array($entry['server']?->uuid, $this->servers, true))
             && ($this->projects === [] || in_array($entry['project']?->uuid, $this->projects, true)))->values();
-        $statusCounts = $inScope->countBy(fn (array $entry): string => $entry['security']->status->value);
-        $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
-            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status)).' ('.number_format($statusCounts[$status] ?? 0).')'])
-            ->all();
         $filtered = $inScope->filter(fn (array $entry): bool => $this->statuses === []
             ? $this->showNotChecked || $entry['security']->status !== SecurityStatusType::NotChecked
             : in_array($entry['security']->status->value, $this->statuses, true))->values();
 
-        $notScanned = $inScope->filter(fn (array $entry): bool => $entry['security']->status === SecurityStatusType::NotChecked);
         $searching = trim($this->search) !== '';
-
         $rows = $searching
             ? $fleet->search($filtered->filter(fn (array $entry): bool => $entry['scanned'])->values(), $this->search)
             : self::byStatus($filtered);
+
+        return [
+            'fleet' => $fleet,
+            'inScope' => $inScope,
+            'notScanned' => $inScope->filter(fn (array $entry): bool => $entry['security']->status === SecurityStatusType::NotChecked),
+            'rows' => $rows,
+            'searching' => $searching,
+            'serverOptions' => $serverOptions,
+            'projectOptions' => $projectOptions,
+        ];
+    }
+
+    /**
+     * The shown resources as a Markdown table for the clipboard.
+     */
+    public function copyList(string $format): string
+    {
+        abort_unless($format === 'markdown', 404);
+        $this->skipRender();
+        ['rows' => $rows, 'searching' => $searching] = $this->listing();
+        $count = number_format($rows->count()).' '.str('resource')->plural($rows->count());
+        $title = $searching
+            ? 'Resources with '.trim($this->search)." ({$count})"
+            : 'Security of '.currentTeam()->name." ({$count})";
+
+        return FleetExport::markdown($title, FleetExport::entries($rows, $searching, TeamVulnerabilities::STATE_LABELS), $searching);
+    }
+
+    /**
+     * Downloads the shown resources as CSV or JSON.
+     */
+    public function downloadList(string $format): StreamedResponse
+    {
+        abort_unless(in_array($format, ['csv', 'json'], true), 404);
+        ['rows' => $rows, 'searching' => $searching] = $this->listing();
+        $entries = FleetExport::entries($rows, $searching, TeamVulnerabilities::STATE_LABELS);
+        $team = currentTeam();
+        $content = $format === 'csv'
+            ? FleetExport::csv($entries, $searching)
+            : FleetExport::json(['team' => (string) $team->name, 'search' => $searching ? trim($this->search) : null], $entries);
+        $name = (Str::slug((string) $team->name) ?: 'team').'-security-'.now()->toDateString().'.'.$format;
+
+        return response()->streamDownload(function () use ($content): void {
+            echo $content;
+        }, $name, ['Content-Type' => $format === 'csv' ? 'text/csv; charset=UTF-8' : 'application/json']);
+    }
+
+    public function render(): View
+    {
+        [
+            'fleet' => $fleet,
+            'inScope' => $inScope,
+            'notScanned' => $notScanned,
+            'rows' => $rows,
+            'searching' => $searching,
+            'serverOptions' => $serverOptions,
+            'projectOptions' => $projectOptions,
+        ] = $this->listing();
+        $user = auth()->user();
+        $team = currentTeam();
+        $entries = $fleet->entries;
+
+        $statusCounts = $inScope->countBy(fn (array $entry): string => $entry['security']->status->value);
+        $statusOptions = collect(TeamVulnerabilities::STATUS_ORDER)
+            ->mapWithKeys(fn (string $status): array => [$status => TeamVulnerabilities::statusLabel(SecurityStatusType::from($status)).' ('.number_format($statusCounts[$status] ?? 0).')'])
+            ->all();
+
         $notScannedServers = $notScanned->pluck('server')->filter()->unique('id')->count();
 
         return view('livewire.image-scan.fleet-vulnerabilities', [
             'items' => $this->paginate($rows),
+            'shownCount' => $rows->count(),
             'searching' => $searching,
             'notScannedLine' => $notScanned->isEmpty() ? null : self::notScannedSentence($notScanned->count(), $notScannedServers),
             // The toggle only matters while no status filter is set.

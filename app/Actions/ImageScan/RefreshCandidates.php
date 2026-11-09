@@ -67,9 +67,7 @@ class RefreshCandidates
     /** ScannerCommands budgets plus 60 s. */
     private const TIMEOUT_REGISTRY = 90;
 
-    private const TIMEOUT_SBOM = 1260;
-
-    private const TIMEOUT_GRYPE = 360;
+    private const TIMEOUT_PACKAGES = 360;
 
     private const TIMEOUT_DEFAULT = 120;
 
@@ -637,7 +635,7 @@ class RefreshCandidates
             $sbom = ImageSbom::query()->where('server_id', $server->id)->where('image_id', $digest)->first();
 
             if ($sbom !== null) {
-                $grype = $this->runStep($this->commands->grype($hex), 'grype', self::TIMEOUT_GRYPE);
+                $grype = $this->runStep($this->commands->grype($hex), 'grype', ScanImage::grypeStepTimeout($this->commands->server));
                 if ($grype !== null && $grype['code'] === 0) {
                     $sbom->forceFill(['last_used_at' => now()])->save();
 
@@ -662,8 +660,8 @@ class RefreshCandidates
                 return null;
             }
 
-            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', self::TIMEOUT_SBOM);
-            $packages = $created !== null && $created['code'] === 0 ? $this->runStep($this->commands->packages($hex), 'packages', self::TIMEOUT_GRYPE) : null;
+            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', ScanImage::sbomStepTimeout($this->commands->server));
+            $packages = $created !== null && $created['code'] === 0 ? $this->runStep($this->commands->packages($hex), 'packages', self::TIMEOUT_PACKAGES) : null;
             if ($packages === null || $packages['code'] !== 0) {
                 $this->error ??= 'scan';
 
@@ -678,7 +676,7 @@ class RefreshCandidates
                 'last_used_at' => now(),
             ])->save();
 
-            $grype = $this->runStep($this->commands->grype($hex), 'grype', self::TIMEOUT_GRYPE);
+            $grype = $this->runStep($this->commands->grype($hex), 'grype', ScanImage::grypeStepTimeout($this->commands->server));
             if ($grype === null || $grype['code'] !== 0) {
                 $this->error ??= 'scan';
 

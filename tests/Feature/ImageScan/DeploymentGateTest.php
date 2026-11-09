@@ -687,7 +687,7 @@ it('stops waiting for the server lock before the deployment times out', function
     $job = deployGateJob();
 
     expect(deployGateBlocked($job)->getMessage())->toBe('Deploy blocked: '.ImageScanErrorCode::LockBusy->message(['server' => 'main-server']))
-        ->and((int) $startedAt->diffInSeconds(now()))->toBeLessThanOrEqual($job->timeout - ScanImage::GATE_SCAN_RESERVE_SECONDS + 1);
+        ->and((int) $startedAt->diffInSeconds(now()))->toBeLessThanOrEqual($job->timeout - ScanImage::gateScanReserveSeconds($this->server) + 1);
 });
 
 it('stops waiting for the server lock when the deployment is cancelled', function () {
@@ -870,7 +870,7 @@ it('scans the started images one at a time on the deployment server in the queue
     $job->handle();
 
     expect($scanned)->toBe(['nginx:1.27', 'redis:7'])
-        ->and($job->timeout)->toBe(2 * ScanImage::LOCK_TTL);
+        ->and($job->timeout)->toBe(2 * ScanImage::lockTtl($this->server));
 });
 
 it('scans the images of the latest completed scans when no image is given', function () {
