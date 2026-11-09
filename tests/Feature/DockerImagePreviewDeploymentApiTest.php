@@ -126,6 +126,20 @@ test('it rejects docker_tag without pull_request_id', function () {
     $response->assertJson(['message' => 'docker_tag requires pull_request_id.']);
 });
 
+test('it rejects a docker_tag that is not a valid docker tag', function (string $dockerTag) {
+    $application = createDockerImageApplication($this->environment, $this->destination);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken])->postJson('/api/v1/deploy', [
+        'uuid' => $application->uuid,
+        'pull_request_id' => 5,
+        'docker_tag' => $dockerTag,
+    ])->assertStatus(400)
+        ->assertJson(['message' => 'docker_tag must be a valid Docker tag: letters, digits, underscores, periods, and dashes, at most 128 characters.']);
+
+    expect($application->previews()->count())->toBe(0)
+        ->and($application->deployment_queue()->count())->toBe(0);
+})->with(['-leading-dash', 'a;id', '$TAG', 'a:b', str_repeat('a', 129)]);
+
 test('it rejects docker_tag for non docker image applications', function () {
     $application = Application::factory()->create([
         'uuid' => (string) Str::uuid(),
