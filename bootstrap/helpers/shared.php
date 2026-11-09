@@ -1831,11 +1831,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 
     return null;
 }
+/**
+ * Finds a standalone database of the team for the API and MCP. The instance database (coolify-db) is never returned.
+ */
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
     foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
         $database = $modelClass::whereUuid($uuid)->first();
-        if ($database && $database->team()->id == $teamId) {
+        if ($database instanceof StandalonePostgresql && $database->isInstanceDatabase()) {
+            return null;
+        }
+        if ($database && $database->team()?->id == $teamId) {
             return $database->unsetRelation('environment');
         }
     }
