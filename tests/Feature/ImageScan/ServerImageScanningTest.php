@@ -163,6 +163,24 @@ describe('server image scanning page', function () {
         expect(Cache::has(PrepareImageScannerJob::stateCacheKey($this->server)))->toBeFalse();
     });
 
+    it('does not delete the scanner data while a scan holds the server lock', function () {
+        Process::fake(fn () => Process::result(output: ''));
+        $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+        Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
+        $lock = ScanImage::serverLock($this->server);
+        $lock->get();
+
+        imageScanningPage()
+            ->call('deleteScannerData')
+            ->assertDispatched('error')
+            ->assertNotDispatched('success');
+        $lock->release();
+
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker volume rm -f coolify-grype-db'));
+        expect(Cache::get(PrepareImageScannerJob::stateCacheKey($this->server)))->toBe('ready')
+            ->and(ScanImage::serverLock($this->server)->get())->toBeTrue();
+    });
+
     it('reports a failed deletion and keeps the progress when the server cannot be reached', function () {
         Process::fake(fn () => Process::result(errorOutput: 'ssh: connect to host failed', exitCode: 255));
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
@@ -188,17 +206,20 @@ describe('server image scanning page', function () {
             ->assertSee('Disk used by scanner data: 1.1 GB');
     });
 
-    it('offers to delete scanner data only when the server has some', function () {
+    it('hides the delete action only when the server is known to have no scanner data', function () {
+        Process::fake(fn () => Process::result(output: ''));
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
 
+        // No cached state or disk use: the data can still be on the server.
+        imageScanningPage()->assertSee('Delete scanner data');
+
+        Cache::put(PrepareImageScannerJob::diskUsedCacheKey($this->server), 0);
         imageScanningPage()->assertDontSee('Delete scanner data');
 
-        Cache::put(PrepareImageScannerJob::diskUsedCacheKey($this->server), 1181116006);
-        imageScanningPage()->assertSee('Delete scanner data');
-
-        Cache::forget(PrepareImageScannerJob::diskUsedCacheKey($this->server));
         Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
         imageScanningPage()->assertSee('Delete scanner data');
+
+        imageScanningPage()->call('deleteScannerData')->assertDontSee('Delete scanner data');
     });
 
     it('shows no disk usage before the job has stored it', function () {
