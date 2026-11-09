@@ -52,6 +52,20 @@
             'disabled' => ! $server->isFunctional(),
         ],
         [
+            'label' => 'Security',
+            'route' => 'server.security',
+            'active' => $activeMenu === 'security',
+            'icon' => 'shield-alert',
+            'group' => 'Security',
+            'visible' => auth()->user()?->can('update', $server),
+            'warning' => filled($server->settings->ssh_host_key_pending),
+            'children' => [
+                ['label' => 'General', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
+                ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'refresh', 'visible' => $server->isFunctional()],
+                ['label' => 'Vulnerabilities', 'route' => 'server.security.vulnerabilities', 'active' => $activeSubMenu === 'vulnerabilities', 'icon' => 'shield-alert', 'visible' => $server->isFunctional()],
+            ],
+        ],
+        [
             'label' => 'Cloudflare Tunnel',
             'route' => 'server.cloudflare-tunnel',
             'active' => $activeMenu === 'cloudflare-tunnel',
@@ -184,19 +198,6 @@
             'group' => 'Operations',
             'visible' => ! $server->isSwarm() && ! $server->isBuildServer(),
             'disabled' => ! $server->isFunctional(),
-        ],
-        [
-            'label' => 'Security',
-            'route' => 'server.security',
-            'active' => $activeMenu === 'security',
-            'icon' => 'shield-alert',
-            'group' => 'Security',
-            'visible' => auth()->user()?->can('update', $server),
-            'warning' => filled($server->settings->ssh_host_key_pending),
-            'children' => [
-                ['label' => 'Overview', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
-                ['label' => 'Image Scanning', 'route' => 'server.security.image-scanning', 'active' => $activeSubMenu === 'image-scanning', 'icon' => 'shield-alert', 'visible' => $server->isFunctional()],
-            ],
         ],
         [
             'label' => 'Transfer',

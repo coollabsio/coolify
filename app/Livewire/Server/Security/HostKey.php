@@ -19,6 +19,9 @@ class HostKey extends Component
 
     public array $parameters = [];
 
+    /** The dropdown value: "warn" or "enforce". */
+    public string $checkMode = 'warn';
+
     public function mount(string $server_uuid)
     {
         try {
@@ -68,20 +71,41 @@ class HostKey extends Component
     {
         return $this->changeHostKey($password, $disabled ? 'check_disabled' : 'check_enabled', fn (ServerSetting $settings) => $settings->forceFill([
             'is_ssh_host_key_check_disabled' => $disabled,
+            'is_ssh_host_key_check_enforced' => $disabled ? false : $settings->is_ssh_host_key_check_enforced,
         ]));
+    }
+
+    /**
+     * Refuses a changed host key on this server ("enforce"), also when the instance only warns, or follows the instance
+     * again ("warn"). Saved at once from the dropdown, without a password: warn still reports a changed key.
+     * Refused while the check is disabled, so that a page open in another tab cannot turn the check back on without a password.
+     */
+    public function setHostKeyCheckMode(string $mode): bool|string|Event
+    {
+        if (! in_array($mode, ['warn', 'enforce'], true)) {
+            return false;
+        }
+        $enforced = $mode === 'enforce';
+
+        return $this->changeHostKey(null, $enforced ? 'check_enforced' : 'check_not_enforced', function (ServerSetting $settings) use ($enforced) {
+            if ($settings->is_ssh_host_key_check_disabled) {
+                throw new \RuntimeException('The host key check is disabled for this server. Reload the page and enable the check first.');
+            }
+            $settings->forceFill(['is_ssh_host_key_check_enforced' => $enforced]);
+        }, confirmPassword: false);
     }
 
     /**
      * @param  callable(ServerSetting): mixed  $change
      */
-    private function changeHostKey(?string $password, string $action, callable $change): bool|string|Event
+    private function changeHostKey(?string $password, string $action, callable $change, bool $confirmPassword = true): bool|string|Event
     {
         try {
             $this->authorize('update', $this->server);
             if (! $this->server->refresh()->canBeValidated()) {
                 throw new \RuntimeException('This server was transferred to another Coolify instance.');
             }
-            if (! verifyPasswordConfirmation($password, $this)) {
+            if ($confirmPassword && ! verifyPasswordConfirmation($password, $this)) {
                 return 'The provided password is incorrect.';
             }
 
@@ -98,7 +122,7 @@ class HostKey extends Component
                 'fingerprints' => ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key),
             ]);
 
-            SshMultiplexingHelper::removeMuxFile($this->server);
+            SshMultiplexingHelper::removeMuxFileAfterHostKeyChange($this->server);
             // The check can take up to a minute on a slow server, so it runs in the queue and the page polls for the result.
             ServerConnectionCheckJob::dispatch($this->server);
             $this->dispatch('hostKeySettingsChanged')->to(Index::class);
@@ -113,9 +137,11 @@ class HostKey extends Component
     public function render(): View
     {
         $settings = $this->server->settings;
+        $this->checkMode = $settings->is_ssh_host_key_check_enforced ? 'enforce' : 'warn';
 
         return view('livewire.server.security.host-key', [
             'mode' => SshMultiplexingHelper::hostKeyCheckingMode($this->server),
+            'instanceMode' => config('constants.ssh.host_key_checking'),
             'fingerprints' => ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key),
             'pendingFingerprints' => ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending),
         ]);

@@ -22,8 +22,9 @@ use Illuminate\Support\Str;
  * Pulls the pinned scanner images on a server and updates the Grype database.
  *
  * The progress is kept in the cache (`image-scan-prepare:{server_id}`: pulling, updating_database, ready,
- * failed) and broadcast as ImageScanUpdated with the scan UUID `prepare`. The database update runs under the scan
- * lock of the server; when it is busy, the job runs again later instead of waiting for it.
+ * failed) and broadcast as ImageScanUpdated with the scan UUID `prepare`. All steps run under the scan lock of the
+ * server, so a deletion of the scanner data cannot run at the same time; when the lock is busy, the job runs again
+ * later instead of waiting for it.
  */
 class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -129,6 +130,35 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         $commands = new ScannerCommands($server, Str::lower(Str::random(24)));
 
         $this->setState($server, self::STATE_PULLING);
+        $lock = ScanImage::serverLock($server);
+        if (! ScanImage::acquireServerLock($lock, $server, 0)) {
+            if ($this->attempts() >= $this->tries) {
+                $this->setState($server, self::STATE_FAILED);
+
+                return;
+            }
+            $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
+
+            return;
+        }
+
+        try {
+            $this->prepareLocked($server, $commands, $dbUrl);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Runs under the server lock, so a scan or a deletion of the scanner data cannot run at the same time.
+     */
+    private function prepareLocked(Server $server, ScannerCommands $commands, ?string $dbUrl): void
+    {
+        // The scanner data can be deleted and scanning turned off before this job got the lock.
+        if (! $this->isStillEnabled($server)) {
+            return;
+        }
+
         $pulled = self::run($commands->prepare(), $server, self::TIMEOUT_PREPARE);
         if ($pulled['exit_codes'] === []) {
             $this->setState($server, self::STATE_FAILED, self::FAILED_CONNECTION);
@@ -153,23 +183,7 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
         }
 
         $this->setState($server, self::STATE_UPDATING_DATABASE);
-        $lock = ScanImage::serverLock($server);
-        if (! ScanImage::acquireServerLock($lock, $server, 0)) {
-            if ($this->attempts() >= $this->tries) {
-                $this->setState($server, self::STATE_FAILED);
-
-                return;
-            }
-            $this->release(ScanResourceImagesJob::lockRetryDelay($this->attempts()));
-
-            return;
-        }
-
-        try {
-            $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
-        } finally {
-            $lock->release();
-        }
+        $updated = self::run($commands->dbUpdate(is_string($dbUrl) && trim($dbUrl) !== '' ? trim($dbUrl) : null), $server, self::TIMEOUT_DB_UPDATE);
         if (($updated['exit_codes']['db-update'] ?? null) !== 0) {
             $this->setState($server, self::STATE_FAILED);
 
@@ -194,7 +208,9 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
     }
 
     /**
-     * Caches the database build date and the disk use of the scanner data that the server page shows.
+     * Caches the database build date and the disk use of the scanner data that the server page shows. A valid
+     * database and all scanner images on the server prove that the scanner is ready, so this also marks it as
+     * ready, unless a preparation is running and sets the state itself.
      */
     public static function storeDetails(Server $server, ScannerCommands $commands): void
     {
@@ -207,6 +223,12 @@ class PrepareImageScannerJob implements ShouldBeEncrypted, ShouldBeUnique, Shoul
             $built = is_array($report) && ($report['valid'] ?? false) === true ? ($report['built'] ?? null) : null;
             if (is_string($built)) {
                 Cache::put(self::builtAtCacheKey($server), CarbonImmutable::parse($built)->toIso8601ZuluString(), now()->addDays(7));
+                if (! in_array(Cache::get(self::stateCacheKey($server)), [self::STATE_PULLING, self::STATE_UPDATING_DATABASE], true)
+                    && (self::run($commands->scannerImages(), $server, self::TIMEOUT_DB_STATUS)['exit_codes']['scanner-images'] ?? null) === 0) {
+                    Cache::forget(self::failedStepCacheKey($server));
+                    Cache::put(self::stateCacheKey($server), self::STATE_READY, now()->addDays(7));
+                    ImageScanUpdated::dispatch($server->team_id, $server->uuid, self::SCAN_UUID);
+                }
             }
         } catch (\Throwable $e) {
             report($e);

@@ -23,7 +23,7 @@ use InvalidArgumentException;
  *   memory limit stopped it (line `coolify-scan-oom {step}`, before the exit marker), and the container is removed in
  *   the same script. Only that line means "out of memory"; a 137 without it was a `timeout` kill. Steps: `pull-syft`,
  *   `pull-grype`, `pull-regctl` (prepare), `pull` (pull), `db-update`, `db-status`, `disk-db` and `disk-sboms` (diskUsage, size = bytes), `inspect`, `save` and `sbom`
- *   (sbomFromLocal), `sbom` (sbomFromRegistry), `grype`, `packages`, `tags`, `digest`.
+ *   (sbomFromLocal), `sbom` (sbomFromRegistry), `copy` and `sbom` (sbomFromHost), `grype`, `packages`, `tags`, `digest`.
  * - A failed run does not stop the batch, and the container and the work directory are still removed.
  * - Methods with a payload print the line `coolify-scan-payload` after the markers, then at most 10485761
  *   bytes of the tool output (`head -c`), so the output is cut when `bytes > OUTPUT_LIMIT`. The file that holds the
@@ -62,6 +62,32 @@ class ScannerCommands
     public const PAYLOAD_SEPARATOR = 'coolify-scan-payload';
 
     public const OOM_MARKER = 'coolify-scan-oom';
+
+    /** SBOM name of the server OS packages (`sboms/host.json`); image SBOMs are named by their 64-character ID. */
+    public const HOST_SBOM = 'host';
+
+    /** The os-release files and the package databases that the OS catalogers read. */
+    private const HOST_PACKAGE_PATHS = [
+        '/etc/os-release',
+        '/usr/lib/os-release',
+        '/var/lib/dpkg/status',
+        '/var/lib/dpkg/status.d',
+        '/lib/apk/db/installed',
+        '/var/lib/rpm',
+        '/usr/lib/sysimage/rpm',
+        '/var/lib/pacman/local',
+    ];
+
+    private const HOST_PACKAGE_DATABASES = [
+        '/var/lib/dpkg/status',
+        '/var/lib/dpkg/status.d',
+        '/lib/apk/db/installed',
+        '/var/lib/rpm',
+        '/usr/lib/sysimage/rpm',
+        '/var/lib/pacman/local',
+    ];
+
+    private const HOST_CATALOGERS = 'dpkg-db-cataloger,rpm-db-cataloger,apk-db-cataloger,alpm-db-cataloger';
 
     private const SCANNER_USER = '65534:65534';
 
@@ -102,6 +128,18 @@ class ScannerCommands
             ),
             $this->databaseVolume(),
         ];
+    }
+
+    /**
+     * Checks that all scanner images are on the server. `docker image inspect` fails when one of them is missing.
+     *
+     * @return list<string>
+     */
+    public function scannerImages(): array
+    {
+        $images = implode(' ', array_map(fn (string $tool) => escapeshellarg($this->image($tool)), ['syft', 'grype', 'regctl', 'init']));
+
+        return [$this->removeContainer(), $this->step('scanner-images', "docker image inspect {$images} >/dev/null 2>&1")];
     }
 
     /**
@@ -225,6 +263,53 @@ class ScannerCommands
     }
 
     /**
+     * Prints `coolify-scan-exit packages-size {code} {KiB}`: the size of the host package databases that `sbomFromHost()`
+     * copies (`du -k`: BusyBox has no `-b`). Missing paths are skipped; the code is 1 when a path that exists cannot be measured.
+     *
+     * @return list<string>
+     */
+    public function hostPackagesSize(): array
+    {
+        $paths = implode(' ', array_map(escapeshellarg(...), self::HOST_PACKAGE_PATHS));
+
+        return [$this->shell('total=0; failed=0; for p in '.$paths.'; do if [ -e "$p" ]; then if out=$(du -skL "$p" 2>/dev/null); then total=$((total + ${out%%[[:space:]]*})); else failed=1; fi; fi; done; echo "'.self::MARKER.' packages-size $failed $total"')];
+    }
+
+    /**
+     * Writes the SBOM of the OS packages of the server to `sboms/host.json`. Only the package databases are copied
+     * (`cp -RL`, so the copy has no links), then Syft reads the copy without network with the OS package catalogers.
+     * Prints `coolify-scan-exit copy {code}` (1 when no package database was found, 2 when a copy failed, so a partial
+     * database never reads as a complete scan) and the `sbom` marker.
+     *
+     * @return list<string>
+     */
+    public function sbomFromHost(): array
+    {
+        $host = $this->workDir().'/in/host';
+        $copies = array_map(function (string $path) use ($host): string {
+            $source = escapeshellarg($path);
+            $target = escapeshellarg($host.$path);
+            $skipLink = $path === '/var/lib/rpm' ? " && [ ! -L {$source} ]" : '';
+
+            return "if [ -e {$source} ]{$skipLink}; then mkdir -p \"\$(dirname {$target})\" && cp -RL {$source} {$target} 2>/dev/null || failed=1; fi";
+        }, self::HOST_PACKAGE_PATHS);
+        $found = implode(' ', array_map(fn (string $path) => escapeshellarg($host.$path), self::HOST_PACKAGE_DATABASES));
+        $copied = "found=0; for p in {$found}; do if [ -e \"\$p\" ]; then found=1; fi; done; if [ \$failed -eq 1 ]; then echo '".self::MARKER." copy 2'; elif [ \$found -eq 1 ]; then echo '".self::MARKER." copy 0'; else echo '".self::MARKER." copy 1'; fi";
+
+        return [
+            $this->removeContainer(),
+            'rm -rf '.escapeshellarg($this->workDir()).' || true',
+            ...$this->sbomDirectory(),
+            'rm -f '.escapeshellarg($this->sbomTmpPath(self::HOST_SBOM)).' || true',
+            'mkdir -p -m 0700 '.escapeshellarg($host).' '.escapeshellarg($this->workDir().'/scratch'),
+            $this->shell(implode('; ', ['failed=0', ...$copies, $copied])),
+            ...$this->ownWorkDir(),
+            $this->writeSbom(self::HOST_SBOM, $this->dockerRun('syft', self::TIMEOUT_SBOM, false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'dir:/in/host', '--override-default-catalogers', self::HOST_CATALOGERS, '-o', 'syft-json', '-q'])),
+            ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath(self::HOST_SBOM)).' || true']),
+        ];
+    }
+
+    /**
      * Writes the SBOM of a registry image to `sboms/{outName}.json` (network on, no socket).
      *
      * @return list<string>
@@ -261,7 +346,7 @@ class ScannerCommands
             $this->databaseMount(),
             $this->sbomMount($sbomName),
             'type=bind,src='.$this->workDir().'/tpl,dst=/tpl,readonly',
-        ], ['sbom:/sbom/sbom.json', '-o', 'template', '-t', '/tpl/grype.tmpl', '-q']), 'grype.tmpl');
+        ], ['sbom:/sbom/sbom.json', '-o', 'template', '-t', '/tpl/grype.tmpl', '-q']), 'grype.tmpl', hostFilter: $sbomName === self::HOST_SBOM);
     }
 
     /**
@@ -529,12 +614,41 @@ class ScannerCommands
      * Runs a tool whose stdout is the payload: stdout goes to a root-owned file in the work directory
      * (not mounted into the container), then at most 10485761 bytes of it are printed.
      *
+     * With $hostFilter the output keeps one line per vulnerability ID, package, package version, fix state, and fix
+     * versions, and drops the problems that the distribution will not fix, before the size is counted. All packages of
+     * the kernel source (`linux*`, `kernel*`) count as one package: the binary packages of one kernel repeat the same
+     * thousands of problems. Of these, the line of the kernel image (`linux-image-*`, `linux-modules-*`, `kernel`,
+     * `kernel-core`) is kept, because only that package has the kernel update and the kernel state. Each installed kernel
+     * keeps its own line (the version is in the key), so a problem of the running kernel is not hidden behind the same
+     * problem of an old one, and a fixed match is never hidden behind an unfixed one. The kept lines stay in the order
+     * of the output. Grype's own `--ignore-states` needs more than the memory limit. In the JSON lines a quote inside a
+     * value is escaped, so the `"id":"…"`, `"pkg":"…"`, and `"fix":"wont-fix"` matches only find keys. The filter runs in the pipe, before
+     * the file limit, because the raw output of a host can be larger than the limit (57 MB on CentOS Stream 9); the exit
+     * code of the run goes through `out.rc`, as `sh` has no `pipefail`. When the run succeeded, the exit code of `awk` is
+     * the exit code of the step, so a write failure (a full disk) fails the scan instead of storing a short report; a stop
+     * at the file limit still reads as cut output.
+     *
      * @param  array<string, mixed>|null  $auth
      * @return list<string>
      */
-    private function capture(string $step, string $dockerRun, ?string $template = null, ?array $auth = null): array
+    private function capture(string $step, string $dockerRun, ?string $template = null, ?array $auth = null, bool $hostFilter = false): array
     {
         $out = escapeshellarg($this->workDir().'/out');
+        $dedupe = implode(' ', [
+            '{ if (!match($0, /"id":"[^"]*"/)) { line[++n] = $0; next }',
+            'k = substr($0, RSTART, RLENGTH); image = 0;',
+            'if (match($0, /"pkg":"[^"]*"/)) { p = substr($0, RSTART, RLENGTH);',
+            'if (p ~ /^"pkg":"(linux|kernel)[-"]/) { image = (p ~ /^"pkg":"(linux-(image|modules)-[^"]*|kernel(-core)?)"$/); p = "kernel" } k = k p }',
+            'if (match($0, /"ver":"[^"]*"/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (match($0, /"fix":"[^"]*"/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (match($0, /"fixv":\[[^]]*\]/)) k = k substr($0, RSTART, RLENGTH);',
+            'if (k in at) { if (image && !isImage[k]) { line[at[k]] = $0; isImage[k] = 1 } next }',
+            'at[k] = ++n; isImage[k] = image; line[n] = $0 }',
+            'END { for (i = 1; i <= n; i++) print line[i] }',
+        ]);
+        $run = $hostFilter
+            ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{$dedupe}' > {$out}; frc=\$?; rc=\$(cat {$out}.rc 2>/dev/null || echo 1); if [ \"\$rc\" -eq 0 ]; then rc=\$frc; fi"
+            : "{$dockerRun} > {$out} 2>/dev/null; rc=\$?";
         $commands = [...$this->start($template === null ? ['scratch'] : ['scratch', 'tpl'])];
         if ($template !== null) {
             $commands[] = $this->writeFile(file_get_contents(resource_path("image-scan/{$template}")), $this->workDir()."/tpl/{$template}");
@@ -546,7 +660,7 @@ class ScannerCommands
         return [
             ...$commands,
             ...$this->ownWorkDir($auth !== null),
-            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$dockerRun} > {$out} 2>/dev/null; rc=\$?; {$this->oomCheck($step)}; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
+            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$run}; {$this->oomCheck($step)}; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
             ...$this->finish(['echo '.self::PAYLOAD_SEPARATOR, 'head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
         ];
     }

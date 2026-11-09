@@ -229,7 +229,7 @@ describe('scan now', function () {
         vulnerabilitiesPage($this->admin, $this->application)
             ->assertSee('The last scan could not run')
             ->call('scanNow')
-            ->assertSee('Get scanner')
+            ->assertSee('Start scan')
             ->assertDontSee('The last scan could not run');
     });
 
@@ -280,7 +280,7 @@ describe('scan progress', function () {
         $checkpoints = vulnerabilitiesPage($this->admin, $this->application)->viewData('checkpoints');
 
         expect(array_column($checkpoints, 'status', 'title'))->toBe(array_combine(
-            ['Get scanner', 'Update database', 'Read image', 'Find vulnerabilities'],
+            ['Start scan', 'Update database', 'Read image', 'Find vulnerabilities'],
             $statuses,
         ));
     })->with([

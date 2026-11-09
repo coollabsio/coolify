@@ -427,13 +427,13 @@ class ScanImage
     /**
      * Updates a missing database once. Grype refuses a database older than 5 days.
      */
-    private function databaseBuiltAt(ScannerCommands $commands): CarbonImmutable
+    public static function databaseBuiltAt(ScannerCommands $commands): CarbonImmutable
     {
-        $builtAt = $this->databaseStatus($commands);
+        $builtAt = self::databaseStatus($commands);
 
         if ($builtAt === null) {
-            $this->updateDatabase($commands);
-            $builtAt = $this->databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing);
+            self::updateDatabase($commands);
+            $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing);
         }
 
         if ($builtAt->lt(now()->subDays(self::DB_MAX_AGE_DAYS))) {
@@ -443,7 +443,7 @@ class ScanImage
         return $builtAt;
     }
 
-    private function updateDatabase(ScannerCommands $commands): void
+    private static function updateDatabase(ScannerCommands $commands): void
     {
         $url = InstanceSettings::get()->image_scan_db_url;
 
@@ -456,9 +456,9 @@ class ScanImage
         instant_remote_process($update, $commands->server, throwError: false, timeout: self::TIMEOUT_DB_UPDATE);
     }
 
-    private function databaseStatus(ScannerCommands $commands): ?CarbonImmutable
+    private static function databaseStatus(ScannerCommands $commands): ?CarbonImmutable
     {
-        $result = $this->runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
+        $result = self::runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
         if (in_array($result['code'], self::EXIT_TIMEOUT, true)) {
             throw new ScanFailed(ImageScanErrorCode::Timeout);
         }
@@ -490,7 +490,7 @@ class ScanImage
         }
 
         $this->progress($resource, 'pull');
-        $result = $this->runStep($commands->server, $commands->pull($imageRef), 'pull', self::TIMEOUT_PULL);
+        $result = self::runStep($commands->server, $commands->pull($imageRef), 'pull', self::TIMEOUT_PULL);
         if ($result['code'] !== 0) {
             throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed);
         }
@@ -504,7 +504,7 @@ class ScanImage
      */
     private function inspect(ScannerCommands $commands, string $imageRef): array
     {
-        $result = $this->runStep($commands->server, $commands->inspect($imageRef), 'inspect', self::TIMEOUT_DEFAULT);
+        $result = self::runStep($commands->server, $commands->inspect($imageRef), 'inspect', self::TIMEOUT_DEFAULT);
         if ($result['code'] !== 0) {
             throw new ScanFailed(ImageScanErrorCode::ImageMissing);
         }
@@ -530,7 +530,8 @@ class ScanImage
 
     /**
      * `docker save` and the SBOM need image size × 2 + 1 GiB on the Docker root and on the scan directory.
-     * Candidate scans from a registry use the same rule (Syft writes the layers to the scratch directory).
+     * Candidate scans from a registry use the same rule (Syft writes the layers to the scratch directory), and host scans
+     * use it with the size of the copied package databases.
      *
      * @throws ScanFailed
      */
@@ -561,7 +562,7 @@ class ScanImage
 
         if ($sbom !== null) {
             $this->progressAll($resources, 'vulnerabilities');
-            $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+            $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
                 $this->assertSucceeded($grype, 'grype');
@@ -575,7 +576,7 @@ class ScanImage
 
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
         $this->progressAll($resources, 'vulnerabilities');
-        $grype = $this->runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+        $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
         $this->assertSucceeded($grype, 'grype');
 
         return [$sbom, $grype];
@@ -588,12 +589,12 @@ class ScanImage
     {
         self::checkDiskSpace($commands, $image['size']);
 
-        $result = $this->runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
+        $result = self::runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
         // `docker save` has no memory limit: its 137 is always a timeout kill.
         $this->assertSucceeded($result, 'save');
         $this->assertSucceeded($result, 'sbom');
 
-        $packages = $this->runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
+        $packages = self::runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
         $this->assertSucceeded($packages, 'packages');
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
@@ -916,7 +917,7 @@ class ScanImage
      * @param  list<string>  $commands
      * @return array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}
      */
-    private function runStep(Server $server, array $commands, string $step, int $timeout): array
+    public static function runStep(Server $server, array $commands, string $step, int $timeout): array
     {
         $output = instant_remote_process($commands, $server, throwError: false, timeout: $timeout);
         $parsed = ScannerCommands::parseOutput($output);
@@ -940,7 +941,7 @@ class ScanImage
      *
      * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $result
      */
-    private function assertSucceeded(array $result, string $step): void
+    public static function assertSucceeded(array $result, string $step): void
     {
         $code = $result['exit_codes'][$step] ?? null;
         if ($code !== 0 && $step !== 'save' && in_array($step, $result['oom'], true)) {
@@ -960,7 +961,7 @@ class ScanImage
      * @param  array{code: int, size: ?int, payload: string, exit_codes: array<string, int>, oom: list<string>}  $result
      * @return array{0: string, 1: bool}
      */
-    private function readPayload(array $result): array
+    public static function readPayload(array $result): array
     {
         $payload = $result['payload'];
         $cut = ($result['size'] ?? 0) > ScannerCommands::OUTPUT_LIMIT || strlen($payload) > ScannerCommands::OUTPUT_LIMIT;
