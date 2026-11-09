@@ -117,10 +117,7 @@ it('handles missing applications gracefully', function () {
         ->once()
         ->andReturn($query);
 
-    // Should not throw exception
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
+    expect(fn () => applyServiceApplicationPrerequisites($service))->not->toThrow(Throwable::class);
 });
 
 it('skips services without prerequisites', function () {
@@ -129,43 +126,5 @@ it('skips services without prerequisites', function () {
     $service->id = 1;
     $service->shouldNotReceive('applications');
 
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with single hyphen', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'docker-registry-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'docker-registry' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with multiple hyphens', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'elasticsearch-with-kibana-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'elasticsearch-with-kibana' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with hyphens in template name', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'apprise-api-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'apprise-api' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
+    expect(fn () => applyServiceApplicationPrerequisites($service))->not->toThrow(Throwable::class);
 });

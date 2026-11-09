@@ -23,6 +23,7 @@ use App\Models\StandaloneSqlite;
 use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class GlobalSearch extends Component
@@ -819,20 +820,20 @@ class GlobalSearch extends Component
                 'link' => route('team.audit-log'),
                 'search_text' => 'team audit log activity history events',
             ] : null,
-            instanceSettings()->is_image_scanning_allowed ? [
+            [
                 'name' => 'Security',
                 'type' => 'navigation',
                 'description' => 'What each resource of your team needs, from its last image scan',
                 'link' => route('vulnerabilities'),
                 'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
-            ] : null,
-            instanceSettings()->is_image_scanning_allowed ? [
+            ],
+            [
                 'name' => 'Team Image Scanning',
                 'type' => 'navigation',
                 'description' => 'Scan rules and ignored vulnerabilities of the team',
                 'link' => route('team.image-scanning'),
                 'search_text' => 'team image scanning vulnerabilities cve scan rules alert block deploys ignored security',
-            ] : null,
+            ],
             isInstanceAdmin() ? [
                 'name' => 'Team Admin View',
                 'type' => 'navigation',
@@ -1480,7 +1481,7 @@ class GlobalSearch extends Component
             return;
         }
         $this->loadingServers = true;
-        $servers = Server::isUsable()->get()->sortBy('name');
+        $servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
         $this->availableServers = $servers->map(fn ($s) => [
             'id' => $s->id,
             'name' => $s->name,

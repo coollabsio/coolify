@@ -219,3 +219,15 @@ it('denies force delete for any user', function () {
     $policy = new DatabasePolicy;
     expect($policy->forceDelete($user, $database))->toBeFalse();
 });
+
+it('denies a root team admin to update the instance database when the token does not cover it', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
+    $database->id = 0;
+
+    $user->shouldReceive('isAdminOfTeam')->with(0)->andReturn(true);
+    $user->shouldReceive('canAccess')->with(AccessLevel::Write, $database)->andReturn(false);
+
+    $policy = new DatabasePolicy;
+    expect($policy->update($user, $database)->allowed())->toBeFalse();
+});

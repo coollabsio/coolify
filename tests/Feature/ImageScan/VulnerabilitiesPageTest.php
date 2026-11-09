@@ -39,7 +39,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array']);
     $this->withoutVite();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create();
@@ -678,7 +678,7 @@ describe('service page', function () {
 
 describe('database page', function () {
     it('shows the findings of a standalone database', function () {
-        $database = create_standalone_postgresql($this->environment->id, $this->destination);
+        $database = create_standalone_postgresql($this->environment->id, $this->destination, databaseImage: 'postgres:16-alpine');
         vulnerabilitiesScan($database, [vulnerabilitiesFinding(['package' => 'libpq'])], [
             'image_ref' => 'postgres:16-alpine',
             'builds_image' => false,
@@ -689,6 +689,19 @@ describe('database page', function () {
         vulnerabilitiesPage($this->admin, $database, 'database')
             ->assertSee('libpq')
             ->assertDontSee('the running image is not the checked image');
+    });
+
+    it('says that the scan is of another image when the database image changed', function () {
+        $database = create_standalone_postgresql($this->environment->id, $this->destination, databaseImage: 'postgres:18-alpine');
+        vulnerabilitiesScan($database, [vulnerabilitiesFinding(['package' => 'libpq'])], [
+            'image_ref' => 'postgres:16-alpine',
+            'builds_image' => false,
+            'summary' => vulnerabilitiesSummary(4),
+        ]);
+
+        vulnerabilitiesPage($this->admin, $database, 'database')
+            ->assertSee('libpq')
+            ->assertSee('the running image is not the checked image');
     });
 });
 
@@ -770,20 +783,6 @@ describe('packages of one image', function () {
 });
 
 describe('sidebar', function () {
-    it('names the item Security and shows no count', function () {
-        vulnerabilitiesScan($this->application, [vulnerabilitiesFinding()], [
-            'summary' => vulnerabilitiesSummary(3),
-        ]);
-        $this->actingAs($this->admin);
-        session(['currentTeam' => $this->team]);
-
-        $this->blade('<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />', [
-            'application' => $this->application->fresh(),
-        ])->assertSee('menu-item-label">Security<', false)
-            ->assertDontSee('fixable now')
-            ->assertDontSee('Vulnerabilities');
-    });
-
     it('shows the dot of the combined status of the service applications and databases', function () {
         $service = vulnerabilitiesService();
         $web = ServiceApplication::forceCreate(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:1.27']);
@@ -806,15 +805,4 @@ describe('sidebar', function () {
         ])->assertSee('aria-label="Security: update now"', false);
     });
 
-    it('hides the item when the instance does not allow image scanning', function () {
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-        Cache::flush();
-        $this->actingAs($this->admin);
-        session(['currentTeam' => $this->team]);
-
-        $this->blade('<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />', [
-            'application' => $this->application->fresh(),
-        ])->assertDontSee('menu-item-label">Security<', false);
-    });
 });

@@ -311,6 +311,11 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         return $this->hasMany(UserChangelogRead::class);
     }
 
+    public function stars(): HasMany
+    {
+        return $this->hasMany(Star::class);
+    }
+
     public function getUnreadChangelogCount(): int
     {
         return app(ChangelogService::class)->getUnreadCountForUser($this);

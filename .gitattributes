@@ -9,4 +9,5 @@ CHANGELOG.md merge=union
 
 /.github export-ignore
 CHANGELOG.md export-ignore
+.changes export-ignore
 .styleci.yml export-ignore

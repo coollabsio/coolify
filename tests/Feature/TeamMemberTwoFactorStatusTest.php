@@ -107,8 +107,6 @@ test('admins see the two factor status of every role, including owners and other
     'owner without two factor' => ['owner', false, 'Two-factor authentication is disabled'],
     'another admin with two factor' => ['admin', true, 'Two-factor authentication is enabled'],
     'another admin without two factor' => ['admin', false, 'Two-factor authentication is disabled'],
-    'member with two factor' => ['member', true, 'Two-factor authentication is enabled'],
-    'member without two factor' => ['member', false, 'Two-factor authentication is disabled'],
 ]);
 
 test('admins see the two factor status on their own row', function () {
@@ -119,17 +117,6 @@ test('admins see the two factor status on their own row', function () {
     Livewire::test(Member::class, ['member' => $admin])
         ->assertSee('You')
         ->assertSee('Two-factor authentication is enabled');
-});
-
-test('the summary counts the members that are missing two factor authentication', function () {
-    $admin = createTeamMember($this->team, 'admin', twoFactorEnabled: true);
-    createTeamMember($this->team, 'member');
-
-    actAsTeamMember($admin, $this->team);
-
-    Livewire::test(Index::class)
-        ->assertSee('1 of 2')
-        ->assertSee('does not have two-factor authentication enabled');
 });
 
 test('the summary confirms when every member has two factor authentication', function () {

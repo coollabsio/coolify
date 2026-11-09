@@ -2,14 +2,17 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Enums\AccessLevel;
 use App\Livewire\Concerns\ManagesDatabaseBackup;
 use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
 use App\Models\StandalonePostgresql;
+use App\Services\Access\AccessResolver;
 use App\Traits\ListensToTeamChannel;
 use Exception;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -186,6 +189,15 @@ class BackupEdit extends Component
             $this->backup->timeout = $this->timeout;
             $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
             $storageIds = $this->customValidate();
+            // The team of the schedule, because the instance database has no environment to read it from.
+            if ($this->backup->newS3StorageIds($storageIds)->isNotEmpty()
+                && ! app(AccessResolver::class)->allowsTeamWide(Auth::user(), AccessLevel::Write, (int) $this->backup->team_id)) {
+                $this->backup->refresh();
+                $this->saveS3 = (bool) $this->backup->save_s3;
+                $this->s3StorageIds = $this->backup->selectedS3Storages()->pluck('id')->all();
+
+                throw new AuthorizationException('You need write access on the whole team to add an S3 storage to this backup.');
+            }
             $changedFields = auditChangedFields($this->backup);
             $this->backup->save();
 

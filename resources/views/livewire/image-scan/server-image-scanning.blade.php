@@ -38,43 +38,39 @@
 
             <x-application.settings-section id="server-image-scanning-section" title="Image scanning"
                 :helper="$sectionHelper">
-                @if ($allowed)
-                    @can('update', $server)
-                        <x-slot:actions>
-                            @if ($enabled && ($prepareState === null || $prepareState === 'failed'))
-                                <x-forms.button type="button" wire:click="prepareScanner">
-                                    {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
-                                </x-forms.button>
-                            @endif
-                            {{-- Disabling forgets the cached state, but the files stay on the server. --}}
-                            @if (! $enabled || $hasScannerData)
-                                <x-modal-confirmation title="Delete scanner data?" buttonTitle="Delete scanner data"
-                                    isErrorButton submitAction="deleteScannerData" temporaryDisableTwoStepConfirmation
-                                    :confirmWithText="false" :confirmWithPassword="false" :actions="[
-                                        'Coolify removes the stored SBOMs, the vulnerability database, and the scanner images from this server.',
-                                        'Scan results in Coolify stay. The next scan gets the scanner again.',
-                                    ]"
-                                    step2ButtonText="Delete scanner data" />
-                            @endif
-                            <div wire:key="image-scanning-change-{{ $enabled ? 'on' : 'off' }}">
-                                <x-modal-confirmation
-                                    title="{{ $enabled ? 'Disable image scanning?' : 'Enable image scanning?' }}"
-                                    buttonTitle="{{ $enabled ? 'Disable' : 'Enable' }}"
-                                    submitAction="{{ $enabled ? 'disable' : 'enable' }}"
-                                    warningMessage="{{ $enabled ? 'New deployments and running images on this server are no longer checked for vulnerabilities. You can enable it again at any time.' : 'Scans run on this server and use its resources. You can disable it again at any time.' }}"
-                                    temporaryDisableTwoStepConfirmation :confirmWithText="false"
-                                    :confirmWithPassword="false" :actions="$enabled
-                                        ? ['Coolify stops scanning the images and the operating system packages of this server.', 'Scan results and scanner data on the server stay.']
-                                        : [$costText]"
-                                    step2ButtonText="{{ $enabled ? 'Disable image scanning' : 'Enable image scanning' }}"
-                                    :isHighlightedButton="! $enabled" />
-                            </div>
-                        </x-slot:actions>
-                    @endcan
-                @endif
-                @if (! $allowed)
-                    <x-empty size="sm" title="Image scanning is turned off for this Coolify instance." />
-                @elseif (! $enabled)
+                @can('update', $server)
+                    <x-slot:actions>
+                        @if ($enabled && ($prepareState === null || $prepareState === 'failed'))
+                            <x-forms.button type="button" wire:click="prepareScanner">
+                                {{ $prepareState === 'failed' ? 'Try again' : 'Get scanner' }}
+                            </x-forms.button>
+                        @endif
+                        {{-- Disabling forgets the cached state, but the files stay on the server. --}}
+                        @if (! $enabled || $hasScannerData)
+                            <x-modal-confirmation title="Delete scanner data?" buttonTitle="Delete scanner data"
+                                isErrorButton submitAction="deleteScannerData" temporaryDisableTwoStepConfirmation
+                                :confirmWithText="false" :confirmWithPassword="false" :actions="[
+                                    'Coolify removes the stored SBOMs, the vulnerability database, and the scanner images from this server.',
+                                    'Scan results in Coolify stay. The next scan gets the scanner again.',
+                                ]"
+                                step2ButtonText="Delete scanner data" />
+                        @endif
+                        <div wire:key="image-scanning-change-{{ $enabled ? 'on' : 'off' }}">
+                            <x-modal-confirmation
+                                title="{{ $enabled ? 'Disable image scanning?' : 'Enable image scanning?' }}"
+                                buttonTitle="{{ $enabled ? 'Disable' : 'Enable' }}"
+                                submitAction="{{ $enabled ? 'disable' : 'enable' }}"
+                                warningMessage="{{ $enabled ? 'New deployments and running images on this server are no longer checked for vulnerabilities. You can enable it again at any time.' : 'Scans run on this server and use its resources. You can disable it again at any time.' }}"
+                                temporaryDisableTwoStepConfirmation :confirmWithText="false"
+                                :confirmWithPassword="false" :actions="$enabled
+                                    ? ['Coolify stops scanning the images and the operating system packages of this server.', 'Scan results and scanner data on the server stay.']
+                                    : [$costText]"
+                                step2ButtonText="{{ $enabled ? 'Disable image scanning' : 'Enable image scanning' }}"
+                                :isHighlightedButton="! $enabled" />
+                        </div>
+                    </x-slot:actions>
+                @endcan
+                @if (! $enabled)
                     <x-empty size="sm" icon-name="shield-alert" title="Image scanning is off for {{ $server->name }}."
                         description="{{ $costText }}">
                         @cannot('update', $server)
@@ -106,14 +102,12 @@
                             }" />
                     </div>
                 @endif
-                @if ($allowed)
-                    <div @class([
-                        'mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]' => ! $enabled || $prepareState !== 'ready',
-                    ])>
-                        <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
-                            :key="'server-image-scan-settings-'.$server->uuid" />
-                    </div>
-                @endif
+                <div @class([
+                    'mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]' => ! $enabled || $prepareState !== 'ready',
+                ])>
+                    <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
+                        :key="'server-image-scan-settings-'.$server->uuid" />
+                </div>
             </x-application.settings-section>
 
             <livewire:server.security.host-vulnerabilities :server_uuid="$server->uuid" :key="'host-vulnerabilities-'.$server->uuid" />

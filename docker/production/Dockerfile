@@ -56,10 +56,7 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
-# Temporary: the node:24.22.1 multi-arch manifest is not published yet, pull the per-arch image instead
-FROM amd64/node:${NODE_VERSION}-alpine3.24 AS nodejs-amd64
-FROM arm64v8/node:${NODE_VERSION}-alpine3.24 AS nodejs-arm64
-FROM nodejs-${TARGETARCH} AS nodejs
+FROM node:${NODE_VERSION}-alpine3.24 AS nodejs
 
 # =================================================================
 # Stage 2: Frontend assets compilation
@@ -74,12 +71,7 @@ COPY . .
 RUN npm run build
 
 # =================================================================
-# Stage 3: Get MinIO client
-# =================================================================
-FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
-
-# =================================================================
-# Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
+# Stage 3: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
 
@@ -219,10 +211,6 @@ COPY --chmod=755 docker/production/etc/s6-overlay/ /etc/s6-overlay/
 RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \
     chmod -R 755 /etc/nginx
-
-# Install MinIO client
-COPY --from=minio-client /usr/bin/mc /usr/bin/mc
-RUN chmod +x /usr/bin/mc
 
 ARG SERVERSIDEUP_PHP_VERSION
 ARG NODE_VERSION

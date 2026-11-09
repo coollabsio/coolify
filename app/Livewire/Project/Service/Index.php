@@ -84,6 +84,8 @@ class Index extends Component
 
     public $requiredPort = null;
 
+    public ?int $requestedPort = null;
+
     public ?string $fqdn = null;
 
     public bool $isGzipEnabled = false;
@@ -630,7 +632,6 @@ class Index extends Component
             $persistedApplication = $this->serviceApplication->fresh();
             $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
             $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($this->service));
-            $previousEditableUrls = $persistedApplication->url;
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
@@ -669,8 +670,9 @@ class Index extends Component
                             continue;
                         }
 
-                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort)) {
                             $this->requiredPort = $requiredPort;
+                            $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                             $this->showPortWarningModal = true;
                             $this->serviceApplication->fqdn = $previousFqdn;
                             $this->serviceApplication->domain_port_overrides = $previousPortOverrides;

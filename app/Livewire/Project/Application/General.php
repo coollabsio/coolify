@@ -9,6 +9,7 @@ use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
@@ -168,7 +169,9 @@ class General extends Component
                 ? ['nullable']
                 : ValidationPatterns::applicationDomainRules(),
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
-            'gitRepository' => 'required',
+            'gitRepository' => isset($this->application) && $this->gitRepository === $this->application->getOriginal('git_repository')
+                ? ['required']
+                : ['required', 'string', new ValidGitRepositoryUrl(allowRepositoryPath: true)],
             'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
             'installCommand' => $this->changedCommandRules('installCommand', 'install_command'),

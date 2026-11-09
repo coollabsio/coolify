@@ -425,6 +425,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
         Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
+        Route::get('/maintenance', ApplicationConfiguration::class)->name('project.application.maintenance');
         Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
@@ -491,6 +492,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
+        Route::get('/maintenance', ServiceConfiguration::class)->name('project.service.maintenance');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
         Route::get('/vulnerabilities', ServiceConfiguration::class)->name('project.service.vulnerabilities');

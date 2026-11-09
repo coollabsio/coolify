@@ -23,6 +23,7 @@ use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
@@ -142,7 +143,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -1819,7 +1820,8 @@ class Application extends BaseModel
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
         $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
-        $base_command = 'git ls-remote';
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $base_command = 'git ls-remote --';
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
@@ -1968,7 +1970,7 @@ class Application extends BaseModel
             $escapedCustomRepository = escapeshellarg($customRepository);
             $gitConfigOption = $this->gitHttpsCredentialConfigOption();
             if ($gitConfigOption) {
-                $base_command = "git {$gitConfigOption} ls-remote";
+                $base_command = "git {$gitConfigOption} ls-remote --";
             }
             if ($this->gitUsesSsh()) {
                 $sshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
@@ -2162,9 +2164,10 @@ class Application extends BaseModel
             }
         }
 
-        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch} --";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch} --";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
@@ -2624,9 +2627,22 @@ class Application extends BaseModel
             return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved or published key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
         }
 
-        $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();
+        $lines = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->values();
+        // Git and SSH print progress, known-hosts and multiplexing notes, and a generic access hint around the real cause.
+        $reasonLines = $lines->reject(fn (string $line) => Str::startsWith($line, [
+            'Cloning into',
+            'Warning: Permanently added',
+            'Control socket connect(',
+            'ControlSocket ',
+            'mux_client_',
+            'Please make sure you have the correct access rights',
+            'and the repository exists.',
+        ]))->take(-10);
+        if ($reasonLines->isEmpty()) {
+            $reasonLines = $lines->take(-1);
+        }
 
-        return $reason ? '<br><br>Reason: '.e(str($reason)->limit(300)->value()) : '';
+        return $reasonLines->isEmpty() ? '' : '<br><br>Reason: '.$reasonLines->map(fn (string $line) => e(str($line)->limit(300)->value()))->implode('<br>');
     }
 
     /**

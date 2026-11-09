@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class Select extends Component
@@ -85,7 +86,7 @@ class Select extends Component
 
             if ($imageStep && $queryServerId !== null && $queryDestination) {
                 $server = Server::isUsable()->whereKey($queryServerId)->first();
-                if ($server && $this->findDestination($server, $queryDestination)) {
+                if ($server && Gate::allows('placeResource', $server) && $this->findDestination($server, $queryDestination)) {
                     $this->type = $queryType;
                     $this->server_id = $server->id;
                     $this->destination_uuid = $queryDestination;
@@ -519,7 +520,7 @@ class Select extends Component
 
     public function loadServers()
     {
-        $this->servers = Server::isUsable()->get()->sortBy('name');
+        $this->servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
         $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
         $this->allServers = $this->servers->concat($this->buildServers);
         $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();

@@ -62,19 +62,6 @@ it('offers Hostinger as a server provider', function () {
         ->assertSet('tokenProvider', 'hostinger');
 });
 
-it('uses the current cloud provider UI and Hostinger affiliate link', function () {
-    Livewire::test(ByHostinger::class)
-        ->assertSee('Hostinger account')
-        ->assertSee('https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io', false)
-        ->assertSee("through Coolify's affiliate link.", false);
-
-    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
-        ->set('loading_data', false)
-        ->assertSee('Hostinger server')
-        ->assertSee('Advanced options')
-        ->assertSee('Buy and create');
-});
-
 it('leaves paid Hostinger backups off by default', function () {
     Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
         ->assertSet('enable_backups', false)

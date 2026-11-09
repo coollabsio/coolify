@@ -17,7 +17,7 @@
     scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
-    vulnerabilitiesUrl: @js(instanceSettings()->is_image_scanning_allowed ? route('vulnerabilities') : null),
+    vulnerabilitiesUrl: @js(route('vulnerabilities')),
 
     get showServerTimingCommand() {
         if (!this.developerCommandsEnabled) return false;

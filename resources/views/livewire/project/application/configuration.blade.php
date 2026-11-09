@@ -14,6 +14,7 @@
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.domains')
                 <livewire:project.application.domains :application="$application" />
+            @elseif ($currentRoute === 'project.application.maintenance')
                 <livewire:project.shared.maintenance :resource="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
@@ -51,9 +52,7 @@
                 <div class="flex flex-col gap-6">
                     <livewire:image-scan.vulnerabilities resource-type="application" :resource-uuid="$application->uuid" />
                     <livewire:image-scan.packages resource-type="application" :resource-uuid="$application->uuid" />
-                    @if (instanceSettings()->is_image_scanning_allowed)
-                        <livewire:image-scan.scan-settings scope-type="application" :scope-uuid="$application->uuid" />
-                    @endif
+                    <livewire:image-scan.scan-settings scope-type="application" :scope-uuid="$application->uuid" />
                 </div>
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />

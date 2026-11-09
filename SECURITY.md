@@ -31,8 +31,9 @@ Please read this section before you send a report. The severity of a report depe
 ### Roles and what they can already do
 
 - **Team member**: read-only access to the resources of the team. A member must not see secrets or change anything.
+- **Member with access grants**: an admin can give a member more levels (such as write or deploy) on the whole team, on projects, on environments, or on resources. A member with write access on a resource can deploy any Docker Compose file for it, including privileged containers and bind mounts of the host file system. That member therefore has root access to the servers where these resources run. In the root team, this includes the Coolify host when a resource runs on the localhost server. Give write access in the root team only to people that you trust as instance admins.
 - **Team admin / owner**: full control of the team's servers. An admin can open a terminal on these servers, deploy any Docker Compose file (including privileged containers and bind mounts of the host file system), run scheduled commands, and read all team secrets. An admin already has root access to every server of the team.
-- **API tokens**: a token has the permissions of its abilities. A token with `write` or `root` ability is equal to a team admin.
+- **API tokens**: a token has the permissions of its abilities. A token with `write` or `root` ability is equal to a team admin. A token limited to projects, environments, or resources is limited like a member with access grants: with `write`, it has root access to the servers where the resources inside its limit run.
 - **Instance admin** (admin or owner of the root team): already controls the Coolify instance and the server it runs on.
 - **Repository and Compose content**: Coolify runs what the configured repository, Dockerfile, or Compose file tells it to run. People who can change this content are trusted for the deployments that use it.
 
@@ -40,8 +41,9 @@ Please read this section before you send a report. The severity of a report depe
 
 - A user who is not logged in can read data, change data, or run code.
 - A team member gets write access, runs commands, or reads secrets of their own team.
+- A member with access grants reads or changes resources, servers, or credentials outside the grants (for example, places a resource on a server that runs no resource of the grant).
 - A user of one team reads or changes resources of another team.
-- A team user runs code inside the Coolify container or on the Coolify host, without being an instance admin.
+- A team user runs code inside the Coolify container or on the Coolify host, without being an instance admin. Exception: a member with write access on a resource that runs on the localhost server (see the roles above).
 - An API token does more than its abilities allow.
 - A public webhook or callback can be used without a valid secret or signature.
 

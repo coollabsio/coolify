@@ -40,7 +40,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array']);
     $this->withoutVite();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create(['show_boarding' => false]);
@@ -449,16 +449,6 @@ describe('page', function () {
             ->assertSeeHtml('coolify.image-scan.servers-not-scanning-dismissed.'.$this->team->id.'.2');
     });
 
-    it('shows the off state when the instance does not allow scanning', function () {
-        fleetScan(fleetApplication('scanned-app'), 'update_available');
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-
-        fleetPage($this->admin)
-            ->assertSee('Image scanning is off for this Coolify instance.')
-            ->assertDontSee('scanned-app');
-    });
-
     it('never shows a server that runs only resources a limited member cannot see', function () {
         $visible = fleetApplication('visible-app');
         fleetScan($visible, 'update_available', ['findings' => [fleetFinding(['package' => 'shared-lib'])]]);
@@ -648,14 +638,6 @@ describe('markers', function () {
             ->toBe(['status' => 'no_fix', 'text' => 'No fix yet', 'label' => 'Security: no fix yet', 'tooltip' => null]);
     });
 
-    it('hides markers when the instance does not allow scanning', function () {
-        $application = fleetApplication('marked-app');
-        fleetScan($application, 'update_now');
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-
-        expect(VulnerabilityMarkers::for(collect([$application->fresh()])))->toBe([]);
-    });
 });
 
 describe('dashboard and search', function () {
@@ -697,14 +679,9 @@ describe('dashboard and search', function () {
         // with node --test) from this URL.
         $search->assertSeeHtml('window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl)')
             ->assertDontSeeHtml('vulnerabilitiesUrl: null');
-
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-
-        Livewire::test(GlobalSearch::class)->assertSeeHtml('vulnerabilitiesUrl: null');
     });
 
-    it('lists the Security page in the navbar only when the instance allows scanning', function () {
+    it('lists the Security page in the navbar', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
         app()->instance('request', Request::create('/vulnerabilities'));
@@ -713,11 +690,6 @@ describe('dashboard and search', function () {
         expect($navbar)->toContain('href="'.route('vulnerabilities').'"')
             ->and($navbar)->toMatch('/href="'.preg_quote(route('vulnerabilities'), '/').'"[^>]*>.*?Security/s')
             ->and($navbar)->not->toContain('Vulnerabilities');
-
-        InstanceSettings::query()->whereKey(0)->update(['is_image_scanning_allowed' => false]);
-        Once::flush();
-
-        expect((string) $this->blade('<x-navbar desktop />'))->not->toContain('href="'.route('vulnerabilities').'"');
     });
 });
 

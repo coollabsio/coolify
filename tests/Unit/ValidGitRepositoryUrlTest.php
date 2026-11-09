@@ -557,3 +557,20 @@ it('rejects raw control characters', function () {
         expect($validator->errors()->first('url'))->toContain('invalid characters');
     }
 });
+
+it('accepts a repository path only when the rule allows it', function () {
+    $paths = ['owner/name', 'group/subgroup/name.git', 'owner/.github'];
+
+    foreach ($paths as $path) {
+        expect(Validator::make(['url' => $path], ['url' => new ValidGitRepositoryUrl(allowRepositoryPath: true)])->passes())->toBeTrue("Failed for path: {$path}")
+            ->and(Validator::make(['url' => $path], ['url' => new ValidGitRepositoryUrl])->passes())->toBeFalse("Passed for path: {$path}");
+    }
+});
+
+it('rejects repository paths that git would read as an option or a local path', function () {
+    $paths = ['--upload-pack=touch /tmp/x', '--upload-pack', '-u/x', '/root/.ssh', './repo/x', '.ssh/x', 'owner/../name', 'owner'];
+
+    foreach ($paths as $path) {
+        expect(Validator::make(['url' => $path], ['url' => new ValidGitRepositoryUrl(allowRepositoryPath: true)])->passes())->toBeFalse("Passed for path: {$path}");
+    }
+});

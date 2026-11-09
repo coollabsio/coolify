@@ -8,6 +8,7 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -102,6 +103,9 @@ class Source extends Component
     {
         if ($toModel) {
             $this->validate();
+            if ($this->gitRepository !== $this->application->getOriginal('git_repository')) {
+                $this->validate(['gitRepository' => ['required', 'string', new ValidGitRepositoryUrl(allowRepositoryPath: true)]]);
+            }
             $attributes = [
                 'git_repository' => $this->gitRepository,
                 'git_branch' => $this->gitBranch,

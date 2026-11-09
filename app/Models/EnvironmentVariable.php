@@ -759,11 +759,27 @@ class EnvironmentVariable extends BaseModel
 
             $scope = self::sharedVariableScope($resource, $reference['type']);
             if ($scope === null || Gate::forUser($user)->denies('viewSensitive', $scope)) {
+                $name = "{$reference['type']}.{$reference['key']}";
+
                 throw ValidationException::withMessages([
-                    $field => "You cannot reference the shared variable {$reference['type']}.{$reference['key']}, because you cannot read its value.",
+                    $field => self::isBlockedOnlyByTokenScope($user, $scope)
+                        ? "This API token is limited to selected projects, environments, or resources, so it cannot reference the {$reference['type']} shared variable {$name}. Use a token for the whole team."
+                        : "You cannot reference the shared variable {$name}, because you cannot read its value.",
                 ]);
             }
         }
+    }
+
+    /**
+     * True when the user is an admin who can read team and server variables, but the API token of the request
+     * is limited to selected projects, environments, or resources.
+     */
+    private static function isBlockedOnlyByTokenScope(User $user, ?SharedEnvironmentVariable $scope): bool
+    {
+        return $scope !== null
+            && in_array($scope->type, ['team', 'server'], true)
+            && data_get($user->currentAccessToken(), 'scopes') !== null
+            && $user->isAdminOfTeam((int) $scope->team_id);
     }
 
     /**

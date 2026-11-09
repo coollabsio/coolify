@@ -64,6 +64,23 @@ class GetRollbackImages
     }
 
     /**
+     * Whether a rollback to the tag is allowed: the tag is a listed rollback image, or the commit of
+     * a successful production deployment. Any other commit (for example a commit of an unmerged pull
+     * request) is rejected, because a rollback builds a missing image from source.
+     */
+    public static function allows(Application $application, string $tag): bool
+    {
+        $deployed = $application->deployment_queue()
+            ->where('status', ApplicationDeploymentStatus::FINISHED->value)
+            ->where('pull_request_id', 0)
+            ->where('rollback', false)
+            ->where('commit', $tag)
+            ->exists();
+
+        return $deployed || collect(self::run($application)['images'])->contains('tag', $tag);
+    }
+
+    /**
      * The repositories of the images that the application builds or pulls. A Docker Compose
      * build names the image of each service `<uuid>_<service>`, like the Compose parser does.
      *

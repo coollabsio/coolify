@@ -1,4 +1,7 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$database" :wire:key="'star-mobile-'.$database->getMorphClass().'-'.$database->uuid" />
+    @endteleport
     @php
         $databasePageItems = [
             [

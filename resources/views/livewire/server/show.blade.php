@@ -221,6 +221,8 @@
                             </x-callout>
                         @endif
 
+                        @include('livewire.server.partials.force-disabled-callout')
+
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input canGate="update" :canResource="$server" id="name" label="Name"
                                 required :disabled="$isValidating" />

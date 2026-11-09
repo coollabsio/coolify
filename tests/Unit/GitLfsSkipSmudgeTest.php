@@ -67,7 +67,7 @@ it('skips the lfs smudge filter for every git call when git lfs is disabled', fu
     $calls = gitCallsWithLfsSkipSmudge(isGitLfsEnabled: false, pullRequestId: 7);
 
     expect($calls)->toBe([
-        '1 clone -b main https://github.com/duilio/bad-lfs-example <tmp>/repo',
+        '1 clone -b main -- https://github.com/duilio/bad-lfs-example <tmp>/repo',
         '1 fetch origin pull/7/head:pr-7-coolify',
         '1 checkout pr-7-coolify',
     ]);
@@ -77,7 +77,7 @@ it('keeps the lfs smudge filter and pulls lfs objects when git lfs is enabled', 
     $calls = gitCallsWithLfsSkipSmudge(isGitLfsEnabled: true);
 
     expect($calls)->toBe([
-        'unset clone -b main https://github.com/duilio/bad-lfs-example <tmp>/repo',
+        'unset clone -b main -- https://github.com/duilio/bad-lfs-example <tmp>/repo',
         'unset lfs ls-files -n',
     ]);
 });
@@ -86,7 +86,7 @@ it('skips the lfs smudge filter for the compose file checkout of a pinned commit
     $calls = gitCallsWithLfsSkipSmudge(isGitLfsEnabled: true, onlyCheckout: true, commit: 'abc123def456abc123def456abc123def456abc1');
 
     expect($calls)->toBe([
-        '1 clone --no-checkout -b main https://github.com/duilio/bad-lfs-example <tmp>/repo',
+        '1 clone --no-checkout -b main -- https://github.com/duilio/bad-lfs-example <tmp>/repo',
         '1 -c advice.detachedHead=false checkout abc123def456abc123def456abc123def456abc1',
     ]);
 });

@@ -7,8 +7,6 @@
             'application_uuid' => $application->uuid,
         ];
 
-        $imageScanningAllowed = (bool) instanceSettings()->is_image_scanning_allowed;
-
         $configurationMenuItems = [
             [
                 'label' => 'General',
@@ -120,6 +118,11 @@
                 'active' => $currentRoute === 'project.application.resource-operations',
             ],
             [
+                'label' => 'Maintenance Mode',
+                'route' => 'project.application.maintenance',
+                'active' => $currentRoute === 'project.application.maintenance',
+            ],
+            [
                 'label' => 'Metrics',
                 'route' => 'project.application.metrics',
                 'active' => $currentRoute === 'project.application.metrics',
@@ -133,8 +136,7 @@
                 'label' => 'Security',
                 'route' => 'project.application.vulnerabilities',
                 'active' => $currentRoute === 'project.application.vulnerabilities',
-                'visible' => $imageScanningAllowed,
-                'security' => $imageScanningAllowed ? \App\Services\ImageScan\SecurityStatus::stored($application)->status->value : null,
+                'security' => \App\Services\ImageScan\SecurityStatus::stored($application)->status->value,
             ],
             [
                 'label' => 'Tags',
@@ -175,6 +177,7 @@
             'Rollback' => 'time-back',
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
+            'Maintenance Mode' => 'bandage',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
             'Security' => 'shield-alert',
@@ -188,7 +191,7 @@
             'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
+            'Operations' => ['Resource Operations', 'Maintenance Mode', 'Resource Limits', 'Rollback', 'Tags'],
             'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)

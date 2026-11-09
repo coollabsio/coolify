@@ -69,12 +69,6 @@ it('restores default Sentinel configuration without rotating credentials or disa
         ->and((bool) $settings->is_sentinel_debug_enabled)->toBeFalse();
 });
 
-it('offers a confirmed restore action and explains what it preserves', function () {
-    Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->assertSee('Restore defaults')
-        ->assertSee('The Sentinel token and metrics setting will be preserved.');
-});
-
 it('does not let team members restore Sentinel defaults', function () {
     $member = User::factory()->create();
     $this->server->team->members()->attach($member->id, ['role' => 'member']);

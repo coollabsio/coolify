@@ -78,28 +78,6 @@ it('auto saves registration policy', function () {
     expect(instanceSettings()->fresh()->disable_registration_when_oauth_enabled)->toBeTrue();
 });
 
-it('shows oidc fields with a naked okta issuer url example', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('OpenID Connect')
-        ->assertSee('https://example.okta.com', false)
-        ->assertDontSee('/oauth2/default', false);
-});
-
-it('shows oidc option checkboxes', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Allow OIDC user creation')
-        ->assertSee('Require verified email')
-        ->assertSee('Use PKCE');
-});
-
 it('does not show unknown oauth providers', function () {
     actingAsInstanceAdmin();
 

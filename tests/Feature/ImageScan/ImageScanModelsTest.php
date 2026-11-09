@@ -164,8 +164,7 @@ it('defaults server scanning to off', function () {
 });
 
 it('defaults the other scan settings', function () {
-    expect(InstanceSettings::findOrFail(0)->is_image_scanning_allowed)->toBeTrue()
-        ->and(Team::factory()->create()->scan_images_on_new_servers)->toBeFalse()
+    expect(Team::factory()->create()->scan_images_on_new_servers)->toBeFalse()
         ->and(imageScanTestApplication()->settings->is_image_scan_enabled)->toBeTrue()
         ->and(ApplicationSetting::query()->first()->fresh()->image_builds_by_team)->toBeNull();
 });

@@ -12,6 +12,7 @@ use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class Destination extends Component
@@ -48,7 +49,7 @@ class Destination extends Component
 
         $this->networks = $this->usableResourceServers()
             ->get()
-            ->filter(fn (Server $server) => $server->canHostResources())
+            ->filter(fn (Server $server) => $server->canHostResources() && Gate::allows('placeResource', $server))
             ->map(function ($server) {
                 return $server->standaloneDockers;
             })->flatten();
@@ -215,6 +216,7 @@ class Destination extends Component
             if (! $server) {
                 return;
             }
+            $this->authorize('placeResource', $server);
             $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
             $reason = $this->resource instanceof Application
                 ? $this->resource->additionalServersUnavailableReason($server)

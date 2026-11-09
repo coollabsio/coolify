@@ -587,19 +587,17 @@ describe('domain DNS configuration after add', function () {
     });
 });
 
-test('dns provider action controls declare update authorization against the resource', function () {
-    $dnsMenu = file_get_contents(resource_path('views/livewire/project/shared/cloudflare-autoconfigure.blade.php'));
-    $providerModal = file_get_contents(resource_path('views/livewire/project/shared/dns-provider-management.blade.php'));
+test('a team member cannot create or replace a managed dns record', function (string $method) {
+    ['application' => $application, 'zone' => $zone] = prepareManagedDnsApplication();
+    actingAsDnsTeamMember($application->team());
+    Http::fake();
 
-    expect($dnsMenu)
-        ->toContain('$dnsAuthResource = property_exists($this, \'application\') ? $this->application : $this->service')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="createManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/');
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call($method, 'app.example.com', $zone->id)
+        ->assertForbidden();
 
-    expect($providerModal)
-        ->toContain('$dnsAuthResource = property_exists($this, \'application\') ? $this->application : $this->service')
-        ->toMatch('/<x-modal-confirmation(?=[^>]*submitAction="replaceManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="createManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/');
-});
+    Http::assertNothingSent();
+})->with(['createManagedDnsRecord', 'replaceManagedDnsRecord']);
 
 test('removing a domain deletes only the managed dns record for that resource', function () {
     $this->withoutVite();

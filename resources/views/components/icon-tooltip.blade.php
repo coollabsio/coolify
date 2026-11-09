@@ -7,8 +7,16 @@
     below: false,
     wrap: false,
     activeTarget: null,
+    label(target) {
+        return target.dataset.tooltip || target.getAttribute('aria-label') || target.title;
+    },
+    {{-- Close and dismiss (X) buttons are obvious, so they get no tooltip. --}}
+    isDismiss(target) {
+        return /^(close|dismiss)\b/i.test(this.label(target) || '');
+    },
     isIconAction(target) {
         if (target.matches('[data-icon-tooltip-ignore]')) return false;
+        if (this.isDismiss(target)) return false;
         if (target.matches('[data-tooltip], .icon-button')) return true;
         return target.hasAttribute('aria-label')
             && target.childElementCount === 1
@@ -16,9 +24,11 @@
     },
     prepare(root) {
         root.querySelectorAll?.('button[title], a[title], [data-tooltip]').forEach((target) => {
-            if (!this.isIconAction(target)) return;
-            target.dataset.iconTooltip = target.dataset.tooltip || target.getAttribute('aria-label') || target.title;
-            if (!target.getAttribute('aria-label')) target.setAttribute('aria-label', target.dataset.iconTooltip);
+            const dismiss = this.isDismiss(target);
+            if (!dismiss && !this.isIconAction(target)) return;
+            const label = this.label(target);
+            if (!dismiss) target.dataset.iconTooltip = label;
+            if (!target.getAttribute('aria-label')) target.setAttribute('aria-label', label);
             target.removeAttribute('title');
         });
     },

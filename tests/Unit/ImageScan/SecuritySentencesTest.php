@@ -295,7 +295,6 @@ it('falls back to the checked time when the stale context has no time', function
 
 it('writes a neutral text for not_checked', function () {
     $texts = [
-        'instance' => 'Image scanning is off for this Coolify instance.',
         'server' => 'Image scanning is off for this server.',
         'application' => 'Image scanning is off for this app.',
         'not_scanned' => 'This image has not been scanned yet.',
@@ -348,7 +347,7 @@ it('never writes an em dash, "safe" or "secure" in any sentence', function () {
         sentenceUpdateNow(['actions' => [sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.')], 'eol' => ['name' => 'Alpine', 'version' => '3.16', 'fixed' => true], 'facts' => ['action_stats' => [['eol' => 1]]]]),
         sentenceUpdateAvailable(['actions' => [sentenceAction(SecurityActionType::PullLatest, 'A newer build of this image fixes it. Pull it and restart.')], 'eol' => ['name' => 'Alpine', 'version' => '3.16', 'fixed' => true], 'facts' => ['action_stats' => [['eol' => 1]]]]),
     ];
-    foreach (['instance', 'server', 'application', 'not_scanned'] as $code) {
+    foreach (['server', 'application', 'not_scanned'] as $code) {
         $securities[] = sentenceSecurity(SecurityStatusType::NotChecked, ['checkReason' => $code]);
     }
     foreach (['images_unchecked', 'stale', 'db_outdated', 'image_changed', 'versions_unchecked'] as $code) {

@@ -318,14 +318,6 @@ test('s3 storage has scheduled backups relationship', function () {
     expect($s3->scheduledBackups()->count())->toBe(1);
 });
 
-test('database backup job escapes the S3 copy destination argument', function () {
-    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
-
-    expect($source)->toContain('$escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");')
-        ->and($source)->toContain('mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}')
-        ->and($source)->not->toContain('mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/');
-});
-
 test('database dump compression uses the helper image and shared CPU setting', function (int $compressionCpuPercentage) {
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);

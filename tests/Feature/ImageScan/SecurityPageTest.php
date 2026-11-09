@@ -46,7 +46,7 @@ beforeEach(function () {
     config(['app.maintenance.store' => 'array']);
     $this->withoutVite();
     $this->withoutDefer();
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->team = Team::factory()->create();

@@ -6,7 +6,6 @@ use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Models\Application;
 use App\Models\ImageScanPolicy;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -214,8 +213,8 @@ class ImageScanPolicyResolver
     }
 
     /**
-     * Why the resource is not scanned now: "instance" (the instance does not allow scanning), "server" (scanning is
-     * off for its server), "application" (the app turned its scan off), or null when it is scanned. Every surface
+     * Why the resource is not scanned now: "server" (scanning is off for its server), "application" (the app turned
+     * its scan off), or null when it is scanned. Every surface
      * that shows results (resource page, sidebar count, markers, team page, dashboard) uses this rule. Reads loaded
      * relations, so eager load the server settings (and the app settings) for lists.
      */
@@ -224,7 +223,6 @@ class ImageScanPolicyResolver
         $scanServer ??= self::mainServer($resource);
 
         return match (true) {
-            ! InstanceSettings::get()->is_image_scanning_allowed => 'instance',
             ! $scanServer instanceof Server || ! $scanServer->settings?->is_image_scan_enabled => 'server',
             $resource instanceof Application && ! $resource->settings?->is_image_scan_enabled => 'application',
             default => null,
@@ -232,13 +230,11 @@ class ImageScanPolicyResolver
     }
 
     /**
-     * The instance allows scanning and an app did not turn its scan off. Reads no rules and no server, so a caller can
-     * stop before it resolves them.
+     * An app did not turn its scan off. Reads no rules and no server, so a caller can stop before it resolves them.
      */
     public static function isAllowedFor(Model $resource): bool
     {
-        return (bool) InstanceSettings::get()->is_image_scanning_allowed
-            && (! $resource instanceof Application || (bool) $resource->settings?->is_image_scan_enabled);
+        return ! $resource instanceof Application || (bool) $resource->settings?->is_image_scan_enabled;
     }
 
     public static function isScanOn(Model $resource): bool

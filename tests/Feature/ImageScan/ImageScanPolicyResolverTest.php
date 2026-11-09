@@ -287,18 +287,10 @@ it('keeps scanning off until the server opts in', function () {
     expect(ImageScanPolicyResolver::for($this->application)->scanEnabled)->toBeFalse();
 });
 
-it('enables scanning when the instance, the server, and the app allow it', function () {
+it('enables scanning when the server and the app allow it', function () {
     resolverEnableScanning();
 
     expect(ImageScanPolicyResolver::for($this->application)->scanEnabled)->toBeTrue();
-});
-
-it('disables scanning when the instance does not allow it', function () {
-    resolverEnableScanning();
-    InstanceSettings::findOrFail(0)->forceFill(['is_image_scanning_allowed' => false])->saveQuietly();
-    Once::flush();
-
-    expect(ImageScanPolicyResolver::for($this->application)->scanEnabled)->toBeFalse();
 });
 
 it('disables scanning when the app turned its scan off', function () {

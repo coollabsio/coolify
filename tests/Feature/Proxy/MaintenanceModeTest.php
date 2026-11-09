@@ -262,8 +262,7 @@ it('lets an admin enable maintenance and save a custom page', function () {
         ->set('maintenancePage', '<h1>Back soon</h1>')
         ->call('submit')
         ->assertDispatched('success')
-        ->set('isMaintenanceEnabled', true)
-        ->call('instantSaveMaintenance')
+        ->call('toggleMaintenance')
         ->assertDispatched('success');
 
     $application->refresh();
@@ -292,8 +291,7 @@ it('does not let a member or another team change maintenance mode', function (st
     session(['currentTeam' => $team]);
 
     Livewire::test(Maintenance::class, ['resource' => $service])
-        ->set('isMaintenanceEnabled', true)
-        ->call('instantSaveMaintenance')
+        ->call('toggleMaintenance')
         ->assertDispatched('error')
         ->set('maintenancePage', '<h1>Hacked</h1>')
         ->call('submit')

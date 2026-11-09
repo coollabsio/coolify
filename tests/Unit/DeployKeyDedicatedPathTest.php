@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
@@ -69,12 +70,62 @@ function expectPrivateKeyMaterializationCommandsSkipLogging(array|Collection|str
 $keyPath = '/root/.ssh/id_rsa_coolify_test-deployment-uuid';
 $gitSshFiles = '/root/.ssh/coolify_git_test-deployment-uuid.config /root/.ssh/coolify_git_test-deployment-uuid.known_hosts';
 
-it('skips logging the docker deploy key materialization command before ls-remote', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $commandPosition = strpos($source, 'base64 -d | tee {$customSshKeyLocation}');
+it('keeps the deploy key out of the deployment log when ls-remote runs inside docker', function () use ($keyPath) {
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    config(['constants.ssh.mux_enabled' => false]);
+    InstanceSettings::forceCreate(['id' => 0]);
+    $serverKey = PrivateKey::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $serverKey->team_id,
+        'private_key_id' => $serverKey->id,
+    ]);
+    $deployKey = 'deploy-key-material-that-must-stay-secret';
+    $application = new class extends Application
+    {
+        public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+        {
+            return ['commands' => collect(), 'branch' => 'main', 'fullRepoUrl' => 'git@gitlab.com:user/repo.git'];
+        }
+    };
+    $stored = Application::factory()->create(['git_branch' => 'main']);
+    $application->setRawAttributes($stored->getAttributes(), true);
+    $application->exists = true;
+    $application->setRelation('settings', $stored->settings);
+    $application->setRelation('private_key', (new PrivateKey)->forceFill(['private_key' => $deployKey]));
+    $deployment = ApplicationDeploymentQueue::query()->create([
+        'application_id' => $application->id,
+        'deployment_uuid' => 'test-deployment-uuid',
+    ]);
+    Process::fake(['*' => Process::result(output: 'done')]);
+    $job = new class extends ApplicationDeploymentJob
+    {
+        public function __construct() {}
+    };
+    foreach ([
+        'application' => $application,
+        'application_deployment_queue' => $deployment,
+        'server' => $server,
+        'deployment_uuid' => 'test-deployment-uuid',
+        'pull_request_id' => 0,
+        'commit' => 'HEAD',
+        'rollback' => false,
+        'git_type' => 'other',
+        'customPort' => 22,
+        'saved_outputs' => collect(),
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
 
-    expect($commandPosition)->not->toBeFalse()
-        ->and(substr($source, $commandPosition, 200))->toContain("'skip_command_log' => true");
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'check_git_if_build_needed'))->invoke($job);
+
+    $encodedKey = base64_encode($deployKey);
+    $storedLogs = $deployment->refresh()->getRawOriginal('logs');
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $encodedKey) && str_contains(remoteProcessScript($process), "base64 -d | tee {$keyPath}"));
+    expect($storedLogs)
+        ->toContain('git ls-remote') // hidden commands with output are logged, so the key is absent only because its command is skipped
+        ->not->toContain($encodedKey)
+        ->not->toContain($deployKey);
 });
 
 it('supports skipping command log entries without adding a hidden command entry', function () {

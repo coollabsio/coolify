@@ -60,25 +60,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
-test('existing application shows railpack without beta label in build pack selector', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => StandaloneDocker::class,
-        'build_pack' => 'railpack',
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
-    ]);
-
-    Livewire::test(General::class, ['application' => $application])
-        ->assertSuccessful()
-        ->assertSee('Railpack')
-        ->assertDontSee('Railpack (Beta)')
-        ->assertDontSee('Railpack (beta)');
-});
-
 test('switching from railpack to compose preserves the existing application domains', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
@@ -120,32 +101,3 @@ test('Dockerfile location defaults to the Dockerfile only for the Dockerfile bui
     'Dockerfile' => ['dockerfile', '/Dockerfile'],
     'Nixpacks' => ['nixpacks', null],
 ]);
-
-test('networking section hints that internal ports can be set per domain', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => StandaloneDocker::class,
-        'build_pack' => 'nixpacks',
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'ports_exposes' => '3000,3001',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
-    ]);
-
-    $domainsUrl = route('project.application.domains', [
-        'project_uuid' => $application->environment->project->uuid,
-        'environment_uuid' => $application->environment->uuid,
-        'application_uuid' => $application->uuid,
-    ]);
-
-    Livewire::test(General::class, ['application' => $application])
-        ->assertSuccessful()
-        ->assertSeeInOrder([
-            'Ports exposes',
-            'You can also set an internal port per domain on',
-            'Port mappings',
-        ])
-        ->assertSee($domainsUrl, false);
-});

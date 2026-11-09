@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server\New\Concerns;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
 
 /**
@@ -22,7 +21,7 @@ trait SetsImageScanning
 
     protected function applyImageScanning(Server $server): void
     {
-        if ($this->scan_images !== 'on' || ! InstanceSettings::get()->is_image_scanning_allowed) {
+        if ($this->scan_images !== 'on') {
             return;
         }
 

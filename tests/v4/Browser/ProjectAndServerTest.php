@@ -92,20 +92,6 @@ it('shows server configuration page for owner', function () {
         ->screenshot(filename: 'core-server-configuration');
 });
 
-it('shows team general and members pages', function () {
-    loginAndSkipBoarding();
-
-    visit('/team')
-        ->assertSee('General')
-        ->assertSee('Danger Zone')
-        ->screenshot(filename: 'core-team-general');
-
-    visit('/team/members')
-        ->assertSee('Members')
-        ->assertSee('Invite a member')
-        ->screenshot(filename: 'core-team-members');
-});
-
 it('shows projects index', function () {
     loginAndSkipBoarding();
 

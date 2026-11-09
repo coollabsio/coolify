@@ -282,6 +282,8 @@
                             :wire:key="'service-status-'.$currentService->uuid" />
                     @endif
                 </div>
+                <livewire:star-toggle :resource="$currentResource"
+                    :wire:key="'star-'.$currentResource->getMorphClass().'-'.$currentResource->uuid" />
             </x-slot:meta>
         </x-breadcrumb-switcher>
     @endif

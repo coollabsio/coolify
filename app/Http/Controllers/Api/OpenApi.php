@@ -165,7 +165,7 @@ use OpenApi\Attributes as OA;
             properties: [
                 new OA\Property(property: 'uuid', type: 'string'),
                 new OA\Property(property: 'type', type: 'string', enum: ['application', 'service', 'database']),
-                new OA\Property(property: 'off_reason', type: 'string', nullable: true, enum: ['instance', 'server', 'application'], description: 'Why the resource is not scanned. Null when it is scanned.'),
+                new OA\Property(property: 'off_reason', type: 'string', nullable: true, enum: ['server', 'application'], description: 'Why the resource is not scanned. Null when it is scanned.'),
                 new OA\Property(property: 'security', ref: '#/components/schemas/SecurityStatus', nullable: true),
                 new OA\Property(property: 'images', type: 'array', items: new OA\Items(properties: [
                     new OA\Property(property: 'scan_uuid', type: 'string'),

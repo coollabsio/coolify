@@ -121,11 +121,6 @@ return new class extends Migration
             $table->date('image_candidate_scans_date')->nullable();
         });
 
-        Schema::table('instance_settings', function (Blueprint $table) {
-            $table->boolean('is_image_scanning_allowed')->default(true);
-            $table->string('image_scan_db_url')->nullable();
-        });
-
         Schema::table('teams', function (Blueprint $table) {
             $table->boolean('scan_images_on_new_servers')->default(false);
         });
@@ -183,10 +178,6 @@ return new class extends Migration
 
         Schema::table('teams', function (Blueprint $table) {
             $table->dropColumn('scan_images_on_new_servers');
-        });
-
-        Schema::table('instance_settings', function (Blueprint $table) {
-            $table->dropColumn(['is_image_scanning_allowed', 'image_scan_db_url']);
         });
 
         Schema::table('server_settings', function (Blueprint $table) {

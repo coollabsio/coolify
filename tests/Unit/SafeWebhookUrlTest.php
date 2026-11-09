@@ -245,9 +245,7 @@ it('pins every resolved address in a single CURLOPT_RESOLVE entry', function () 
     ]));
 
     if (! defined('CURLOPT_RESOLVE')) {
-        expect(true)->toBeTrue();
-
-        return;
+        $this->markTestSkipped('CURLOPT_RESOLVE is not available.');
     }
 
     $entries = SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook')['curl'][CURLOPT_RESOLVE];

@@ -189,10 +189,6 @@ final class TeamVulnerabilities
      */
     public static function updateNowResources(int $teamId): array
     {
-        if (! instanceSettings()->is_image_scanning_allowed) {
-            return [];
-        }
-
         $owners = ImageScan::query()
             // Whether a resource is scanned is decided by the shared rule, not by the server of its scans.
             ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))

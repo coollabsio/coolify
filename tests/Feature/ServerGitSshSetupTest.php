@@ -91,7 +91,7 @@ test('a github app repository on the server needs no ssh setup', function () {
 
     expect($checkout)->toContain('https://github.com/org/repo')
         ->and($checkout)->not->toContain('coolify_git_test-uuid')
-        ->and($lsRemote)->toContain("git ls-remote 'https://github.com/org/repo'")
+        ->and($lsRemote)->toContain("git ls-remote -- 'https://github.com/org/repo'")
         ->and($lsRemote)->not->toContain('bash -c')
         ->and($lsRemote)->not->toContain('coolify_git_test-uuid');
 });

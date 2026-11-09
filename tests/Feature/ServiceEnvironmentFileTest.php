@@ -124,9 +124,3 @@ test('empty service values stay empty', function () {
 
     expect($line)->toBe('EMPTY=');
 });
-
-test('saveComposeConfigs writes compose env file lines', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Models/Service.php');
-
-    expect($source)->toContain('$envs->push($this->composeEnvironmentFileLine($env));');
-});

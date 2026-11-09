@@ -21,7 +21,7 @@ beforeEach(function () {
     Cache::flush();
     Server::flushIdentityMap();
     config(['app.maintenance.store' => 'array']);
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->member = User::factory()->create();

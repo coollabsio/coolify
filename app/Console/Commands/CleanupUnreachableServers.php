@@ -15,7 +15,8 @@ class CleanupUnreachableServers extends Command
     public function handle()
     {
         echo "Running unreachable server cleanup...\n";
-        $servers = Server::where('unreachable_count', '>=', 3)->whereHas('notificationThrottles', fn ($query) => $query->where('notification', Unreachable::class))->where('updated_at', '<', now()->subDays(7))->get();
+        // The localhost server is the Coolify host itself, so the cleanup never touches it.
+        $servers = Server::where('id', '!=', 0)->where('unreachable_count', '>=', 3)->whereHas('notificationThrottles', fn ($query) => $query->where('notification', Unreachable::class))->where('updated_at', '<', now()->subDays(7))->get();
         if ($servers->count() > 0) {
             foreach ($servers as $server) {
                 echo "Cleanup unreachable server ($server->id) with name $server->name";

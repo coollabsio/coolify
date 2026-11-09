@@ -177,6 +177,27 @@ class Create extends Component
 
     public function render()
     {
-        return view('livewire.project.resource.create');
+        return view('livewire.project.resource.create', $this->pendingResource());
+    }
+
+    /**
+     * @return array{pendingName: ?string, pendingLogo: ?string}
+     */
+    private function pendingResource(): array
+    {
+        if (! $this->pendingType) {
+            return ['pendingName' => null, 'pendingLogo' => null];
+        }
+        $type = str($this->pendingType);
+        if (in_array($type->value(), DATABASE_TYPES, true)) {
+            return ['pendingName' => $type->headline()->value(), 'pendingLogo' => null];
+        }
+        $services = get_service_templates();
+        $key = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
+
+        return [
+            'pendingName' => str($key)->headline()->value(),
+            'pendingLogo' => service_logo_urls(data_get($services, "$key.logo"))['logo'],
+        ];
     }
 }

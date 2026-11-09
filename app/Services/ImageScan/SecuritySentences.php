@@ -92,7 +92,6 @@ final class SecuritySentences
             SecurityStatus::REASON_DB_OUTDATED => 'the vulnerability database is out of date',
             SecurityStatus::REASON_IMAGE_CHANGED => 'the running image is not the checked image',
             SecurityStatus::REASON_VERSIONS_UNCHECKED => 'Coolify has not checked for newer versions yet',
-            'instance' => 'Image scanning is off for this Coolify instance.',
             'server' => 'Image scanning is off for this server.',
             'application' => 'Image scanning is off for this app.',
             default => 'This image has not been scanned yet.',

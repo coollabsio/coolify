@@ -64,10 +64,6 @@ class ImageScanDigestJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQue
 
     public function handle(): void
     {
-        if (! instanceSettings()->is_image_scanning_allowed) {
-            return;
-        }
-
         /** @var list<array<string, mixed>> $marks */
         $marks = [];
         $resources = [];

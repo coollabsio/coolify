@@ -51,7 +51,7 @@ beforeEach(function () {
     Server::flushIdentityMap();
     Storage::fake('ssh-keys');
     config(['constants.ssh.mux_enabled' => false, 'constants.ssh.max_retries' => 1]);
-    InstanceSettings::forceCreate(['id' => 0, 'is_image_scanning_allowed' => true]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->server = candidatesServer($this->team);

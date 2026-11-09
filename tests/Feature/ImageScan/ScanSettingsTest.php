@@ -129,15 +129,6 @@ describe('instance scope', function () {
         expect(scanSettingsInstanceRow()->gate_mode)->toBe(ImageScanGateMode::Off);
     });
 
-    it('offers Off, On, and Strict with what On and Strict block', function () {
-        scanSettingsAs(scanSettingsInstanceAdmin(), Team::find(0), 'instance')
-            ->assertSee('Block deploys')
-            ->assertSee('Strict')
-            ->assertSee('Blocks a deploy when the new image adds a problem that attackers are using or are likely to use.')
-            ->assertSee('Also blocks critical, high, and counted medium problems that have a fix, and operating systems that no longer get security fixes.')
-            ->assertDontSee('Alert on');
-    });
-
     it('forbids the instance rules to users who are not instance admins', function () {
         scanSettingsAs($this->admin, $this->team, 'instance')->assertForbidden();
     });
@@ -151,39 +142,6 @@ describe('instance page', function () {
         Livewire::test(InstanceImageScanning::class)->assertRedirect(route('dashboard'));
     });
 
-    it('turns image scanning off for the instance', function () {
-        $admin = scanSettingsInstanceAdmin();
-        $this->actingAs($admin);
-        session(['currentTeam' => Team::find(0)]);
-
-        Livewire::test(InstanceImageScanning::class)
-            ->set('isImageScanningAllowed', '0')
-            ->assertDispatched('success');
-
-        expect(InstanceSettings::query()->find(0)->is_image_scanning_allowed)->toBeFalse();
-    });
-
-    it('saves an https vulnerability database URL and rejects http and junk', function (string $url, bool $valid) {
-        $admin = scanSettingsInstanceAdmin();
-        $this->actingAs($admin);
-        session(['currentTeam' => Team::find(0)]);
-
-        $component = Livewire::test(InstanceImageScanning::class)
-            ->set('imageScanDbUrl', $url)
-            ->call('saveDatabaseUrl');
-
-        if ($valid) {
-            $component->assertHasNoErrors();
-            expect(InstanceSettings::query()->find(0)->image_scan_db_url)->toBe($url);
-        } else {
-            $component->assertHasErrors('imageScanDbUrl');
-            expect(InstanceSettings::query()->find(0)->image_scan_db_url)->toBeNull();
-        }
-    })->with([
-        'https' => ['https://mirror.example.com/grype/listing.json', true],
-        'http' => ['http://mirror.example.com/grype/listing.json', false],
-        'junk' => ['not a url', false],
-    ]);
 });
 
 describe('team scope', function () {
@@ -668,7 +626,6 @@ describe('count medium problems', function () {
 
     it('refreshes the stored status of an app right away', function () {
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
-        InstanceSettings::query()->find(0)->forceFill(['is_image_scanning_allowed' => true])->save();
         Once::flush();
         $scan = ImageScan::factory()->create([
             'server_id' => $this->server->id,
