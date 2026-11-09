@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.1] - 2026-11-09
+
+### Added
+
+- The reason of a failed image scan in a `Show error log` section on the `Security` page and in the Laravel log
+  - The error log shows the failed step, its exit code, and the end of the command output. Only users who can change the resource or server see it
+
+### Fixed
+
+- Failed image scans on self-hosted instances, because the scanner templates were missing from the Coolify image
+- Ignored custom container labels and wildcard domains in maintenance mode ([#12498](https://github.com/coollabsio/coolify/issues/12498))
+  - With editable container labels, maintenance mode uses the Traefik router rules and the Caddy site addresses of the labels
+- Showed an error on the `Vulnerabilities` page
+- Showed warning callouts in the accent color instead of yellow when a custom theme is active
+
 ## [v4.7.0] - 2026-11-09
 
 ### Breaking Changes
