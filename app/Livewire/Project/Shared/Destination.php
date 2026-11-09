@@ -107,11 +107,35 @@ class Destination extends Component
         return $server;
     }
 
+    /**
+     * Whether the application runs on the server, as its main server or as an additional server.
+     */
+    private function runsOnServer(Server $server): bool
+    {
+        return $this->resource->destination->server_id == $server->id
+            || $this->resource->additional_networks()->wherePivot('server_id', $server->id)->exists();
+    }
+
+    /**
+     * Whether the network is the main destination or an additional network of the application on the server.
+     */
+    private function isAttachedDestination(StandaloneDocker $destination, Server $server): bool
+    {
+        if ($this->resource->destination_type === StandaloneDocker::class && $this->resource->destination_id == $destination->id) {
+            return true;
+        }
+
+        return $this->resource->additional_networks()->wherePivot('server_id', $server->id)->whereKey($destination->id)->exists();
+    }
+
     public function stop($serverId)
     {
         try {
             $this->authorize('deploy', $this->resource);
             $server = $this->resourceServers()->findOrFail((int) $serverId);
+            if (! $this->runsOnServer($server)) {
+                abort(404);
+            }
             StopApplicationOneServer::run($this->resource, $server);
             auditLog('ui.application.destination_stopped', [
                 'team_id' => $this->resource->team()?->id,
@@ -139,8 +163,11 @@ class Destination extends Component
             if (! $server) {
                 return;
             }
-            $deployment_uuid = new_public_id();
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
+            if (! $this->isAttachedDestination($destination, $server)) {
+                abort(404);
+            }
+            $deployment_uuid = new_public_id();
             $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->resource,
