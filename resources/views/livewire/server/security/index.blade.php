@@ -12,7 +12,7 @@
         {{-- Links sent before the patching sections got their own page (notifications) end with their section ID. --}}
         <div class="application-settings-form flex w-full min-w-0 flex-col gap-6"
             x-data
-            x-init="if (['#server-patching-overview-section', '#server-package-updates-section', '#server-held-updates-section'].includes(location.hash)) { window.location.replace(@js(route('server.security.patches', ['server_uuid' => $server->uuid]))) }">
+            x-init="if (['#server-patching-overview-section', '#server-package-updates-section', '#server-held-updates-section'].includes(location.hash)) { window.location.replace(@js(route('server.security.patches', ['server_uuid' => $server->uuid])) + location.hash) }">
             <livewire:server.security.host-key :server_uuid="$server->uuid" />
             <livewire:server.security.terminal-access :server_uuid="$server->uuid" />
         </div>
