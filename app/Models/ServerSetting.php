@@ -114,12 +114,27 @@ class ServerSetting extends Model
     /** @var list<int> */
     public const array IMAGE_SCAN_MEMORY_OPTIONS_MB = [1024, 2048, 4096, 8192];
 
+    /** Time limit of one Syft run and of one Grype run, in seconds. */
+    public const int DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS = 600;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS = [300, 600, 1200, 1800, 3600];
+
+    /** CPUs of each scanner container. */
+    public const float DEFAULT_IMAGE_SCAN_CPUS = 1.0;
+
+    /** @var list<float> */
+    public const array IMAGE_SCAN_CPU_OPTIONS = [0.5, 1.0, 2.0, 4.0];
+
     protected $fillable = [
         'server_id',
         'is_image_scan_enabled',
         'image_scan_memory_mb',
         'image_candidate_scans_today',
         'image_candidate_scans_date',
+        'image_scan_syft_timeout',
+        'image_scan_grype_timeout',
+        'image_scan_cpus',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -205,10 +220,16 @@ class ServerSetting extends Model
         'is_image_scan_enabled' => false,
         'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
+        'image_scan_syft_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_grype_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_cpus' => self::DEFAULT_IMAGE_SCAN_CPUS,
     ];
 
     protected $casts = [
         'force_disabled' => 'boolean',
+        'image_scan_syft_timeout' => 'integer',
+        'image_scan_grype_timeout' => 'integer',
+        'image_scan_cpus' => 'float',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',

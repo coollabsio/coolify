@@ -35,9 +35,9 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
     public $maxExceptions = 1;
 
     /** A run never takes longer than the server scan lock lives, so the worker does not stop it before the cleanup. */
-    public $timeout = ScanImage::LOCK_TTL;
+    public $timeout = ScanImage::MAX_LOCK_TTL;
 
-    public $uniqueFor = ScanImage::LOCK_TTL;
+    public $uniqueFor = ScanImage::MAX_LOCK_TTL;
 
     public function __construct(public Server $server)
     {
@@ -62,7 +62,7 @@ class ScanHostPackagesJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProce
      */
     public static function dispatchManual(Server $server): void
     {
-        Cache::put(self::runningCacheKey($server), (string) Str::uuid(), now()->addSeconds(2 * ScanImage::LOCK_TTL));
+        Cache::put(self::runningCacheKey($server), (string) Str::uuid(), now()->addSeconds(2 * ScanImage::lockTtl($server)));
         self::dispatch($server);
     }
 

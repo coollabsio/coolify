@@ -23,7 +23,7 @@ enum ImageScanErrorCode: string
     /**
      * Fixed user-facing message. Raw command output is never shown.
      *
-     * @param  array{server?: string, n?: int|string}  $context
+     * @param  array{server?: string, n?: int|string, step?: string}  $context
      */
     public function message(array $context = []): string
     {
@@ -34,7 +34,11 @@ enum ImageScanErrorCode: string
             self::DiskSpace => isset($context['n']) ? "Not enough disk space on {$server}: {$n} GB needed." : "Not enough disk space on {$server}.",
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
-            self::Timeout => 'The scan took too long and was stopped.',
+            self::Timeout => match ($context['step'] ?? null) {
+                'sbom' => "Syft took too long and was stopped. Raise the Syft time limit on the Vulnerabilities page of {$server}.",
+                'grype' => "Grype took too long and was stopped. Raise the Grype time limit on the Vulnerabilities page of {$server}.",
+                default => 'The scan took too long and was stopped.',
+            },
             self::OutOfMemory => "The scanner ran out of memory and was stopped. Raise the scanner memory limit on the Vulnerabilities page of {$server}, and make sure that {$server} has that much free memory.",
             self::LockBusy => "Another scan is still running on {$server}.",
             self::RegistryAuth => "Coolify cannot read this image from its registry. Log in to the registry on {$server}.",

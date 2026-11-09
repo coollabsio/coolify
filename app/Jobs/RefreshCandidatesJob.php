@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\ImageScan\RefreshCandidates;
+use App\Actions\ImageScan\ScanImage;
 use App\Events\ImageScanUpdated;
 use App\Models\ImageScan;
 use App\Services\ImageScan\ScanLockBusy;
@@ -29,10 +30,10 @@ class RefreshCandidatesJob implements ShouldBeUnique, ShouldQueue
     /** An unexpected error fails the job; only a busy lock retries it. */
     public $maxExceptions = 1;
 
-    /** Two candidate scans and the scan of the current base image, plus the registry calls. */
-    public $timeout = 7200;
+    /** Two candidate scans and the scan of the current base image at the highest scanner limits, plus the registry calls. */
+    public $timeout = (RefreshCandidates::MAX_CANDIDATE_SCANS + 1) * ScanImage::MAX_SCANNER_STEPS_SECONDS + 1800;
 
-    public $uniqueFor = 7200;
+    public $uniqueFor = (RefreshCandidates::MAX_CANDIDATE_SCANS + 1) * ScanImage::MAX_SCANNER_STEPS_SECONDS + 1800;
 
     public $deleteWhenMissingModels = true;
 

@@ -243,9 +243,10 @@ final class DeploymentImageScan
     {
         $startedAt = $this->job('started_at');
         $elapsed = $startedAt === null ? 0 : max(0, now()->getTimestamp() - (int) $startedAt);
-        $left = (int) $this->job('timeout') - $elapsed - ScanImage::GATE_SCAN_RESERVE_SECONDS;
+        $server = $this->job('server');
+        $left = (int) $this->job('timeout') - $elapsed - ScanImage::gateScanReserveSeconds($server);
 
-        return max(ScanImage::GATE_LOCK_WAIT_SECONDS, min(ScanImage::LOCK_TTL, $left));
+        return max(ScanImage::GATE_LOCK_WAIT_SECONDS, min(ScanImage::lockTtl($server), $left));
     }
 
     /**

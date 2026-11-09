@@ -49,24 +49,26 @@ class ScanImage
 {
     use AsAction;
 
-    /**
-     * The longest run of handle() under the lock: database status, update, and status again, inspect, pull, and
-     * inspect again, Grype on a stored SBOM that is gone, disk check, SBOM, packages, Grype, cleanup. The lock must
-     * not expire under a scan that still runs.
-     */
-    public const LOCK_TTL = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
+    /** lockTtl() without its SBOM and its two Grype runs. */
+    private const LOCK_TTL_WITHOUT_SCANNERS = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
         + 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_PULL
-        + self::TIMEOUT_GRYPE + self::TIMEOUT_DEFAULT + self::TIMEOUT_SBOM + 2 * self::TIMEOUT_GRYPE
+        + self::TIMEOUT_DEFAULT + self::TIMEOUT_PACKAGES
         + self::TIMEOUT_DEFAULT;
+
+    /** SBOM, packages, and two Grype runs at the highest Syft and Grype time limits: one candidate scan at most. */
+    public const MAX_SCANNER_STEPS_SECONDS = self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
+        + self::TIMEOUT_PACKAGES + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
+
+    /** lockTtl() at the highest Syft and Grype time limits: for job timeouts and marks that do not know the server. */
+    public const MAX_LOCK_TTL = self::LOCK_TTL_WITHOUT_SCANNERS
+        + self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
+        + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
 
     /**
      * One wait of a deploy gate for the server lock (spec 5); background scans never wait. The gate waits again while
      * the lock is busy, see `DeploymentImageScan::gateLockWaitSeconds()`.
      */
     public const GATE_LOCK_WAIT_SECONDS = 120;
-
-    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
-    public const GATE_SCAN_RESERVE_SECONDS = self::TIMEOUT_SBOM + self::TIMEOUT_GRYPE;
 
     public const LAST_ERROR_TTL_DAYS = 7;
 
@@ -75,9 +77,12 @@ class ScanImage
 
     private const TIMEOUT_DB_UPDATE = 960;
 
-    private const TIMEOUT_SBOM = 1260;
+    private const TIMEOUT_SAVE = 600;
 
-    private const TIMEOUT_GRYPE = 360;
+    private const TIMEOUT_PACKAGES = 360;
+
+    /** SSH time on top of the time limit of a scanner container. */
+    private const STEP_MARGIN = 60;
 
     private const TIMEOUT_PULL = 660;
 
@@ -92,6 +97,8 @@ class ScanImage
     private const EXIT_DOCKER_RUN = 125;
 
     private string $runId = '';
+
+    private int $lockTtl = self::MAX_LOCK_TTL;
 
     private CarbonImmutable $startedAt;
 
@@ -111,6 +118,7 @@ class ScanImage
     public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false, bool $pullWhenMissing = false): ImageScan
     {
         $this->runId = Str::lower(Str::random(24));
+        $this->lockTtl = self::lockTtl($server);
         $this->pullWhenMissing = $pullWhenMissing;
         $this->startedAt = CarbonImmutable::now();
         $policy = ImageScanPolicyResolver::for($resource, $server);
@@ -189,6 +197,7 @@ class ScanImage
     public function rescan(Server $server, string $imageId, array $targets, int $lockWaitSeconds = 0, bool $retryWhenBusy = false): array
     {
         $this->runId = Str::lower(Str::random(24));
+        $this->lockTtl = self::lockTtl($server);
         $this->startedAt = CarbonImmutable::now();
         $context = ['server' => (string) $server->name];
 
@@ -232,11 +241,39 @@ class ScanImage
     }
 
     /**
+     * The longest run of handle() under the lock: database status, update, and status again, inspect, pull, and
+     * inspect again, Grype on a stored SBOM that is gone, disk check, SBOM, packages, Grype, cleanup. The lock must
+     * not expire under a scan that still runs.
+     */
+    public static function lockTtl(Server $server): int
+    {
+        return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
+    }
+
+    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    public static function gateScanReserveSeconds(Server $server): int
+    {
+        return self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
+    }
+
+    /** SSH timeout of one SBOM step on the server: `docker save` of a local image, then Syft. */
+    public static function sbomStepTimeout(Server $server): int
+    {
+        return self::TIMEOUT_SAVE + ScannerCommands::syftTimeout($server) + self::STEP_MARGIN;
+    }
+
+    /** SSH timeout of one Grype run on the server. */
+    public static function grypeStepTimeout(Server $server): int
+    {
+        return ScannerCommands::grypeTimeout($server) + self::STEP_MARGIN;
+    }
+
+    /**
      * One scan or scan data change at a time per server (spec 4.1).
      */
     public static function serverLock(Server $server): Lock
     {
-        return Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+        return Cache::lock("image-scan:{$server->id}", self::lockTtl($server), Str::random(40));
     }
 
     /**
@@ -421,7 +458,7 @@ class ScanImage
             'run_id' => $this->runId,
             'stage' => $stage,
             'started_at' => $this->startedAt->toIso8601String(),
-        ], self::LOCK_TTL);
+        ], $this->lockTtl);
         $this->broadcast($resource, $this->runId, final: false);
     }
 
@@ -571,7 +608,7 @@ class ScanImage
 
         if ($sbom !== null) {
             $this->progressAll($resources, 'vulnerabilities');
-            $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+            $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::grypeStepTimeout($commands->server));
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
                 $this->assertSucceeded($grype, 'grype');
@@ -585,7 +622,7 @@ class ScanImage
 
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
         $this->progressAll($resources, 'vulnerabilities');
-        $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+        $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::grypeStepTimeout($commands->server));
         $this->assertSucceeded($grype, 'grype');
 
         return [$sbom, $grype];
@@ -598,12 +635,12 @@ class ScanImage
     {
         self::checkDiskSpace($commands, $image['size']);
 
-        $result = self::runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
+        $result = self::runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::sbomStepTimeout($commands->server));
         // `docker save` has no memory limit: its 137 is always a timeout kill.
         $this->assertSucceeded($result, 'save');
         $this->assertSucceeded($result, 'sbom');
 
-        $packages = self::runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
+        $packages = self::runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_PACKAGES);
         $this->assertSucceeded($packages, 'packages');
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
@@ -954,10 +991,10 @@ class ScanImage
     {
         $code = $result['exit_codes'][$step] ?? null;
         if ($code !== 0 && $step !== 'save' && in_array($step, $result['oom'], true)) {
-            throw new ScanFailed(ImageScanErrorCode::OutOfMemory, detail: "step {$step} was killed because it ran out of memory");
+            throw new ScanFailed(ImageScanErrorCode::OutOfMemory, ['step' => $step], "step {$step} was killed because it ran out of memory");
         }
         if (in_array($code, self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout, detail: "step {$step} exited with code {$code} (timeout)");
+            throw new ScanFailed(ImageScanErrorCode::Timeout, ['step' => $step], "step {$step} exited with code {$code} (timeout)");
         }
         if ($code !== 0) {
             $codes = json_encode($result['exit_codes']);

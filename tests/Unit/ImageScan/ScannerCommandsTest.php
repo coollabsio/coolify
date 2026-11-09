@@ -285,6 +285,45 @@ it('caps tool output on disk at twice the read limit in the blocks that sh count
     }
 });
 
+it('runs Grype with the default time limit and resources when the server has no settings', function () {
+    $run = scannerDockerRuns($this->commands->grype(SCANNER_TEST_HEX))[0];
+
+    expect($run)->toContain('; timeout -k 10 600 docker run ')
+        ->toContain('--cpus 1 --memory 1024m --memory-swap 1024m ');
+});
+
+function scannerServerWith(array $settings): Server
+{
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('root');
+    $server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting($settings));
+
+    return $server;
+}
+
+it('runs the scanner containers with the time limits and CPUs of the server settings', function () {
+    $commands = new ScannerCommands(scannerServerWith(['image_scan_syft_timeout' => 1800, 'image_scan_grype_timeout' => 1200, 'image_scan_cpus' => 2.0]), SCANNER_TEST_RUN_ID);
+    $local = implode("\n", scannerUnwrapped($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX)));
+
+    expect($local)->toContain('timeout -k 10 600 docker save ')
+        ->and(scannerDockerRuns($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1800 docker run ')
+        ->and(scannerDockerRuns($commands->sbomFromHost())[0])->toContain('; timeout -k 10 1800 docker run ')
+        ->and(scannerDockerRuns($commands->sbomFromRegistry('nginx:1', 'linux/amd64', 'cand-1', null))[0])->toContain('; timeout -k 10 1800 docker run ');
+
+    expect(scannerDockerRuns($commands->grype(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1200 docker run ')
+        ->toContain('--cpus 2 --memory 1024m ')
+        ->and(scannerDockerRuns($commands->packages(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 300 docker run ')
+        ->toContain('--cpus 2 ');
+});
+
+it('keeps stored scanner limits inside the options', function () {
+    $server = scannerServerWith(['image_scan_syft_timeout' => 99999, 'image_scan_grype_timeout' => 5, 'image_scan_cpus' => 0.1]);
+
+    expect(ScannerCommands::syftTimeout($server))->toBe(3600)
+        ->and(ScannerCommands::grypeTimeout($server))->toBe(300)
+        ->and(ScannerCommands::cpus($server))->toBe('0.5');
+});
+
 it('mounts the database and the SBOM read-only for Grype', function () {
     $run = scannerDockerRuns($this->commands->grype(SCANNER_TEST_HEX))[0];
 
@@ -630,4 +669,28 @@ it('keeps one line per vulnerability and drops the problems that the distributio
     expect($host)->toContain('grep -v -F \'"fix":"wont-fix"\'')
         ->toContain('if (k in at)')
         ->and(implode("\n", scannerUnwrapped($this->commands->grype(SCANNER_TEST_HEX))))->not->toContain('grep -v')->not->toContain('k in at');
+});
+
+it('offers only the memory and CPU options that fit the server', function (array $metadata, array $memory, array $cpus) {
+    $server = (new Server)->forceFill(['server_metadata' => $metadata]);
+
+    expect(ScannerCommands::memoryOptionsMb($server))->toBe($memory)
+        ->and(ScannerCommands::cpuOptions($server))->toBe($cpus);
+})->with([
+    'not collected yet' => [[], [1024, 2048, 4096, 8192], [0.5, 1.0, 2.0, 4.0]],
+    '4 GB VM (3.8 GiB usable), 2 cores' => [['memory_bytes' => 4_080_000_000, 'cpus' => 2], [1024, 2048], [0.5, 1.0, 2.0]],
+    'exactly 8 GiB, 8 cores' => [['memory_bytes' => 8 * 1024 ** 3, 'cpus' => 8], [1024, 2048, 4096, 8192], [0.5, 1.0, 2.0, 4.0]],
+    'smaller than every option' => [['memory_bytes' => 512 * 1024 ** 2, 'cpus' => 1], [1024], [0.5, 1.0]],
+]);
+
+it('sizes the job timeouts for the highest time limit option', function () {
+    expect(ScannerCommands::MAX_SYFT_TIMEOUT)->toBe(max(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS))
+        ->and(ScannerCommands::MAX_GRYPE_TIMEOUT)->toBe(max(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS));
+});
+
+it('never passes Docker more CPUs than the server has', function () {
+    $server = scannerServerWith(['image_scan_cpus' => 4.0]);
+    $server->forceFill(['server_metadata' => ['cpus' => 2]]);
+
+    expect(ScannerCommands::cpus($server))->toBe('2');
 });

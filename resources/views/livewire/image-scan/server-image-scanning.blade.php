@@ -6,7 +6,7 @@
     <livewire:server.navbar :server="$server" />
 
     @php
-        $costText = 'Scans use up to 1 CPU and ' . $memoryLimit . ' of memory while they run, and about 1.2 GB of disk, plus temporary space for one image.';
+        $costText = "Scans use up to {$cpuLimit} CPU and {$memoryLimit} of memory while they run, and about 1.2 GB of disk, plus temporary space for one image.";
         $pullState = match ($prepareState) {
             'pulling' => 'running',
             'updating_database', 'ready' => 'success',
@@ -105,14 +105,35 @@
                 <div @class([
                     'mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]' => ! $enabled || $prepareState !== 'ready',
                 ])>
-                    <div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        <x-forms.listbox id="scannerMemoryMb" label="Scanner memory limit" onChange="$commit"
-                            :disabled="auth()->user()->cannot('update', $server)"
-                            helper="Memory that each scanner step can use. Raise it when a scan stops because it ran out of memory. The server must have this much free memory."
-                            :options="$memoryOptions" />
+                    @php
+                        $cannotUpdate = auth()->user()->cannot('update', $server);
+                    @endphp
+                    <x-application.settings-subsection id="image-scan-limits-section" title="Scanner limits"
+                        helper="Limits of each scanner step on this server. Raise one when a scan stops because it took too long or ran out of memory. A new limit applies to the next scan."
+                        first>
+                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <x-forms.listbox id="scannerSyftTimeout" label="Syft time limit" onChange="$commit"
+                                :disabled="$cannotUpdate"
+                                helper="Time to list the packages of one image. Large images need more time."
+                                :options="$timeoutOptions" />
+                            <x-forms.listbox id="scannerGrypeTimeout" label="Grype time limit" onChange="$commit"
+                                :disabled="$cannotUpdate"
+                                helper="Time to match the packages of one image with the vulnerability database."
+                                :options="$timeoutOptions" />
+                            <x-forms.listbox id="scannerCpus" label="Scanner CPU limit" onChange="$commit"
+                                :disabled="$cannotUpdate"
+                                helper="CPUs that each scanner step can use. Values above the CPU count of this server are not listed."
+                                :options="$cpuOptions" />
+                            <x-forms.listbox id="scannerMemoryMb" label="Scanner memory limit" onChange="$commit"
+                                :disabled="$cannotUpdate"
+                                helper="Memory that each scanner step can use. Values above the memory of this server are not listed. The server must also have this much free memory when a scan runs."
+                                :options="$memoryOptions" />
+                        </div>
+                    </x-application.settings-subsection>
+                    <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                        <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
+                            :key="'server-image-scan-settings-'.$server->uuid" />
                     </div>
-                    <livewire:image-scan.scan-settings scope-type="server" :scope-uuid="$server->uuid" :embedded="true"
-                        :key="'server-image-scan-settings-'.$server->uuid" />
                 </div>
             </x-application.settings-section>
 
