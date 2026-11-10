@@ -2195,7 +2195,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'PORT='))) {
+                if (! empty($ports) && $this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'PORT='))) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
