@@ -155,6 +155,19 @@ it('marks preview rows that have the production value without sending values to 
         ->assertDontSee('plain-production-value');
 });
 
+it('compares only the given preview variables with production values', function () {
+    createProductionValueTestVariable($this->application, 'FIRST', 'first-value');
+    createProductionValueTestVariable($this->application, 'SECOND', 'second-value');
+    $first = previewProductionValueTestVariable($this->application, 'FIRST');
+    $second = previewProductionValueTestVariable($this->application, 'SECOND');
+
+    $application = $this->application->fresh();
+
+    expect($application->previewEnvironmentVariableIdsWithProductionValues([$second->id]))->toBe([$second->id])
+        ->and($application->previewEnvironmentVariableIdsWithProductionValues([]))->toBe([])
+        ->and($application->previewEnvironmentVariableIdsWithProductionValues())->toEqualCanonicalizing([$first->id, $second->id]);
+});
+
 it('saves the production values in previews setting', function () {
     Livewire::test(Previews::class, ['application' => $this->application])
         ->assertSet('useProductionValuesInPreviews', true)
