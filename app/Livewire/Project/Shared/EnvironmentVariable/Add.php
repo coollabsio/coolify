@@ -45,6 +45,10 @@ class Add extends Component
 
     public bool $copy_value_to_preview = true;
 
+    /** The application copies production values to new preview variables, so one variable can opt out. */
+    #[Locked]
+    public bool $canLeavePreviewValueEmpty = false;
+
     public string $key;
 
     public ?string $value = null;
@@ -96,12 +100,9 @@ class Add extends Component
     {
         $this->parameters = get_route_parameters();
         $this->problematicVariables = self::getProblematicVariablesForFrontend();
-        $this->copy_value_to_preview = $this->defaultCopyValueToPreview();
-    }
-
-    private function defaultCopyValueToPreview(): bool
-    {
-        return ! ($this->resource instanceof Application) || $this->resource->settings?->use_production_values_in_previews !== false;
+        $this->canLeavePreviewValueEmpty = $this->showPreview
+            && $this->resource instanceof Application
+            && $this->resource->settings?->use_production_values_in_previews !== false;
     }
 
     #[Computed]
@@ -244,7 +245,7 @@ class Add extends Component
             'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
             'comment' => $this->comment,
-            'copy_value_to_preview' => $this->showPreview ? $this->copy_value_to_preview : null,
+            'copy_value_to_preview' => $this->canLeavePreviewValueEmpty ? $this->copy_value_to_preview : null,
         ]);
         $this->clear();
     }
@@ -258,6 +259,6 @@ class Add extends Component
         $this->is_runtime = true;
         $this->is_buildtime = true;
         $this->comment = null;
-        $this->copy_value_to_preview = $this->defaultCopyValueToPreview();
+        $this->copy_value_to_preview = true;
     }
 }

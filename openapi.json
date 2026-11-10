@@ -5349,7 +5349,7 @@
                                     },
                                     "copy_value_to_preview": {
                                         "type": "boolean",
-                                        "description": "Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application."
+                                        "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
                                     }
                                 },
                                 "type": "object"
@@ -5536,7 +5536,7 @@
                                                 },
                                                 "copy_value_to_preview": {
                                                     "type": "boolean",
-                                                    "description": "Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application."
+                                                    "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
                                                 }
                                             },
                                             "type": "object"
