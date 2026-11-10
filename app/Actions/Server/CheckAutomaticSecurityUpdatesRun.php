@@ -53,7 +53,7 @@ SH;
             'apt' => self::APT_LAST_RUN_COMMAND,
             'dnf' => self::DNF_LAST_RUN_COMMAND,
         };
-        $output = (string) instant_remote_process([$command, CheckUpdates::REBOOT_CHECK_COMMAND], $server, false);
+        $output = (string) instant_remote_process([$command, CheckUpdates::REBOOT_CHECK_COMMAND], $server);
 
         $run = $packageManager === 'apt' ? self::parseAptLog($output) : self::parseDnfOutput($output);
         if ($run === null) {
