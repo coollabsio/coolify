@@ -49,17 +49,29 @@
             ->filter()
             ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
+
+    // Pages that the user can star (components/starred-menu)
+    $starrableMenuItems = $configurationItems->map(fn (array $item): array => [
+        'key' => $item['route'],
+        'label' => $item['label'],
+        'icon' => $item['icon'],
+        'href' => route($item['route'], $serviceRouteParameters),
+        'active' => $item['active'],
+        'navigate' => $item['navigate'] ?? true,
+    ])->values()->all();
 @endphp
 
 <x-main-nav-menu back-label="Dashboard" :name="$service->name" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="service" :items="$starrableMenuItems" />
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
+                <div class="starred-menu-row">
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
@@ -73,6 +85,8 @@
                         <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                     @endif
                 </a>
+                <x-starred-menu.toggle menu="service" :page="$menuItem['route']" :label="$menuItem['label']" />
+                </div>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
                     <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{ activeSection: '' }">
