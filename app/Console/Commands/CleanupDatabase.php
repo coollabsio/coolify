@@ -48,6 +48,10 @@ class CleanupDatabase extends Command
 
         $this->cleanupTable('scheduled_task_executions', 'created_at', now()->subDays($keep_days));
 
+        // Backup retention removes only successful runs. A failed run has no file, so only its record is left.
+        $this->cleanupTable('scheduled_database_backup_executions', 'created_at', now()->subDays($keep_days), fn (Builder $query) => $query
+            ->where('status', 'failed'));
+
         $this->cleanupTable('github_runner_executions', 'created_at', now()->subDays($keep_days), fn (Builder $query) => $query
             ->whereNotIn('status', array_map(fn (GithubRunnerStatus $status): string => $status->value, GithubRunnerStatus::active())));
     }
