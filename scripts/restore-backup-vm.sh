@@ -40,8 +40,6 @@ IMAGE_DIR=${IMAGE_DIR:-/var/lib/libvirt/images/coolify-restore-test}
 NAT_NETWORK=${NAT_NETWORK:-default}
 OFFLINE_NETWORK=${OFFLINE_NETWORK:-coolify-restore-offline}
 OFFLINE_SUBNET=${OFFLINE_SUBNET:-192.168.241}
-# Both VMs use the same MAC address: the guest network config matches the NIC by MAC.
-VM_MAC=52:54:00:c0:1f:01
 UBUNTU_IMAGE_URL=https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
 UBUNTU_IMAGE="$IMAGE_DIR/ubuntu-noble-amd64.qcow2"
 SSH_KEY="$IMAGE_DIR/ssh_key"
@@ -68,32 +66,44 @@ delete_vm() {
     rm -f "$IMAGE_DIR/$1.qcow2" "$IMAGE_DIR/$1-seed.iso"
 }
 
+# vm_ip <name>: the DHCP lease of the VM. Each VM has a new random MAC address,
+# so a lease of a deleted VM cannot match.
 vm_ip() {
     "${VIRSH[@]}" domifaddr "$1" --source lease 2>/dev/null |
         awk '$3 == "ipv4" { sub(/\/.*/, "", $4); print $4; exit }'
 }
 
+# wait_for_ip <name>: prints the IP address on stdout and the progress on stderr.
 wait_for_ip() {
     local ip=""
+    printf 'Waiting for the IP address of %s (up to 3 minutes)' "$1" >&2
     for _ in $(seq 1 90); do
         ip=$(vm_ip "$1")
         [ -n "$ip" ] && break
+        printf '.' >&2
         sleep 2
     done
-    [ -n "$ip" ] || die "VM $1 did not get an IP address from DHCP."
+    echo >&2
+    [ -n "$ip" ] || die "VM $1 did not get an IP address from DHCP. Boot log: virsh --connect qemu:///system console $1"
     echo "$ip"
 }
 
-# wait_for_ssh <ip>: waits for SSH and for cloud-init to finish.
+# wait_for_ssh <ip> <name>: waits for SSH and for cloud-init to finish.
 wait_for_ssh() {
-    for _ in $(seq 1 90); do
+    printf 'Waiting for SSH on %s (up to 5 minutes)' "$1"
+    for _ in $(seq 1 60); do
         if ssh "${SSH_OPTS[@]}" "root@$1" true 2>/dev/null; then
-            ssh "${SSH_OPTS[@]}" "root@$1" 'cloud-init status --wait >/dev/null || true'
+            echo
+            echo "Waiting for cloud-init in the VM (up to 10 minutes)..."
+            ssh "${SSH_OPTS[@]}" "root@$1" 'timeout 600 cloud-init status --wait >/dev/null' ||
+                echo "cloud-init did not finish cleanly; continuing. Log: /var/log/cloud-init-output.log in the VM"
             return 0
         fi
-        sleep 2
+        printf '.'
+        sleep 3
     done
-    die "SSH to root@$1 does not respond."
+    echo
+    die "SSH to root@$1 does not respond. Boot log: virsh --connect qemu:///system console $2"
 }
 
 vm_ssh() { ssh "${SSH_OPTS[@]}" "root@$VM_IP" "$@"; }
@@ -145,12 +155,22 @@ runcmd:
   - systemctl restart ssh
 EOF
     printf 'instance-id: %s-%s\nlocal-hostname: %s\n' "$name" "$(date +%s)" "$name" >"$seed_dir/meta-data"
+    # Match the NIC by name, not by MAC: the restore VM boots from the disk of the builder VM
+    # with a different MAC address. A new instance-id makes cloud-init apply this on each VM.
+    cat >"$seed_dir/network-config" <<EOF
+version: 2
+ethernets:
+  nic:
+    match:
+      name: "en*"
+    dhcp4: true
+EOF
     if command -v xorriso >/dev/null; then
-        xorriso -as mkisofs -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" 2>/dev/null
+        xorriso -as mkisofs -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" "$seed_dir/network-config" 2>/dev/null
     elif command -v cloud-localds >/dev/null; then
-        cloud-localds "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
+        cloud-localds --network-config="$seed_dir/network-config" "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
     else
-        genisoimage -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
+        genisoimage -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" "$seed_dir/network-config"
     fi
     rm -rf "$seed_dir"
 
@@ -158,7 +178,7 @@ EOF
         --import --os-variant ubuntu24.04 \
         --disk "path=$IMAGE_DIR/$name.qcow2,format=qcow2,bus=virtio" \
         --disk "path=$IMAGE_DIR/$name-seed.iso,device=cdrom" \
-        --network "network=$network,model=virtio,mac=$VM_MAC" \
+        --network "network=$network,model=virtio" \
         --graphics none --noautoconsole >/dev/null
 }
 
@@ -174,7 +194,7 @@ build_base_image() {
     delete_vm "$BUILDER_NAME"
     create_vm "$BUILDER_NAME" "$UBUNTU_IMAGE" "$NAT_NETWORK"
     VM_IP=$(wait_for_ip "$BUILDER_NAME")
-    wait_for_ssh "$VM_IP"
+    wait_for_ssh "$VM_IP" "$BUILDER_NAME"
 
     log "Installing Coolify $VERSION in the builder VM (no backup data in this VM)"
     vm_ssh "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- $VERSION"
@@ -256,7 +276,7 @@ ensure_offline_network
 create_vm "$VM_NAME" "$BASE_IMAGE" "$OFFLINE_NETWORK"
 VM_IP=$(wait_for_ip "$VM_NAME")
 log "VM IP address on the offline network: $VM_IP"
-wait_for_ssh "$VM_IP"
+wait_for_ssh "$VM_IP" "$VM_NAME"
 
 log "Confirming that the VM has no internet access"
 if vm_ssh 'timeout 5 bash -c "echo >/dev/tcp/1.1.1.1/443" 2>/dev/null || timeout 5 bash -c "echo >/dev/tcp/8.8.8.8/53" 2>/dev/null'; then
