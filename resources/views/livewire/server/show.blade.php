@@ -88,7 +88,7 @@
                             @if ($server->isTransferredAway())
                                 <x-status-badge label="Transferred away" type="warning" />
                             @else
-                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                <x-status-badge :label="$server->isFunctional() ? 'Operational' : 'Validation required'"
                                     :type="$server->isFunctional() ? 'success' : 'warning'" />
                             @endif
                         </x-slot:badges>
