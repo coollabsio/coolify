@@ -3570,6 +3570,9 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                copy_value_to_preview:
+                  type: boolean
+                  description: 'Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application.'
               type: object
       responses:
         '201':
@@ -3674,7 +3677,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, copy_value_to_preview: { type: boolean, description: 'Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application.' } }, type: object }
               type: object
       responses:
         '201':

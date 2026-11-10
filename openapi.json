@@ -5346,6 +5346,10 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "copy_value_to_preview": {
+                                        "type": "boolean",
+                                        "description": "Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application."
                                     }
                                 },
                                 "type": "object"
@@ -5529,6 +5533,10 @@
                                                 "is_shown_once": {
                                                     "type": "boolean",
                                                     "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                                },
+                                                "copy_value_to_preview": {
+                                                    "type": "boolean",
+                                                    "description": "Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application."
                                                 }
                                             },
                                             "type": "object"

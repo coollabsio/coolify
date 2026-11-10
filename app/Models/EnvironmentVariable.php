@@ -142,6 +142,12 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping',
     ];
 
+    /**
+     * Not stored: decides for a new production variable of an application if its preview copy gets the
+     * production value. Null uses the "New preview variables" setting of the application.
+     */
+    public ?bool $copyValueToPreview = null;
+
     protected static function booted()
     {
         static::creating(function (ModelsEnvironmentVariable $environment_variable) {
@@ -160,7 +166,8 @@ class EnvironmentVariable extends BaseModel
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
                         // The preview copy is part of the same change, so it gets no audit rows of its own.
-                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false;
+                        $usesProductionValue = $environment_variable->copyValueToPreview
+                            ?? $application->settings?->use_production_values_in_previews !== false;
                         // forceFill: is_production_value_copy is not fillable.
                         $preview = (new ModelsEnvironmentVariable)->forceFill([
                             'key' => $environment_variable->key,

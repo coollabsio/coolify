@@ -4434,6 +4434,7 @@ class ApplicationsController extends Controller
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                                        'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application.'],
                                     ],
                                 ),
                             ],
@@ -4499,7 +4500,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']);
+            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview']);
 
             if ($item->has('key')) {
                 $item->put('key', ValidationPatterns::normalizeEnvironmentVariableKey((string) $item->get('key')));
@@ -4519,6 +4520,7 @@ class ApplicationsController extends Controller
                 'is_runtime' => 'boolean',
                 'is_buildtime' => 'boolean',
                 'comment' => 'string|nullable|max:256',
+                'copy_value_to_preview' => 'boolean|nullable',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -4563,7 +4565,7 @@ class ApplicationsController extends Controller
                     $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
                     $env->save();
                 } else {
-                    $env = $application->environment_variables()->create([
+                    $env = $application->environment_variables()->make([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
@@ -4576,6 +4578,10 @@ class ApplicationsController extends Controller
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
+                    $env->copyValueToPreview = is_null($item->get('copy_value_to_preview'))
+                        ? null
+                        : (bool) $item->get('copy_value_to_preview');
+                    $env->save();
                 }
             }
             $returnedEnvs->push($this->removeSensitiveData($env));
@@ -4624,6 +4630,7 @@ class ApplicationsController extends Controller
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                        'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application with preview deployments: true copies the value to the preview copy, false leaves the preview copy empty. Default: the use_production_values_in_previews setting of the application.'],
                     ],
                 ),
             ),
@@ -4660,7 +4667,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -4690,6 +4697,7 @@ class ApplicationsController extends Controller
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            'copy_value_to_preview' => 'boolean|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -4749,7 +4757,7 @@ class ApplicationsController extends Controller
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
             } else {
-                $env = $application->environment_variables()->create([
+                $env = $application->environment_variables()->make([
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
@@ -4762,6 +4770,10 @@ class ApplicationsController extends Controller
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
+                $env->copyValueToPreview = is_null($request->input('copy_value_to_preview'))
+                    ? null
+                    : $request->boolean('copy_value_to_preview');
+                $env->save();
 
                 auditLog('api.application.env_created', [
                     'team_id' => $teamId,

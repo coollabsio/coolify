@@ -192,7 +192,7 @@
                                 Add
                             </button>
                         </x-slot:content>
-                        <livewire:project.shared.environment-variable.add :resource="$resource" />
+                        <livewire:project.shared.environment-variable.add :resource="$resource" :showPreview="$showPreview" />
                     </x-modal-input>
                 @endcan
         </x-table.toolbar>
