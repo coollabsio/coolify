@@ -7154,6 +7154,84 @@ html.dark .project-card-stats-dot {
     padding-right: 0;
 }
 
+/* Starred resource menu pages (components/starred-menu). The star button sits on the right of its row:
+   it shows on hover and on focus, and always for a starred page. */
+.starred-menu-row {
+    position: relative;
+}
+
+.starred-menu-row > .menu-item {
+    padding-right: 2rem;
+}
+
+.starred-menu-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    color: var(--color-neutral-400);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 0.1s, color 0.1s;
+}
+
+.starred-menu-toggle:hover {
+    color: var(--color-warning-600);
+}
+
+.starred-menu-row:hover > .starred-menu-toggle,
+.starred-menu-toggle:focus-visible,
+.starred-menu-toggle[aria-pressed="true"] {
+    opacity: 1;
+}
+
+.starred-menu-toggle[aria-pressed="true"] {
+    color: var(--color-warning-600);
+}
+
+html.dark .starred-menu-toggle[aria-pressed="true"],
+html.dark .starred-menu-toggle:hover {
+    color: var(--color-warning);
+}
+
+/* Touch screens have no hover: show every star, dimmed. */
+@media (hover: none) {
+    .starred-menu-toggle {
+        opacity: 0.6;
+    }
+}
+
+.starred-menu-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.625rem 0.25rem;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-faint);
+}
+
+.starred-menu-item {
+    cursor: grab;
+}
+
+.starred-menu-item.is-dragging > .menu-item {
+    outline: 1px dashed var(--color-coollabs);
+    outline-offset: -1px;
+}
+
+/* Collapsed desktop sidebar: the starred icons show first, above a divider. */
+.app-sidebar .sidebar-collapsed .nav-context-menu :is(.starred-menu-toggle, .starred-menu-title) {
+    display: none !important;
+}
+
 /* A page menu's own "Back to ..." item: the main sidebar copy has the back row instead (components/main-nav-menu). */
 .nav-context-menu [data-page-only] {
     display: none !important;

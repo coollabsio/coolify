@@ -20,6 +20,7 @@ use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
+use App\Http\Controllers\StarredMenuItemsController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\CheckForcePasswordReset;
@@ -304,6 +305,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::put('/profile/starred-menu-items', StarredMenuItemsController::class)->name('profile.starred-menu-items');
     Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
         ->middleware('password.confirm')
         ->name('profile.passkeys.confirm');

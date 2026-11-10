@@ -79,6 +79,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
         'email_change_code_expires_at' => 'datetime',
+        'starred_menu_items' => 'array',
     ];
 
     /**

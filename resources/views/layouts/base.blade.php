@@ -435,6 +435,7 @@
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/purify.min.js') }}"></script>
+        <script type="application/json" id="starred-menu-items">@json((object) (auth()->user()->starred_menu_items ?? []))</script>
     @endauth
 </head>
 @section('body')
