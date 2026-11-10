@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -36,11 +38,14 @@ class StarredMenuItemsController extends Controller
             fn (string $routeName): bool => Str::startsWith($routeName, $prefix) && Route::has($routeName),
         ));
 
-        $user = $request->user();
-        $starred = $user->starred_menu_items ?? [];
-        $starred[$validated['menu']] = $items;
-        $user->starred_menu_items = $starred;
-        $user->save();
+        // Lock the row so that concurrent saves of other menus (e.g. from another tab) are not lost.
+        DB::transaction(function () use ($request, $validated, $items): void {
+            $user = User::query()->lockForUpdate()->findOrFail($request->user()->id);
+            $starred = $user->starred_menu_items ?? [];
+            $starred[$validated['menu']] = $items;
+            $user->starred_menu_items = $starred;
+            $user->save();
+        });
 
         return response()->noContent();
     }
