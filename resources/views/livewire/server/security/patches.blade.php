@@ -191,6 +191,21 @@
                                     </div>
                                 @endcan
                             </div>
+                            @php
+                                $lastAutoRun = $autoSecurityUpdates ? $server->settings->auto_security_updates_last_run : null;
+                            @endphp
+                            @if (filled(data_get($lastAutoRun, 'started_at')))
+                                <p class="mt-1.5 text-[12px] text-neutral-500 dark:text-fg-dim">
+                                    Last run {{ $lastAutoRun['started_at'] }} (server time):
+                                    @if ($lastAutoRun['failed'])
+                                        <span class="text-red-600 dark:text-red-400">failed</span>
+                                    @elseif ($lastAutoRun['packages'] !== [])
+                                        {{ count($lastAutoRun['packages']) }} {{ Str::plural('package', count($lastAutoRun['packages'])) }} updated
+                                    @else
+                                        no updates needed
+                                    @endif
+                                </p>
+                            @endif
                         </div>
                         <x-forms.input canGate="update" :canResource="$server" id="autoSecurityUpdatesTime"
                                 label="Maintenance window" placeholder="03:00"

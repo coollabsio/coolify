@@ -68,6 +68,9 @@ class Webhook extends Component
     public bool $serverPatchWebhookNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedWebhookNotifications = true;
 
     #[Validate(['boolean'])]
@@ -106,6 +109,7 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->server_auto_update_webhook_notifications = $this->serverAutoUpdateWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
             $this->settings->image_vulnerabilities_webhook_notifications = $this->imageVulnerabilitiesWebhookNotifications;
 
@@ -133,6 +137,7 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->serverAutoUpdateWebhookNotifications = $this->settings->server_auto_update_webhook_notifications;
             $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
             $this->imageVulnerabilitiesWebhookNotifications = $this->settings->image_vulnerabilities_webhook_notifications;
         }

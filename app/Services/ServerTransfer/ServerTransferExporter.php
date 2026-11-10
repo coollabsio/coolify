@@ -73,6 +73,8 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The target reads the last automatic update run again and keeps it as its baseline.
+        'auto_security_updates_last_run',
         // The daily candidate scan counter of the source; the target counts its own.
         'image_candidate_scans_today',
         'image_candidate_scans_date',

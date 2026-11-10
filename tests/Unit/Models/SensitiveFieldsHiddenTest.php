@@ -195,6 +195,7 @@ describe('Sensitive model fields are hidden by default', function () {
             'telegram_notifications_server_reachable_thread_id',
             'telegram_notifications_server_unreachable_thread_id',
             'telegram_notifications_server_patch_thread_id',
+            'telegram_notifications_server_auto_update_thread_id',
             'telegram_notifications_traefik_outdated_thread_id',
         );
     });
