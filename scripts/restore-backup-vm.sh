@@ -44,7 +44,7 @@ UBUNTU_IMAGE_URL=https://cloud-images.ubuntu.com/noble/current/noble-server-clou
 UBUNTU_IMAGE="$IMAGE_DIR/ubuntu-noble-amd64.qcow2"
 SSH_KEY="$IMAGE_DIR/ssh_key"
 VIRSH=(virsh --connect qemu:///system)
-SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5)
+SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 die() {
@@ -197,8 +197,13 @@ build_base_image() {
     wait_for_ssh "$VM_IP" "$BUILDER_NAME"
 
     log "Installing Coolify $VERSION in the builder VM (no backup data in this VM)"
-    vm_ssh "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- $VERSION"
+    vm_ssh "set -o pipefail; curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- $VERSION" ||
+        die "The Coolify install failed in the builder VM. No base image was saved."
+    # A broken base image would be reused by every later run, so check it before it is saved.
+    vm_ssh 'docker inspect coolify coolify-db coolify-redis >/dev/null && [ -f /data/coolify/source/.env ]' ||
+        die "Coolify is not installed in the builder VM. No base image was saved."
 
+    echo "Shutting down the builder VM (up to 2 minutes)..."
     vm_ssh 'shutdown -h now' || true
     for _ in $(seq 1 60); do
         [ "$("${VIRSH[@]}" domstate "$BUILDER_NAME")" = "shut off" ] && break
@@ -261,6 +266,18 @@ fi
 delete_vm "$VM_NAME"
 
 mkdir -p "$IMAGE_DIR"
+# The VM disks grow on the host disk. When the host disk is full, QEMU pauses the VM without a
+# message. The restore VM holds the backup and the restored database (about 3 times the backup),
+# a new base image needs about 6 GiB. A gzipped backup is counted as 5 times its size.
+BACKUP_MIB=$(($(stat -c %s "$BACKUP_FILE") / 1024 / 1024))
+gzip -t "$BACKUP_FILE" 2>/dev/null && BACKUP_MIB=$((BACKUP_MIB * 5))
+FREE_MIB=$(($(df --output=avail -k "$IMAGE_DIR" | tail -n 1) / 1024))
+NEEDED_MIB=$((BACKUP_MIB * 3 + 2048))
+[ -f "$BASE_IMAGE" ] || NEEDED_MIB=$((NEEDED_MIB + 6144))
+if [ "$FREE_MIB" -lt "$NEEDED_MIB" ]; then
+    die "Not enough free disk space in $IMAGE_DIR: ${FREE_MIB} MiB free, about ${NEEDED_MIB} MiB needed.
+Free disk space, or set IMAGE_DIR to a larger disk."
+fi
 if [ ! -f "$SSH_KEY" ]; then
     # Do not use the comment "coolify": install.sh removes authorized_keys lines with exactly that comment.
     ssh-keygen -q -t ed25519 -N '' -C restore-test-vm -f "$SSH_KEY"
@@ -286,7 +303,7 @@ if vm_ssh 'getent hosts cdn.coollabs.io >/dev/null'; then
     die "The VM can resolve internet host names. Stopped before the backup was copied."
 fi
 
-log "Copying the backup into the VM"
+log "Copying the backup into the VM ($(du -h "$BACKUP_FILE" | cut -f1))"
 if gzip -t "$BACKUP_FILE" 2>/dev/null; then
     gzip -dc "$BACKUP_FILE" | vm_ssh 'cat >/root/coolify-backup.dmp'
 else
@@ -302,10 +319,15 @@ log "Restoring the backup and starting Coolify (migrations run on start)"
 set -euo pipefail
 cd /data/coolify/source
 
+echo "Waiting for coolify-db (up to 2 minutes)..."
 for _ in $(seq 1 60); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' coolify-db 2>/dev/null)" = healthy ] && break
     sleep 2
 done
+[ "$(docker inspect -f '{{.State.Health.Status}}' coolify-db 2>/dev/null)" = healthy ] || {
+    echo "ERROR: coolify-db is not healthy. Logs: docker logs coolify-db" >&2
+    exit 1
+}
 
 # Start the same image tag again after the restore.
 LATEST_IMAGE=$(docker inspect -f '{{.Config.Image}}' coolify | sed 's/.*://')
@@ -327,7 +349,7 @@ echo "SELF_HOSTED=${SELF_HOSTED}" >>.env
 # Recreate the database: tables from a newer fresh install must not remain.
 docker exec coolify-db psql -q -U coolify -d postgres -v ON_ERROR_STOP=1 \
     -c 'DROP DATABASE coolify WITH (FORCE)' -c 'CREATE DATABASE coolify OWNER coolify'
-echo "Running pg_restore..."
+echo "Running pg_restore of $(du -h /root/coolify-backup.dmp | cut -f1) (a large backup takes several minutes)..."
 restore_section() {
     docker exec -i coolify-db pg_restore --exit-on-error --no-acl --no-owner --section="$1" -U coolify -d coolify </root/coolify-backup.dmp
 }
@@ -364,9 +386,15 @@ LATEST_IMAGE=$LATEST_IMAGE docker compose --env-file .env $COMPOSE_FILES up -d -
 
 # The container reports healthy while migrations still run on a large database.
 # Seeders continue in the background; with many servers they can run for a long time.
-echo "Waiting for migrations to finish..."
+echo "Waiting for migrations to finish (progress: docker logs -f coolify in the VM)..."
+started=$SECONDS
+next_report=$((SECONDS + 60))
 while docker exec coolify sh -c "ps aux | grep -q '[a]rtisan start:migration'"; do
     sleep 5
+    if [ "$SECONDS" -ge "$next_report" ]; then
+        echo "  migrations still running ($(((SECONDS - started) / 60)) min)"
+        next_report=$((next_report + 60))
+    fi
 done
 
 echo
