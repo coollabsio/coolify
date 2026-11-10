@@ -268,9 +268,9 @@ delete_vm "$VM_NAME"
 mkdir -p "$IMAGE_DIR"
 # The VM disks grow on the host disk. When the host disk is full, QEMU pauses the VM without a
 # message. The restore VM holds the backup and the restored database (about 3 times the backup),
-# a new base image needs about 6 GiB. A gzipped backup is counted as 5 times its size.
-BACKUP_MIB=$(($(stat -c %s "$BACKUP_FILE") / 1024 / 1024))
-gzip -t "$BACKUP_FILE" 2>/dev/null && BACKUP_MIB=$((BACKUP_MIB * 5))
+# a new base image needs about 6 GiB. pg_dump compresses a custom-format dump by default, and a
+# .gz backup is compressed too, so each backup is counted as 5 times its size.
+BACKUP_MIB=$(($(stat -c %s "$BACKUP_FILE") / 1024 / 1024 * 5))
 FREE_MIB=$(($(df --output=avail -k "$IMAGE_DIR" | tail -n 1) / 1024))
 NEEDED_MIB=$((BACKUP_MIB * 3 + 2048))
 [ -f "$BASE_IMAGE" ] || NEEDED_MIB=$((NEEDED_MIB + 6144))
