@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.5] - 2026-11-10
+
+### Fixed
+
+- Crashed the `Keys & Tokens` > `API Tokens` page with a 500 error for a token with scopes stored in an unexpected format
+- Failed connection to SFTP backup storages on an IPv6 address, and a connection error without the network reason
+  - The error now shows the network reason, for example `Connection refused` or `Connection timed out`
+
 ## [v4.7.4] - 2026-11-10
 
 ### Fixed
