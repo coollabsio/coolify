@@ -61,10 +61,11 @@ it('keeps the production value badge after production changes and removes it whe
     expect($page->script('[...document.querySelectorAll(".env-table-item")].some((row) => row.textContent.includes("Production value"))'))->toBeFalse();
 
     $page->navigate($url.'/preview-deployments')
-        ->assertSee('Use production values in previews')
-        ->click('input[wire\\:model="useProductionValuesInPreviews"]')
+        ->assertSee('New preview variables')
+        ->click('#useProductionValuesInPreviews-trigger')
+        ->click('.listbox-option:visible:has-text("Leave empty")')
         ->assertSee('Settings saved.')
-        ->screenshot(filename: 'preview-env-use-production-values-checkbox');
+        ->screenshot(filename: 'preview-env-new-preview-variables-listbox');
 
     expect($this->application->fresh()->settings->use_production_values_in_previews)->toBeFalse();
 });
