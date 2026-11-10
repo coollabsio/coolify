@@ -60,6 +60,16 @@
 @endphp
 
 @php
+    // Pages that the user can star (components/starred-menu)
+    $starrableMenuItems = $configurationItems->map(fn (array $item): array => [
+        'key' => $item['route'],
+        'label' => $item['label'],
+        'icon' => $item['icon'],
+        'href' => route($item['route'], $databaseRouteParameters),
+        'active' => $item['active'],
+        'navigate' => $item['navigate'] ?? true,
+    ])->values()->all();
+
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
     registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $database->name);
 @endphp
@@ -76,11 +86,13 @@
 @endif
     <nav aria-label="Database settings"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="database" :items="$starrableMenuItems" />
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
+                <div class="starred-menu-row">
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
@@ -91,6 +103,8 @@
                     @endif
                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                 </a>
+                <x-starred-menu.toggle menu="database" :page="$menuItem['route']" :label="$menuItem['label']" />
+                </div>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{

@@ -9,6 +9,7 @@ import { registerLivewireRequestFailureHandler } from './livewire-request-failur
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
 import { dismissSecurityCallout, securityCallout } from './security-callout.js';
+import { initializeStarredMenu, starredMenuCommands } from './starred-menu.js';
 import { vulnerabilitySearchItem } from './vulnerability-search.js';
 
 // The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
@@ -64,6 +65,7 @@ document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
 document.addEventListener('alpine:init', initializeNumberStepperComponent);
 document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
+document.addEventListener('alpine:init', initializeStarredMenu);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms
@@ -233,7 +235,7 @@ window.currentPageSearchItems = function currentPageSearchItems() {
         items.push({ label, breadcrumb: 'Section', search_text: label + ' section', href: 'section-' + index, element: section });
     });
 
-    return items;
+    return [...items, ...starredMenuCommands()];
 };
 
 // When a settings sub-section link navigates across pages (href="route#section-id"),

@@ -232,6 +232,16 @@
             ],
         ];
 
+        // Pages that the user can star (components/starred-menu)
+        $starrableMenuItems = collect($configurationMenuItems)->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $menuIcons[$item['label']] ?? 'settings',
+            'href' => route($item['route'], $applicationRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->all();
+
         // Pages and in-page sections that the command palette (⌘K) can search on this page
         $settingsSearchItems = settingsSearchItems($groupedMenuItems, $applicationRouteParameters, $pageSections);
     @endphp
@@ -255,6 +265,7 @@
 @endif
                 <nav aria-label="Configuration sections"
                     class="grid grid-cols-1 gap-0.5">
+                    <x-starred-menu.group menu="application" :items="$starrableMenuItems" />
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -263,6 +274,7 @@
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="{{ $placement }}-application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                                <div class="starred-menu-row">
                                 <a wire:key="{{ $placement }}-application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -284,6 +296,8 @@
                                         </span>
                                     @endif
                                 </a>
+                                <x-starred-menu.toggle menu="application" :page="$menuItem['route']" :label="$menuItem['label']" />
+                                </div>
                                 {{-- Sub-sections belong to the current page only; collapse them for
                                      every other item so the sidebar stays short. --}}
                                 @if ($menuItem['active'] && filled($sections))
