@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemAdapter as FlysystemAdapter;
+use phpseclib3\Exception\UnableToConnectException;
 
 class S3Storage extends BaseModel
 {
@@ -956,6 +957,15 @@ class S3Storage extends BaseModel
 
     private function toUserFriendlyConnectionException(\Throwable $exception): \Throwable
     {
+        $rootCause = $exception;
+        while ($rootCause->getPrevious() !== null) {
+            $rootCause = $rootCause->getPrevious();
+        }
+        if ($rootCause instanceof UnableToConnectException) {
+            // Flysystem shows only "Unable to connect to host". The network error (refused, timed out) is in phpseclib.
+            return new \RuntimeException('Could not connect to the '.$this->storageType()->label().' server: '.$rootCause->getMessage(), previous: $exception);
+        }
+
         $message = str($exception->getMessage())->lower();
 
         if ($message->contains(['timed out', 'timeout', 'connection refused', 'could not resolve', 'curl error 28'])) {
