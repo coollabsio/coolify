@@ -28,8 +28,8 @@
         <input id="serverParts-path" type="text" class="input" wire:model="serverParts.path"
             placeholder="backups/coolify" autocomplete="off" @disabled($disabled ?? false) />
         <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
-            Absolute path from the root of the server, for example home/user/backups. Leave it empty to use the login
-            directory.
+            Absolute path from the root of the server, also without a leading slash. For example, home/backups on a
+            Hetzner Storage Box, where only home is writable. Leave it empty to use the login directory.
         </p>
     </div>
 </div>
