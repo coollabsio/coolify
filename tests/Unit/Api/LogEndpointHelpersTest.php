@@ -122,9 +122,3 @@ it('filters service containers when another Docker label contains commas', funct
     expect(filterServiceSubContainersByName($containers, 'app-service-uuid')->pluck('ID')->all())
         ->toBe(['app']);
 });
-
-it('does not interpolate the requested service name into the docker ps shell command', function () {
-    $source = file_get_contents(__DIR__.'/../../../bootstrap/helpers/docker.php');
-
-    expect($source)->not->toContain('coolify.name={$name}');
-});

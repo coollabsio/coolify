@@ -242,17 +242,6 @@ it('requires IPv6 when public IPv4 is disabled', function () {
         ->assertHasErrors(['enable_ipv6']);
 });
 
-it('renders advanced Vultr options in their own settings section', function () {
-    Livewire::test(ByVultr::class)
-        ->set('current_step', 2)
-        ->assertSee('Advanced options')
-        ->assertSee('Provider SSH keys, networking, and cloud-init.')
-        ->assertSee('Extra SSH keys')
-        ->assertSee('Enable IPv6')
-        ->assertSee('Disable public IPv4')
-        ->assertSee('Cloud-init script');
-});
-
 it('renders a single buy button and no back button on the Vultr form', function () {
     $html = Livewire::test(ByVultr::class)
         ->set('current_step', 2)

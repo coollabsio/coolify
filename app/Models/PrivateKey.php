@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use phpseclib3\Crypt\DSA;
 use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -49,18 +53,29 @@ class PrivateKey extends BaseModel
 
     protected $casts = [
         'private_key' => 'encrypted',
+        'is_git_related' => 'boolean',
     ];
+
+    /**
+     * Accept any key that can be loaded. A server transfer sets it, because the key already works on the source.
+     */
+    public bool $allowLegacyKey = false;
 
     protected $appends = ['public_key'];
 
     protected static function booted()
     {
         static::saving(function ($key) {
+            $storedPrivateKey = $key->exists ? $key->getOriginal('private_key') : null;
             $key->private_key = formatPrivateKey($key->private_key);
 
-            if (! self::validatePrivateKey($key->private_key)) {
+            // Check only new or changed keys, so older keys can still be renamed.
+            $normalize = fn (string $privateKey): string => str_replace("\r\n", "\n", formatPrivateKey($privateKey));
+            $isChanged = $storedPrivateKey === null || $normalize($key->private_key) !== $normalize($storedPrivateKey);
+            $error = $isChanged ? self::validationError($key->private_key, ! $key->allowLegacyKey) : null;
+            if ($error) {
                 throw ValidationException::withMessages([
-                    'private_key' => ['The private key is invalid.'],
+                    'private_key' => [$error],
                 ]);
             }
 
@@ -133,15 +148,41 @@ class PrivateKey extends BaseModel
             ->select($selectArray->all());
     }
 
-    public static function validatePrivateKey($privateKey)
+    /**
+     * Returns why a private key cannot be used, or null when it is valid.
+     * Without $strict, only checks that the key can be loaded.
+     */
+    public static function validationError(?string $privateKey, bool $strict = true): ?string
     {
         try {
-            PublicKeyLoader::load($privateKey);
-
-            return true;
+            $key = PublicKeyLoader::loadPrivateKey((string) $privateKey);
         } catch (\Throwable $e) {
-            return false;
+            return 'The private key is invalid. Paste an unencrypted private key, not a public key or a certificate.';
         }
+
+        if (! $strict) {
+            return null;
+        }
+
+        if (! str_starts_with(trim((string) $privateKey), '-----BEGIN ')) {
+            return 'PuTTY and other key formats are not supported. Paste the key in OpenSSH or PEM format. It starts with "-----BEGIN".';
+        }
+
+        if ($key instanceof DSA) {
+            return 'DSA keys are not supported. Use an Ed25519 or RSA key.';
+        }
+
+        if ($key instanceof RSA && $key->getLength() < 2048) {
+            return 'RSA keys must have at least 2048 bits.';
+        }
+
+        try {
+            $key->getPublicKey()->toString('OpenSSH');
+        } catch (\Throwable $e) {
+            return 'This key type is not supported. Use an Ed25519, ECDSA (nistp256, nistp384, or nistp521), or RSA key.';
+        }
+
+        return null;
     }
 
     public static function createAndStore(array $data)
@@ -160,14 +201,25 @@ class PrivateKey extends BaseModel
         });
     }
 
-    public static function generateNewKeyPair($type = 'rsa')
+    /**
+     * @param  int|null  $rsaKeyLength  The RSA key length in bits; null keeps the default of generateSSHKey().
+     */
+    public static function generateNewKeyPair($type = 'ed25519', ?int $rsaKeyLength = null)
     {
         try {
             $instance = new self;
             $instance->rateLimit(10);
             $name = generate_random_name();
             $description = 'Created by Coolify';
-            $keyPair = generateSSHKey($type === 'ed25519' ? 'ed25519' : 'rsa');
+            if ($type === 'rsa' && $rsaKeyLength !== null) {
+                $key = RSA::createKey($rsaKeyLength);
+                $keyPair = [
+                    'private' => $key->toString('PKCS1'),
+                    'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key']),
+                ];
+            } else {
+                $keyPair = generateSSHKey($type === 'rsa' ? 'rsa' : 'ed25519');
+            }
 
             return [
                 'name' => $name,
@@ -191,15 +243,28 @@ class PrivateKey extends BaseModel
         }
     }
 
-    public static function validateAndExtractPublicKey($privateKey)
+    /**
+     * The key type and key data, without a comment. Lines in authorized_keys are found by this value.
+     */
+    public function publicKeyBody(): string
     {
-        $isValid = self::validatePrivateKey($privateKey);
-        $publicKey = $isValid ? self::extractPublicKeyFromPrivate($privateKey) : '';
+        $publicKey = self::extractPublicKeyFromPrivate($this->private_key);
+        if (is_null($publicKey)) {
+            throw new \RuntimeException('The private key is invalid.');
+        }
 
-        return [
-            'isValid' => $isValid,
-            'publicKey' => $publicKey,
-        ];
+        return implode(' ', array_slice(preg_split('/\s+/', trim($publicKey)), 0, 2));
+    }
+
+    /**
+     * The authorized_keys line that Coolify adds. The comment names the instance and the key,
+     * and does not contain the word "coolify", which old install scripts remove.
+     */
+    public function authorizedKeysLine(): string
+    {
+        $instance = substr(hash('sha256', (string) (config('app.id') ?: config('app.url'))), 0, 12);
+
+        return "{$this->publicKeyBody()} cpk:{$instance}:{$this->uuid}";
     }
 
     public function storeInFileSystem()
@@ -248,6 +313,7 @@ class PrivateKey extends BaseModel
                     'path' => $keyLocation,
                 ]);
             }
+            SshMultiplexingHelper::giveToSshDirectoryOwner($keyLocation, $lockFile);
 
             return $keyLocation;
         } finally {
@@ -295,15 +361,6 @@ class PrivateKey extends BaseModel
         return Storage::disk('ssh-keys')->path("ssh_key@{$this->uuid}");
     }
 
-    public function updatePrivateKey(array $data)
-    {
-        return DB::transaction(function () use ($data) {
-            $this->update($data);
-
-            return $this;
-        });
-    }
-
     public function servers()
     {
         return $this->hasMany(Server::class);
@@ -329,9 +386,15 @@ class PrivateKey extends BaseModel
         return $this->hasMany(GiteaApp::class);
     }
 
+    public function s3Storages(): HasMany
+    {
+        return $this->hasMany(S3Storage::class);
+    }
+
     public function isInUse()
     {
         return $this->servers()->exists()
+            || $this->s3Storages()->exists()
             || $this->applications()->exists()
             || $this->githubApps()->exists()
             || $this->gitlabApps()->exists()

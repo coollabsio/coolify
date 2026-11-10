@@ -841,6 +841,9 @@ class Github extends Controller
             ])
                 ->timeout(10)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+            if (! $response->successful()) {
+                assertGithubClockInSync($response);
+            }
         } catch (\Throwable $e) {
             return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }
@@ -875,6 +878,7 @@ class Github extends Controller
         $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
             ->where('team_id', $team_id)
             ->firstOrFail();
+        abort_unless($request->user()->can('update', $github_app), 403);
 
         if ($request->user()->currentTeam()?->id !== $team_id) {
             refreshSession($github_app->team);

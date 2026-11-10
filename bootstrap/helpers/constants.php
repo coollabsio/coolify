@@ -65,6 +65,12 @@ const MIN_STOP_GRACE_PERIOD_SECONDS = 1;
 const MAX_STOP_GRACE_PERIOD_SECONDS = 3600;
 const DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS = 5;
 const MAX_ROLLING_UPDATE_DRAIN_SECONDS = 300;
+/**
+ * caddy-docker-proxy reloads Caddy when any proxied container changes (a restart gives it a new IP), and a reload
+ * closes every WebSocket at once unless `reverse_proxy` sets `stream_close_delay` (Caddy 2.7+). A stream to a
+ * stopped or replaced container still ends with that container.
+ */
+const CADDY_STREAM_CLOSE_DELAY = '24h';
 
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',
@@ -131,5 +137,6 @@ const NEEDS_TO_DISABLE_GZIP = [
 ];
 const NEEDS_TO_DISABLE_STRIPPREFIX = [
     'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
+    'rybbit' => ['rybbit_backend'],
 ];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];

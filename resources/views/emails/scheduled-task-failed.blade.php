@@ -1,5 +1,9 @@
 <x-emails.layout>
-Scheduled task ({{ $task->name }}) was FAILED with the following error:
+{{ $title ?? "Scheduled task ({$task->name}) failed." }}
+
+{{ $summary ?? '' }}
+
+Last error:
 
 <pre>
 {{ $output }}

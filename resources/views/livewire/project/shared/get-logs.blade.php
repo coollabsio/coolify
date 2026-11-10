@@ -199,19 +199,15 @@
                                     <button type="button" role="menuitem" class="listbox-option"
                                         x-on:click="
                                             open = false;
-                                            $wire.copyLogs().then(logs => {
-                                                logs = logs.replace(/^([^\t\n]+)\t/gm, '$1 | ');
-                                                if (!navigator.clipboard?.writeText) {
-                                                    Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
-                                                    return;
-                                                }
-                                                navigator.clipboard.writeText(logs).then(() => {
-                                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
-                                                }).catch(() => {
-                                                    Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
-                                                });
+                                            if (!navigator.clipboard) {
+                                                Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                                                return;
+                                            }
+                                            const logs = $wire.copyLogs().then(logs => logs.replace(/^([^\t\n]+)\t/gm, '$1 | '));
+                                            window.copyTextToClipboard(logs).then(() => {
+                                                Livewire.dispatch('success', ['Logs copied to clipboard.']);
                                             }).catch(() => {
-                                                Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
+                                                Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
                                             });
                                         ">
                                         <span class="flex-1 text-left">Copy logs</span>

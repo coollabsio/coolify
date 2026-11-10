@@ -22,6 +22,8 @@ class Upgrade extends Component
 
     public bool $fullButton = false;
 
+    public string $updateChannel = 'stable';
+
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
@@ -43,6 +45,8 @@ class Upgrade extends Component
         $this->currentVersion = config('constants.coolify.version');
         $this->latestVersion = get_latest_version_of_coolify();
         $this->devMode = isDev();
+        $settings = InstanceSettings::find(0);
+        $this->updateChannel = (string) data_get($settings, 'update_channel', 'stable');
 
         if ($this->devMode) {
             $this->isUpgradeAvailable = true;
@@ -50,7 +54,13 @@ class Upgrade extends Component
             return;
         }
 
-        $settings = InstanceSettings::find(0);
+        if (data_get($settings, 'update_channel') === 'custom') {
+            $this->latestVersion = (string) $settings->update_custom_tag;
+            $this->isUpgradeAvailable = $this->fullButton && $this->latestVersion !== '';
+
+            return;
+        }
+
         $hasNewerVersion = version_compare($this->latestVersion, $this->currentVersion, '>');
         $newVersionAvailable = (bool) data_get($settings, 'new_version_available', false);
 
@@ -77,6 +87,11 @@ class Upgrade extends Component
                     UpdateCoolify::run(manual_update: true);
                 } catch (\Throwable $e) {
                     report($e);
+                    try {
+                        CoolifyUpgradeStatus::writeError(Server::findOrFail(0), $e->getMessage());
+                    } catch (\Throwable $statusException) {
+                        report($statusException);
+                    }
                 }
             })->afterResponse();
 
@@ -84,7 +99,7 @@ class Upgrade extends Component
                 'team_id' => null,
                 'resource' => 'instance',
                 'from_version' => config('constants.coolify.version'),
-                'to_version' => get_latest_version_of_coolify(),
+                'to_version' => $this->latestVersion,
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -118,7 +133,8 @@ class Upgrade extends Component
 
         return CoolifyUpgradeStatus::fromFile(
             content: $content,
-            runningVersion: $this->currentVersion !== '' ? $this->currentVersion : (string) config('constants.coolify.version'),
+            // The version of the container that answers, not $currentVersion: after the restart, that is still the old version of the page.
+            runningVersion: (string) config('constants.coolify.version'),
             targetVersion: $this->latestVersion !== '' ? $this->latestVersion : get_latest_version_of_coolify(),
         );
     }

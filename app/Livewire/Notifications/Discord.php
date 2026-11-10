@@ -74,6 +74,9 @@ class Discord extends Component
     public bool $traefikOutdatedDiscordNotifications = true;
 
     #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
 
     public function mount()
@@ -111,6 +114,7 @@ class Discord extends Component
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
             $this->settings->server_auto_update_discord_notifications = $this->serverAutoUpdateDiscordNotifications;
             $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
+            $this->settings->image_vulnerabilities_discord_notifications = $this->imageVulnerabilitiesDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
@@ -140,6 +144,7 @@ class Discord extends Component
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
             $this->serverAutoUpdateDiscordNotifications = $this->settings->server_auto_update_discord_notifications;
             $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
+            $this->imageVulnerabilitiesDiscordNotifications = $this->settings->image_vulnerabilities_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
         }

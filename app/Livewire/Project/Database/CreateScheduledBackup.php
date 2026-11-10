@@ -82,6 +82,12 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $database->clickhouse_db;
             }
 
+            // Odoo keeps its data in databases that the user creates in Odoo, so the database
+            // that the container env names (POSTGRES_DB=postgres) stays empty.
+            if ($database instanceof ServiceDatabase && $database->service?->service_type === 'odoo') {
+                $payload['dump_all'] = true;
+            }
+
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
             auditLog('ui.database.backup_schedule_created', [
                 'team_id' => $database->team()?->id,

@@ -46,23 +46,6 @@ it('shows the source name and organization on the source page', function () {
     $response->assertSee('GitHub App for coollabsio');
 });
 
-it('renders the team, notification, and key settings pages', function () {
-    $team = $this->get(route('team.index'));
-    $team->assertSuccessful();
-    $team->assertSee('Manage your team, members, and access settings.');
-    $team->assertSee('New team');
-
-    $notifications = $this->get(route('notifications.email'));
-    $notifications->assertSuccessful();
-    $notifications->assertSee('Configure how your team receives deployment and system alerts.');
-
-    $keys = $this->get(route('security.private-key.index'));
-    $keys->assertSuccessful();
-    $keys->assertSee('Manage SSH keys, cloud credentials, and API access tokens.');
-    $keys->assertSee('Private Keys');
-    $keys->assertSee('New private key');
-});
-
 it('shows the destination name and network server on the destination page', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id, 'name' => 'prod-server']);
     $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();

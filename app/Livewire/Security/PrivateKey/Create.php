@@ -71,7 +71,7 @@ class Create extends Component
                 return;
             }
 
-            return $this->redirectAfterCreation($privateKey);
+            return $this->redirectAfterCreation();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -79,18 +79,18 @@ class Create extends Component
 
     private function validatePrivateKey()
     {
-        $validationResult = PrivateKey::validateAndExtractPublicKey($this->value);
-        $this->publicKey = $validationResult['publicKey'];
+        $error = PrivateKey::validationError($this->value);
+        $this->publicKey = $error ? '' : PrivateKey::extractPublicKeyFromPrivate($this->value);
 
-        if (! $validationResult['isValid']) {
-            $this->addError('value', 'Invalid private key');
+        if ($error) {
+            $this->addError('value', $error);
         }
     }
 
-    private function redirectAfterCreation(PrivateKey $privateKey)
+    private function redirectAfterCreation()
     {
         return $this->from === 'server'
             ? redirectRoute($this, 'dashboard')
-            : redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            : redirectRoute($this, 'security.private-key.index');
     }
 }

@@ -9,6 +9,8 @@ import {
 import {
     TERMINAL_CONNECT_TIMEOUT_MS,
     TERMINAL_CONNECTION_ERRORS,
+    isTerminalOutputFrame,
+    isTerminalSessionEndedNotice,
     isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
     terminalSessionStartMethods,
@@ -673,6 +675,8 @@ export function initializeTerminalComponent() {
 
                 try {
                     this.socket = new WebSocket(url);
+                    // PTY output arrives in binary frames; text frames are control messages.
+                    this.socket.binaryType = 'arraybuffer';
 
                     // Set connection timeout - increased for initial connection
                     const timeoutMs = this.reconnectAttempts === 0 ? TERMINAL_CONNECT_TIMEOUT_MS : this.connectionTimeout;
@@ -1032,6 +1036,11 @@ export function initializeTerminalComponent() {
             },
 
             handleSocketMessage(event) {
+                if (isTerminalOutputFrame(event.data)) {
+                    this.writeTerminalOutput(new Uint8Array(event.data));
+                    return;
+                }
+
                 // Handle pong responses
                 if (event.data === 'pong') {
                     this.heartbeatMissed = 0;
@@ -1107,6 +1116,9 @@ export function initializeTerminalComponent() {
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
+                } else if (isTerminalSessionEndedNotice(event.data)) {
+                    // The server ends the PTY next; 'pty-exited' then resets the terminal.
+                    this.$wire.dispatch('error', event.data);
                 } else if (isTerminalStartupRejection(event.data)) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
                     this.pendingCommand = null;
@@ -1114,18 +1126,22 @@ export function initializeTerminalComponent() {
                     this.resetTerminalSessionCountdown();
                     this.failTerminalConnection(event.data, { override: true });
                 } else {
-                    try {
-                        this.pendingWrites++;
-                        this.term.write(event.data, (err) => {
-                            if (err) {
-                                logTerminal('error', '[Terminal] Write error:', err);
-                            }
-                            this.flowControlCallback();
-                        });
-                    } catch (error) {
-                        logTerminal('error', '[Terminal] Write operation failed:', error);
-                        this.pendingWrites = Math.max(0, this.pendingWrites - 1);
-                    }
+                    logTerminal('warn', '[Terminal] Ignoring unknown control message:', event.data);
+                }
+            },
+
+            writeTerminalOutput(data) {
+                try {
+                    this.pendingWrites++;
+                    this.term.write(data, (err) => {
+                        if (err) {
+                            logTerminal('error', '[Terminal] Write error:', err);
+                        }
+                        this.flowControlCallback();
+                    });
+                } catch (error) {
+                    logTerminal('error', '[Terminal] Write operation failed:', error);
+                    this.pendingWrites = Math.max(0, this.pendingWrites - 1);
                 }
             },
 

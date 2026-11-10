@@ -10,6 +10,7 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\CleanupUnusedSshKeys;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
@@ -48,10 +49,15 @@ class Kernel extends ConsoleKernel
             $this->instanceTimezone = config('app.timezone');
         }
 
+        // Files are local to each cloud node; do not dispatch to the shared queue.
+        $this->scheduleInstance->call(fn () => app(CleanupUnusedSshKeys::class)->handle())
+            ->name('cleanup:ssh-keys')
+            ->hourly();
+
         $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
             ->name('cleanup:ssh-mux')
             ->hourly()
-            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+            ->when(fn () => config('constants.ssh.mux_enabled'));
         // Every cloud node reads its own versions.json, so each node refreshes it (no onOneServer).
         $this->scheduleInstance->call(fn () => refresh_versions_file())
             ->name('versions:refresh-local')

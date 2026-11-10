@@ -21,6 +21,7 @@ trait TogglesNotificationEvents
         'serverPatch',
         'serverAutoUpdate',
         'traefikOutdated',
+        'imageVulnerabilities',
     ];
 
     public function toggleEvent(string $property): void

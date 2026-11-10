@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\IntegrationToken;
 use App\Models\Project;
 use App\Models\Server;
@@ -22,6 +23,7 @@ use App\Models\StandaloneSqlite;
 use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class GlobalSearch extends Component
@@ -206,6 +208,7 @@ class GlobalSearch extends Component
             'new mysql' => 'mysql',
             'new mariadb' => 'mariadb',
             'new redis' => 'redis',
+            'new valkey' => 'redis',
             'new keydb' => 'keydb',
             'new dragonfly' => 'dragonfly',
             'new sqlite' => 'sqlite',
@@ -239,9 +242,13 @@ class GlobalSearch extends Component
             return true;
         }
 
+        if ($type === 'source') {
+            return $user->can('create', GithubApp::class);
+        }
+
         // Applications, Databases, Services, and other resources
         if (in_array($type, [
-            'project', 'source',
+            'project',
             // Applications
             'public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key',
             'dockerfile', 'docker-compose-empty', 'docker-image',
@@ -472,7 +479,7 @@ class GlobalSearch extends Component
                         'link' => $db->link(),
                         'project' => $db->environment->project->name ?? null,
                         'environment' => $db->environment->name ?? null,
-                        'search_text' => strtolower($db->name.' '.$db->uuid.' redis '.$db->description.' database databases db'),
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' redis valkey '.$db->description.' database databases db'),
                     ];
                 })
         );
@@ -813,6 +820,20 @@ class GlobalSearch extends Component
                 'link' => route('team.audit-log'),
                 'search_text' => 'team audit log activity history events',
             ] : null,
+            [
+                'name' => 'Security',
+                'type' => 'navigation',
+                'description' => 'What each resource of your team needs, from its last image scan',
+                'link' => route('vulnerabilities'),
+                'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
+            ],
+            [
+                'name' => 'Team Image Scanning',
+                'type' => 'navigation',
+                'description' => 'Scan rules and ignored vulnerabilities of the team',
+                'link' => route('team.image-scanning'),
+                'search_text' => 'team image scanning vulnerabilities cve scan rules alert block deploys ignored security',
+            ],
             isInstanceAdmin() ? [
                 'name' => 'Team Admin View',
                 'type' => 'navigation',
@@ -924,6 +945,13 @@ class GlobalSearch extends Component
                     'search_text' => 'settings updates auto update upgrade version frequency',
                 ],
                 [
+                    'name' => 'Image Scanning Settings',
+                    'type' => 'navigation',
+                    'description' => 'Allow image scanning, the vulnerability database, and default scan rules',
+                    'link' => route('settings.image-scanning'),
+                    'search_text' => 'settings image scanning vulnerabilities cve scan rules grype database mirror alert block deploys security',
+                ],
+                [
                     'name' => 'Instance Backup',
                     'type' => 'navigation',
                     'description' => 'Back up the Coolify instance database',
@@ -956,6 +984,7 @@ class GlobalSearch extends Component
                 route('profile'),
                 route('profile.appearance'),
                 route('security.api-tokens'),
+                route('vulnerabilities'),
             ];
             $navigation = $navigation->whereIn('link', $projectPages)->values();
         }
@@ -1171,8 +1200,8 @@ class GlobalSearch extends Component
         // Storage - can be created if user is admin or owner
         if ($user->isAdmin() || $user->isOwner()) {
             $items->push([
-                'name' => 'S3 Storage',
-                'description' => 'Add S3 storage for backups and file uploads',
+                'name' => 'Storage',
+                'description' => 'Add S3, SFTP, FTPS, or WebDAV storage for backups',
                 'quickcommand' => '(type: new storage)',
                 'type' => 'storage',
                 'category' => 'Quick Actions',
@@ -1192,8 +1221,8 @@ class GlobalSearch extends Component
             ]);
         }
 
-        // GitHub Source - can be created if user has createAnyResource permission
-        if ($user->can('createAnyResource')) {
+        // GitHub Source - can be created if user can create a GitHub App
+        if ($user->can('create', GithubApp::class)) {
             $items->push([
                 'name' => 'GitHub App',
                 'description' => 'Connect a GitHub app for source control',
@@ -1319,12 +1348,12 @@ class GlobalSearch extends Component
             ]);
 
             $items->push([
-                'name' => 'Redis',
-                'description' => 'In-memory data structure store',
-                'quickcommand' => '(type: new redis)',
+                'name' => 'Redis / Valkey',
+                'description' => 'In-memory data structure store (Redis or Valkey)',
+                'quickcommand' => '(type: new redis or new valkey)',
                 'type' => 'redis',
                 'category' => 'Databases',
-                'logo' => 'svgs/redis.svg',
+                'logo' => 'svgs/resources/redis-valkey.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1448,8 +1477,11 @@ class GlobalSearch extends Component
 
     public function loadServers()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingServers = true;
-        $servers = Server::isUsable()->get()->sortBy('name');
+        $servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
         $this->availableServers = $servers->map(fn ($s) => [
             'id' => $s->id,
             'name' => $s->name,
@@ -1474,6 +1506,9 @@ class GlobalSearch extends Component
 
     public function loadDestinations()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingDestinations = true;
         $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 

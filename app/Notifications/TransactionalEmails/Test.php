@@ -10,8 +10,11 @@ class Test extends CustomEmailNotification
 {
     public bool $isTestNotification = true;
 
-    public function __construct(public string $emails, public bool $isTransactionalEmail = true)
-    {
+    public function __construct(
+        public string $emails,
+        public bool $isTransactionalEmail = true,
+        public ?bool $usesNotificationSender = null,
+    ) {
         $this->onQueue('high');
     }
 

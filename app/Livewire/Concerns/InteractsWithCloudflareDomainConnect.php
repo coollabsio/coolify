@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DnsRecordHints;
 use App\Support\DomainConnect\CloudflareDomainConnect;
 use Illuminate\Support\Js;
@@ -211,35 +212,12 @@ trait InteractsWithCloudflareDomainConnect
      */
     protected function serverIpsForDnsHints(): array
     {
-        $ipv4 = null;
-        $ipv6 = null;
+        return $this->serverDnsAddresses()->addresses();
+    }
 
-        $ip = $this->serverIpForDomainConnect();
-        if (filled($ip)) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                $ipv4 = $ip;
-            } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
-                $ipv6 = $ip;
-            }
-        }
-
-        if ($this->usesInstanceNetworkAddressesForDnsHints()) {
-            try {
-                $settings = instanceSettings();
-                $publicV4 = data_get($settings, 'public_ipv4');
-                $publicV6 = data_get($settings, 'public_ipv6');
-                if ($ipv4 === null && is_string($publicV4) && filter_var($publicV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    $ipv4 = $publicV4;
-                }
-                if ($ipv6 === null && is_string($publicV6) && filter_var($publicV6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-                    $ipv6 = $publicV6;
-                }
-            } catch (\Throwable) {
-                //
-            }
-        }
-
-        return [$ipv4, $ipv6];
+    protected function serverDnsAddresses(): ServerDnsAddresses
+    {
+        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, $this->usesInstanceNetworkAddressesForDnsHints());
     }
 
     protected function defaultDnsHostname(): string
@@ -265,13 +243,7 @@ trait InteractsWithCloudflareDomainConnect
      */
     protected function publicServerIpForDomainConnect(): ?string
     {
-        foreach ($this->serverIpsForDnsHints() as $address) {
-            if (is_string($address) && DnsRecordHints::isPublicAddress($address)) {
-                return $address;
-            }
-        }
-
-        return null;
+        return $this->serverDnsAddresses()->publicAddresses()[0] ?? null;
     }
 
     protected function serverIpForDomainConnect(): ?string

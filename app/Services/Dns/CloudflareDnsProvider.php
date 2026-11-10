@@ -14,6 +14,7 @@ use App\Models\ServiceApplication;
 use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -95,10 +96,10 @@ class CloudflareDnsProvider
      *
      * @return array<int, array{id: string, type: string, name: string, content: string, proxied: bool|null, ttl: int|null, comment: string|null}>
      */
-    public function findRecords(DnsProviderZone $zone, string $hostname, ?string $type): array
+    public function findRecords(DnsProviderZone $zone, string $hostname, ?string $type, int $timeoutSeconds = 30): array
     {
         $hostname = strtolower(rtrim($hostname, '.'));
-        $response = $this->client($zone->integrationToken)->get(
+        $response = $this->client($zone->integrationToken)->timeout($timeoutSeconds)->get(
             "https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records",
             array_filter(['type' => $type, 'name' => $hostname, 'per_page' => 100]),
         );
@@ -114,6 +115,54 @@ class CloudflareDnsProvider
             ->map(fn (array $remote): array => $this->normalizeRemoteRecord($remote, $hostname, $type ?? ''))
             ->values()
             ->all();
+    }
+
+    /**
+     * Whether Cloudflare sends a proxied hostname to another server than the given one. A Cloudflare IP in DNS hides
+     * the origin, so the zone's records are read: the hostname's own record, or else the closest wildcard record that
+     * covers it (a Cloudflare wildcard also covers deeper names, so `*.example.com` covers `app.apps.example.com`).
+     * False when Coolify cannot tell: no zone of the server's team manages the hostname, the records cannot be read,
+     * a CNAME sends the hostname on, or no record is found.
+     */
+    public function sendsHostnameToAnotherServer(Server $server, string $hostname, ?string $expectedIp = null, int $timeoutSeconds = 5): bool
+    {
+        $hostname = strtolower(rtrim($hostname, '.'));
+        $zone = $server->team_id === null ? null : $this->findZones($server->team_id, $hostname)->first();
+        if ($zone === null) {
+            return false;
+        }
+        $addresses = array_filter([$expectedIp, ...ServerDnsAddresses::forServer($server)->addresses()]);
+        if ($addresses === []) {
+            return false;
+        }
+
+        $names = [$hostname];
+        for ($parent = str($hostname)->after('.')->value(); str_ends_with($parent, '.'.$zone->name); $parent = str($parent)->after('.')->value()) {
+            $names[] = '*.'.$parent;
+        }
+        if (str_ends_with($hostname, '.'.$zone->name)) {
+            $names[] = '*.'.$zone->name;
+        }
+
+        try {
+            foreach ($names as $name) {
+                $records = collect($this->findRecords($zone, $name, null, $timeoutSeconds))
+                    ->filter(fn (array $record): bool => in_array($record['type'], ['A', 'AAAA', 'CNAME'], true));
+                if ($records->isEmpty()) {
+                    continue;
+                }
+                if ($records->contains('type', 'CNAME')) {
+                    return false;
+                }
+
+                return ! $records->contains(fn (array $record): bool => collect($addresses)
+                    ->contains(fn (string $address): bool => DnsRecordHints::sameAddress($record['content'], $address)));
+            }
+        } catch (RuntimeException|ConnectionException) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
@@ -181,7 +230,7 @@ class CloudflareDnsProvider
             throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
         }
         if (count($remoteRecords) === 1) {
-            throw new DnsRecordConflictException($remoteRecords[0]['id'], $remoteRecords[0]['content'], $content);
+            throw new DnsRecordConflictException($remoteRecords[0]['id'], $remoteRecords[0]['content'], $content, $remoteRecords[0]['comment']);
         }
 
         $uuid = new_public_id();
@@ -498,7 +547,11 @@ class CloudflareDnsProvider
     {
         $resourceType = $resource ? str(class_basename($resource))->snake()->value() : 'dns_record';
 
-        $source = auth()->check() ? 'ui' : 'system';
+        $source = match (true) {
+            auth()->user()?->currentAccessToken() !== null => 'api',
+            auth()->check() => 'ui',
+            default => 'system',
+        };
         auditLog("{$source}.dns_record.{$action}", [
             'team_id' => $zone->integrationToken->team_id,
             'resource' => $resourceType,

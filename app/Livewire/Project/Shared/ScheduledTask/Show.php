@@ -45,6 +45,9 @@ class Show extends Component
     #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
+    #[Validate(['boolean'])]
+    public bool $useShell = true;
+
     #[Locked]
     public string $serverTimezone = 'UTC';
 
@@ -76,6 +79,7 @@ class Show extends Component
             $this->task->frequency = str($this->frequency)->trim()->value();
             $this->task->container = str($this->container)->trim()->value();
             $this->task->timeout = (int) $this->timeout;
+            $this->task->use_shell = $this->useShell;
             $changedFields = auditChangedFields($this->task);
             $this->task->save();
 
@@ -87,6 +91,7 @@ class Show extends Component
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;
+            $this->useShell = $this->task->use_shell ?? true;
         }
 
         return [];
@@ -145,7 +150,7 @@ class Show extends Component
     public function delete()
     {
         try {
-            $this->authorize('update', $this->resource);
+            $this->authorize('delete', $this->resource);
             $this->authorize('delete', $this->task);
             $this->task->delete();
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());

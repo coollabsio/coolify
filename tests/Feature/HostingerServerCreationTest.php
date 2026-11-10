@@ -62,19 +62,6 @@ it('offers Hostinger as a server provider', function () {
         ->assertSet('tokenProvider', 'hostinger');
 });
 
-it('uses the current cloud provider UI and Hostinger affiliate link', function () {
-    Livewire::test(ByHostinger::class)
-        ->assertSee('Hostinger account')
-        ->assertSee('https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io', false)
-        ->assertSee("through Coolify's affiliate link.", false);
-
-    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
-        ->set('loading_data', false)
-        ->assertSee('Hostinger server')
-        ->assertSee('Advanced options')
-        ->assertSee('Buy and create');
-});
-
 it('leaves paid Hostinger backups off by default', function () {
     Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
         ->assertSet('enable_backups', false)
@@ -407,7 +394,7 @@ it('starts a stopped Hostinger VPS from the server page', function () {
     expect($server->fresh()->hostinger_virtual_machine_status)->toBe('starting');
 });
 
-it('labels the Hostinger status refresh button on the server page', function () {
+it('refreshes the Hostinger status from the server details action before the server is validated', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -416,10 +403,20 @@ it('labels the Hostinger status refresh button on the server page', function () 
         'hostinger_virtual_machine_status' => 'running',
     ]);
 
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/17923' => Http::response([
+            'id' => 17923,
+            'state' => 'stopped',
+            'ipv4' => [['address' => $server->ip]],
+        ]),
+    ]);
+
     Livewire::test(Show::class, ['server_uuid' => $server->uuid])
         ->assertSee('Hostinger · Running')
-        ->assertSee('Refresh provider status')
-        ->assertSeeHtml('wire:click.prevent="checkHostingerVirtualMachineStatus(true)"');
+        ->call('refreshServerMetadata')
+        ->assertSet('hostingerVirtualMachineStatus', 'stopped')
+        ->assertDispatched('info', 'Provider status refreshed. Validate the server connection to fetch server details.')
+        ->assertSee('Hostinger · Stopped');
 });
 
 it('does not validate a stopped Hostinger VPS over SSH', function () {

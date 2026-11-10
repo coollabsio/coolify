@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Livewire\Attributes\Locked;
 
 /**
@@ -26,6 +27,29 @@ trait ListensToTeamChannel
     public function ignoreStaleTeamChannelEvent(): void
     {
         $this->skipRender();
+    }
+
+    /**
+     * The data of a team channel event. Events about one resource send it encrypted in `payload`,
+     * because the team channel also reaches members without access to that resource.
+     *
+     * @param  array<string, mixed>  $event
+     * @return array<string, mixed>
+     */
+    protected function teamChannelPayload(array $event): array
+    {
+        if (! array_key_exists('payload', $event)) {
+            return $event;
+        }
+
+        try {
+            // The payload comes from the browser: unserialize it without classes.
+            $payload = unserialize(decrypt($event['payload'], false), ['allowed_classes' => false]);
+        } catch (DecryptException) {
+            return [];
+        }
+
+        return is_array($payload) ? $payload : [];
     }
 
     /**

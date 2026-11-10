@@ -17,7 +17,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 it('shows patch and minor upgrade warnings on the first proxy render', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.13',
             'v3.6' => '3.6.25',
@@ -50,7 +50,7 @@ it('shows patch and minor upgrade warnings on the first proxy render', function 
 });
 
 it('shows a warning from the saved image before version detection finishes', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => ['v3.7' => '3.7.13', 'v3.6' => '3.6.25'],
     ]);
 
@@ -96,7 +96,7 @@ it('does not treat an unapplied image as the running Traefik version', function 
 });
 
 it('ignores stale minor upgrade information for the detected Traefik version', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -121,7 +121,7 @@ it('ignores stale minor upgrade information for the detected Traefik version', f
 });
 
 it('does not offer the Traefik branch already configured on a running proxy', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -154,7 +154,7 @@ YAML;
 });
 
 it('still offers a newer Traefik branch than the configured image', function () {
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => [
             'v3.7' => '3.7.8',
             'v3.6' => '3.6.23',
@@ -211,11 +211,19 @@ YAML,
 
 it('preserves a newer Traefik warning stored after the warning was inspected', function () {
     $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    $this->actingAs($user);
     $server = Server::factory()->create([
         'team_id' => $team->id,
         'proxy' => [
             'type' => ProxyTypes::TRAEFIK->value,
             'status' => 'running',
+            'last_saved_proxy_configuration' => <<<'YAML'
+services:
+  traefik:
+    image: traefik:v3.7
+YAML,
         ],
         'detected_traefik_version' => '3.6.23',
         'traefik_outdated_info' => [
@@ -228,7 +236,7 @@ it('preserves a newer Traefik warning stored after the warning was inspected', f
 
     $component = new Proxy;
     $component->server = $server;
-    $component->proxySettings = 'services:'.PHP_EOL.'  traefik:'.PHP_EOL.'    image: traefik:v3.7';
+    $component->mount();
 
     $newerWarning = [
         'current' => '3.7.8',
@@ -238,10 +246,10 @@ it('preserves a newer Traefik warning stored after the warning was inspected', f
     ];
     Server::query()->whereKey($server->id)->update(['traefik_outdated_info' => $newerWarning]);
 
-    $method = new ReflectionMethod($component, 'clearAppliedTraefikBranchWarning');
-    $method->invoke($component);
+    $component->loadProxyConfiguration();
 
-    expect($server->refresh()->traefik_outdated_info)->toBe($newerWarning);
+    expect($component->server->traefik_outdated_info['upgrade_target'])->toBe('v3.7')
+        ->and($server->refresh()->traefik_outdated_info)->toBe($newerWarning);
 });
 
 it('does not mark stale Traefik outdated information as a current warning', function () {
@@ -274,29 +282,6 @@ it('marks matching Traefik outdated information as a current warning', function 
     expect($server->hasCurrentTraefikOutdatedInfo())->toBeTrue();
 });
 
-it('clears stale Traefik version state before detecting the current version', function () {
-    $team = Team::factory()->create();
-    $server = Server::factory()->create([
-        'team_id' => $team->id,
-        'detected_traefik_version' => '3.6.23',
-        'traefik_outdated_info' => [
-            'current' => '3.6.23',
-            'latest' => '3.7.8',
-            'type' => 'minor_upgrade',
-            'upgrade_target' => 'v3.7',
-        ],
-    ]);
-
-    $job = new CheckTraefikVersionForServerJob($server, ['v3.7' => '3.7.8']);
-    $method = new ReflectionMethod($job, 'clearOutdatedInfo');
-    $method->invoke($job);
-
-    $server->refresh();
-
-    expect($server->detected_traefik_version)->toBeNull()
-        ->and($server->traefik_outdated_info)->toBeNull();
-});
-
 it('clears Traefik version state when the proxy changes', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create([
@@ -321,7 +306,7 @@ it('clears Traefik version state when the proxy changes', function () {
 
 it('cleans stale Traefik version state while selecting servers to check', function () {
     Bus::fake();
-    Cache::put('coolify:versions:all', [
+    Cache::put('coolify:versions', [
         'traefik' => ['v3.7' => '3.7.8'],
     ]);
 

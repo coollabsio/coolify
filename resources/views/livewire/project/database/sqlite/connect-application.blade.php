@@ -1,7 +1,7 @@
 {{-- Rendered inside the General form, so no <form> here: the button is type=button and Enter is handled explicitly. --}}
 <div>
     <x-application.settings-section title="Connect application"
-        description="Mount the data volume of this database into an application on the same server. The application must run as user 65532 or as root to access the files.">
+        description="Mount the data volume of this database into an application on the same server. Keep the data in a Docker volume as the database files are writable by every user, so with a bind mount every user on the host can read and change them.">
         @if ($this->connections->isNotEmpty() || $this->composeConnections->isNotEmpty())
             <div class="mb-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
                 @foreach ($this->connections as $connection)

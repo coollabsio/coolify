@@ -69,8 +69,7 @@ class ResourcesController extends Controller
         }
         $resources = $resources->flatten();
         $resources = $resources->map(function ($resource) {
-            exposeSensitiveFields($resource);
-            $payload = $resource->toArray();
+            $payload = serializeApiResource($resource);
             $payload['status'] = $resource->status;
             $payload['type'] = $resource->type();
 

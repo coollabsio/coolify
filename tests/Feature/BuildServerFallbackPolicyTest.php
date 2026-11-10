@@ -23,7 +23,7 @@ afterEach(function () {
     Server::flushIdentityMap();
 });
 
-function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array $applicationAttributes = [], bool $buildServerEnabled = true, bool $restartOnly = false): array
+function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array $applicationAttributes = [], bool $buildServerEnabled = true, bool $restartOnly = false, ?int $reservedBuildServerId = null): array
 {
     $project = new Project;
     $project->setRelation('team', $team);
@@ -40,6 +40,7 @@ function makeBuildServerSelectionJob(Team $team, Server $deploymentServer, array
     $application->setRelation('settings', $settings);
 
     $deploymentQueue = Mockery::mock(ApplicationDeploymentQueue::class);
+    $deploymentQueue->shouldReceive('getAttribute')->with('build_server_id')->andReturn($reservedBuildServerId)->byDefault();
     $job = (new ReflectionClass(ApplicationDeploymentJob::class))->newInstanceWithoutConstructor();
 
     foreach ([
@@ -148,7 +149,7 @@ test('strict teams use an available dedicated build server', function () {
     ]);
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
 
-    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $buildServer->id])->once()->andReturnTrue();
     $deploymentQueue->shouldReceive('addLogEntry')
         ->once()
         ->with("Found a suitable build server ({$buildServer->name}).");
@@ -179,7 +180,7 @@ test('build server selection only picks dedicated build servers', function () {
     $buildServer = makeRoleServer($team, 'build');
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
 
-    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $buildServer->id])->once()->andReturnTrue();
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with("Found a suitable build server ({$buildServer->name}).");
 
     invokeBuildServerSelection($job);
@@ -194,7 +195,7 @@ test('fallback builds on the deployment server instead of another combined serve
     makeRoleServer($team, 'both');
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
 
-    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldNotReceive('update');
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with('No suitable build server found. Using the deployment server.');
 
     invokeBuildServerSelection($job);
@@ -210,7 +211,7 @@ test('deployments-only servers build on a dedicated build server without the app
     $buildServer = makeRoleServer($team, 'build');
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, ['docker_registry_image_name' => 'ghcr.io/coollabsio/app'], buildServerEnabled: false);
 
-    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $buildServer->id])->once()->andReturnTrue();
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with("Found a suitable build server ({$buildServer->name}).");
 
     invokeBuildServerSelection($job);
@@ -252,7 +253,7 @@ test('deployments-only servers restart without a registry image', function () {
     $buildServer = makeRoleServer($team, 'build');
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, buildServerEnabled: false, restartOnly: true);
 
-    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $buildServer->id])->once()->andReturnTrue();
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with("Found a suitable build server ({$buildServer->name}).");
 
     invokeBuildServerSelection($job);
@@ -312,7 +313,7 @@ test('additional deployments-only servers pull the registry image without a buil
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, ['docker_registry_image_name' => 'ghcr.io/coollabsio/app'], $buildServerEnabled);
     markAsAdditionalServer($job);
 
-    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldNotReceive('update');
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with('Additional server: pulls the image from the registry, no build server needed.');
 
     invokeBuildServerSelection($job);
@@ -331,7 +332,7 @@ test('additional servers do not use a build server when the application enables 
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, ['docker_registry_image_name' => 'ghcr.io/coollabsio/app']);
     markAsAdditionalServer($job);
 
-    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldNotReceive('update');
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with('Additional server: pulls the image from the registry, no build server needed.');
 
     invokeBuildServerSelection($job);
@@ -436,7 +437,7 @@ test('strict teams restart on the deployment server when no build server is avai
     $deploymentServer = makeRoleServer($team, $role);
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, buildServerEnabled: $buildServerEnabled, restartOnly: true);
 
-    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldNotReceive('update');
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with('No suitable build server found. Using the deployment server.');
 
     invokeBuildServerSelection($job);
@@ -454,7 +455,7 @@ test('strict teams restart on an available build server', function () {
     $buildServer = makeRoleServer($team, 'build');
     [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, buildServerEnabled: false, restartOnly: true);
 
-    $deploymentQueue->shouldReceive('setAttribute')->with('build_server_id', $buildServer->id)->once()->andReturnSelf();
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $buildServer->id])->once()->andReturnTrue();
     $deploymentQueue->shouldReceive('addLogEntry')->once()->with("Found a suitable build server ({$buildServer->name}).");
 
     invokeBuildServerSelection($job);
@@ -481,3 +482,74 @@ test('a restart that has to rebuild applies the build server rules again', funct
     'deployments-only server' => ['deployment', false, 'is set to deployments only, and no usable build server was found.'],
     'application uses a build server' => ['both', true, 'No available dedicated build server was found.'],
 ]);
+
+test('the selected build server is saved on the deployment so a cancel finds the helper container', function () {
+    $team = Team::factory()->create();
+    $deploymentServer = makeRoleServer($team, 'both');
+    $buildServer = makeRoleServer($team, 'build');
+    [$job] = makeBuildServerSelectionJob($team, $deploymentServer);
+    $deployment = ApplicationDeploymentQueue::query()->create([
+        'application_id' => '1',
+        'deployment_uuid' => 'build-server-cancel-test',
+        'server_id' => $deploymentServer->id,
+    ]);
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'application_deployment_queue'))->setValue($job, $deployment);
+
+    invokeBuildServerSelection($job);
+    // execute_remote_command() refreshes the deployment before each command.
+    $deployment->refresh();
+
+    expect($deployment->build_server_id)->toBe($buildServer->id)
+        ->and(ApplicationDeploymentQueue::query()->find($deployment->id)->build_server_id)->toBe($buildServer->id);
+});
+
+function makeAvailableBuildServer(Team $team, int $concurrentBuilds = 1): Server
+{
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'server_role' => 'build',
+        'is_build_server' => true,
+        'concurrent_builds' => $concurrentBuilds,
+    ]);
+
+    return $server;
+}
+
+test('the job builds on the build server that admission reserved', function () {
+    $team = Team::factory()->create();
+    $deploymentServer = Server::factory()->create(['team_id' => $team->id]);
+    makeAvailableBuildServer($team);
+    $reserved = makeAvailableBuildServer($team);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, reservedBuildServerId: $reserved->id);
+
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $reserved->id])->once()->andReturnTrue();
+    $deploymentQueue->shouldReceive('addLogEntry')->once();
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($reserved))->toBeTrue();
+});
+
+test('a force-started job without a reservation builds on a build server with a free build slot', function () {
+    $team = Team::factory()->create();
+    $deploymentServer = Server::factory()->create(['team_id' => $team->id]);
+    $full = makeAvailableBuildServer($team);
+    $free = makeAvailableBuildServer($team);
+    ApplicationDeploymentQueue::create([
+        'application_id' => 1,
+        'deployment_uuid' => 'running-on-full-build-server',
+        'status' => 'in_progress',
+        'server_id' => $deploymentServer->id,
+        'build_server_id' => $full->id,
+    ]);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
+
+    $deploymentQueue->shouldReceive('update')->with(['build_server_id' => $free->id])->once()->andReturnTrue();
+    $deploymentQueue->shouldReceive('addLogEntry')->once();
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($free))->toBeTrue();
+});

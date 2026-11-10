@@ -7,6 +7,8 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
@@ -167,4 +169,149 @@ test('removes an unused pending user after the last revocation', function () {
 
     $this->assertDatabaseMissing('team_invitations', ['id' => $this->invitationA->id]);
     $this->assertDatabaseMissing('users', ['id' => $this->pendingUser->id]);
+});
+
+function invitationMagicLinkPassword(TeamInvitation $invitation): ?string
+{
+    if (parse_url($invitation->link, PHP_URL_PATH) !== '/auth/link') {
+        return null;
+    }
+    parse_str((string) parse_url($invitation->link, PHP_URL_QUERY), $query);
+
+    return explode('@@@', Crypt::decryptString($query['token']), 3)[2];
+}
+
+test('sends a working magic link when the same team invites again after expiration', function () {
+    $this->actingAs($this->ownerA);
+    session(['currentTeam' => $this->teamA]);
+    $this->invitationA->forceFill(['created_at' => now()->subDays(10)])->save();
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $this->pendingUser->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    $invitation = TeamInvitation::whereEmail($this->pendingUser->email)->sole();
+    $user = User::whereEmail($this->pendingUser->email)->sole();
+    $password = invitationMagicLinkPassword($invitation);
+
+    expect($password)->not->toBeNull()
+        ->and(Hash::check($password, $user->password))->toBeTrue();
+});
+
+test('sends a working magic link to an invited user who never set a password', function () {
+    $user = User::factory()->create([
+        'email' => 'removed-invitee@example.com',
+        'email_verified_at' => null,
+        'force_password_reset' => true,
+    ]);
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $user->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    $password = invitationMagicLinkPassword(TeamInvitation::whereEmail($user->email)->sole());
+
+    expect($password)->not->toBeNull()
+        ->and(Hash::check($password, $user->refresh()->password))->toBeTrue();
+});
+
+test('keeps the login link and password of an invited user who can sign in', function (array $attributes) {
+    $user = User::factory()->create(array_merge(['email' => 'existing-invitee@example.com'], $attributes));
+    $passwordHash = $user->password;
+    if ($attributes['force_password_reset'] ?? false) {
+        $this->teamA->members()->attach($user, ['role' => 'member']);
+    }
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $user->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    expect(invitationMagicLinkPassword(TeamInvitation::whereEmail($user->email)->sole()))->toBeNull()
+        ->and($user->refresh()->password)->toBe($passwordHash);
+})->with([
+    'own password' => [['force_password_reset' => false]],
+    'pending member of another team' => [['force_password_reset' => true, 'email_verified_at' => null]],
+]);
+
+test('keeps the inviter signed in when the invitee password is rotated', function () {
+    $user = User::factory()->create([
+        'email' => 'rotated-invitee@example.com',
+        'email_verified_at' => null,
+        'force_password_reset' => true,
+    ]);
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $user->email)
+        ->call('viaLink');
+
+    $this->assertAuthenticatedAs($this->ownerB);
+    expect(data_get(session('currentTeam'), 'id'))->toBe($this->teamB->id);
+});
+
+test('gives a second team a plain link without changing the pending login of the first', function (bool $legacy) {
+    $this->withoutVite();
+    config()->set('app.maintenance.store', 'array');
+    $password = 'temporary-invitation-password';
+    $this->pendingUser->forceFill(['password' => Hash::make($password)])->save();
+    $passwordHash = $this->pendingUser->password;
+    $firstToken = Crypt::encryptString($legacy
+        ? "{$this->pendingUser->email}@@@{$password}"
+        : "{$this->pendingUser->email}@@@{$this->invitationA->uuid}@@@{$password}");
+    $this->invitationA->update(['link' => route('auth.link', ['token' => $firstToken])]);
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $this->pendingUser->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    $secondInvitation = TeamInvitation::whereTeamId($this->teamB->id)->whereEmail($this->pendingUser->email)->sole();
+    expect(invitationMagicLinkPassword($secondInvitation))->toBeNull()
+        ->and($this->pendingUser->refresh()->password)->toBe($passwordHash);
+
+    auth()->logout();
+    session()->flush();
+    $this->post(route('auth.link.accept'), ['token' => $firstToken])->assertRedirect(route('dashboard'));
+    $this->assertAuthenticatedAs($this->pendingUser);
+    expect($this->pendingUser->teams()->whereKey($this->teamA->id)->exists())->toBeTrue();
+    $this->assertDatabaseHas('team_invitations', ['id' => $secondInvitation->id]);
+})->with(['current token' => false, 'legacy token' => true]);
+
+test('gives a plain link while another team has any unexpired invitation', function (string $case) {
+    $password = 'temporary-invitation-password';
+    $this->pendingUser->forceFill(['password' => Hash::make($password)])->save();
+    $passwordHash = $this->pendingUser->password;
+    $email = $case === 'wrong email' ? 'someone-else@example.com' : $this->pendingUser->email;
+    $uuid = $case === 'wrong invitation' ? 'another-invitation' : $this->invitationA->uuid;
+    $tokenPassword = $case === 'wrong password' ? 'another-password' : $password;
+    $token = $case === 'invalid token' ? 'invalid-token' : Crypt::encryptString("{$email}@@@{$uuid}@@@{$tokenPassword}");
+    $this->invitationA->update(['link' => route('auth.link', ['token' => $token])]);
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $this->pendingUser->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    $invitation = TeamInvitation::whereTeamId($this->teamB->id)->whereEmail($this->pendingUser->email)->sole();
+    expect(invitationMagicLinkPassword($invitation))->toBeNull()
+        ->and($this->pendingUser->refresh()->password)->toBe($passwordHash);
+    $this->assertDatabaseHas('team_invitations', ['id' => $this->invitationA->id]);
+})->with(['wrong email', 'wrong invitation', 'wrong password', 'invalid token']);
+
+test('sends a new magic link when the invitation of another team has expired', function () {
+    $passwordHash = $this->pendingUser->password;
+    $this->invitationA->forceFill(['created_at' => now()->subDays(10)])->save();
+
+    Livewire::test(InviteLink::class)
+        ->set('email', $this->pendingUser->email)
+        ->call('viaLink')
+        ->assertDispatched('success');
+
+    $invitation = TeamInvitation::whereTeamId($this->teamB->id)->whereEmail($this->pendingUser->email)->sole();
+    $newPassword = invitationMagicLinkPassword($invitation);
+    expect($newPassword)->not->toBeNull()
+        ->and($this->pendingUser->refresh()->password)->not->toBe($passwordHash)
+        ->and(Hash::check($newPassword, $this->pendingUser->password))->toBeTrue();
 });

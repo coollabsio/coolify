@@ -9,6 +9,7 @@ use App\Models\StandalonePostgresql;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class General extends Component
@@ -35,6 +36,7 @@ class General extends Component
 
     public ?string $postgresConf = null;
 
+    #[Locked]
     public ?array $initScripts = null;
 
     public string $image;
@@ -265,11 +267,19 @@ class General extends Component
         $container_name = $this->database->uuid;
         $configuration_dir = database_configuration_dir().'/'.$container_name;
 
+        // Only an unchanged filename of an existing script skips validation, so legacy rows stay editable.
+        if (! $oldScript || $oldScript['filename'] !== $script['filename']) {
+            try {
+                validateFilenameSafe((string) data_get($script, 'filename'), 'init script filename');
+            } catch (Exception $e) {
+                $this->dispatch('error', $e->getMessage());
+
+                return;
+            }
+        }
+
         if ($oldScript && $oldScript['filename'] !== $script['filename']) {
             try {
-                // New filename is user-supplied — must be safe before accepting the rename.
-                validateFilenameSafe($script['filename'], 'init script filename');
-
                 // Old filename may be a legacy value written before this validation existed.
                 // basename() scopes the rm to the initdb.d directory; escapeshellarg() contains
                 // any remaining shell-metachars. No validator — don't block cleanup of legacy rows.

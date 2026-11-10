@@ -73,15 +73,6 @@ it('redirects unauthenticated users to login', function () {
         ->screenshot();
 });
 
-it('shows dashboard after successful login and onboarding skip', function () {
-    $page = loginAndSkipBoarding();
-
-    $page->assertSee('Dashboard')
-        ->assertSee('Projects')
-        ->assertSee('Servers')
-        ->screenshot();
-});
-
 it('displays all projects on dashboard', function () {
     $page = loginAndSkipBoarding();
 

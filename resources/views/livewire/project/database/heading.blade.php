@@ -1,4 +1,7 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$database" :wire:key="'star-mobile-'.$database->getMorphClass().'-'.$database->uuid" />
+    @endteleport
     @php
         $databasePageItems = [
             [
@@ -7,7 +10,6 @@
                 'active' => request()->routeIs('project.database.configuration')
                     || request()->routeIs('project.database.environment-variables')
                     || request()->routeIs('project.database.servers')
-                    || request()->routeIs('project.database.import-backup')
                     || request()->routeIs('project.database.persistent-storage')
                     || request()->routeIs('project.database.healthcheck')
                     || request()->routeIs('project.database.webhooks')

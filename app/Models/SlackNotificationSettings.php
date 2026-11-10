@@ -34,6 +34,7 @@ class SlackNotificationSettings extends Model
         'server_patch_slack_notifications',
         'server_auto_update_slack_notifications',
         'traefik_outdated_slack_notifications',
+        'image_vulnerabilities_slack_notifications',
     ];
 
     protected $hidden = [
@@ -59,6 +60,7 @@ class SlackNotificationSettings extends Model
         'server_patch_slack_notifications' => 'boolean',
         'server_auto_update_slack_notifications' => 'boolean',
         'traefik_outdated_slack_notifications' => 'boolean',
+        'image_vulnerabilities_slack_notifications' => 'boolean',
     ];
 
     public function team()

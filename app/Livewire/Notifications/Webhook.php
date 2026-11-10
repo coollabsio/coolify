@@ -73,6 +73,9 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedWebhookNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesWebhookNotifications = false;
+
     public function mount()
     {
         try {
@@ -108,6 +111,7 @@ class Webhook extends Component
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
             $this->settings->server_auto_update_webhook_notifications = $this->serverAutoUpdateWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
+            $this->settings->image_vulnerabilities_webhook_notifications = $this->imageVulnerabilitiesWebhookNotifications;
 
             $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
@@ -135,6 +139,7 @@ class Webhook extends Component
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
             $this->serverAutoUpdateWebhookNotifications = $this->settings->server_auto_update_webhook_notifications;
             $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
+            $this->imageVulnerabilitiesWebhookNotifications = $this->settings->image_vulnerabilities_webhook_notifications;
         }
     }
 

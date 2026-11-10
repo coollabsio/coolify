@@ -2,18 +2,34 @@
 
 namespace App\Notifications\Server;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class DockerCleanupFailed extends CustomEmailNotification
+/**
+ * Sent on the first failure, then at most once a day until a cleanup on the server succeeds again.
+ */
+class DockerCleanupFailed extends CustomEmailNotification implements ThrottledNotification
 {
     public function __construct(public Server $server, public string $message)
     {
         $this->onQueue('high');
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->server;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array
@@ -28,6 +44,7 @@ class DockerCleanupFailed extends CustomEmailNotification
         $mail->view('emails.docker-cleanup-failed', [
             'name' => $this->server->name,
             'text' => $this->message,
+            'reminder' => NotificationThrottle::FAILURE_REMINDER_TEXT,
         ]);
 
         return $mail;

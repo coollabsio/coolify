@@ -229,7 +229,7 @@ class PublicGitRepository extends Component
             $this->git_branch = 'main';
         }
         if ($this->git_host === 'github.com') {
-            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+            $this->git_source = GithubApp::query()->whereKey(0)->where('is_public', true)->first();
 
             return;
         }
@@ -277,6 +277,8 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
+
             $this->validate();
 
             // Additional validation for git repository and branch

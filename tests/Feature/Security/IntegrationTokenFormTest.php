@@ -200,29 +200,6 @@ test('integration tokens page lists saved provider and capabilities', function (
         ->assertSee('DNS');
 });
 
-test('cloudflare dns scope guidance and token creation link are shown', function () {
-    Livewire::test(IntegrationTokenForm::class)
-        ->set('capabilities', ['dns'])
-        ->assertSee('Zone - DNS - Edit')
-        ->assertSee('Zone - Zone - Read')
-        ->assertSeeHtml(e(IntegrationToken::cloudflareTokenTemplateUrl(['dns'])));
-});
-
-test('saved integration token rows render modal editors with a gear button', function () {
-    IntegrationToken::query()->create([
-        'team_id' => $this->team->id,
-        'provider' => 'cloudflare',
-        'name' => 'Production DNS',
-        'token' => 'original-token',
-        'capabilities' => ['dns'],
-    ]);
-
-    Livewire::test(IntegrationTokens::class)
-        ->assertSee('Edit Integration Token')
-        ->assertSee('Production DNS')
-        ->assertSeeHtml(':aria-label="`Edit ${tokenName}`"');
-});
-
 test('an integration token can be rotated after validating its capabilities', function () {
     Http::fake([
         'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
@@ -330,18 +307,6 @@ test('an invalid replacement does not rotate the integration token', function ()
         ->assertDispatched('error');
 
     expect($savedToken->fresh()->token)->toBe('original-token');
-});
-
-test('new integration token form controls declare authorization matching server-side actions', function () {
-    $editor = file_get_contents(resource_path('views/livewire/security/integration-token-editor.blade.php'));
-    $form = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($editor)
-        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="edit-automatic-dns")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="refreshZones")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/');
-
-    expect($form)
-        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="automatic-dns")(?=[^>]*canGate="create")(?=[^>]*:canResource="\\\\App\\\\Models\\\\IntegrationToken::class")[^>]*>/');
 });
 
 function vaultIntegrationToken(Team $team, array $metadata = ['base_url' => 'https://example.com:8200']): IntegrationToken

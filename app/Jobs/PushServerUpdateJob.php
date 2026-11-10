@@ -132,6 +132,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function __construct(public Server $server, public $data)
     {
+        $this->onQueue(sentinel_queue());
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();
@@ -247,6 +248,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
         $this->allServiceApplicationIds = $this->serviceApplicationsById->keys();
         $this->allServiceDatabaseIds = $this->serviceDatabasesById->keys();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds($this->applications->whereIn('id', $this->allApplicationIds)
+            ->concat($this->previews)
+            ->concat($this->databases)
+            ->concat($this->serviceApplicationsById)
+            ->concat($this->serviceDatabasesById));
 
         // Owners of application containers outside this server's applications, in one query.
         $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
@@ -404,6 +410,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         // Aggregate multi-container service statuses
         $this->aggregateServiceContainerStatuses();
+
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
 
         $this->checkLogDrainContainer();
 

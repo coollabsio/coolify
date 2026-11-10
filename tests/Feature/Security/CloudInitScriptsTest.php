@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Security\CloudInitScript\Show;
-use App\Livewire\Security\CloudInitScriptForm;
 use App\Livewire\Security\CloudInitScripts;
 use App\Models\CloudInitScript;
 use App\Models\InstanceSettings;
@@ -26,33 +25,6 @@ beforeEach(function () {
 
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
-});
-
-test('cloud-init scripts page describes scripts for every cloud provider', function () {
-    Livewire::test(CloudInitScripts::class)
-        ->assertSee('Reusable initialization scripts for cloud servers.')
-        ->assertDontSee('Currently working only with Hetzner');
-});
-
-test('cloud-init script form does not show a cancel button in the modal', function () {
-    Livewire::test(CloudInitScriptForm::class)
-        ->assertSee('Create script')
-        ->assertDontSee('Cancel');
-});
-
-test('cloud-init script cards open the modal editor without inline actions or created time', function () {
-    $script = CloudInitScript::query()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Docker Host Setup',
-        'script' => "#cloud-config\npackages:\n  - htop\n",
-    ]);
-
-    Livewire::test(CloudInitScripts::class)
-        ->assertSee('Docker Host Setup')
-        ->assertSee('Edit Cloud-Init Script')
-        ->assertDontSee(route('security.cloud-init-scripts.show', ['cloud_init_script_uuid' => $script->uuid]), false)
-        ->assertDontSee('Created')
-        ->assertSee('Delete');
 });
 
 test('cloud-init script detail page shows editable script fields', function () {

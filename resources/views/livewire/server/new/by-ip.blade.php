@@ -92,6 +92,7 @@
                         ]" />
                 </x-forms.collapsible>
             </x-application.settings-section>
+            @include('livewire.server.new.partials.image-scanning')
         </form>
     @endif
 </div>

@@ -195,7 +195,7 @@ test('the deployment job ls-remote uses the HTTPS credential in the helper conta
     $application = gitHttpsCredentialApplication($this->repository);
     $job = (new ReflectionClass(ApplicationDeploymentJob::class))->newInstanceWithoutConstructor();
     $reflection = new ReflectionObject($job);
-    foreach (['application' => $application, 'customPort' => 22, 'fullRepoUrl' => $this->repository] as $property => $value) {
+    foreach (['application' => $application, 'customPort' => 22, 'deployment_uuid' => 'deploy-uuid', 'fullRepoUrl' => $this->repository] as $property => $value) {
         $reflection->getProperty($property)->setValue($job, $value);
     }
 

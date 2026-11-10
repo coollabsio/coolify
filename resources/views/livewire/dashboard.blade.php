@@ -8,36 +8,8 @@
     @endif
 
     @php
-        $dashboardItemLimit = 8;
-        $dashboardProjects = $projects->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
-        $dashboardServers = $servers->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
+        $dashboardItemLimit = \App\Livewire\Dashboard::ITEM_LIMIT;
         $hasTrafficAnalytics = $servers->contains(fn ($server) => $server->isTrafficAnalyticsEnabled());
-        $projectResourceCounts = $dashboardProjects->mapWithKeys(fn ($project) => [$project->id => collect([
-            $project->applications_count,
-            $project->services_count,
-            $project->postgresqls_count,
-            $project->redis_count,
-            $project->keydbs_count,
-            $project->dragonflies_count,
-            $project->clickhouses_count,
-            $project->mongodbs_count,
-            $project->mysqls_count,
-            $project->mariadbs_count,
-            $project->sqlites_count,
-        ])->sum()]);
-        $serverStatuses = $dashboardServers->mapWithKeys(function ($server) {
-            $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
-
-            return [$server->id => match (true) {
-                $server->settings->force_disabled => ['Disabled', 'error'],
-                ! $server->settings->is_reachable && ! $server->settings->is_usable => ['Unavailable', 'error'],
-                ! $server->settings->is_reachable => ['Unreachable', 'error'],
-                ! $server->settings->is_usable => ['Not ready', 'warning'],
-                $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-                default => ['Ready', 'success'],
-            }];
-        });
         $iconButton = 'card-icon-button flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black';
         // Same look as $iconButton, sized to the 20px section title it sits next to.
         $titleIconButton = 'flex size-5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
@@ -62,6 +34,114 @@
                     </x-callout>
                 @endforeach
             </div>
+        @endif
+
+        @php
+            $securityCount = count($securityUpdateNow);
+            $securityKey = 'coolify.image-scan.dashboard-update-now-dismissed.'.currentTeam()->id;
+        @endphp
+        {{-- Dismissed until a resource that was not dismissed needs an update now (resources/js/security-callout.js).
+             It also renders without resources, so the dismissed set is cleared and the next one shows again. --}}
+        <div x-data="{
+                resources: @js($securityUpdateNow),
+                key: @js($securityKey),
+                state: { visible: {{ $securityCount > 0 ? 'true' : 'false' }}, reset: false },
+                dismiss() {
+                    if (window.dismissSecurityCallout) localStorage.setItem(this.key, window.dismissSecurityCallout(this.resources, localStorage.getItem(this.key)));
+                    this.state.visible = false;
+                },
+            }"
+            x-init="state = window.securityCallout?.(resources, localStorage.getItem(key)) ?? state; if (state.reset) localStorage.removeItem(key)"
+            x-show="state.visible" x-cloak wire:key="dashboard-security-{{ md5(implode(',', $securityUpdateNow)) }}">
+            @if ($securityCount > 0)
+                <x-callout type="danger" dismissible :title="\App\Livewire\Dashboard::securityCalloutTitle($securityCount)"
+                    on-dismiss="dismiss()">
+                    <a href="{{ route('vulnerabilities', ['statuses' => ['update_now']]) }}" {{ wireNavigate() }}
+                        class="font-medium underline-offset-2 hover:underline">Review</a>
+                </x-callout>
+            @endif
+        </div>
+
+        {{-- First on every screen size, so starred resources are one tap away on phones too. --}}
+        @if ($starredResources->isNotEmpty())
+            <section class="@container mb-0! min-w-0">
+                <x-section-heading title="Starred" />
+                {{-- Pointer events, so the same code works for mouse, touch, and pen. The handle has touch-none, so a drag on a phone does not scroll the page. --}}
+                <div class="grid min-w-0 grid-cols-1 gap-3 @lg:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4"
+                    x-data="{
+                        dragged: null,
+                        lifted: ['z-20', 'scale-[1.02]', 'shadow-lg', 'ring-2', 'ring-coollabs/40', 'dark:ring-brand-light/30', 'cursor-grabbing'],
+                        start(event) {
+                            this.dragged = event.currentTarget.closest('[data-star-id]');
+                            this.dragged.classList.add(...this.lifted);
+                        },
+                        move(event) {
+                            if (!this.dragged) return;
+                            const target = document.elementsFromPoint(event.clientX, event.clientY)
+                                .map((element) => element.closest('[data-star-id]'))
+                                .find((card) => card && card !== this.dragged && $el.contains(card));
+                            {{-- A card that still slides would move away under the pointer and swap back. --}}
+                            if (!target || target.getAnimations().length) return;
+                            const rect = target.getBoundingClientRect();
+                            const after = (event.clientX - rect.left) / rect.width + (event.clientY - rect.top) / rect.height > 1;
+                            const cards = [...$el.querySelectorAll('[data-star-id]')];
+                            const oldRects = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
+                            target.parentNode.insertBefore(this.dragged, after ? target.nextSibling : target);
+                            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                            {{-- FLIP: each card that moved slides from its old place to the new one. --}}
+                            cards.forEach((card) => {
+                                const oldRect = oldRects.get(card);
+                                const newRect = card.getBoundingClientRect();
+                                const dx = oldRect.left - newRect.left;
+                                const dy = oldRect.top - newRect.top;
+                                if (dx || dy) {
+                                    card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+                                }
+                            });
+                        },
+                        end() {
+                            if (!this.dragged) return;
+                            this.dragged.classList.remove(...this.lifted);
+                            this.dragged = null;
+                            $wire.reorderStars([...$el.querySelectorAll('[data-star-id]')].map((card) => Number(card.dataset.starId)));
+                        },
+                    }" x-on:pointermove.window="move($event)" x-on:pointerup.window="end()"
+                    x-on:pointercancel.window="end()">
+                    @foreach ($starredResources as $starred)
+                        <article wire:key="dashboard-star-{{ $starred['star_id'] }}" data-star-id="{{ $starred['star_id'] }}"
+                            class="group relative flex min-h-16 min-w-0 select-none items-center gap-3 rounded-xl [-webkit-touch-callout:none] border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                            <a href="{{ $starred['href'] }}" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                aria-label="Open {{ $starred['name'] }}"></a>
+                            <button type="button" title="Drag to change the order" aria-label="Move {{ $starred['name'] }}"
+                                x-on:pointerdown.prevent="start($event)"
+                                class="relative z-10 -mx-1.5 flex h-8 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black active:cursor-grabbing dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <x-reicon name="grip-vertical" class="size-4" />
+                            </button>
+                            <div
+                                class="resource-glyph flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
+                                @if ($starred['resource'] instanceof \App\Models\Server)
+                                    <x-reicon name="servers" class="size-4" />
+                                @else
+                                    <x-resource-logo :resource="$starred['resource']" />
+                                @endif
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ $starred['name'] }}
+                                </h3>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $starred['context'] }}
+                                </p>
+                            </div>
+                            <button type="button" wire:click="unstar({{ $starred['star_id'] }})"
+                                title="Remove from the dashboard" aria-label="Unstar {{ $starred['name'] }}"
+                                class="relative z-10 flex size-6.5 shrink-0 items-center justify-center rounded-md text-warning transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.06]">
+                                <x-reicon name="star-filled" class="size-4" />
+                            </button>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
         @endif
 
         {{-- Wide screens: projects and servers fill the left, activity is a fixed-width column on the right.
@@ -188,19 +268,25 @@
                     @endforeach
                 </div>
 
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
-                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableHead }}">
-                        <div>Project</div>
-                        <div>Contents</div>
-                        <div class="hidden @2xl:block">Description</div>
-                        <div></div>
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setProjectSort">
+                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_4.5rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4.5rem] {{ $tableHead }}">
+                        <x-table.sort-header label="Project" asc="name-asc" desc="name-desc"
+                            action="setProjectSort" :current="$projectSort" />
+                        <x-table.sort-header label="Contents" asc="resources-asc" desc="resources-desc" first="desc"
+                            action="setProjectSort" :current="$projectSort" title="Sort by resource count" />
+                        <div class="hidden @2xl:block">
+                            <x-table.sort-header label="Description" asc="description-asc" desc="description-desc"
+                                action="setProjectSort" :current="$projectSort" />
+                        </div>
+                        <span class="text-right">Actions</span>
                     </div>
                     @foreach ($dashboardProjects as $project)
                         @php
                             $firstEnvironment = $project->environments->first();
                         @endphp
                         <div wire:key="dashboard-project-row-{{ $project->uuid }}"
-                            class="relative grid grid-cols-[minmax(0,1fr)_7rem_4rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4rem] {{ $tableRow }}">
+                            class="relative grid grid-cols-[minmax(0,1fr)_7rem_4.5rem] gap-4 @2xl:min-w-[560px] @2xl:grid-cols-[minmax(0,1.2fr)_7rem_minmax(0,1.5fr)_4.5rem] {{ $tableRow }}">
                             <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }}
                                 class="absolute inset-0" aria-label="Open {{ $project->name }}"></a>
                             <div class="flex min-w-0 items-center gap-3">
@@ -368,14 +454,20 @@
                         ? 'grid-cols-[minmax(0,1fr)_9.5rem] @xl:grid-cols-[minmax(0,1fr)_9rem_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9rem_9.5rem]'
                         : 'grid-cols-[minmax(0,1fr)_9.5rem] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_9.5rem]';
                 @endphp
-                <div x-show="viewMode === 'table'" class="{{ $tableShell }}">
+                <div x-show="viewMode === 'table'" class="{{ $tableShell }} transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setServerSort">
                     <div class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] {{ $tableHead }}">
-                        <div>Server</div>
-                        <div class="hidden @2xl:block">Description</div>
+                        <x-table.sort-header label="Server" asc="name-asc" desc="name-desc"
+                            action="setServerSort" :current="$serverSort" />
+                        <div class="hidden @2xl:block">
+                            <x-table.sort-header label="Description" asc="description-asc" desc="description-desc"
+                                action="setServerSort" :current="$serverSort" />
+                        </div>
                         @if ($showServerUsage)
                             <div class="hidden @xl:block">Usage</div>
                         @endif
-                        <div>Status</div>
+                        <x-table.sort-header label="Status" asc="status-asc" desc="status-desc"
+                            action="setServerSort" :current="$serverSort" />
                     </div>
                     @foreach ($dashboardServers as $server)
                         @php
@@ -383,7 +475,7 @@
                         @endphp
                         <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                             wire:key="dashboard-server-row-{{ $server->uuid }}"
-                            class="grid {{ $serverTableColumns }} gap-4 @2xl:min-w-[480px] hover:no-underline {{ $tableRow }}">
+                            class="grid {{ $serverTableColumns }} gap-x-4 gap-y-2 @2xl:min-w-[480px] hover:no-underline {{ $tableRow }}">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div
                                     class="resource-glyph flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
@@ -397,10 +489,14 @@
                                 {{ filled($server->description) ? $server->description : '-' }}
                             </p>
                             @if ($showServerUsage)
-                                <div class="hidden @xl:block">
+                                {{-- Below @xl the usage takes a second line of the row, under the name and status. --}}
+                                <div @class([
+                                    'order-last col-span-full @xl:order-none @xl:col-span-1',
+                                    'hidden @xl:block' => ! $server->isMetricsEnabled(),
+                                ])>
                                     @if ($server->isMetricsEnabled())
                                         {{-- The latest values from the grid card's chart (server-metrics-chart), so the table sends no requests of its own. --}}
-                                        <div class="flex flex-col gap-1 text-[11px] text-neutral-500 tabular-nums dark:text-fg-dim"
+                                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-neutral-500 tabular-nums @xl:grid-cols-1 dark:text-fg-dim"
                                             x-data="{
                                                 cpu: null,
                                                 memory: null,

@@ -134,12 +134,17 @@ class Controller extends BaseController
             $team = $invitation->team;
             $alreadyMember = $user->teams()->where('team_id', $team->id)->exists();
             if (! $alreadyMember) {
-                $user->teams()->attach($team->id, ['role' => $invitation->role]);
+                $user->teams()->attach($team->id, $invitation->membershipAttributes());
             }
 
             $user->forceFill([
                 'password' => Hash::make(Str::random(64)),
-            ])->save();
+            ]);
+            // Only an emailed token proves the address. A copied link can be used by the inviting admin.
+            if ($invitation->via === 'email' && ! $user->hasVerifiedEmail()) {
+                $user->forceFill(['email_verified_at' => now()]);
+            }
+            $user->save();
             $invitation->delete();
 
             return [$user, $team, $invitation, $alreadyMember];
@@ -224,6 +229,11 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
@@ -249,6 +259,11 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
@@ -259,7 +274,7 @@ class Controller extends BaseController
 
             return redirect()->route('team.index');
         }
-        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+        $user->teams()->attach($invitation->team->id, $invitation->membershipAttributes());
         $invitation->delete();
         $this->auditInvitationAccepted($user, $invitation, alreadyMember: false);
 
@@ -279,7 +294,6 @@ class Controller extends BaseController
             'already_member' => $alreadyMember,
             'member_id' => $user->id,
             'member_name' => $user->name,
-            'member_email' => $user->email,
             'actor_id' => $user->id,
             'actor_name' => $user->name,
             'actor_email' => $user->email,
