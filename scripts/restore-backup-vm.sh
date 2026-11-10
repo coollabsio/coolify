@@ -308,7 +308,27 @@ echo "SELF_HOSTED=${SELF_HOSTED}" >>.env
 docker exec coolify-db psql -q -U coolify -d postgres -v ON_ERROR_STOP=1 \
     -c 'DROP DATABASE coolify WITH (FORCE)' -c 'CREATE DATABASE coolify OWNER coolify'
 echo "Running pg_restore..."
-docker exec -i coolify-db pg_restore --exit-on-error --no-acl --no-owner -U coolify -d coolify </root/coolify-backup.dmp
+restore_section() {
+    docker exec -i coolify-db pg_restore --exit-on-error --no-acl --no-owner --section="$1" -U coolify -d coolify </root/coolify-backup.dmp
+}
+restore_section pre-data
+restore_section data
+# Coolify Cloud backups leave out the rows of log and execution tables, such as
+# scheduled_database_backup_executions. Rows that point to them must go before
+# post-data adds the foreign keys.
+docker exec coolify-db psql -q -U coolify -d coolify -v ON_ERROR_STOP=1 -c "
+DO \$\$
+DECLARE deleted bigint;
+BEGIN
+    IF to_regclass('public.database_backup_s3_replicas') IS NOT NULL THEN
+        DELETE FROM database_backup_s3_replicas r
+        WHERE NOT EXISTS (SELECT 1 FROM scheduled_database_backup_executions e WHERE e.id = r.execution_id);
+        GET DIAGNOSTICS deleted = ROW_COUNT;
+        RAISE NOTICE 'Deleted % database_backup_s3_replicas rows without an execution', deleted;
+    END IF;
+END
+\$\$;"
+restore_section post-data
 
 # Drop cached data of the fresh installation.
 REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' .env | cut -d= -f2-)
