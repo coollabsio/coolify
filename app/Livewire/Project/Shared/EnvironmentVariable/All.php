@@ -70,6 +70,7 @@ class All extends Component
     private ?Collection $composeEnvironmentAssignments = null;
 
     private ?bool $canViewComposeContent = null;
+
     /** @var array<int, int>|null */
     private ?array $previewVariableIdsWithProductionValues = null;
 

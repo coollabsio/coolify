@@ -948,9 +948,12 @@ it('filters docker compose generated service variables from build args', functio
     expect($envArgs->has('SERVICE_URL_APP'))->toBeFalse();
 });
 
-it('falls back to production runtime vars without a preview copy only when public PR deployments are off', function (bool $isPublic) {
+it('falls back to production runtime vars without a preview copy only when previews use production values', function (bool $isPublic, bool $usesProductionValues, bool $fallsBack) {
     [$application, $server] = makeDeploymentControlVarFixture();
-    $application->settings()->update(['is_pr_deployments_public_enabled' => $isPublic]);
+    $application->settings()->update([
+        'is_pr_deployments_public_enabled' => $isPublic,
+        'use_production_values_in_previews' => $usesProductionValues,
+    ]);
 
     createApplicationEnvironmentVariable($application, [
         'key' => 'APP_NAME',
@@ -975,11 +978,12 @@ it('falls back to production runtime vars without a preview copy only when publi
     /** @var Collection $runtimeEnvs */
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBe(! $isPublic);
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBe($fallsBack);
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('PREVIEW_FLAG=')))->toBeTrue();
 })->with([
-    'public PR deployments off' => [false],
-    'public PR deployments on' => [true],
+    'public PR deployments off' => [false, true, true],
+    'public PR deployments on' => [true, true, false],
+    'production values in previews off' => [false, false, false],
 ]);
 
 it('does not give production runtime values to a preview copy that is not a runtime variable', function () {
