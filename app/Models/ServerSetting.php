@@ -171,6 +171,7 @@ class ServerSetting extends Model
         'patch_checked_at',
         'is_auto_security_updates_enabled',
         'auto_security_updates_time',
+        'auto_security_updates_last_run',
     ];
 
     /**
@@ -212,6 +213,7 @@ class ServerSetting extends Model
         'patch_check_result' => 'array',
         'patch_checked_at' => 'datetime',
         'is_auto_security_updates_enabled' => 'boolean',
+        'auto_security_updates_last_run' => 'array',
         'is_logdrain_cloudwatch_enabled' => 'boolean',
     ];
 

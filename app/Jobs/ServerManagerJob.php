@@ -214,6 +214,12 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
+        if (data_get($server->settings, 'is_auto_security_updates_enabled')
+            && shouldRunCronNow(self::autoSecurityUpdatesCheckCron($server), $serverTimezone, "server-auto-security-updates-check:{$server->id}", $this->executionTime)
+        ) {
+            ServerAutoSecurityUpdatesCheckJob::dispatch($server);
+        }
+
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 
@@ -226,6 +232,15 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     public static function sentinelVersionCheckCron(Server $server): string
     {
         return sprintf('%d * * * *', $server->id % 60);
+    }
+
+    /**
+     * Hourly check for a new run of the automatic security updates, at a stable per-server minute that is
+     * half an hour away from the Sentinel version check.
+     */
+    public static function autoSecurityUpdatesCheckCron(Server $server): string
+    {
+        return sprintf('%d * * * *', ($server->id + 30) % 60);
     }
 
     /**

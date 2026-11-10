@@ -2,6 +2,7 @@
 
 use App\Enums\ServerRole;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\ServerAutoSecurityUpdatesCheckJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Models\InstanceSettings;
@@ -123,4 +124,17 @@ it('does not run every patch check at once after an upgrade from the old weekly 
     runStaggerTestManagerAt(Carbon::parse('2025-01-15 12:00:00', 'UTC'));
 
     Queue::assertNotPushed(ServerPatchCheckJob::class);
+});
+
+it('checks the automatic security updates run every hour only on servers that use them', function () {
+    $on = createStaggerTestServer($this->team);
+    $on->settings->update(['is_auto_security_updates_enabled' => true]);
+    $off = createStaggerTestServer($this->team);
+
+    expect(ServerManagerJob::autoSecurityUpdatesCheckCron($on))->toBe(sprintf('%d * * * *', ($on->id + 30) % 60));
+
+    runStaggerTestManagerAt(Carbon::parse('2025-01-15 13:00:00')->setMinute(($on->id + 30) % 60));
+
+    Queue::assertPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($on));
+    Queue::assertNotPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($off));
 });

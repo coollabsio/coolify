@@ -37,6 +37,11 @@
             ['key' => 'serverReachable', 'label' => 'Server reachable'],
             ['key' => 'serverUnreachable', 'label' => 'Server unreachable'],
             ['key' => 'serverPatch', 'label' => 'Server patching'],
+            [
+                'key' => 'serverAutoUpdate',
+                'label' => 'Automatic security updates',
+                'helper' => 'Notify when automatic security updates install packages or fail on a server.',
+            ],
             ['key' => 'traefikOutdated', 'label' => 'Traefik proxy outdated'],
         ],
     ];

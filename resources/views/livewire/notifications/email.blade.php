@@ -173,6 +173,7 @@
                             ['property' => 'serverReachableEmailNotifications', 'label' => 'Server reachable', 'enabled' => $serverReachableEmailNotifications],
                             ['property' => 'serverUnreachableEmailNotifications', 'label' => 'Server unreachable', 'enabled' => $serverUnreachableEmailNotifications],
                             ['property' => 'serverPatchEmailNotifications', 'label' => 'Server patching', 'enabled' => $serverPatchEmailNotifications],
+                            ['property' => 'serverAutoUpdateEmailNotifications', 'label' => 'Automatic security updates', 'enabled' => $serverAutoUpdateEmailNotifications],
                             ['property' => 'traefikOutdatedEmailNotifications', 'label' => 'Traefik proxy outdated', 'enabled' => $traefikOutdatedEmailNotifications],
                         ]" />
                 </div>

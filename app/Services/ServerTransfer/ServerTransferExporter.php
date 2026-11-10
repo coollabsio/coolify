@@ -68,6 +68,8 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The target reads the last automatic update run again and keeps it as its baseline.
+        'auto_security_updates_last_run',
     ];
 
     /**

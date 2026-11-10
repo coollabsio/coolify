@@ -75,6 +75,9 @@ class Pushover extends Component
     public bool $serverPatchPushoverNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdatePushoverNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedPushoverNotifications = true;
 
     public function mount()
@@ -111,6 +114,7 @@ class Pushover extends Component
             $this->settings->server_reachable_pushover_notifications = $this->serverReachablePushoverNotifications;
             $this->settings->server_unreachable_pushover_notifications = $this->serverUnreachablePushoverNotifications;
             $this->settings->server_patch_pushover_notifications = $this->serverPatchPushoverNotifications;
+            $this->settings->server_auto_update_pushover_notifications = $this->serverAutoUpdatePushoverNotifications;
             $this->settings->traefik_outdated_pushover_notifications = $this->traefikOutdatedPushoverNotifications;
 
             $changedFields = array_keys($this->settings->getDirty());
@@ -141,6 +145,7 @@ class Pushover extends Component
             $this->serverReachablePushoverNotifications = $this->settings->server_reachable_pushover_notifications;
             $this->serverUnreachablePushoverNotifications = $this->settings->server_unreachable_pushover_notifications;
             $this->serverPatchPushoverNotifications = $this->settings->server_patch_pushover_notifications;
+            $this->serverAutoUpdatePushoverNotifications = $this->settings->server_auto_update_pushover_notifications;
             $this->traefikOutdatedPushoverNotifications = $this->settings->traefik_outdated_pushover_notifications;
         }
     }

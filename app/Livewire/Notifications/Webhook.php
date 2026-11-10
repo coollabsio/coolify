@@ -68,6 +68,9 @@ class Webhook extends Component
     public bool $serverPatchWebhookNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedWebhookNotifications = true;
 
     public function mount()
@@ -103,6 +106,7 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->server_auto_update_webhook_notifications = $this->serverAutoUpdateWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
 
             $changedFields = array_keys($this->settings->getDirty());
@@ -129,6 +133,7 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->serverAutoUpdateWebhookNotifications = $this->settings->server_auto_update_webhook_notifications;
             $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
         }
     }

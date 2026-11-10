@@ -76,6 +76,9 @@ class Telegram extends Component
     public bool $serverPatchTelegramNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateTelegramNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedTelegramNotifications = true;
 
     #[Validate(['nullable', 'string'])]
@@ -121,6 +124,9 @@ class Telegram extends Component
     public ?string $telegramNotificationsServerPatchThreadId = null;
 
     #[Validate(['nullable', 'string'])]
+    public ?string $telegramNotificationsServerAutoUpdateThreadId = null;
+
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsTraefikOutdatedThreadId = null;
 
     public function mount()
@@ -157,6 +163,7 @@ class Telegram extends Component
             $this->settings->server_reachable_telegram_notifications = $this->serverReachableTelegramNotifications;
             $this->settings->server_unreachable_telegram_notifications = $this->serverUnreachableTelegramNotifications;
             $this->settings->server_patch_telegram_notifications = $this->serverPatchTelegramNotifications;
+            $this->settings->server_auto_update_telegram_notifications = $this->serverAutoUpdateTelegramNotifications;
             $this->settings->traefik_outdated_telegram_notifications = $this->traefikOutdatedTelegramNotifications;
 
             $this->settings->telegram_notifications_deployment_success_thread_id = $this->telegramNotificationsDeploymentSuccessThreadId;
@@ -173,6 +180,7 @@ class Telegram extends Component
             $this->settings->telegram_notifications_server_reachable_thread_id = $this->telegramNotificationsServerReachableThreadId;
             $this->settings->telegram_notifications_server_unreachable_thread_id = $this->telegramNotificationsServerUnreachableThreadId;
             $this->settings->telegram_notifications_server_patch_thread_id = $this->telegramNotificationsServerPatchThreadId;
+            $this->settings->telegram_notifications_server_auto_update_thread_id = $this->telegramNotificationsServerAutoUpdateThreadId;
             $this->settings->telegram_notifications_traefik_outdated_thread_id = $this->telegramNotificationsTraefikOutdatedThreadId;
 
             $changedFields = array_keys($this->settings->getDirty());
@@ -197,6 +205,7 @@ class Telegram extends Component
                 $this->telegramNotificationsServerReachableThreadId = $this->settings->telegram_notifications_server_reachable_thread_id;
                 $this->telegramNotificationsServerUnreachableThreadId = $this->settings->telegram_notifications_server_unreachable_thread_id;
                 $this->telegramNotificationsServerPatchThreadId = $this->settings->telegram_notifications_server_patch_thread_id;
+                $this->telegramNotificationsServerAutoUpdateThreadId = $this->settings->telegram_notifications_server_auto_update_thread_id;
                 $this->telegramNotificationsTraefikOutdatedThreadId = $this->settings->telegram_notifications_traefik_outdated_thread_id;
             } else {
                 $this->telegramToken = null;
@@ -217,6 +226,7 @@ class Telegram extends Component
             $this->serverReachableTelegramNotifications = $this->settings->server_reachable_telegram_notifications;
             $this->serverUnreachableTelegramNotifications = $this->settings->server_unreachable_telegram_notifications;
             $this->serverPatchTelegramNotifications = $this->settings->server_patch_telegram_notifications;
+            $this->serverAutoUpdateTelegramNotifications = $this->settings->server_auto_update_telegram_notifications;
             $this->traefikOutdatedTelegramNotifications = $this->settings->traefik_outdated_telegram_notifications;
 
         }

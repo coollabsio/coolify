@@ -722,6 +722,7 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'auto_security_updates_last_run',
                 ])
                 ->all();
             $server->settings->fill($safe);

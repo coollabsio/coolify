@@ -46,6 +46,7 @@ class EmailNotificationSettings extends Model
         'server_reachable_email_notifications',
         'server_unreachable_email_notifications',
         'server_patch_email_notifications',
+        'server_auto_update_email_notifications',
         'traefik_outdated_email_notifications',
     ];
 
@@ -86,6 +87,7 @@ class EmailNotificationSettings extends Model
         'scheduled_task_failure_email_notifications' => 'boolean',
         'server_disk_usage_email_notifications' => 'boolean',
         'server_patch_email_notifications' => 'boolean',
+        'server_auto_update_email_notifications' => 'boolean',
         'traefik_outdated_email_notifications' => 'boolean',
     ];
 
