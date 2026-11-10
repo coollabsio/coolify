@@ -134,6 +134,7 @@ it('checks the automatic security updates run every hour only on servers that us
     expect(ServerManagerJob::autoSecurityUpdatesCheckCron($on))->toBe(sprintf('%d * * * *', ($on->id + 30) % 60));
 
     runStaggerTestManagerAt(Carbon::parse('2025-01-15 13:00:00')->setMinute(($on->id + 30) % 60));
+    runStaggerTestManagerAt(Carbon::parse('2025-01-15 14:00:00')->setMinute(($off->id + 30) % 60));
 
     Queue::assertPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($on));
     Queue::assertNotPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($off));
