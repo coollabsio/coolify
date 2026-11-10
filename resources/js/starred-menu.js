@@ -9,6 +9,9 @@ const saveUrl = '/profile/starred-menu-items';
 // Saves run one after the other, so the last saved order always wins.
 let pendingSave = Promise.resolve();
 
+// Number of the last save started per menu, so only the newest save can roll back.
+const lastSaveId = {};
+
 /**
  * Registers the store and the group component. The layout renders the saved stars
  * (#starred-menu-items) once per full page load; after that the store is the source.
@@ -30,6 +33,9 @@ export function initializeStarredMenu() {
 function createStarredMenuStore(initialMenus) {
     return {
         menus: initialMenus,
+
+        // The stars that the server has, per menu. A failed save goes back to them.
+        saved: structuredClone(initialMenus),
 
         keys(menu) {
             return this.menus[menu] ?? [];
@@ -60,6 +66,8 @@ function createStarredMenuStore(initialMenus) {
 
         save(menu) {
             const items = [...this.keys(menu)];
+            const saveId = (lastSaveId[menu] ?? 0) + 1;
+            lastSaveId[menu] = saveId;
             pendingSave = pendingSave
                 .then(() => fetch(saveUrl, {
                     method: 'PUT',
@@ -74,8 +82,16 @@ function createStarredMenuStore(initialMenus) {
                     if (!response.ok) {
                         throw new Error('HTTP ' + response.status);
                     }
+                    this.saved[menu] = items;
                 })
-                .catch(() => window.toast?.('Could not save the starred menu items.', { type: 'warning' }));
+                .catch(() => {
+                    // A newer save or a drag in progress has the newer state: keep it.
+                    const unchanged = JSON.stringify(this.keys(menu)) === JSON.stringify(items);
+                    if (lastSaveId[menu] === saveId && unchanged) {
+                        this.menus[menu] = [...(this.saved[menu] ?? [])];
+                    }
+                    window.toast?.('Could not save the starred menu items.', { type: 'warning' });
+                });
         },
     };
 }
