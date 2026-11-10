@@ -55,7 +55,9 @@ class AutomaticSecurityUpdatesFinished extends CustomEmailNotification
         $packages = $this->run['packages'];
         $lines = ["Run started at {$this->run['started_at']} (server time)."];
         if ($packages !== []) {
-            $lines[] = ($this->failed() ? 'Packages to update' : 'Updated packages').' ('.count($packages).'): '.implode(', ', $packages);
+            $shown = array_slice($packages, 0, 20);
+            $more = count($packages) - count($shown);
+            $lines[] = ($this->failed() ? 'Packages to update' : 'Updated packages').' ('.count($packages).'): '.implode(', ', $shown).($more > 0 ? " and {$more} more" : '');
         }
         if ($this->failed() && $this->run['errors'] !== []) {
             $lines[] = 'Errors:';
