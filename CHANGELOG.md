@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.4] - 2026-11-10
+
+### Fixed
+
+- Kept the records of failed database backups forever
+  - The daily database cleanup deletes failed database backups that are older than 60 days
+- Missing production runtime variables in preview deployments when the variable has no preview variable
+  - A preview gets these production runtime variables again, except when `PR deployment access` is public. The deployment log lists each variable that a preview does not get
+
 ## [v4.7.3] - 2026-11-09
 
 ### Added
