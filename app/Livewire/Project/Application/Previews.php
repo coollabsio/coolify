@@ -24,6 +24,8 @@ class Previews extends Component
 
     public bool $isPrDeploymentsPublicEnabled = false;
 
+    public bool $useProductionValuesInPreviews = true;
+
     public string $deployment_uuid;
 
     public array $parameters;
@@ -48,6 +50,7 @@ class Previews extends Component
     {
         $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
         $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
+        $this->useProductionValuesInPreviews = $this->application->settings->use_production_values_in_previews ?? true;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
         $this->syncDockerTags();
@@ -59,10 +62,12 @@ class Previews extends Component
         $this->validate([
             'isPreviewDeploymentsEnabled' => 'boolean',
             'isPrDeploymentsPublicEnabled' => 'boolean',
+            'useProductionValuesInPreviews' => 'boolean',
         ]);
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->application->settings->use_production_values_in_previews = $this->useProductionValuesInPreviews;
         $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');

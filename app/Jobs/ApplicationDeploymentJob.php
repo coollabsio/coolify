@@ -2195,7 +2195,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'PORT='))) {
+                if (! empty($ports) && $this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'PORT='))) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
@@ -2807,12 +2807,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * A preview can run code from a fork when public PR deployments are on, so it must not get production
-     * values. A preview from before v4.5.1 keeps them, because it was deployed with them.
+     * A preview can run code from a fork when public PR deployments are on, and "Use production values in
+     * previews" off means the user does not want production values in previews, so in both cases it must not
+     * get production values. A preview from before v4.5.1 keeps them, because it was deployed with them.
      */
     private function previewUsesProductionValues(): bool
     {
-        return ! $this->application->settings->is_pr_deployments_public_enabled || (bool) $this->preview?->keeps_production_values;
+        $settings = $this->application->settings;
+
+        return ($settings->use_production_values_in_previews && ! $settings->is_pr_deployments_public_enabled) || (bool) $this->preview?->keeps_production_values;
     }
 
     /**
@@ -2839,7 +2842,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $previewVariables = $this->application->environment_variables_preview()->get();
         $skippedKeys = $previewVariables->whereIn('id', $this->previewVariableIdsWithProductionValues())->pluck('key');
         if ($skippedKeys->isNotEmpty()) {
-            $this->application_deployment_queue->addLogEntry('⚠️ Public PR deployments are on, so this preview does not get the preview variables that still have the production value: '.$skippedKeys->implode(', '), 'stderr');
+            $this->application_deployment_queue->addLogEntry('⚠️ Public PR deployments are on or "Use production values in previews" is off, so this preview does not get the preview variables that still have the production value: '.$skippedKeys->implode(', '), 'stderr');
             $this->application_deployment_queue->addLogEntry('   To use them, give them a preview value in Environment Variables > Preview Deployments.', type: 'info');
         }
 
@@ -2865,9 +2868,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * IDs of preview variables that have the same value as the production variable with the same key.
-     * Coolify copies each new production variable to the previews. With public PR deployments, a
-     * preview can run code from a fork, so it gets only the preview values that the user changed.
+     * IDs of preview variables that still have the production value, which this preview deployment skips.
+     * With public PR deployments, a preview can run code from a fork. With "Use production values in
+     * previews" off, the user does not want production values in previews at all. In both cases a
+     * preview gets only the preview values that the user changed.
      *
      * @return array<int, int>
      */
@@ -2881,12 +2885,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues = [];
         }
 
-        $productionValues = $this->application->environment_variables()->get()->pluck('value', 'key');
-
-        return $this->previewVariableIdsWithProductionValues = $this->application->environment_variables_preview()->get()
-            ->filter(fn (EnvironmentVariable $env) => $productionValues->has($env->key) && $productionValues->get($env->key) === $env->value)
-            ->pluck('id')
-            ->all();
+        return $this->previewVariableIdsWithProductionValues = $this->application->previewEnvironmentVariableIdsWithProductionValues();
     }
 
     /**

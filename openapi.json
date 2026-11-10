@@ -870,6 +870,10 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
+                                    },
                                     "stop_grace_period": {
                                         "type": "integer",
                                         "nullable": true,
@@ -1541,6 +1545,10 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
                                     },
                                     "stop_grace_period": {
                                         "type": "integer",
@@ -2886,6 +2894,10 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
+                                    },
                                     "stop_grace_period": {
                                         "type": "integer",
                                         "nullable": true,
@@ -3448,6 +3460,10 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
+                                    },
                                     "stop_grace_period": {
                                         "type": "integer",
                                         "nullable": true,
@@ -3989,6 +4005,10 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
                                     },
                                     "stop_grace_period": {
                                         "type": "integer",
@@ -4811,6 +4831,10 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "use_production_values_in_previews": {
+                                        "type": "boolean",
+                                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
+                                    },
                                     "stop_grace_period": {
                                         "type": "integer",
                                         "nullable": true,
@@ -5322,6 +5346,10 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "copy_value_to_preview": {
+                                        "type": "boolean",
+                                        "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
                                     }
                                 },
                                 "type": "object"
@@ -5505,6 +5533,10 @@
                                                 "is_shown_once": {
                                                     "type": "boolean",
                                                     "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                                },
+                                                "copy_value_to_preview": {
+                                                    "type": "boolean",
+                                                    "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
                                                 }
                                             },
                                             "type": "object"
@@ -29282,6 +29314,10 @@
                     },
                     "is_pr_deployments_public_enabled": {
                         "type": "boolean"
+                    },
+                    "use_production_values_in_previews": {
+                        "type": "boolean",
+                        "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value."
                     },
                     "use_build_secrets": {
                         "type": "boolean"

@@ -1307,6 +1307,43 @@ class Application extends BaseModel
             ->where('is_preview', true);
     }
 
+    /**
+     * IDs of preview variables that have the production value: automatic copies of a production variable that
+     * the user did not change, and preview variables with the same value as the production variable with the
+     * same key. An automatic copy stays in the list after production changes (for example a rotated secret),
+     * because the old production value can still be valid. Empty values do not count, because they hold no
+     * production data. Give $previewIds to check only those preview variables.
+     *
+     * @param  array<int, int>|null  $previewIds
+     * @return array<int, int>
+     */
+    public function previewEnvironmentVariableIdsWithProductionValues(?array $previewIds = null): array
+    {
+        if ($previewIds === []) {
+            return [];
+        }
+
+        $previewVariables = $this->environment_variables_preview()
+            ->when($previewIds !== null, fn ($query) => $query->whereKey($previewIds))
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value));
+
+        if ($previewVariables->isEmpty()) {
+            return [];
+        }
+
+        $productionValues = $this->environment_variables()
+            ->whereIn('key', $previewVariables->pluck('key')->unique()->values()->all())
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->pluck('value', 'key');
+
+        return $previewVariables
+            ->filter(fn (EnvironmentVariable $env) => $env->is_production_value_copy || $productionValues->get($env->key) === $env->value)
+            ->pluck('id')
+            ->all();
+    }
+
     public function runtime_environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
