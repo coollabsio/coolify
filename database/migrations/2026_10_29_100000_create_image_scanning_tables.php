@@ -19,6 +19,12 @@ return new class extends Migration
 
     public function up(): void
     {
+        // First: the image_scans foreign key below locks this table, and a later ALTER would upgrade that lock and can deadlock with running workers.
+        Schema::table('application_deployment_queues', function (Blueprint $table) {
+            $table->jsonb('scan_gate_result')->nullable();
+            $table->foreignId('scan_gate_bypassed_by')->nullable()->constrained('users')->nullOnDelete();
+        });
+
         Schema::create('image_scan_policies', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
@@ -133,11 +139,6 @@ return new class extends Migration
         Schema::table('applications', function (Blueprint $table) {
             // Security updates of a Compose app: {service: {from, to}}; applied while the compose file still names `from`.
             $table->json('docker_compose_image_overrides')->nullable();
-        });
-
-        Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->jsonb('scan_gate_result')->nullable();
-            $table->foreignId('scan_gate_bypassed_by')->nullable()->constrained('users')->nullOnDelete();
         });
 
         foreach (self::NOTIFICATION_COLUMNS as $tableName => [$column, $default]) {
