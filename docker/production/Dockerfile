@@ -66,7 +66,7 @@ FROM nodejs AS static-assets
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -82,9 +82,9 @@ RUN apk upgrade && \
 COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
-COPY docker/coolify-terminal/package*.json /terminal/
+COPY package*.json /terminal/
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefix /terminal && \
+    npm ci --omit=dev --prefix /terminal && \
     npm rebuild node-pty --prefix /terminal --update-binary && \
     rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
         /terminal/node_modules/node-pty/prebuilds/win32-*
