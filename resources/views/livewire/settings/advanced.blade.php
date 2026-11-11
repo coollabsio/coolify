@@ -174,6 +174,17 @@
                 </div>
             </x-application.settings-section>
 
+            <x-application.settings-section id="sentinel-section" title="Sentinel">
+                <div class="flex max-w-md flex-col gap-4">
+                    <x-forms.listbox id="sentinel_runtime_mode" label="Sentinel runtime" onChange="instantSave"
+                        helper="Host service mode runs Sentinel as a systemd service on each server and needs systemd. A server that cannot run the service keeps the Docker container. The Coolify host (localhost) always uses the Docker container. Servers switch at their next Sentinel check, and the metrics history stays."
+                        :options="[
+                            ['value' => 'docker', 'label' => 'Docker container'],
+                            ['value' => 'host', 'label' => 'Host service (systemd)'],
+                        ]" />
+                </div>
+            </x-application.settings-section>
+
             <x-application.settings-section id="storage-section" title="Storage"
                 helper="Where Coolify stores uploaded images and how users download files.">
                 <x-application.settings-subsection first id="avatar-storage-section" title="Image storage"

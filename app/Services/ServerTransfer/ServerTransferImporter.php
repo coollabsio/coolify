@@ -4,6 +4,7 @@ namespace App\Services\ServerTransfer;
 
 use App\Enums\BackupStorageType;
 use App\Enums\GithubRunnerDockerMode;
+use App\Enums\SentinelRuntime;
 use App\Enums\ServerRole;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
@@ -741,6 +742,7 @@ class ServerTransferImporter
                     'auto_security_updates_last_run',
                     'image_candidate_scans_today', 'image_candidate_scans_date',
                     'ssh_host_key_pending',
+                    'sentinel_runtime',
                 ])
                 ->all();
             $server->settings->fill($safe);
@@ -752,6 +754,8 @@ class ServerTransferImporter
                 'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
                 'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
                 'is_ssh_host_key_check_enforced' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_enforced', false),
+                // Where Sentinel runs on the host, so the first start on this instance removes a running host service.
+                'sentinel_runtime' => SentinelRuntime::tryFrom((string) data_get($settingsPayload, 'sentinel_runtime')) ?? SentinelRuntime::Docker,
             ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
                 data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),

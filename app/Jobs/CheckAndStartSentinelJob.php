@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Server\StartSentinel;
+use App\Enums\SentinelRuntime;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -48,33 +49,65 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
         }
 
         $latestVersion = get_latest_sentinel_version();
+        $runtime = StartSentinel::actualRuntime($this->server);
 
-        // An SSH failure throws here, so it is never mistaken for a missing container.
-        // A missing container gives empty output and exit code 0.
-        $sentinelStatus = instant_remote_process_with_timeout(["docker ps -a --filter 'name=^coolify-sentinel$' --format '{{.State}} {{.Status}}'"], $this->server);
-        if (! str_starts_with((string) $sentinelStatus, 'running')) {
+        // A change of the instance setting, or a cached host failure, moves the server to the other runtime.
+        if (StartSentinel::wantedRuntime($this->server) !== $runtime) {
             $this->startSentinel($latestVersion);
 
             return;
         }
-        if (str_contains($sentinelStatus, '(unhealthy)')) {
-            $this->server->rememberSentinelPushProblem('The Sentinel container was unhealthy. Coolify restarted it.');
-            $this->startSentinel($latestVersion);
 
-            return;
+        if ($runtime === SentinelRuntime::Host) {
+            // `is-active` exits non-zero for a stopped unit, so `|| true` keeps that apart from an SSH failure, which throws.
+            $serviceState = trim((string) instant_remote_process_with_timeout(['systemctl is-active sentinel.service || true'], $this->server));
+            // systemd restarts a crashed service (Restart=always); it is `activating` until then.
+            if (! in_array($serviceState, ['active', 'activating'], true)) {
+                $this->startSentinel($latestVersion);
+
+                return;
+            }
+        } else {
+            // An SSH failure throws here, so it is never mistaken for a missing container.
+            // A missing container gives empty output and exit code 0.
+            $sentinelStatus = instant_remote_process_with_timeout(["docker ps -a --filter 'name=^coolify-sentinel$' --format '{{.State}} {{.Status}}'"], $this->server);
+            if (! str_starts_with((string) $sentinelStatus, 'running')) {
+                $this->startSentinel($latestVersion);
+
+                return;
+            }
+            if (str_contains($sentinelStatus, '(unhealthy)')) {
+                $this->server->rememberSentinelPushProblem('The Sentinel container was unhealthy. Coolify restarted it.');
+                $this->startSentinel($latestVersion);
+
+                return;
+            }
         }
 
         // One SSH call reads the version and the last push result. Sentinel versions without
-        // /api/push-status give an empty second line. printf is a shell builtin, so the token is not a process argument.
+        // /api/push-status give an empty second line. The token is in a heredoc, so it is not a process argument.
+        $token = $this->server->settings->ensureValidSentinelToken();
+        $script = implode("\n", [
+            'curl -s http://127.0.0.1:8888/api/version',
+            'echo',
+            "curl -sf -H @- http://127.0.0.1:8888/api/push-status <<'COOLIFY_SENTINEL_AUTH'",
+            "Authorization: Bearer {$token}",
+            'COOLIFY_SENTINEL_AUTH',
+            'true',
+        ]);
         $output = instant_remote_process_with_timeout([
-            "docker exec coolify-sentinel sh -c 'curl -s http://127.0.0.1:8888/api/version; echo; printf \"Authorization: Bearer %s\\n\" \"\$TOKEN\" | curl -sf -H @- http://127.0.0.1:8888/api/push-status'",
+            "{$runtime->shellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT",
         ], $this->server, false);
         [$runningVersion, $pushStatus] = array_pad(explode("\n", trim((string) $output), 2), 2, null);
         $this->rememberPushError($pushStatus);
 
+        // The host binary comes from its own pinned image, so it is compared with its own version.
+        $wantedVersion = $runtime === SentinelRuntime::Host ? StartSentinel::latestHostVersion() : $latestVersion;
+
         // An empty version means that the API does not answer yet, for example while Sentinel starts.
-        // A Sentinel whose API stays down fails its health check and is restarted above.
-        if (filled($runningVersion) && version_compare(trim($runningVersion), $latestVersion, '<')) {
+        // A container whose API stays down fails its health check and is restarted above. A host service
+        // whose API stays down does not push, so the stall check below restarts it.
+        if (filled($runningVersion) && version_compare(trim($runningVersion), $wantedVersion, '<')) {
             $this->startSentinel($latestVersion);
 
             return;

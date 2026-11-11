@@ -821,22 +821,22 @@ class SentinelTrafficClient
     }
 
     /**
-     * Build the `docker exec ... curl` command run inside the Sentinel container.
+     * Build the curl command run where Sentinel runs (its container or the host).
      *
-     * The token reaches curl on stdin (`-H @-`) from a heredoc, so it is never a process argument
-     * that other users on the server can read in /proc. The URL is double-quoted so the literal `&`
+     * The shell reads the script from stdin, and curl reads the token header (`-H @-`) from a
+     * heredoc, so the token is never a process argument that other users on the server can read in /proc. The URL is double-quoted so the literal `&`
      * between the `from`/`to` (and `limit`) query params is not a shell background operator. The
      * app key and dimension are validated (assertSafeKey/assertSafeDimension) before reaching here,
      * so the URL cannot contain shell metacharacters that break out of the quoting.
      */
     protected function buildFetchCommand(string $token, string $url): string
     {
-        return 'docker exec -i coolify-sentinel curl -sS '.self::CURL_TIMEOUT_OPTIONS." -H @- \"{$url}\"".$this->authorizationHeredoc($token);
+        return $this->sentinelScript('curl -sS '.self::CURL_TIMEOUT_OPTIONS." -H @- \"{$url}\"".$this->authorizationHeredoc($token));
     }
 
     /**
-     * Build one `docker exec` that curls every URL in order and separates the responses
-     * with a 0x1E record separator, so warm() can split them back apart. The container shell
+     * Build one shell where Sentinel runs that curls every URL in order and separates the responses
+     * with a 0x1E record separator, so warm() can split them back apart. The shell
      * reads the script, which holds the token, from stdin; each curl reads the header from stdin.
      * No pipe or `sh -c` is used, so the non-root sudo parser only puts sudo in front of the line.
      *
@@ -849,7 +849,16 @@ class SentinelTrafficClient
             $urls
         ));
 
-        return "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT";
+        return $this->sentinelScript($script);
+    }
+
+    /**
+     * Run the script in the shell of the server's Sentinel runtime. No pipe or `sh -c` is used,
+     * so the non-root sudo parser only puts sudo in front of the line.
+     */
+    private function sentinelScript(string $script): string
+    {
+        return "{$this->server->sentinelShellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT";
     }
 
     /**

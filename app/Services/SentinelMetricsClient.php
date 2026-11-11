@@ -395,13 +395,13 @@ class SentinelMetricsClient
 
         return self::fetchOverSsh(
             $this->server,
-            ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+            ["{$this->server->sentinelShellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
             $url
         ) ?? '';
     }
 
     /**
-     * Start one `docker exec` that curls every URL in order, with the responses separated by
+     * Start one shell where Sentinel runs that curls every URL in order, with the responses separated by
      * a 0x1E record separator. The token reaches curl on stdin, so it is not a process argument.
      * The token only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
      * cannot end the heredoc. No pipe or `sh -c` is used, so the non-root sudo parser only puts
@@ -417,7 +417,7 @@ class SentinelMetricsClient
             $urls
         ));
         // `true` last: a failed curl empties only its own response, not the whole batch.
-        $command = "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\ntrue\nCOOLIFY_SENTINEL_SCRIPT";
+        $command = "{$this->server->sentinelShellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\ntrue\nCOOLIFY_SENTINEL_SCRIPT";
         $commands = $this->server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $this->server) : [$command];
 
         return Process::timeout(self::REMOTE_TIMEOUT)->start(

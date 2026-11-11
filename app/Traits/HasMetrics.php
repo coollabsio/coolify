@@ -46,7 +46,7 @@ trait HasMetrics
 
         $output = SentinelMetricsClient::fetchOverSsh(
             $server,
-            ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+            ["{$server->sentinelShellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
             static::class.':'.$this->uuid.':'.implode(',', $types).':'.$mins
         );
         if ($output === null) {
@@ -158,7 +158,7 @@ trait HasMetrics
             $command = "curl -sS --connect-timeout 2 --max-time 3 -H @- \"{$endpoint}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
             $response = SentinelMetricsClient::fetchOverSsh(
                 $server,
-                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+                ["{$server->sentinelShellCommand()} <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
                 static::class.':'.$this->uuid.':'.$type.':'.$mins
             );
         }

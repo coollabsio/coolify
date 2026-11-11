@@ -42,7 +42,11 @@
                             <p><span class="font-medium">Last error:</span> <code class="break-all">{{ $sentinelPushProblem }}</code></p>
                         @endif
                         <ul class="list-disc space-y-1 pl-4">
-                            <li>Confirm that the <code>coolify-sentinel</code> container is running.</li>
+                            @if ($server->settings->sentinel_runtime === \App\Enums\SentinelRuntime::Host)
+                                <li>Confirm that the <code>sentinel.service</code> systemd service is running (<code>systemctl status sentinel.service</code>).</li>
+                            @else
+                                <li>Confirm that the <code>coolify-sentinel</code> container is running.</li>
+                            @endif
                             <li>
                                 <a class="font-medium underline underline-offset-2"
                                     href="{{ route('server.sentinel.logs', ['server_uuid' => $server->uuid]) }}"

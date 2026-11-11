@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SentinelRuntime;
 use App\Traits\HasSmtpServers;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -120,6 +121,7 @@ class InstanceSettings extends Model
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
+        'sentinel_runtime_mode' => SentinelRuntime::class,
         'is_wire_navigate_enabled' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
         'webhook_allowed_internal_hosts' => 'array',

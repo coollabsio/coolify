@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Settings;
 
+use App\Enums\SentinelRuntime;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use App\Services\FileDownloadStorageService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -66,6 +68,8 @@ class Advanced extends Component
 
     public string $file_download_storage = 'stream';
 
+    public string $sentinel_runtime_mode = 'docker';
+
     public int $server_validation_rate_limit_seconds = 600;
 
     public int $server_validation_max_failures_per_ip = 10;
@@ -94,6 +98,7 @@ class Advanced extends Component
             'server_validation_rate_limit_seconds' => 'required|integer|min:60|max:86400',
             'server_validation_max_failures_per_ip' => 'required|integer|min:1|max:1000',
             'server_validation_max_failures_per_team' => 'required|integer|min:1|max:10000',
+            'sentinel_runtime_mode' => ['required', Rule::enum(SentinelRuntime::class)],
         ];
     }
 
@@ -142,6 +147,7 @@ class Advanced extends Component
         $this->file_download_storage = $this->settings->file_download_s3_storage_id
             ? 's3:'.$this->settings->file_download_s3_storage_id
             : 'stream';
+        $this->sentinel_runtime_mode = ($this->settings->sentinel_runtime_mode ?? SentinelRuntime::Docker)->value;
     }
 
     public function submit()
@@ -252,6 +258,8 @@ class Advanced extends Component
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
+            $this->settings->sentinel_runtime_mode = SentinelRuntime::tryFrom($this->sentinel_runtime_mode)
+                ?? throw new \InvalidArgumentException('The selected Sentinel runtime is not available.');
             $this->saveAvatarStorageSetting();
             $this->saveFileDownloadStorageSetting();
             $this->saveAndAudit();

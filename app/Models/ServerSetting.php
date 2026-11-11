@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SentinelRuntime;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use App\Helpers\SshMultiplexingHelper;
@@ -251,6 +252,7 @@ class ServerSetting extends Model
         'geoip_maxmind_license_key' => 'encrypted',
         'logdrain_custom_config' => 'encrypted',
         'traffic_ip_mode' => TrafficIpMode::class,
+        'sentinel_runtime' => SentinelRuntime::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',

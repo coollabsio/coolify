@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Enums\SentinelRuntime;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
 use App\Models\Team;
@@ -87,6 +88,9 @@ class DeleteServer
 
         try {
             instant_remote_process(['docker rm -f coolify-sentinel'], $server, false, timeout: 30, maxAttempts: 1);
+            if (StartSentinel::actualRuntime($server) === SentinelRuntime::Host) {
+                RemoveHostSentinel::run($server);
+            }
         } catch (\Throwable $e) {
             logger()->warning('Failed to stop Sentinel before deleting the server', [
                 'error' => $e->getMessage(),

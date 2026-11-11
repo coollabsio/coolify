@@ -10,6 +10,7 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Enums\SentinelRuntime;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
@@ -1628,6 +1629,14 @@ $siteAddress {
     public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
+    }
+
+    /**
+     * The command that runs a shell script from stdin where Sentinel listens on 127.0.0.1:8888.
+     */
+    public function sentinelShellCommand(): string
+    {
+        return ($this->settings->sentinel_runtime ?? SentinelRuntime::Docker)->shellCommand();
     }
 
     /**
