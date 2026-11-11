@@ -136,6 +136,39 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         expect($body)->toContain('axiom-key-secret');
     });
 
+    test('server detail keeps the deprecated flat log drain fields', function () {
+        $this->server->settings->update([
+            'logdrain_type' => 'axiom',
+            'logdrain_config' => [...$this->server->settings->logdrain_config, 'cloudwatch' => ['region' => 'eu-west-1']],
+        ]);
+        $token = makeApiToken($this->user, $this->team, ['read']);
+
+        $settings = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson("/api/v1/servers/{$this->server->uuid}")->assertOk()->json('settings');
+
+        expect($settings)
+            ->toMatchArray([
+                'is_logdrain_axiom_enabled' => true,
+                'is_logdrain_newrelic_enabled' => false,
+                'is_logdrain_cloudwatch_enabled' => false,
+                'logdrain_cloudwatch_region' => 'eu-west-1',
+                'logdrain_axiom_dataset_name' => null,
+            ])
+            ->not->toHaveKeys(['logdrain_axiom_api_key', 'logdrain_newrelic_license_key', 'logdrain_custom_config', 'logdrain_custom_config_parser']);
+    });
+
+    test('read sensitive token sees the deprecated flat log drain secrets', function () {
+        $token = makeApiToken($this->user, $this->team, ['read', 'read:sensitive']);
+
+        $settings = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson("/api/v1/servers/{$this->server->uuid}")->assertOk()->json('settings');
+
+        expect($settings)->toMatchArray([
+            'logdrain_axiom_api_key' => 'axiom-key-secret',
+            'logdrain_custom_config_parser' => 'custom-parser-data',
+        ]);
+    });
+
     test('saved proxy configuration in server detail requires read sensitive', function () {
         $this->server->proxy->set('last_saved_proxy_configuration', "services:\n  traefik:\n    environment:\n      TOKEN: stored-proxy-config-value\n");
         $this->server->save();

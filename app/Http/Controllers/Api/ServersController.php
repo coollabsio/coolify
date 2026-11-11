@@ -22,6 +22,7 @@ use App\Models\Server as ModelsServer;
 use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
@@ -51,6 +52,7 @@ class ServersController extends Controller
         }
 
         return serializeApiResponse($settings)
+            ->merge(LegacyLogDrainFields::fromSettings($settings, request()->attributes->get('can_read_sensitive', false) === true))
             ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD)
             ->put('ssh_host_key_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key))
             ->put('ssh_host_key_pending_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));

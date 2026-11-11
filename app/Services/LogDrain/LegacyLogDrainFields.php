@@ -3,6 +3,7 @@
 namespace App\Services\LogDrain;
 
 use App\Enums\LogDrainType;
+use App\Models\ServerSetting;
 
 /**
  * The flat log drain fields of the server settings before `logdrain_type` and
@@ -44,6 +45,27 @@ class LegacyLogDrainFields
         [$type, $key] = self::FIELDS[$name];
 
         return $type->driver()->fields()[$key];
+    }
+
+    /**
+     * The flat fields with the values of the given settings. Secret fields are left out unless asked for.
+     *
+     * @return array<string, mixed>
+     */
+    public static function fromSettings(ServerSetting $settings, bool $withSecrets): array
+    {
+        $fields = [];
+        foreach (self::FLAGS as $flag => $type) {
+            $fields[$flag] = $settings->logdrain_type === $type;
+        }
+        foreach (self::FIELDS as $name => [$type, $key]) {
+            if (! $withSecrets && (self::field($name)['secret'] ?? false)) {
+                continue;
+            }
+            $fields[$name] = $settings->logDrainConfig($type)[$key] ?? null;
+        }
+
+        return $fields;
     }
 
     /**

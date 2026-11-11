@@ -25,19 +25,7 @@ class ServerLogDrainsController extends Controller
 
     private function transform(Server $server): array
     {
-        $settings = $server->settings;
-        $payload = [];
-        foreach (LegacyLogDrainFields::FLAGS as $flag => $type) {
-            $payload[$flag] = $settings->logdrain_type === $type;
-        }
-        foreach (LegacyLogDrainFields::FIELDS as $name => [$type, $key]) {
-            if ((LegacyLogDrainFields::field($name)['secret'] ?? false) && ! $this->canReadSensitive()) {
-                continue;
-            }
-            $payload[$name] = $settings->logDrainConfig($type)[$key] ?? null;
-        }
-
-        return $payload;
+        return LegacyLogDrainFields::fromSettings($server->settings, $this->canReadSensitive());
     }
 
     #[OA\Get(
