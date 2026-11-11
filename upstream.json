@@ -3,11 +3,11 @@
 		"version": "1.0.19"
 	},
 	"sentinel": {
-		"version": "1.1.5"
+		"version": "1.1.6"
 	},
 	"sentinel-host": {
-		"version": "1.1.5",
-		"digest": "sha256:05530359731cc5e9aaa05cd85749945e2e6d414c0e36b95f8a17c4adb6ab13b4"
+		"version": "1.1.6",
+		"digest": "sha256:d9b8da85f97cad8b1564fa6b2caaa799d397bdea8f70247282d9542b733d6452"
 	},
 	"traefik": {
 		"v3.7": "3.7.16",
