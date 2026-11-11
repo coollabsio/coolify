@@ -1,0 +1,13 @@
+paranoid: true
+
+allowBuilds:
+  node-pty: true
+jailBuildExclusions:
+  - node-pty # node-gyp downloads itself and the Node.js headers
+
+minimumReleaseAge: 4320 # 3 days
+advisoryCheckEveryInstall: true
+
+securityScanner: "@socketsecurity/bun-security-scanner"
+
+enableGlobalVirtualStore: false
