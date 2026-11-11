@@ -99,8 +99,8 @@ COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php
 ENV PHP_OPCACHE_ENABLE=0
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
+COPY package*.json /terminal/
+RUN npm ci --omit=dev --prefix /terminal && \
     npm rebuild node-pty --prefix /terminal --update-binary
 COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
