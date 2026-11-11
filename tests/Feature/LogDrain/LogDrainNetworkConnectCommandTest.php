@@ -2,6 +2,7 @@
 
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Service\StartService;
+use App\Enums\LogDrainType;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
@@ -49,7 +50,7 @@ function createServiceOnServer(Server $server, string $network, bool $connectToD
 
 it('connects the log drain container to a service preferred network when the server log drain is enabled', function () {
     $server = createServerWithTeam();
-    $server->settings()->update(['is_logdrain_custom_enabled' => true]);
+    $server->settings->update(['logdrain_type' => LogDrainType::Custom]);
     $service = createServiceOnServer($server, 'signoz-net', true);
 
     $commands = reflectedLogDrainNetworkCommands(new StartService, $service->fresh(['destination.server.settings']));
@@ -59,7 +60,7 @@ it('connects the log drain container to a service preferred network when the ser
 
 it('does not connect the log drain container when service preferred network is disabled', function () {
     $server = createServerWithTeam();
-    $server->settings()->update(['is_logdrain_custom_enabled' => true]);
+    $server->settings->update(['logdrain_type' => LogDrainType::Custom]);
     $service = createServiceOnServer($server, 'signoz-net', false);
 
     $commands = reflectedLogDrainNetworkCommands(new StartService, $service->fresh(['destination.server.settings']));
@@ -78,7 +79,7 @@ it('does not connect the log drain container when the server log drain is disabl
 
 it('connects a restarted log drain container to all enabled service preferred networks on the server', function () {
     $server = createServerWithTeam();
-    $server->settings()->update(['is_logdrain_custom_enabled' => true]);
+    $server->settings->update(['logdrain_type' => LogDrainType::Custom]);
     createServiceOnServer($server, 'signoz-net', true);
     createServiceOnServer($server, 'ignored-net', false);
     createServiceOnServer($server, 'signoz-net', true);

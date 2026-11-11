@@ -50,10 +50,11 @@ beforeEach(function () {
     $this->server->settings->forceFill([
         'sentinel_token' => encrypt('super-secret-sentinel-token'),
         'sentinel_custom_url' => 'https://sentinel.internal',
-        'logdrain_axiom_api_key' => encrypt('axiom-key-secret'),
-        'logdrain_newrelic_license_key' => encrypt('newrelic-key-secret'),
-        'logdrain_custom_config' => 'custom-config-data',
-        'logdrain_custom_config_parser' => 'custom-parser-data',
+        'logdrain_config' => [
+            'axiom' => ['api_key' => 'axiom-key-secret'],
+            'newrelic' => ['license_key' => 'newrelic-key-secret'],
+            'custom' => ['config' => 'custom-config-data', 'parser_config' => 'custom-parser-data'],
+        ],
     ])->saveQuietly();
 });
 
@@ -70,9 +71,9 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         $body = $response->getContent();
         expect($body)->not->toContain('sentinel_token');
         expect($body)->not->toContain('sentinel_custom_url');
-        expect($body)->not->toContain('logdrain_axiom_api_key');
-        expect($body)->not->toContain('logdrain_newrelic_license_key');
-        expect($body)->not->toContain('logdrain_custom_config');
+        expect($body)->not->toContain('axiom-key-secret');
+        expect($body)->not->toContain('newrelic-key-secret');
+        expect($body)->not->toContain('custom-config-data');
     });
 
     test('read sensitive token sees sentinel and logdrain fields', function () {
@@ -87,7 +88,7 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         $body = $response->getContent();
         expect($body)->toContain('sentinel_token');
         expect($body)->toContain('sentinel_custom_url');
-        expect($body)->toContain('logdrain_axiom_api_key');
+        expect($body)->toContain('axiom-key-secret');
     });
 
     test('root token sees sentinel and logdrain fields', function () {
@@ -115,9 +116,9 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         $body = $response->getContent();
         expect($body)->not->toContain('sentinel_token');
         expect($body)->not->toContain('sentinel_custom_url');
-        expect($body)->not->toContain('logdrain_axiom_api_key');
-        expect($body)->not->toContain('logdrain_newrelic_license_key');
-        expect($body)->not->toContain('logdrain_custom_config');
+        expect($body)->not->toContain('axiom-key-secret');
+        expect($body)->not->toContain('newrelic-key-secret');
+        expect($body)->not->toContain('custom-config-data');
     });
 
     test('read sensitive token sees sentinel and logdrain fields in server detail', function () {
@@ -132,7 +133,7 @@ describe('GET /api/v1/servers sensitive field gating', function () {
         $body = $response->getContent();
         expect($body)->toContain('sentinel_token');
         expect($body)->toContain('sentinel_custom_url');
-        expect($body)->toContain('logdrain_axiom_api_key');
+        expect($body)->toContain('axiom-key-secret');
     });
 
     test('saved proxy configuration in server detail requires read sensitive', function () {
@@ -172,8 +173,8 @@ describe('GET /api/v1/servers sensitive field gating', function () {
 
         $body = $response->getContent();
         expect($body)->not->toContain('sentinel_token');
-        expect($body)->not->toContain('logdrain_axiom_api_key');
-        expect($body)->not->toContain('logdrain_newrelic_license_key');
+        expect($body)->not->toContain('axiom-key-secret');
+        expect($body)->not->toContain('newrelic-key-secret');
     });
 });
 
@@ -372,7 +373,7 @@ describe('GET /api/v1/applications nested-relation scrubbing', function () {
         $body = $response->getContent();
         expect($body)->not->toContain('"sentinel_token":');
         expect($body)->not->toContain('"sentinel_custom_url":');
-        expect($body)->not->toContain('"logdrain_axiom_api_key":');
+        expect($body)->not->toContain('"logdrain_config":');
     });
 
     test('read-sensitive token sees nested sentinel_token via destination.server.settings', function () {

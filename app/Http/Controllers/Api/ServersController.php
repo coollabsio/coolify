@@ -46,10 +46,7 @@ class ServersController extends Controller
             $settings = $settings->makeVisible([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
 
@@ -107,12 +104,6 @@ class ServersController extends Controller
             'id',
         ]);
         $canReadSensitive = request()->attributes->get('can_read_sensitive', false) === true;
-        if ($canReadSensitive) {
-            $server->makeVisible([
-                'logdrain_axiom_api_key',
-                'logdrain_newrelic_license_key',
-            ]);
-        }
 
         $serialized = serializeApiResponse($server);
         if (! $canReadSensitive && is_array($serialized->get('proxy'))) {
