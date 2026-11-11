@@ -9,8 +9,8 @@ ARG CLOUDFLARED_VERSION=2026.11.1
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.9-r1
-# https://nodejs.org/en/about/previous-releases
-ARG NODE_VERSION=24.22.3
+# https://hub.docker.com/r/peakimages/aube/tags?name=node26
+ARG AUBE_IMAGE=docker.io/peakimages/aube:2.11.0-node26-v0.1.0@sha256:77780eeb44d92b07585af01d089b678e2410b513014d0d136749d91dc7aa4e31
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.1
 
@@ -58,38 +58,30 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
-FROM node:${NODE_VERSION}-alpine3.24 AS nodejs
-
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM nodejs AS static-assets
+FROM ${AUBE_IMAGE} AS static-assets
 
 WORKDIR /app
-COPY package*.json vite.config.js postcss.config.cjs ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts
+COPY package.json aube-lock.yaml aube-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/aube \
+    aube install --dev --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN aube run --no-install build
 
 # =================================================================
 # Stage 3: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM ${BASE_IMAGE} AS terminal-dependencies
+FROM ${AUBE_IMAGE} AS terminal-dependencies
 
-USER root
-
-RUN apk upgrade && \
-    apk add --no-cache make g++ python3
-COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
-COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
-COPY package*.json /terminal/
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --prefix /terminal && \
-    npm rebuild node-pty --prefix /terminal --update-binary && \
-    rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
-        /terminal/node_modules/node-pty/prebuilds/win32-*
+RUN apk add --no-cache make g++ python3
+WORKDIR /terminal
+COPY package.json aube-lock.yaml aube-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/aube \
+    aube install --prod --frozen-lockfile && \
+    rm -rf node_modules/node-pty/prebuilds/darwin-* \
+        node_modules/node-pty/prebuilds/win32-*
 COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 
@@ -141,6 +133,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     libstdc++ \
+    libatomic \
     openssh-client \
     git \
     git-lfs \
@@ -206,7 +199,7 @@ COPY --chown=www-data:www-data release.json upstream.json ./
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
-COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=terminal-dependencies /usr/local/bin/node /usr/local/bin/node
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure the Nginx site of the base image

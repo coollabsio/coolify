@@ -8,7 +8,7 @@ The v4.7 video is the reference: `marketing/releases/v4.7/video.json` and `marke
 
 - A running Coolify dev instance with the release code (see "Development Environment" in `AGENTS.md`). The main checkout serves `https://<host>:8000`.
 - `ffmpeg` on the host.
-- Playwright Chromium: `npm install && npx playwright install chromium`.
+- Playwright Chromium: `aube install && aube exec playwright install chromium`.
 
 ## Steps
 
