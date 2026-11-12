@@ -92,6 +92,6 @@ class ScheduledTaskPolicy
 
     private function resource(ScheduledTask $scheduledTask): ?object
     {
-        return $scheduledTask->application ?? $scheduledTask->service;
+        return $scheduledTask->resource();
     }
 }

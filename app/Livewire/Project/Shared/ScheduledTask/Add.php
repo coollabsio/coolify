@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\Application;
+use App\Models\NodeWorkload;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use App\Models\StandalonePostgresql;
@@ -77,11 +78,17 @@ class Add extends Component
             case 'standalone-postgresql':
                 $this->resource = StandalonePostgresql::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
+            case 'cluster-application':
+                abort_unless(nodesEnabled(), 404);
+                $this->resource = NodeWorkload::query()->where('team_id', currentTeam()->id)->findOrFail($this->id);
+                break;
             default:
                 throw new \Exception('Invalid resource type');
         }
 
-        $this->serverTimezone = getServerTimezone($this->resource->destination?->server);
+        $this->serverTimezone = $this->resource instanceof NodeWorkload
+            ? (instanceSettings()->instance_timezone ?: config('app.timezone'))
+            : getServerTimezone($this->resource->destination?->server);
 
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();
@@ -132,6 +139,9 @@ class Add extends Component
                     break;
                 case 'service':
                     $task->service_id = $this->id;
+                    break;
+                case 'cluster-application':
+                    $task->node_workload_id = $this->resource->id;
                     break;
             }
             $task->save();

@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
 import 'dotenv/config';
@@ -364,8 +364,12 @@ function parseMessage(message) {
  *
  * @returns {Promise<boolean>} false when the command was rejected and no PTY started
  */
-async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) {
-    const userSession = userSessions.get(userId);
+/**
+ * Ends the PTY that the session runs before a new one starts.
+ *
+ * @returns {Promise<boolean>} false when the previous PTY could not be ended
+ */
+async function replaceActivePty(ws, userSession, userId) {
     if (userSession && userSession.isActive) {
         userSession.endReason = 'replaced';
         const result = await killPtyProcess(userId);
@@ -382,6 +386,15 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
     if (userSession.terminalSessionTimer) {
         clearTimeout(userSession.terminalSessionTimer);
         userSession.terminalSessionTimer = null;
+    }
+
+    return true;
+}
+
+async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) {
+    const userSession = userSessions.get(userId);
+    if (!await replaceActivePty(ws, userSession, userId)) {
+        return false;
     }
 
     const commandString = command[0].split('\n').join(' ');
@@ -449,14 +462,116 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
         terminalSessionTimeout,
     });
     const ptyProcess = pty.spawn('ssh', sanitizedSshArgs.concat([hereDocContent]), options);
+    // Attach sessions share the container's main process, so they must be detached, not killed.
+    startPtySession(userSession, ptyProcess, terminalSessionId, reportEnd, isAttachCommand(hereDocContent));
+
+    return true;
+}
+
+/**
+ * Starts a shell in a cluster application container. Flux streams it from Sentinel (decision 0018);
+ * Coolify opened the session and gave a one-time ticket for it.
+ *
+ * @returns {Promise<boolean>} false when Flux refused the session
+ */
+async function handleFluxTerminal(ws, flux, userId, terminalSessionId, reportEnd) {
+    const userSession = userSessions.get(userId);
+    if (!await replaceActivePty(ws, userSession, userId)) {
+        return false;
+    }
+
+    let ptyProcess;
+    try {
+        ptyProcess = await openFluxTerminal(flux);
+    } catch (error) {
+        logTerminal('error', 'Flux refused the terminal session.', {
+            userId,
+            error: error?.message ?? error,
+        });
+        ws.send('Could not connect to the container terminal.');
+        return false;
+    }
+
+    startPtySession(userSession, ptyProcess, terminalSessionId, reportEnd, false);
+
+    return true;
+}
+
+/**
+ * A PTY-like object for a Flux terminal session: binary WebSocket messages are the PTY input and output,
+ * a text message resizes, and the last text message before the close holds the exit code.
+ */
+function openFluxTerminal(flux) {
+    return new Promise((resolve, reject) => {
+        const socket = new WebSocket(flux.url, {
+            headers: { Authorization: `Bearer ${flux.ticket}` },
+            handshakeTimeout: 10_000,
+            maxPayload: 1024 * 1024,
+        });
+        const dataListeners = [];
+        const exitListeners = [];
+        let exitCode = null;
+        let opened = false;
+
+        socket.on('open', () => {
+            opened = true;
+            resolve({
+                write: (data) => {
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(Buffer.from(data, 'utf8'));
+                    }
+                },
+                resize: (cols, rows) => {
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({ resize: { cols, rows } }));
+                    }
+                },
+                // A paused socket stops the acknowledgements, so Sentinel stops reading the shell output.
+                pause: () => socket.pause(),
+                resume: () => socket.resume(),
+                kill: () => socket.close(),
+                onData: (listener) => dataListeners.push(listener),
+                onExit: (listener) => exitListeners.push(listener),
+            });
+        });
+        socket.on('message', (data, isBinary) => {
+            if (isBinary) {
+                dataListeners.forEach((listener) => listener(data));
+                return;
+            }
+            try {
+                const status = JSON.parse(data.toString());
+                exitCode = Number.isInteger(status?.exit_code) ? status.exit_code : null;
+            } catch (_) {
+                // not a status message
+            }
+        });
+        socket.on('error', (error) => {
+            if (!opened) {
+                reject(error);
+            }
+        });
+        socket.on('close', () => {
+            if (!opened) {
+                reject(new Error('Flux closed the terminal session.'));
+                return;
+            }
+            exitListeners.forEach((listener) => listener({ exitCode: exitCode ?? 1, signal: undefined }));
+        });
+    });
+}
+
+function startPtySession(userSession, ptyProcess, terminalSessionId, reportEnd, isAttach) {
+    const userId = userSession.userId;
+    const ws = userSession.ws;
+    const terminalSessionTimeout = getTerminalSessionTimeout();
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
     userSession.endReason = null;
     userSession.lastActivityAt = Date.now();
     const sessionWatch = watchTerminalSession(userSession, ptyProcess, terminalSessionId);
-    // Attach sessions share the container's main process, so they must be detached, not killed.
-    userSession.isAttach = isAttachCommand(hereDocContent);
+    userSession.isAttach = isAttach;
 
     ws.send('pty-ready');
 
@@ -466,7 +581,7 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
         if (userSession.ptyProcess !== ptyProcess) return;
         // Output counts as activity, so commands like `docker logs -f` are not ended as idle.
         userSession.lastActivityAt = Date.now();
-        ws.send(Buffer.from(data, 'utf8'));
+        ws.send(Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'));
     });
 
     // when parent closes
@@ -501,8 +616,6 @@ async function handleCommand(ws, command, userId, terminalSessionId, reportEnd) 
     userSession.terminalSessionTimer = setTimeout(async () => {
         await endTerminalSession(userSession, ptyProcess, 'max_duration', `it reached the maximum duration of ${terminalSessionTimeout / 3600} hours.`);
     }, terminalSessionTimeout * 1000);
-
-    return true;
 }
 
 /**
@@ -621,12 +734,16 @@ async function handleTerminalToken(userSession, token) {
     try {
         const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
         terminalSessionId = response.data?.session_id;
-        if (response.status !== 200 || typeof response.data?.command !== 'string' || typeof terminalSessionId !== 'string') {
+        const flux = response.data?.flux;
+        const isFluxSession = typeof flux?.url === 'string' && typeof flux?.ticket === 'string';
+        if (response.status !== 200 || (typeof response.data?.command !== 'string' && !isFluxSession) || typeof terminalSessionId !== 'string') {
             rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
             return;
         }
 
-        const started = await handleCommand(userSession.ws, [response.data.command], userSession.userId, terminalSessionId, reportEnd);
+        const started = isFluxSession
+            ? await handleFluxTerminal(userSession.ws, flux, userSession.userId, terminalSessionId, reportEnd)
+            : await handleCommand(userSession.ws, [response.data.command], userSession.userId, terminalSessionId, reportEnd);
         if (!started) {
             reportEnd('rejected');
         }

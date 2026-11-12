@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Node\RunNodeWorkloadCommand;
 use App\Models\Application;
 use App\Models\Node;
+use App\Models\NodeWorkload;
 use App\Models\Server;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
@@ -88,6 +90,14 @@ class ExecuteContainerCommand extends Component
             $this->authorize('view', $this->resource);
             $this->servers = $this->servers->push($this->resource);
             $this->containersLoaded = true;
+        } elseif (data_get($this->parameters, 'workload_uuid')) {
+            abort_unless(nodesEnabled(), 404);
+            $this->type = 'cluster';
+            $this->resource = NodeWorkload::query()
+                ->where('uuid', $this->parameters['workload_uuid'])
+                ->where('team_id', currentTeam()->id)
+                ->firstOrFail();
+            $this->authorize('view', $this->resource);
         } elseif (data_get($this->parameters, 'node_uuid')) {
             abort_unless(nodesEnabled(), 404);
             $this->type = 'node';
@@ -108,6 +118,14 @@ class ExecuteContainerCommand extends Component
     {
         if ($this->containersLoaded) {
             return;
+        }
+
+        if ($this->type === 'cluster') {
+            foreach (RunNodeWorkloadCommand::runningContainers($this->resource) as $target) {
+                if ($target['node']->is_reachable && $target['node']->is_usable) {
+                    $this->containers->push(['server' => $target['node'], 'container' => ['Names' => $target['container']]]);
+                }
+            }
         }
 
         foreach ($this->servers as $server) {
@@ -248,6 +266,12 @@ class ExecuteContainerCommand extends Component
                 throw new \RuntimeException('Container not found.');
             }
 
+            if ($this->type === 'cluster') {
+                $this->connectToClusterContainer($container);
+
+                return;
+            }
+
             // Verify server ownership and status
             $server = data_get($container, 'server');
             if (! $server || ! $server instanceof Server) {
@@ -286,6 +310,24 @@ class ExecuteContainerCommand extends Component
         } finally {
             $this->isConnecting = false;
         }
+    }
+
+    /**
+     * A cluster application container runs on a Node. The terminal opens it through Flux, which only reaches
+     * workload containers (decision 0018).
+     *
+     * @param  array{server: Node, container: array{Names: string}}  $container
+     */
+    private function connectToClusterContainer(array $container): void
+    {
+        $node = $container['server'];
+        $this->authorize('update', $this->resource);
+        if (! $this->resource->nodes()->whereKey($node->id)->exists()) {
+            throw new \RuntimeException('Server ownership verification failed.');
+        }
+
+        $this->dispatch('send-terminal-command', true, $container['container']['Names'], $node->uuid, null, 'node');
+        $this->dispatch('terminal-should-focus');
     }
 
     /**

@@ -47,9 +47,11 @@
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" type="number"
                     placeholder="300" id="timeout" helper="Maximum execution time from 60 to 36,000 seconds."
                     label="Timeout (seconds)" required />
-                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="php"
-                    helper="Leave empty when the resource only has one container." id="container"
-                    label="{{ $type === 'service' ? 'Service' : 'Container' }}" />
+                @unless ($type === 'cluster-application')
+                    <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="php"
+                        helper="Leave empty when the resource only has one container." id="container"
+                        label="{{ $type === 'service' ? 'Service' : 'Container' }}" />
+                @endunless
             </div>
             <div class="mt-4">
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"

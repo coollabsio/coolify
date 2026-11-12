@@ -14,6 +14,8 @@
             'servers' => 'Servers',
             'webhooks' => 'Webhooks',
             'backups' => 'Backups',
+            'scheduled-tasks' => 'Scheduled Tasks',
+            'terminal' => 'Terminal',
             'danger' => 'Danger Zone',
         ];
         // The status can carry the health, like "Running (healthy)".

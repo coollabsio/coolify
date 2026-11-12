@@ -25,7 +25,7 @@
                     'value' => $containerName,
                     'label' => $containerName,
                 ])->values()->all()" />
-        @else
+        @elseif ($type !== 'cluster-application')
             <x-forms.input placeholder="php" id="container"
                 helper="Leave empty when the resource only has one container." label="Container" />
         @endif

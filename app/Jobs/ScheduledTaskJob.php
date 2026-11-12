@@ -2,10 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\RunNodeWorkloadCommand;
 use App\Events\ScheduledTaskDone;
 use App\Exceptions\NonReportableException;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\NodeWorkload;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
@@ -57,7 +59,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public ScheduledTask $task;
 
-    public Application|Service|null $resource = null;
+    public Application|Service|NodeWorkload|null $resource = null;
 
     public ?ScheduledTaskExecution $task_log = null;
 
@@ -102,7 +104,16 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         $this->task->loadMissing([
             'service.destination.server.settings',
             'application.destination.server.settings',
+            'nodeWorkload',
         ]);
+
+        if ($this->task->nodeWorkload) {
+            // A cluster application runs on Nodes, not on a server: there is no server timezone.
+            $this->resource = $this->task->nodeWorkload;
+            $this->team = Team::findOrFail($this->task->team_id);
+
+            return;
+        }
 
         if ($this->task->service) {
             $this->resource = $this->task->service;
@@ -160,6 +171,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 'retry_count' => $this->attempts() - 1,
             ]);
 
+            if ($this->resource instanceof NodeWorkload) {
+                $this->runInClusterContainer();
+
+                return;
+            }
+
             if ($this->resource->type() === 'application') {
                 // `docker ps -a` also lists stopped containers, for example the old container of a rolling update.
                 getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
@@ -201,21 +218,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
                     $this->task_output = $this->redact(instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->task->timeout ?? 300, disableMultiplexing: true) ?? '');
-                    $this->task_log->update([
-                        'status' => 'success',
-                        'message' => $this->task_output,
-                    ]);
-
-                    $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
-                    if ($this->task->recordSuccess()) {
-                        $this->team?->notify(new ScheduledJobRecovered(
-                            failureEvent: 'scheduled_task_failure',
-                            title: "Scheduled task ({$this->task->name}) works again.",
-                            webhookEvent: 'task_recovered',
-                            url: $this->task->url(),
-                            webhookData: ['task_name' => $this->task->name, 'task_uuid' => $this->task->uuid],
-                        ));
-                    }
+                    $this->recordSuccessfulRun();
 
                     return;
                 }
@@ -266,6 +269,63 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    private function recordSuccessfulRun(): void
+    {
+        $this->task_log->update([
+            'status' => 'success',
+            'message' => $this->task_output,
+        ]);
+
+        $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
+        if ($this->task->recordSuccess()) {
+            $this->team?->notify(new ScheduledJobRecovered(
+                failureEvent: 'scheduled_task_failure',
+                title: "Scheduled task ({$this->task->name}) works again.",
+                webhookEvent: 'task_recovered',
+                url: $this->task->url(),
+                webhookData: ['task_name' => $this->task->name, 'task_uuid' => $this->task->uuid],
+            ));
+        }
+    }
+
+    /**
+     * Runs the task in one running container of the cluster application with `workload.exec.v1`
+     * (decision 0018). Sentinel runs the arguments without a host shell; `sh -c` wraps the command
+     * in the container like `docker exec` does on a server.
+     */
+    private function runInClusterContainer(): void
+    {
+        $target = RunNodeWorkloadCommand::runningContainers($this->resource)->first();
+        // A stopped resource is not a task failure: it sends no notification and does not count toward auto-disable.
+        if ($target === null) {
+            $this->task_log->update([
+                'status' => 'skipped',
+                'message' => 'Skipped: the resource has no running container.',
+            ]);
+
+            return;
+        }
+
+        $result = RunNodeWorkloadCommand::run($target['node'], $target['container'], $this->task->commandArguments(), $this->task->timeout ?? 300);
+        $output = $result['output'];
+        if ($result['truncated']) {
+            $output .= "\n\n[... Output truncated at 1MB limit ...]";
+        }
+        $this->task_output = $this->redact($output);
+
+        if ($result['exit_code'] === 0 && ! $result['timed_out']) {
+            $this->recordSuccessfulRun();
+
+            return;
+        }
+
+        $reason = $result['timed_out'] || $result['exit_code'] === null
+            ? ($result['error'] !== '' ? $result['error'] : 'The command did not finish.')
+            : "The command exited with code {$result['exit_code']}.";
+
+        throw new NonReportableException($this->redact(trim($reason."\n".$this->task_output)));
     }
 
     private function boundedTaskCommand(string $command): string
@@ -320,7 +380,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->team ??= Team::find($this->task->team_id);
-        $this->resource ??= $this->task->application ?? $this->task->service;
+        $this->resource ??= $this->task->resource();
         $safeErrorMessage = $this->redact($exception?->getMessage() ?? 'Unknown error');
         $safeTrace = $this->redact($exception?->getTraceAsString() ?? '');
 

@@ -1,7 +1,9 @@
 <div @unless(in_array($type, ['server', 'node'], true)) wire:init="loadContainers" @endunless>
-    <x-slot:title>
-        {{ data_get_str($resource, 'name')->limit(10) }} > Terminal | Coolify
-    </x-slot>
+    @unless ($type === 'cluster')
+        <x-slot:title>
+            {{ data_get_str($resource, 'name')->limit(10) }} > Terminal | Coolify
+        </x-slot>
+    @endunless
 
     @if ($type === 'application')
         <livewire:project.shared.configuration-checker :resource="$resource" />
@@ -12,7 +14,7 @@
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @elseif ($type === 'server')
         <livewire:server.navbar :server="$servers->first()" />
-    @else
+    @elseif ($type === 'node')
         <x-node.navbar :node="$resource" />
     @endif
 

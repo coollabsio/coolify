@@ -302,6 +302,7 @@ final class ServerTransferCoverage
         ScheduledTask::class => [
             'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
             'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,
+            'node_workload_id' => 'Only tasks of cluster applications use it, and a transfer does not move them.',
         ],
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [

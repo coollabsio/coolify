@@ -20,7 +20,7 @@
                 ['key' => 'logs', 'label' => 'Runtime Logs', 'icon' => 'unordered-list'],
                 // Not in the v4 database menu: on a cluster, a database deploys like an application.
                 ['key' => 'deployments', 'label' => 'Deployment Logs', 'icon' => 'time-back'],
-                ['label' => 'Terminal', 'icon' => 'browser-terminal', 'visible' => $canAccessTerminal],
+                ['key' => 'terminal', 'label' => 'Terminal', 'icon' => 'browser-terminal', 'visible' => $canAccessTerminal],
                 ['label' => 'Files', 'icon' => 'folder', 'visible' => $canAccessTerminal],
                 ['label' => 'Metrics', 'icon' => 'graph'],
                 ['label' => 'Security', 'icon' => 'shield-alert'],
@@ -29,6 +29,7 @@
                 ['key' => 'servers', 'label' => 'Servers', 'icon' => 'servers'],
             ],
             'Automation' => [
+                ['key' => 'scheduled-tasks', 'label' => 'Scheduled Tasks', 'icon' => 'calendar'],
                 ['key' => 'webhooks', 'label' => 'Webhooks', 'icon' => 'webhook'],
                 ['key' => $hasVolumes ? 'backups' : null, 'label' => 'Backups', 'icon' => 'database'],
             ],
@@ -53,7 +54,7 @@
             'Observe & troubleshoot' => [
                 ['key' => 'logs', 'label' => 'Runtime Logs', 'icon' => 'unordered-list'],
                 ['key' => 'deployments', 'label' => 'Deployment Logs', 'icon' => 'time-back'],
-                ['label' => 'Terminal', 'icon' => 'browser-terminal', 'visible' => $canAccessTerminal],
+                ['key' => 'terminal', 'label' => 'Terminal', 'icon' => 'browser-terminal', 'visible' => $canAccessTerminal],
                 ['label' => 'Files', 'icon' => 'folder', 'visible' => $canAccessTerminal],
                 ['label' => 'Metrics', 'icon' => 'graph'],
                 ['label' => 'Analytics', 'icon' => 'analytics'],
@@ -65,7 +66,7 @@
                 ['label' => 'Preview Deployments', 'icon' => 'eye'],
             ],
             'Automation' => [
-                ['label' => 'Scheduled Tasks', 'icon' => 'calendar'],
+                ['key' => 'scheduled-tasks', 'label' => 'Scheduled Tasks', 'icon' => 'calendar'],
                 ['key' => 'webhooks', 'label' => 'Webhooks', 'icon' => 'webhook'],
                 ['key' => $hasVolumes ? 'backups' : null, 'label' => 'Backups', 'icon' => 'database'],
             ],
@@ -93,6 +94,8 @@
         'resource-limits' => 'project.cluster-application.resource-limits',
         'webhooks' => 'project.cluster-application.webhooks',
         'backups' => 'project.cluster-application.backups',
+        'scheduled-tasks' => 'project.cluster-application.scheduled-tasks',
+        'terminal' => 'project.cluster-application.terminal',
         'danger' => 'project.cluster-application.danger',
     ];
 

@@ -52,6 +52,8 @@ class Terminal extends Component
 
     public ?string $currentServerUuid = null;
 
+    public string $currentTargetType = 'server';
+
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
@@ -110,7 +112,7 @@ class Terminal extends Component
             $this->authorize('canAccessTerminal');
 
             $server = match ($targetType) {
-                'node' => $this->terminalNode($serverUuid, (bool) $isContainer),
+                'node' => $this->terminalNode($serverUuid),
                 'server' => Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail(),
                 default => abort(404),
             };
@@ -136,8 +138,21 @@ class Terminal extends Component
         $this->currentIsContainer = (bool) $isContainer;
         $this->currentIdentifier = $identifier;
         $this->currentServerUuid = $serverUuid;
+        $this->currentTargetType = $targetType;
 
-        if ($isContainer) {
+        if ($isContainer && $server instanceof Node) {
+            // A cluster application container: Sentinel opens the shell through Flux (decision 0018).
+            try {
+                app(TerminalSessionService::class)->clusterWorkload(auth()->user(), $server, (string) $identifier);
+            } catch (HttpExceptionInterface) {
+                $this->failTerminalSession(self::NOT_ALLOWED_MESSAGE);
+
+                return;
+            }
+            $this->hasShell = true;
+            $this->attachAvailable = false;
+            $mode = $this->terminalMode = 'shell';
+        } elseif ($isContainer) {
             // Validate container identifier format (alphanumeric, dashes, and underscores only)
             if (! is_string($identifier) || ! ValidationPatterns::isValidContainerName($identifier)) {
                 $this->failTerminalSession('The container name is not valid.');
@@ -175,9 +190,8 @@ class Terminal extends Component
         $this->dispatch('send-terminal-token', $token);
     }
 
-    private function terminalNode(string $uuid, bool $isContainer): Node
+    private function terminalNode(string $uuid): Node
     {
-        abort_if($isContainer, 404);
         abort_unless(nodesEnabled(), 404);
 
         return Node::query()
@@ -222,7 +236,7 @@ class Terminal extends Component
             return;
         }
 
-        $this->sendTerminalCommand(true, $this->currentIdentifier, $this->currentServerUuid, $mode);
+        $this->sendTerminalCommand(true, $this->currentIdentifier, $this->currentServerUuid, $mode, $this->currentTargetType);
     }
 
     #[On('terminalConnected')]

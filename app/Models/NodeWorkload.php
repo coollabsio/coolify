@@ -500,6 +500,11 @@ class NodeWorkload extends BaseModel
         return $this->hasMany(NodeOperation::class);
     }
 
+    public function scheduled_tasks(): HasMany
+    {
+        return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
+    }
+
     public function volumes(): HasMany
     {
         return $this->hasMany(NodeVolume::class);

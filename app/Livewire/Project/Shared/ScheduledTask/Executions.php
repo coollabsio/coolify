@@ -52,6 +52,9 @@ class Executions extends Component
             if (! $this->serverTimezone) {
                 $this->serverTimezone = data_get($task, 'service.destination.server.settings.server_timezone');
             }
+            if (! $this->serverTimezone && $task->node_workload_id !== null) {
+                $this->serverTimezone = instanceSettings()->instance_timezone ?: config('app.timezone');
+            }
             if (! $this->serverTimezone) {
                 $this->serverTimezone = 'UTC';
             }
@@ -169,7 +172,7 @@ class Executions extends Component
      */
     public function canReadOutput(): bool
     {
-        $resource = $this->task?->application ?? $this->task?->service;
+        $resource = $this->task?->resource();
 
         return $resource && auth()->user()?->can('update', $resource);
     }

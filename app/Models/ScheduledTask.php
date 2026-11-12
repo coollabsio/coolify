@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use OpenApi\Attributes as OA;
@@ -46,6 +47,7 @@ class ScheduledTask extends BaseModel
         'team_id',
         'application_id',
         'service_id',
+        'node_workload_id',
     ];
 
     /**
@@ -220,11 +222,38 @@ class ScheduledTask extends BaseModel
         return $arguments;
     }
 
+    /**
+     * The arguments of the command in the container, for a typed exec without a host shell (cluster applications).
+     *
+     * @return list<string>
+     */
+    public function commandArguments(): array
+    {
+        if ($this->use_shell ?? true) {
+            return ['sh', '-c', $this->command];
+        }
+
+        $arguments = self::splitCommandArguments($this->command);
+        if ($arguments === []) {
+            throw new \InvalidArgumentException('The command is empty.');
+        }
+
+        return $arguments;
+    }
+
+    public function resource(): Application|Service|NodeWorkload|null
+    {
+        return $this->application ?? $this->service ?? $this->nodeWorkload;
+    }
+
     public function url(): ?string
     {
-        $resource = $this->application ?? $this->service;
+        $resource = $this->resource();
         if (! $resource) {
             return null;
+        }
+        if ($resource instanceof NodeWorkload) {
+            return base_url().'/project/'.data_get($resource, 'project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/cluster-application/{$resource->uuid}/scheduled-tasks?task_uuid={$this->uuid}";
         }
         $type = $resource instanceof Application ? 'application' : 'service';
 
@@ -239,6 +268,11 @@ class ScheduledTask extends BaseModel
     public function application()
     {
         return $this->belongsTo(Application::class);
+    }
+
+    public function nodeWorkload(): BelongsTo
+    {
+        return $this->belongsTo(NodeWorkload::class);
     }
 
     public function latest_log(): HasOne

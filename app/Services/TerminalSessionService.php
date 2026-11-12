@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Actions\Node\OpenNodeWorkloadTerminal;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Node;
+use App\Models\NodeContainer;
+use App\Models\NodeWorkload;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ValidationPatterns;
@@ -28,7 +31,9 @@ class TerminalSessionService
     public function issue(User $user, Server|Node $server, ?string $container = null, string $mode = 'shell', ?string $clientIp = null, ?string $userAgent = null): string
     {
         if ($server instanceof Node && $container !== null) {
-            throw new AccessDeniedHttpException('Container terminals are not available for Nodes.');
+            // Only containers of cluster applications, never other containers of the Node.
+            $this->clusterWorkload($user, $server, $container);
+            $mode = 'shell';
         }
         $token = Str::random(64);
 
@@ -122,6 +127,36 @@ class TerminalSessionService
     }
 
     /**
+     * The cluster application that runs `$container` on the Node, when the user may open a terminal in it:
+     * an admin of the team of the application, with two-factor authentication when that team requires it.
+     * Uses the team of the Node and the application, not the session team.
+     */
+    public function clusterWorkload(User $user, Node $node, string $container): NodeWorkload
+    {
+        $workload = ValidationPatterns::isValidContainerName($container)
+            ? NodeContainer::query()
+                ->where('node_id', $node->id)
+                ->where('name', $container)
+                ->where('state', 'running')
+                ->first()?->workload
+            : null;
+
+        if (! nodesEnabled()
+            || ! $workload instanceof NodeWorkload
+            || $workload->team_id !== $node->team_id
+            || ! str_starts_with($container, 'coolify-'.$workload->uuid.'-')
+            || ! $workload->nodes()->whereKey($node->id)->exists()
+            || ! $user->can('update', $workload)
+            || ($workload->team()?->is_two_factor_required && blank($user->two_factor_confirmed_at))
+            || ! $node->is_reachable
+            || ! $node->is_usable) {
+            throw new AccessDeniedHttpException('Terminal container is not authorized.');
+        }
+
+        return $workload;
+    }
+
+    /**
      * Check again that the user may keep a live session open. Uses the team of the server,
      * not the session team, because the user can switch teams while the terminal runs.
      */
@@ -140,6 +175,9 @@ class TerminalSessionService
                 ->first();
             if (! nodesEnabled() || ! $node || ! $user->isAdminOfTeam($node->team_id) || ($node->team?->is_two_factor_required && blank($user->two_factor_confirmed_at)) || ! $node->is_reachable || ! $node->is_usable) {
                 throw new AccessDeniedHttpException('Terminal session is no longer authorized.');
+            }
+            if (is_string(data_get($session, 'container'))) {
+                $this->clusterWorkload($user, $node, $session['container']);
             }
 
             return;
@@ -227,7 +265,7 @@ class TerminalSessionService
     /** @return array{command: string, session_id: string} */
     private function redeemNode(User $user, array $payload): array
     {
-        if (! nodesEnabled() || $payload['container'] !== null) {
+        if (! nodesEnabled()) {
             throw new AccessDeniedHttpException('Terminal target is not authorized.');
         }
 
@@ -236,6 +274,10 @@ class TerminalSessionService
             ->where('uuid', $payload['server_uuid'])
             ->with('privateKey')
             ->firstOrFail();
+
+        if ($payload['container'] !== null) {
+            return $this->redeemNodeContainer($user, $node, $payload);
+        }
 
         if (! $user->isAdminOfTeam($node->team_id)
             || ! $node->is_reachable
@@ -269,6 +311,43 @@ class TerminalSessionService
         auditLog('terminal.session.started', $this->auditContext($session, 'started'));
 
         return ['command' => $sshCommand, 'session_id' => $sessionId];
+    }
+
+    /**
+     * Opens the shell through Flux (decision 0018). The terminal server attaches with the one-time ticket.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{flux: array{url: string, ticket: string}, session_id: string}
+     */
+    private function redeemNodeContainer(User $user, Node $node, array $payload): array
+    {
+        $container = (string) $payload['container'];
+        $this->clusterWorkload($user, $node, $container);
+
+        try {
+            $flux = OpenNodeWorkloadTerminal::run($node, $container);
+        } catch (\RuntimeException $exception) {
+            throw new AccessDeniedHttpException($exception->getMessage(), $exception);
+        }
+
+        $sessionId = Str::random(64);
+        $session = [
+            'user_id' => $user->id,
+            'team_id' => $node->team_id,
+            'server_uuid' => $node->uuid,
+            'server_name' => $node->name,
+            'target_type' => 'node',
+            'container' => $container,
+            'mode' => 'shell',
+            'client_ip' => data_get($payload, 'client_ip'),
+            'user_agent' => data_get($payload, 'user_agent'),
+            'started_at' => now()->getTimestamp(),
+        ];
+        Cache::put($this->liveSessionKey($sessionId), $session, now()->addSeconds(self::LIVE_SESSION_TTL_SECONDS));
+
+        auditLog('terminal.session.started', $this->auditContext($session, 'started'));
+
+        return ['flux' => $flux, 'session_id' => $sessionId];
     }
 
     /**

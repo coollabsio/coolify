@@ -48,6 +48,9 @@ class All extends Component
             } else {
                 $this->containerNames = collect([]);
             }
+        } else {
+            // A cluster application has one container per server.
+            $this->containerNames = collect([]);
         }
 
         if ($this->taskUuid !== '') {

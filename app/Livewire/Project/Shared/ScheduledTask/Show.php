@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
+use App\Models\NodeWorkload;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,7 +17,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     #[Locked]
-    public Application|Service $resource;
+    public Application|Service|NodeWorkload $resource;
 
     #[Locked]
     public ScheduledTask $task;
@@ -51,13 +52,15 @@ class Show extends Component
     #[Locked]
     public string $serverTimezone = 'UTC';
 
-    public function mount(Application|Service $resource, ScheduledTask $task): void
+    public function mount(Application|Service|NodeWorkload $resource, ScheduledTask $task): void
     {
         $this->resource = $resource;
         $this->type = $resource->type();
         $this->parameters = get_route_parameters();
         $this->task = $resource->scheduled_tasks()->whereKey($task->id)->firstOrFail();
-        $this->serverTimezone = getServerTimezone($this->task->server());
+        $this->serverTimezone = $resource instanceof NodeWorkload
+            ? (instanceSettings()->instance_timezone ?: config('app.timezone'))
+            : getServerTimezone($this->task->server());
         $this->syncData();
     }
 

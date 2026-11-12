@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Actions\Node\BackupNodeVolume;
+use App\Actions\Node\RunNodeWorkloadCommand;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Models\NodeVolume;
+use App\Models\NodeWorkload;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
@@ -323,6 +325,7 @@ class ScheduledJobManager implements ShouldQueue
             'service.destination.server.team.subscription',
             'application.destination.server.settings',
             'application.destination.server.team.subscription',
+            'nodeWorkload',
         ])
             ->where('enabled', true)
             ->when($lastTaskId !== null, fn (Builder $query) => $query->where('id', '>', $lastTaskId))
@@ -375,6 +378,12 @@ class ScheduledJobManager implements ShouldQueue
 
         foreach ($tasks as $task) {
             try {
+                if ($task->node_workload_id !== null) {
+                    $this->processScheduledClusterTask($task);
+
+                    continue;
+                }
+
                 $server = $task->server();
 
                 if (blank($server) || (! $task->service && ! $task->application)) {
@@ -675,6 +684,60 @@ class ScheduledJobManager implements ShouldQueue
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing volume backup', [
                 'backup_id' => $backup->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * A task of a cluster application runs on a Node through Flux (decision 0018). Nodes have no
+     * server timezone, so the schedule uses the instance timezone, like Node volume backups.
+     */
+    private function processScheduledClusterTask(ScheduledTask $task): void
+    {
+        try {
+            $workload = $task->nodeWorkload;
+            if (! $workload instanceof NodeWorkload) {
+                $task->delete();
+                $this->skippedCount++;
+                $this->logSkip('task', 'resource_deleted', ['task_id' => $task->id, 'team_id' => $task->team_id]);
+
+                return;
+            }
+
+            $timezone = $this->instanceTimezone();
+            $scheduleKey = "scheduled-task:{$task->id}";
+            $delivery = app(ScheduledJobDeliveryService::class);
+            $node = RunNodeWorkloadCommand::runningContainers($workload)->first()['node'] ?? null;
+            $skipReason = match (true) {
+                ! nodesEnabled() => 'nodes_disabled',
+                $node === null => 'application_not_running',
+                ! $node->hasRecentFluxHeartbeat() => 'node_offline',
+                $node->supportsCapability(RunNodeWorkloadCommand::CAPABILITY) !== true => 'node_capability_missing',
+                isCloud() && $task->team_id !== 0 && ! data_get(Team::query()->with('subscription')->find($task->team_id), 'subscription.stripe_invoice_paid', false) => 'subscription_unpaid',
+                default => null,
+            };
+            if ($skipReason !== null) {
+                if ($delivery->recordSkipped($scheduleKey, $task->frequency, $timezone, $this->executionTime)) {
+                    $this->skippedCount++;
+                    $this->logSkip('task', $skipReason, ['task_id' => $task->id, 'task_name' => $task->name, 'team_id' => $task->team_id, 'node_id' => $node?->id]);
+                }
+
+                return;
+            }
+
+            if ($delivery->recordAndPublish($scheduleKey, $task->frequency, $timezone, 'scheduled-task', $task->id, [], $this->executionTime)) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Task dispatched', [
+                    'task_id' => $task->id,
+                    'task_name' => $task->name,
+                    'team_id' => $task->team_id,
+                    'node_id' => $node->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing task', [
+                'task_id' => $task->id,
                 'error' => $e->getMessage(),
             ]);
         }

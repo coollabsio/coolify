@@ -67,6 +67,8 @@ class IssueFluxCredential
             'builder.reconcile.v1',
             'registry.reconcile.v1',
             'registry.inspect.v1',
+            'workload.exec.v1',
+            'workload.terminal.v1',
         ], $capabilities));
 
         $credential = JWT::encode([

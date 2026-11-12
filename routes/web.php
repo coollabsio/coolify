@@ -456,6 +456,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/webhooks', ClusterApplicationShow::class)->name('project.cluster-application.webhooks');
             Route::get('/backups', ClusterApplicationShow::class)->name('project.cluster-application.backups');
             Route::get('/backups/{backup_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.backup.show');
+            Route::get('/scheduled-tasks', ClusterApplicationShow::class)->name('project.cluster-application.scheduled-tasks');
+            Route::get('/terminal', ClusterApplicationShow::class)->name('project.cluster-application.terminal')->middleware('can.access.terminal');
             Route::get('/danger', ClusterApplicationShow::class)->name('project.cluster-application.danger');
         });
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
