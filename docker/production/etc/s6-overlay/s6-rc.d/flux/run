@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# php artisan flux:run replaces itself with Flux (decision 0021), or exits with 125 when Nodes are not in use.
+service_directory="$(pwd)"
+cd /var/www/html || exit 1
+
+# Development runs s6 as root: allow www-data (PHP-FPM, Horizon, scheduler) to restart this service, and run as www-data.
+if [ "$(id -u)" = "0" ]; then
+    /command/s6-svperms -G www-data "$service_directory"
+    exec /command/s6-setuidgid www-data php artisan flux:run
+fi
+
+exec php artisan flux:run

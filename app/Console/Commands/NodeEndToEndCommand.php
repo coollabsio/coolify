@@ -17,7 +17,6 @@ use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
-use App\Models\FluxCertificate;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
@@ -39,9 +38,6 @@ use Throwable;
 class NodeEndToEndCommand extends Command
 {
     public const CLUSTER_NAME = 'Development QEMU mesh';
-
-    /** The CA switch writes this request and waits for scripts/node-e2e to restart the Flux container. */
-    public const FLUX_RESTART_DIRECTORY = 'app/node-e2e';
 
     private const ACTIONS = [
         'status', 'deploy', 'lifecycle', 'operation', 'await-operation', 'firewall-add', 'firewall-remove', 'reconcile',
@@ -85,7 +81,7 @@ class NodeEndToEndCommand extends Command
                 'reconcile' => $this->queueReconciliation(),
                 'ping' => PingFluxConnection::run($this->node()),
                 'ca-start' => $this->rotation(fn (RotateFluxCertificateAuthority $rotation) => $rotation->start($this->user())),
-                'ca-continue' => $this->rotation(fn (RotateFluxCertificateAuthority $rotation) => $rotation->advance((bool) $this->option('force'), $this->restartFluxThroughHost(...))),
+                'ca-continue' => $this->rotation(fn (RotateFluxCertificateAuthority $rotation) => $rotation->advance((bool) $this->option('force'))),
                 'ca-cancel' => $this->rotation(fn (RotateFluxCertificateAuthority $rotation) => $rotation->cancel()),
                 'ca-status' => RotateFluxCertificateAuthority::make()->status(),
                 'remove-node' => $this->removeNode(),
@@ -325,50 +321,6 @@ class NodeEndToEndCommand extends Command
         $step($rotation);
 
         return $rotation->status();
-    }
-
-    /**
-     * The CA switch restarts Flux with the new leaf. The development Flux runs in a host
-     * container, so the host script restarts it on request; this side then checks that Flux
-     * serves the expected certificate.
-     */
-    private function restartFluxThroughHost(FluxCertificate $certificate): void
-    {
-        $directory = storage_path(self::FLUX_RESTART_DIRECTORY);
-        if (! is_dir($directory)) {
-            mkdir($directory, 0775, true);
-        }
-        $request = $directory.'/flux-restart.request';
-        $done = $directory.'/flux-restart.done';
-        @unlink($done);
-        file_put_contents($request, $certificate->fingerprint);
-        for ($attempt = 0; ! file_exists($done); $attempt++) {
-            if ($attempt >= 120) {
-                @unlink($request);
-                throw new RuntimeException('scripts/node-e2e did not restart Flux within 120 seconds.');
-            }
-            Sleep::for(1)->second();
-        }
-        @unlink($done);
-
-        $host = (string) config('constants.flux.tls_verify_host', 'coolify-flux');
-        retry(15, function () use ($host, $certificate): void {
-            $context = stream_context_create(['ssl' => [
-                'capture_peer_cert' => true,
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-                'SNI_server_name' => $certificate->identities[0] ?? $host,
-            ]]);
-            $client = @stream_socket_client("ssl://{$host}:7443", $errorCode, $errorMessage, 5, STREAM_CLIENT_CONNECT, $context);
-            if ($client === false) {
-                throw new RuntimeException("Flux TLS is not reachable: {$errorMessage}");
-            }
-            $peer = stream_context_get_params($client)['options']['ssl']['peer_certificate'] ?? null;
-            fclose($client);
-            if ($peer === null || openssl_x509_fingerprint($peer, 'sha256') !== $certificate->fingerprint) {
-                throw new RuntimeException('Flux did not serve the expected TLS certificate.');
-            }
-        }, 1000);
     }
 
     /** @return array<string, mixed> */

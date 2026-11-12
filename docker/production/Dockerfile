@@ -12,6 +12,9 @@ ARG NGINX_VERSION=1.31.8-r1
 ARG NODE_VERSION=24.22.1
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.0
+# Flux, the Node connection broker (decision 0021). Pin a published ghcr.io/coollabsio/flux tag with its multi-arch digest:
+# docker buildx imagetools inspect ghcr.io/coollabsio/flux:<tag> --format '{{json .Manifest.Digest}}'
+ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:main-ea82bdb@sha256:531a49f4fb34f7634b94d40d41d0c18c5175babcae7ea16f9099dccc692124db
 
 # Add user/group
 ARG USER_ID=9999
@@ -57,6 +60,8 @@ RUN --mount=type=cache,target=/tmp/cache \
 USER www-data
 
 FROM node:${NODE_VERSION}-alpine3.24 AS nodejs
+
+FROM ${FLUX_IMAGE} AS flux
 
 # =================================================================
 # Stage 2: Frontend assets compilation
@@ -204,6 +209,12 @@ RUN composer dump-autoload
 COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
+# Flux runs as www-data (s6 service flux) and reads its certificate from /data/coolify/flux/pki.
+# Coolify writes the certificate from the database at each start of Flux, so the directory needs no volume.
+COPY --from=flux /usr/local/bin/flux /usr/local/bin/flux
+RUN install -d -o www-data -g www-data -m 0700 /data/coolify/flux
+ENV FLUX_RUNTIME_UID=${USER_ID}
+
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
 COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
@@ -215,6 +226,7 @@ RUN mkdir -p /etc/nginx/conf.d && \
 
 ARG SERVERSIDEUP_PHP_VERSION
 ARG NODE_VERSION
+ARG FLUX_IMAGE
 ARG CREATED
 ARG GIT_SHA
 
@@ -233,6 +245,7 @@ LABEL org.opencontainers.image.title="Coolify" \
     io.coolify.nginx.version="${NGINX_VERSION}" \
     io.coolify.node.version="${NODE_VERSION}" \
     io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
+    io.coolify.flux.image="${FLUX_IMAGE}" \
     io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
     io.coolify.php-uv.version="${PHP_UV_VERSION}"
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\CheckNodeFluxConnection;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeHost;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
@@ -42,6 +43,7 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
             PrepareNodeHost::run($node);
 
             $this->step($node, 'installing', 'Installing server components');
+            CheckNodeFluxConnection::run($node);
             InstallSentinel::run($node);
 
             $this->step($node, 'connecting', 'Connecting to Coolify');
@@ -128,6 +130,7 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
     private function safeMessage(Throwable $exception): string
     {
         return match (true) {
+            str_starts_with($exception->getMessage(), CheckNodeFluxConnection::FAILURE_PREFIX) => $exception->getMessage(),
             str_contains($exception->getMessage(), 'Podman') => 'Coolify could not prepare Podman on this server.',
             str_contains($exception->getMessage(), 'connect') => 'The server could not connect to Coolify.',
             default => 'Coolify could not finish the server installation. Open the technical details or retry.',

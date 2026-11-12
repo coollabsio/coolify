@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Exit code 125 of flux:run: s6 keeps the service down until Coolify starts it (s6-svc -u, RestartFlux).
+if [ "$1" = "125" ]; then
+    exit 125
+fi
+
+# Wait before the next start after a failure (for example while the database starts), but not after a restart.
+case "$1" in
+    0 | 256) ;;
+    *) sleep 3 ;;
+esac

@@ -10,11 +10,16 @@ ARG POSTGRES_VERSION=18
 ARG NGINX_VERSION=1.31.8-r1
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.0
+# Flux, the Node connection broker (decision 0021). Pin a published ghcr.io/coollabsio/flux tag with its multi-arch digest:
+# docker buildx imagetools inspect ghcr.io/coollabsio/flux:<tag> --format '{{json .Manifest.Digest}}'
+ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:main-ea82bdb@sha256:531a49f4fb34f7634b94d40d41d0c18c5175babcae7ea16f9099dccc692124db
 
 # =================================================================
 # Get MinIO client
 # =================================================================
 FROM ghcr.io/coollabsio/mx:0.1.0 AS minio-client
+
+FROM ${FLUX_IMAGE} AS flux
 
 # =================================================================
 # Final Stage: Production image
@@ -115,6 +120,10 @@ RUN mkdir -p /etc/nginx/conf.d && \
 # Install MinIO client
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
+
+# Flux (s6 service flux). To test a local build, scripts/node-e2e --build mounts its binary and sets FLUX_BINARY.
+COPY --from=flux /usr/local/bin/flux /usr/local/bin/flux
+RUN install -d -o www-data -g www-data -m 0700 /data/coolify/flux
 
 ARG SERVERSIDEUP_PHP_VERSION
 ARG COOLIFY_VERSION

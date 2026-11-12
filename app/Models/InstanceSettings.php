@@ -77,6 +77,8 @@ class InstanceSettings extends Model
         'instance_uuid',
         'is_passkey_enabled',
         'is_nodes_enabled',
+        'flux_host',
+        'flux_port',
     ];
 
     protected $hidden = [
@@ -93,6 +95,8 @@ class InstanceSettings extends Model
         'resend_from_name',
         'domain_connect_private_key',
         'sentinel_token',
+        'flux_signing_private_key',
+        'flux_internal_token',
     ];
 
     protected $casts = [
@@ -130,6 +134,9 @@ class InstanceSettings extends Model
         'is_dashboard_force_https_enabled' => 'boolean',
         'is_passkey_enabled' => 'boolean',
         'is_nodes_enabled' => 'boolean',
+        'flux_port' => 'integer',
+        'flux_signing_private_key' => 'encrypted',
+        'flux_internal_token' => 'encrypted',
         'server_validation_rate_limit_seconds' => 'integer',
         'server_validation_max_failures_per_ip' => 'integer',
         'server_validation_max_failures_per_team' => 'integer',
@@ -244,6 +251,55 @@ class InstanceSettings extends Model
     public static function get()
     {
         return once(fn () => InstanceSettings::findOrFail(0));
+    }
+
+    /** @var array<string, string> The config key in constants.flux and the column of each generated Flux secret. */
+    private const FLUX_SECRET_COLUMNS = [
+        'signing_key_id' => 'flux_signing_key_id',
+        'signing_public_key' => 'flux_signing_public_key',
+        'signing_private_key' => 'flux_signing_private_key',
+        'internal_token' => 'flux_internal_token',
+    ];
+
+    /**
+     * Fills the constants.flux secrets that no FLUX_* environment variable sets (development and Coolify Cloud set them)
+     * with the generated values. Before the migrations run, the settings row or its columns do not exist yet.
+     */
+    public static function useStoredFluxSecrets(): void
+    {
+        $missing = array_filter(self::FLUX_SECRET_COLUMNS, fn (string $key): bool => blank(config("constants.flux.{$key}")), ARRAY_FILTER_USE_KEY);
+        if ($missing === []) {
+            return;
+        }
+        $stored = rescue(function () use ($missing): array {
+            $settings = self::query()->whereKey(0)->first(['id', ...array_values($missing)]);
+
+            return array_filter(array_map(fn (string $column) => $settings?->{$column}, $missing), filled(...));
+        }, [], report: false);
+        foreach ($stored as $key => $value) {
+            config(["constants.flux.{$key}" => $value]);
+        }
+    }
+
+    /**
+     * Generates the Flux signing key pair, key ID, and internal token once, on the first start.
+     */
+    public static function ensureFluxSecrets(): void
+    {
+        (new self)->getConnection()->transaction(function (): void {
+            $settings = self::query()->lockForUpdate()->findOrFail(0);
+            if (filled($settings->flux_signing_key_id) && filled($settings->flux_internal_token)) {
+                return;
+            }
+            $keyPair = sodium_crypto_sign_keypair();
+            $settings->forceFill([
+                'flux_signing_key_id' => 'coolify-'.bin2hex(random_bytes(8)),
+                'flux_signing_public_key' => base64_encode(sodium_crypto_sign_publickey($keyPair)),
+                'flux_signing_private_key' => base64_encode(sodium_crypto_sign_secretkey($keyPair)),
+                'flux_internal_token' => bin2hex(random_bytes(32)),
+            ])->save();
+        });
+        self::useStoredFluxSecrets();
     }
 
     public function ensureInstanceUuid(): string

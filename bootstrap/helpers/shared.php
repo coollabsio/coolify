@@ -1022,12 +1022,11 @@ function isDev(): bool
 
 /**
  * The gate for the Node product (Podman Nodes, clusters, host Sentinel, Flux) in the UI and for new work. Instance
- * admins set it in Settings > Advanced. Flux ships only in the development stack today, so Nodes also need a
- * development instance.
+ * admins set it in Settings > Advanced.
  */
 function nodesEnabled(): bool
 {
-    return isDev() && (bool) instanceSettings()->is_nodes_enabled;
+    return (bool) instanceSettings()->is_nodes_enabled;
 }
 
 /**
@@ -1036,7 +1035,7 @@ function nodesEnabled(): bool
  */
 function nodesInUse(): bool
 {
-    return nodesEnabled() || (isDev() && Node::query()->exists());
+    return nodesEnabled() || Node::query()->exists();
 }
 
 /**

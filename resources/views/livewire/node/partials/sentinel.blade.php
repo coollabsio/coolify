@@ -152,12 +152,12 @@
                     warningMessage="The control connection drops briefly while Sentinel restarts."
                     step2ButtonText="Rotate token" />
             </div>
-            @if (isDev() && auth()->user()?->can('update', instanceSettings()))
+            @if (auth()->user()?->can('update', instanceSettings()))
                 <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                     <div class="min-w-0">
                         <p class="text-[13px] font-medium text-black dark:text-fg">Renew certificate</p>
                         <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                            Development only. Renews the instance-wide Flux TLS certificate used by every cluster server.
+                            Instance admins only. Renews the instance-wide Flux TLS certificate used by every cluster server and restarts Flux.
                         </p>
                     </div>
                     <x-forms.button wire:click="renewFluxCertificate">Renew certificate</x-forms.button>

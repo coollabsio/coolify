@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Actions\Node\Build\EnsureNodeRegistry;
+use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -199,7 +200,7 @@ class ReconcileNodeClusterNetwork
 
             $members = $this->members($cluster);
             $peers = $members->filter(fn (Node $node): bool => filled($node->wireguard_public_key) && filled($node->wireguard_ip) && filled($node->workload_cidr));
-            $fluxProbeHost = parse_url((string) config('constants.flux.public_url'), PHP_URL_HOST) ?: '';
+            $fluxProbeHost = trim((string) parse_url(rescue(fn () => (new ResolveFluxPublicUrl)->resolve(), '', report: false), PHP_URL_HOST), '[]');
             $firewallRules = $this->firewallRules($cluster);
             $ingressRules = $this->ingressRules($cluster);
             // The registry exists once the cluster has a Git workload. Its certificate is renewed here.

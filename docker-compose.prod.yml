@@ -35,6 +35,8 @@ services:
       - "${APP_PORT:-8000}:8080"
       - "${REVERB_PORT:-${SOKETI_PORT:-6001}}:6001"
       - "6002:6002"
+      # Flux (Nodes). Nothing listens on it while Nodes are off.
+      - "${FLUX_PORT:-7443}:7443"
     expose:
       - "${APP_PORT:-8000}"
       - "6001"

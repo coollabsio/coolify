@@ -73,6 +73,13 @@ class Init extends Command
         $this->settings = instanceSettings();
         $this->servers = Server::all();
 
+        // Before Horizon and the scheduler start, so their workers read the Flux secrets at boot.
+        try {
+            InstanceSettings::ensureFluxSecrets();
+        } catch (\Throwable $e) {
+            echo "Could not generate the Flux secrets: {$e->getMessage()}\n";
+        }
+
         $do_not_track = data_get($this->settings, 'do_not_track', true);
         if ($do_not_track == false) {
             $this->sendAliveSignal();

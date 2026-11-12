@@ -6,6 +6,7 @@ use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Http\Middleware\EnsureTeamWideAccess;
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
@@ -55,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureQueue();
         $this->configureServerTransferImport();
         $this->configureLivewire();
+        InstanceSettings::useStoredFluxSecrets();
     }
 
     /**

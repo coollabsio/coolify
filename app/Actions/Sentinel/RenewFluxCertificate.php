@@ -4,7 +4,6 @@ namespace App\Actions\Sentinel;
 
 use App\Models\FluxCertificate;
 use App\Models\FluxCertificateAuthority;
-use App\Models\Server;
 use Closure;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -17,8 +16,9 @@ class RenewFluxCertificate
     /**
      * @param  Closure(FluxCertificate): void|null  $restartAndValidate
      * @param  FluxCertificateAuthority|null  $authority  A CA rotation switch passes the new CA; renewal otherwise keeps the active CA.
+     * @param  list<string>|null  $identities  A change of the Flux URL passes the new names; renewal otherwise keeps them.
      */
-    public function handle(?Closure $restartAndValidate = null, bool $force = false, ?FluxCertificateAuthority $authority = null): bool
+    public function handle(?Closure $restartAndValidate = null, bool $force = false, ?FluxCertificateAuthority $authority = null, ?array $identities = null): bool
     {
         $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux';
         if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
@@ -47,8 +47,8 @@ class RenewFluxCertificate
                 throw new RuntimeException('Flux renewal requires the current installation CA.');
             }
 
-            $candidate = $previous->getConnection()->transaction(function () use ($previous, $authority): FluxCertificate {
-                $candidate = IssueFluxCertificate::run($previous->identities, $authority);
+            $candidate = $previous->getConnection()->transaction(function () use ($previous, $authority, $identities): FluxCertificate {
+                $candidate = IssueFluxCertificate::run($identities ?? $previous->identities, $authority);
                 $expectedAuthorityId = $authority->id ?? $previous->certificate_authority_id;
                 if ($candidate->certificate_authority_id !== $expectedAuthorityId) {
                     throw new RuntimeException('Flux renewal must not change the installation CA.');
@@ -93,25 +93,27 @@ class RenewFluxCertificate
 
     private function restartAndValidate(FluxCertificate $certificate): void
     {
-        $server = Server::findOrFail(0);
-        instant_remote_process(['docker restart coolify-flux'], $server, timeout: 30);
-        $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux/pki';
+        RestartFlux::run();
+        $caFile = rtrim(config('constants.coolify.base_config_path'), '/').'/flux/pki/ca.pem';
         $identity = $certificate->identities[0];
-        $verification = filter_var($identity, FILTER_VALIDATE_IP) !== false ? '-verify_ip' : '-verify_hostname';
-        $port = (int) config('constants.flux.port');
-        $host = (string) config('constants.flux.tls_verify_host', '127.0.0.1');
-        $connect = str_contains($host, ':') ? '['.$host.']:'.$port : $host.':'.$port;
-        $command = 'timeout 15 openssl s_client -showcerts -connect '.escapeshellarg($connect)
-            .' -CAfile '.escapeshellarg($directory.'/ca.pem')
-            .' -verify_return_error '.$verification.' '.escapeshellarg($identity)
-            .' -servername '.escapeshellarg($identity).' </dev/null';
 
-        retry(5, function () use ($server, $command, $certificate): void {
-            $output = instant_remote_process([$command], $server, timeout: 20);
-            if (! preg_match('/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $output ?? '', $matches)
-                || openssl_x509_fingerprint($matches[0], 'sha256') !== $certificate->fingerprint) {
+        retry(30, function () use ($caFile, $identity, $certificate): void {
+            $context = stream_context_create(['ssl' => [
+                'capture_peer_cert' => true,
+                'cafile' => $caFile,
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'peer_name' => $identity,
+            ]]);
+            $client = @stream_socket_client('ssl://127.0.0.1:'.FluxRuntime::LISTEN_PORT, $errorCode, $errorMessage, 5, STREAM_CLIENT_CONNECT, $context);
+            if ($client === false) {
+                throw new RuntimeException("Flux TLS is not reachable: {$errorMessage}");
+            }
+            $peer = stream_context_get_params($client)['options']['ssl']['peer_certificate'] ?? null;
+            fclose($client);
+            if ($peer === null || openssl_x509_fingerprint($peer, 'sha256') !== $certificate->fingerprint) {
                 throw new RuntimeException('Flux did not serve the expected TLS certificate.');
             }
-        }, 200);
+        }, 500);
     }
 }

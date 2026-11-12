@@ -1,7 +1,7 @@
 # V5 Control Architecture: Current State
 
 **Status:** Development only  
-**Feature gate:** the instance setting `is_nodes_enabled` (Settings > Advanced), on a development instance only  
+**Feature gate:** the instance setting `is_nodes_enabled` (Settings > Advanced), off by default (beta)  
 **Last reviewed:** 2026-11-12
 
 ## Purpose
@@ -11,8 +11,9 @@ each normal request. SSH remains the bootstrap and recovery path. On a cluster
 of Nodes, Coolify builds, deploys, moves, and serves cluster applications and
 databases. `nodesEnabled()` in `bootstrap/helpers/shared.php` is the only gate.
 It needs the instance setting `is_nodes_enabled`
-([decision 0015](../decisions/0015-node-release-criteria.md)) and a
-development instance, because Flux ships only in the development stack.
+([decision 0015](../decisions/0015-node-release-criteria.md)). Flux runs as the
+s6 service `flux` in the Coolify container
+([decision 0021](../decisions/0021-production-flux.md)).
 `nodesInUse()` keeps the control channel of existing Nodes working (Flux
 certificates, trust bundles, assignments) while the setting is off.
 
@@ -295,7 +296,7 @@ target placement that the move attached, unless the target became ready.
 
 | Action | Effect |
 | --- | --- |
-| Renew certificate | Issues and activates a new Flux leaf certificate under the current CA. It restarts Flux, validates the served certificate, and restores the prior files after a failed check. |
+| Renew certificate | Issues and activates a new Flux leaf certificate under the current CA. It restarts the s6 service `flux` (`s6-svc -r`), validates the served certificate inside the container, and restores the prior files after a failed check. |
 | Repair trust | Reinstalls the current Coolify CA bundle on one server and restarts Sentinel. During a CA rotation the current bundle holds both CAs. It does not create a new CA or leaf certificate. |
 | Rotate CA | Replaces the installation CA in stages without downtime. Instance admins run it from **Settings → Node trust** or with `php artisan flux:rotate-ca`. |
 
@@ -343,9 +344,11 @@ Sentinel refuses to connect until trust is repaired.
 
 ### Development
 
-Coolify and Flux run in containers. The testing host runs systemd in its test
-container, and host-native Sentinel runs as a systemd service inside it. The
-stack uses published `main` images from GHCR. This setup tests the production
+Flux runs in the Coolify container, as in production. The development image
+copies the pinned Flux binary; `scripts/node-e2e --build` mounts a local build
+instead (`FLUX_BINARY`). The development compose file sets fixed Flux secrets
+and `FLUX_PUBLIC_URL`. The testing host runs systemd in its test container, and
+host-native Sentinel runs as a systemd service inside it. This setup tests the production
 process model while keeping local development reproducible.
 
 Developers with KVM access can also start the optional two-Node QEMU profile.
@@ -452,8 +455,6 @@ Ingress ([decision 0005](../decisions/0005-node-ingress.md)):
 
 ### Not implemented
 
-- Nodes outside a development instance: the production installer has no Flux
-  service, no Flux TLS certificate, and no Flux signing keys;
 - a Sentinel release with every capability that Coolify grants. `upstream.json`
   pins `sentinel-host` 1.1.5. Sentinel v1.1.5 and v1.1.6 do not have private
   Git builds, volume backup and restore, registry credentials, external pushes,

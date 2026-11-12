@@ -147,29 +147,57 @@
                 </x-application.settings-subsection>
             </x-application.settings-section>
 
-            @if (isDev())
-                <x-application.settings-section id="nodes-section" title="Nodes and clusters">
-                    <x-slot:badges>
-                        <x-beta-badge />
-                    </x-slot:badges>
-                    <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.listbox canGate="update" :canResource="$settings" id="is_nodes_enabled" label="Nodes"
-                            helper="Show cluster servers and clusters to all teams. Only instance admins can change this setting. If you disable Nodes, existing Nodes stay connected and their applications continue to run, but users cannot open or change them."
-                            onChange="saveNodesEnabled" :options="[
-                                ['value' => true, 'label' => 'Enabled'],
-                                ['value' => false, 'label' => 'Disabled'],
-                            ]" />
-                        <div x-show="! $wire.is_nodes_enabled" @if ($is_nodes_enabled) x-cloak @endif class="lg:col-span-2">
-                            <x-callout type="warning" title="Cluster applications continue to run">
-                                Coolify hides the cluster pages and blocks new clusters, cluster servers, and cluster
-                                applications. Existing Nodes stay connected and their applications continue to run.
-                                Webhooks and the API can still deploy existing cluster applications.
-                                To stop a cluster application, enable Nodes and stop the application first.
-                            </x-callout>
+            <x-application.settings-section id="nodes-section" title="Nodes and clusters">
+                <x-slot:badges>
+                    <x-beta-badge />
+                </x-slot:badges>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="is_nodes_enabled" label="Nodes"
+                        helper="Show cluster servers and clusters to all teams. Only instance admins can change this setting. If you disable Nodes, existing Nodes stay connected and their applications continue to run, but users cannot open or change them."
+                        onChange="saveNodesEnabled" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                    <div class="flex flex-col gap-4 lg:col-span-2">
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.input canGate="update" :canResource="$settings" id="flux_host" label="Flux host"
+                                helper="The DNS name or IP address of this server that Nodes use to reach Flux. Empty uses the instance domain, else the public IP address."
+                                :placeholder="$fluxDefaultHost ?? 'flux.example.com'" />
+                            <x-forms.input canGate="update" :canResource="$settings" id="flux_port" type="number" min="1"
+                                max="65535" label="Flux port"
+                                helper="The TCP port that Nodes connect to. Coolify publishes Flux on host port {{ config('constants.flux.port') }} (FLUX_PORT)."
+                                :placeholder="(string) config('constants.flux.port')" />
                         </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <x-forms.button canGate="update" :canResource="$settings" type="button" wire:click="saveFluxUrl">
+                                Save Flux URL
+                            </x-forms.button>
+                        </div>
+                        @if ($fluxUrlFromEnvironment)
+                            <x-status-badge status="Using FLUX_PUBLIC_URL from environment" type="neutral" />
+                        @endif
+                        @if ($fluxUrl)
+                            <x-callout type="info" title="Open the Flux port">
+                                Nodes connect to <span class="font-mono">{{ $fluxUrl }}</span>. Allow inbound TCP port
+                                {{ parse_url($fluxUrl, PHP_URL_PORT) }} from every Node to this server in its firewall.
+                                Node onboarding checks this connection before it installs Sentinel.
+                            </x-callout>
+                        @else
+                            <x-callout type="warning" title="No Flux URL">
+                                Set the Flux host, or set the instance domain or public IP address, before you add a Node.
+                            </x-callout>
+                        @endif
                     </div>
-                </x-application.settings-section>
-            @endif
+                    <div x-show="! $wire.is_nodes_enabled" @if ($is_nodes_enabled) x-cloak @endif class="lg:col-span-2">
+                        <x-callout type="warning" title="Cluster applications continue to run">
+                            Coolify hides the cluster pages and blocks new clusters, cluster servers, and cluster
+                            applications. Existing Nodes stay connected and their applications continue to run.
+                            Webhooks and the API can still deploy existing cluster applications.
+                            To stop a cluster application, enable Nodes and stop the application first.
+                        </x-callout>
+                    </div>
+                </div>
+            </x-application.settings-section>
 
             <x-application.settings-section id="interface-section" title="Interface and telemetry">
                 <div class="grid gap-4 lg:grid-cols-2">

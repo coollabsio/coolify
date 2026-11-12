@@ -2,6 +2,11 @@
 
 namespace App\Livewire\Settings;
 
+use App\Actions\Sentinel\FluxRuntime;
+use App\Actions\Sentinel\RenewFluxCertificate;
+use App\Actions\Sentinel\ResolveFluxPublicUrl;
+use App\Actions\Sentinel\RestartFlux;
+use App\Models\FluxCertificate;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
@@ -52,6 +57,10 @@ class Advanced extends Component
     public bool $is_mcp_server_enabled;
 
     public bool $is_nodes_enabled = false;
+
+    public ?string $flux_host = null;
+
+    public ?string $flux_port = null;
 
     public ?string $webhook_allowed_internal_hosts = null;
 
@@ -118,6 +127,8 @@ class Advanced extends Component
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
         $this->is_nodes_enabled = (bool) $this->settings->is_nodes_enabled;
+        $this->flux_host = $this->settings->flux_host;
+        $this->flux_port = $this->settings->flux_port === null ? null : (string) $this->settings->flux_port;
         $this->webhook_allowed_internal_hosts = collect($this->settings->webhook_allowed_internal_hosts ?? [])->implode(',');
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
         // Do not prefill the secret into the form; only update when the admin pastes a new value.
@@ -342,7 +353,46 @@ class Advanced extends Component
             $this->validateOnly('is_nodes_enabled', ['is_nodes_enabled' => 'boolean']);
             $this->settings->is_nodes_enabled = $this->is_nodes_enabled;
             $this->saveAndAudit();
+            if (FluxRuntime::shouldRun()) {
+                rescue(fn () => RestartFlux::run(restart: false));
+            }
             $this->redirectRoute('settings.advanced', navigate: false);
+        } catch (\Exception $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * The host and port that Nodes use to reach Flux. A new host needs a Flux certificate for it, so Flux restarts.
+     * While Flux is down, it gets the certificate when it starts (FluxRuntime).
+     */
+    public function saveFluxUrl(): void
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->flux_host = filled($this->flux_host) ? strtolower(trim($this->flux_host)) : null;
+            $this->validate([
+                'flux_host' => ['nullable', 'string', 'max:253', function (string $attribute, string $value, \Closure $fail): void {
+                    $isHostname = filter_var($value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false && ! preg_match('/^[\d.]+$/D', $value);
+                    if (filter_var($value, FILTER_VALIDATE_IP) === false && ! $isHostname) {
+                        $fail('Use a DNS name or an IP address without a scheme or port.');
+                    }
+                }],
+                'flux_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            ]);
+            $this->settings->flux_host = $this->flux_host;
+            $this->settings->flux_port = filled($this->flux_port) ? (int) $this->flux_port : null;
+            $this->saveAndAudit();
+
+            $identities = (new ResolveFluxPublicUrl)->certificateIdentities();
+            $active = FluxCertificate::query()->where('state', 'active')->first();
+            if ($active !== null && ! in_array($identities[0], $active->identities, true) && FluxRuntime::shouldRun()) {
+                RenewFluxCertificate::run(null, true, null, $identities);
+                $this->dispatch('success', 'Flux URL saved. Flux restarted with a certificate for '.$identities[0].'.');
+
+                return;
+            }
+            $this->dispatch('success', 'Flux URL saved.');
         } catch (\Exception $e) {
             handleError($e, $this);
         }
@@ -439,6 +489,10 @@ class Advanced extends Component
 
     public function render()
     {
-        return view('livewire.settings.advanced');
+        return view('livewire.settings.advanced', [
+            'fluxUrl' => rescue(fn () => (new ResolveFluxPublicUrl)->resolve(), null, report: false),
+            'fluxDefaultHost' => ResolveFluxPublicUrl::defaultHost(),
+            'fluxUrlFromEnvironment' => filled(config('constants.flux.public_url')),
+        ]);
     }
 }

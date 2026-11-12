@@ -150,16 +150,22 @@ return [
 
     'flux' => [
         'renew_before_days' => 30,
+        // The user that runs Flux (www-data of the Coolify image) owns the certificate files.
         'runtime_uid' => (int) env('FLUX_RUNTIME_UID', 65532),
-        'tls_verify_host' => env('FLUX_TLS_VERIFY_HOST', '127.0.0.1'),
+        'binary' => env('FLUX_BINARY', '/usr/local/bin/flux'),
+        // The default public port of the Flux URL. Flux listens on 7443 inside the Coolify container.
         'port' => (int) env('FLUX_PORT', 7443),
         'public_url' => env('FLUX_PUBLIC_URL'),
         'issuer' => env('FLUX_ISSUER', env('APP_ID')),
+        // Without these variables, Coolify uses the values that it generated and stored in the instance settings.
         'signing_key_id' => env('FLUX_SIGNING_KEY_ID'),
         'signing_private_key' => env('FLUX_SIGNING_PRIVATE_KEY'),
         'signing_public_key' => env('FLUX_SIGNING_PUBLIC_KEY'),
+        'previous_signing_key_id' => env('FLUX_PREVIOUS_SIGNING_KEY_ID'),
+        'previous_signing_public_key' => env('FLUX_PREVIOUS_SIGNING_PUBLIC_KEY'),
         'internal_token' => env('FLUX_INTERNAL_TOKEN'),
-        'internal_url' => env('FLUX_INTERNAL_URL'),
+        // Any other URL means that Flux runs outside this container (Coolify Cloud), so the s6 service stays down.
+        'internal_url' => env('FLUX_INTERNAL_URL', 'http://127.0.0.1:7080'),
         'development_allow_plaintext' => env('FLUX_DEVELOPMENT_ALLOW_PLAINTEXT', false),
     ],
 
