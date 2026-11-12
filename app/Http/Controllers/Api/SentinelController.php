@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
@@ -133,7 +134,7 @@ class SentinelController extends Controller
     }
 
     /**
-     * Sentinel sends its version on every push, so an outdated Sentinel is found without SSH.
+     * Sentinel sends its version on every push, so an outdated Sentinel, or one in the other runtime, is found without SSH.
      * The reported version also tells ServerManagerJob to skip its hourly SSH version check.
      * Old Sentinel versions do not send the header and keep the hourly SSH check.
      */
@@ -145,8 +146,11 @@ class SentinelController extends Controller
 
         Cache::put(Server::sentinelReportedVersionCacheKey($server->id), $runningVersion, now()->addHours(2));
 
+        // A change of the Sentinel runtime setting also needs the check, because it moves Sentinel to the other runtime.
+        $runtimeChanged = StartSentinel::wantedRuntime($server) !== StartSentinel::actualRuntime($server);
         $latestVersion = data_get(get_versions_data(), 'sentinel.version');
-        if (blank($latestVersion) || version_compare($runningVersion, $latestVersion, '>=')) {
+        $isOutdated = filled($latestVersion) && version_compare($runningVersion, $latestVersion, '<');
+        if (! $runtimeChanged && ! $isOutdated) {
             return;
         }
 
