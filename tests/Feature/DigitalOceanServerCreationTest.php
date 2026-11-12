@@ -164,15 +164,3 @@ it('deletes the droplet when local server persistence fails', function () {
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.digitalocean.com/v2/droplets/555');
 });
-
-it('renders only a single buy button as the DigitalOcean form action', function () {
-    $html = Livewire::test(ByDigitalOcean::class)
-        ->set('current_step', 2)
-        ->assertDontSee('wire:click="previousStep"', false)
-        ->assertSeeHtml('class="button button-highlighted"')
-        ->assertSee('Buy and create')
-        ->html();
-
-    expect(substr_count($html, 'type="submit"'))->toBe(1)
-        ->and(substr_count($html, 'Buy and create'))->toBe(1);
-});

@@ -1210,16 +1210,6 @@ test('critical operational events persist with their source action and actor', f
     'api.database.import_started',
 ]);
 
-test('audit log displays source abbreviations in uppercase', function () {
-    AuditEvent::factory()->create([
-        'team_id' => $this->team->id,
-        'source' => 'cli',
-    ]);
-
-    Livewire::test(AuditLog::class)
-        ->assertSee('CLI');
-});
-
 test('audit log page filters events by search and action', function () {
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,

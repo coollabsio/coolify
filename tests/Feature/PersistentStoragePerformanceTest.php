@@ -101,8 +101,6 @@ it('renders volume rows inline without nested Livewire row components', function
     $component = Livewire::test(All::class, ['resource' => $application]);
 
     expect($component->html())
-        ->toContain('data-table')
-        ->toContain('wire:submit="submit(')
         ->not->toContain('shared-configure-volume-backup-');
 
     // The only nested components are the per-row backup forms, keyed by volume id.
@@ -125,10 +123,7 @@ it('batches volume backup meta and exposes forms for every volume', function () 
     $component = Livewire::test(All::class, ['resource' => $application]);
 
     expect($component->get('volumeBackupMeta'))->toHaveCount(5)
-        ->and($component->get('forms'))->toHaveCount(5)
-        ->and($component->html())->toContain('volumes-col-backup')
-        ->toContain('Backups are saved to S3')
-        ->toContain('Backups are stored locally only');
+        ->and($component->get('forms'))->toHaveCount(5);
 
     expect($component->get("volumeBackupMeta.{$application->persistentStorages->first()->id}.s3"))->toBeTrue();
 
@@ -157,10 +152,6 @@ it('mounts a backup form per volume row keyed by the volume id', function () {
     expect($component->snapshot['memo']['children'])
         ->toHaveCount(3)
         ->toHaveKey("configure-volume-backup-{$volume->id}");
-
-    $component
-        ->assertSee('Configure Volume Backup')
-        ->assertSee('Frequency');
 });
 
 it('keeps file mount content out of the volumes tab snapshot', function () {

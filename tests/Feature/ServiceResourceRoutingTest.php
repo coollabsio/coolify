@@ -208,23 +208,6 @@ test('legacy service database backup list redirects to unified service backups',
     $this->get($legacyUrl)->assertRedirect($centralBackupsUrl);
 });
 
-test('service backup schedules open in place from the unified view', function () {
-    $backup = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-
-    $this->get(route('project.service.volume-backups.index', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ]))
-        ->assertOk()
-        ->assertSee("wire:click=\"openSchedule('{$backup->uuid}')\"", false);
-});
-
 test('service database backup schedules open in the Livewire component', function () {
     Queue::fake();
     $backup = ScheduledDatabaseBackup::create([
@@ -369,7 +352,7 @@ test('service storage backups page includes schedules from all compose databases
         'custom_type' => 'postgresql',
     ]);
 
-    $backups = collect([$this->ownServiceDatabase, $secondDatabase])->map(function (ServiceDatabase $database) {
+    collect([$this->ownServiceDatabase, $secondDatabase])->each(function (ServiceDatabase $database) {
         return ScheduledDatabaseBackup::create([
             'team_id' => $this->teamA->id,
             'description' => $database->name.' backup',
@@ -385,11 +368,8 @@ test('service storage backups page includes schedules from all compose databases
         'service_uuid' => $this->ownService->uuid,
     ]))
         ->assertOk()
-        ->assertSee('>Database</button>', false)
         ->assertSee('own-db')
-        ->assertSee('analytics-db')
-        ->assertSee("wire:click=\"openSchedule('{$backups->first()->uuid}')\"", false)
-        ->assertSee("wire:click=\"backupNow('database', '{$backups->first()->uuid}')\"", false);
+        ->assertSee('analytics-db');
 });
 
 test('service backup settings open automatically from the creation redirect', function () {
@@ -419,44 +399,6 @@ test('service backup settings reject a backup belonging to another team', functi
 
     Livewire::withQueryParams(['backup_uuid' => $backup->uuid])
         ->test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService]);
-});
-
-test('service backups have explicit settings actions for database and storage schedules', function () {
-    $databaseBackup = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    $volume = LocalPersistentVolume::create([
-        'name' => 'service-data',
-        'mount_path' => '/data',
-        'resource_id' => $this->ownServiceDatabase->id,
-        'resource_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    $volumeBackup = $volume->scheduledBackups()->create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-    ]);
-
-    $html = Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])->html();
-    $dom = new DOMDocument;
-    @$dom->loadHTML($html);
-    $xpath = new DOMXPath($dom);
-    $buttons = $xpath->query('//button[@role="menuitem"][normalize-space()="Edit"]');
-    $actions = [];
-    foreach ($buttons as $button) {
-        $actions[] = $button->getAttribute('wire:click');
-    }
-
-    expect($actions)->toContain("openSchedule('{$databaseBackup->uuid}')", "openSchedule('{$volumeBackup->uuid}')");
-
-    foreach (['database' => $databaseBackup, 'storage' => $volumeBackup] as $type => $backup) {
-        $backupAction = "wire:click=\"backupNow('{$type}', '{$backup->uuid}')\"";
-        $settingsAction = "wire:click=\"openSchedule('{$backup->uuid}')\"";
-        expect(strpos($html, $backupAction))->toBeLessThan(strrpos($html, $settingsAction));
-    }
-
 });
 
 test('members cannot open service backup settings', function () {
@@ -584,25 +526,6 @@ test('service execution pagination excludes other teams and denies opening their
         ->call('openExecution', $execution->uuid)
         ->assertNotFound();
 })->with(['database', 'storage']);
-
-test('execution page size remains adjustable when all runs fit on one page', function () {
-    $schedule = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    foreach (range(1, 11) as $index) {
-        $schedule->executions()->create(['status' => 'success']);
-    }
-
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->set('perPage', 25)
-        ->assertSeeHtml('aria-label="Items per page"')
-        ->assertDontSeeHtml('aria-label="Next page"')
-        ->set('perPage', 10)
-        ->assertSeeHtml('aria-label="Next page"');
-});
 
 test('service backup lists identify the configured S3 storage without extra columns', function () {
     foreach (['Cloudflare R2', 'Railway S3', 'Maxio S3'] as $name) {

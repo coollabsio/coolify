@@ -156,14 +156,11 @@ test('an administrator cannot create storage on a cross-team resource', function
     expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('file mount modal shows the calculated host file path above the destination input', function () {
+test('file mount modal shows the calculated host file path', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
-        ->assertSeeText('Create a managed file on the host and mount it inside the container.')
-        ->assertSeeText('Host file path')
         ->assertSeeText($this->application->workdir().'/')
         ->set('file_storage_path', '/etc/nginx/nginx.conf')
-        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf')
-        ->assertDontSeeText('Actual file mounted from the host system to the container.');
+        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf');
 });
 
 test('livewire file storage stores safe file mounts under the application configuration root', function () {

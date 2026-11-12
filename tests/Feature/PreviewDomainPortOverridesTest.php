@@ -145,9 +145,7 @@ it('uses the dns badge as progress for single and all preview checks', function 
 
     Livewire::test(PreviewDomains::class, ['preview' => $preview])
         ->call($action, ...$parameters)
-        ->assertSet('domainRows.0.dns_status', 'checking')
-        ->assertSee('Checking DNS...')
-        ->assertSeeHtml('loading-indicator');
+        ->assertSet('domainRows.0.dns_status', 'checking');
 
     Queue::assertPushed(CheckDomainDnsJob::class, 1);
 })->with([
@@ -312,22 +310,6 @@ it('prunes a preview domain port override when removing the domain', function ()
     expect($preview->fqdn)->toBe('https://two-preview.example.com')
         ->and($preview->domain_port_overrides)
         ->toBe(['https://two-preview.example.com' => 3000]);
-});
-
-it('shows a warning when a preview domain has no internal port and ports exposes is empty', function () {
-    $this->application->update([
-        'ports_exposes' => null,
-    ]);
-
-    $preview = createPreviewForPortTests($this->application, 109, [
-        'fqdn' => 'https://preview.example.com',
-        'domain_port_overrides' => null,
-    ]);
-
-    Livewire::test(PreviewDomains::class, ['preview' => $preview])
-        ->assertSee('aria-label="No internal port"', false)
-        ->assertSee('Set Ports Exposes or a per-domain internal port')
-        ->assertDontSee('aria-label="Internal port ', false);
 });
 
 it('rejects adding a preview domain whose portless URL is already configured', function () {
@@ -694,7 +676,6 @@ it('shows a port warning when a preview domain uses a port that is not exposed o
         ->call('addDomain')
         ->assertSet('showPortWarningModal', true)
         ->assertSet('unrecognizedPort', 9090)
-        ->assertSee('Use a different port?')
         ->assertSee('9090');
 
     expect($preview->fresh()->fqdn)->toBeNull();

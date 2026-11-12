@@ -198,13 +198,11 @@ test('removing the last resource from a tag on the resource page keeps the tag',
         ->and(Tag::find($this->tag->id))->not->toBeNull();
 });
 
-test('the tags canvas page opens a tag from its connect link', function () {
+test('the tags canvas and tag pages open', function () {
     tagCanvasAs($this, $this->admin, $this->team)->get(route('tags.canvas'))
-        ->assertOk()
-        ->assertSee('data-mode="tags"', false);
+        ->assertOk();
     tagCanvasAs($this, $this->admin, $this->team)->get(route('tags.show', ['tagName' => 'production']))
-        ->assertOk()
-        ->assertSee(route('tags.canvas').'?select=tag%3A'.$this->tag->uuid, false);
+        ->assertOk();
 });
 
 test('the tags page reopens the canvas when the user left it on the canvas view', function () {

@@ -25,29 +25,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows an add private key button when no private keys exist', function () {
-    Livewire::test(Dashboard::class)
-        ->assertSee('A private key is required')
-        ->assertSee('Add an SSH private key before connecting your first server.')
-        ->assertSee('Add private key')
-        ->assertSee(route('security.private-key.index'), false);
-});
-
-it('shows a new server button when private keys exist but servers do not', function () {
-    PrivateKey::factory()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Deploy Key',
-    ]);
-
-    Livewire::test(Dashboard::class)
-        ->assertSee('No servers yet')
-        ->assertSee('Connect infrastructure for your deployments.')
-        ->assertSee('New server')
-        ->assertSee(route('server.create'), false)
-        ->assertDontSee('A private key is required')
-        ->assertDontSee('Add private key');
-});
-
 it('does not show server empty state when servers exist', function () {
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,

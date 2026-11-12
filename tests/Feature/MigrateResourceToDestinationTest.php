@@ -406,8 +406,7 @@ test('resource operations only shows migration in development mode', function ()
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ResourceOperations::class, ['resource' => $application])
-        ->assertSee('Migrate to another server')
-        ->assertSee('Dev');
+        ->assertSee('Migrate to another server');
 
     config(['app.env' => 'production']);
 

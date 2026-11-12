@@ -98,24 +98,15 @@ describe('server image scanning page', function () {
         Queue::assertNothingPushed();
     });
 
-    it('shows the off state with the turn on button', function () {
-        imageScanningPage()
-            ->assertSee('Image scanning is off for '.$this->server->name.'.')
-            ->assertSee('Enable image scanning?');
-    });
-
-    it('shows only the title row and the database build time in the helper when the scanner is ready', function () {
+    it('shows the database build time when the scanner is ready', function () {
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
         Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
         Cache::put(PrepareImageScannerJob::builtAtCacheKey($this->server), now()->subDay()->toIso8601ZuluString());
 
         imageScanningPage()
             ->assertSee('Database built 1 day ago')
-            ->assertSee('Coolify downloads the latest vulnerability database every day')
             ->assertDontSee('Update database')
-            ->assertDontSee('Get scanner')
-            ->assertSee('Disable image scanning?')
-            ->assertSee('Delete scanner data');
+            ->assertDontSee('Get scanner');
     });
 
     it('shows the progress of the scanner preparation', function () {

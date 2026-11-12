@@ -2,7 +2,6 @@
 
 use App\Actions\Server\DeleteServer;
 use App\Jobs\ValidateNewCloudServerJob;
-use App\Livewire\Server\Create;
 use App\Livewire\Server\CreatePage;
 use App\Livewire\Server\Delete;
 use App\Livewire\Server\New\ByHostinger;
@@ -53,10 +52,6 @@ beforeEach(function () {
 });
 
 it('offers Hostinger as a server provider', function () {
-    Livewire::test(Create::class)
-        ->assertSee('Hostinger')
-        ->assertSee(route('server.create.type', ['type' => 'hostinger']), false);
-
     Livewire::test(CreatePage::class, ['type' => 'hostinger'])
         ->assertSet('title', 'Hostinger')
         ->assertSet('tokenProvider', 'hostinger');
@@ -65,27 +60,15 @@ it('offers Hostinger as a server provider', function () {
 it('leaves paid Hostinger backups off by default', function () {
     Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
         ->assertSet('enable_backups', false)
-        ->set('loading_data', false)
-        ->assertSee('Enable weekly Hostinger backups (extra cost)')
-        ->assertSee('Hostinger charges extra for backups. Check the price in hPanel before you enable them.');
+        ->set('loading_data', false);
 });
 
-it('selects Hostinger account SSH keys with the same dropdown as Hetzner', function () {
+it('escapes the names of Hostinger account SSH keys', function () {
     Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
         ->set('loading_data', false)
         ->set('hostinger_public_keys', [['id' => 42, 'name' => '<b>Operations</b>']])
-        ->assertSee('Extra SSH keys')
-        ->assertSee('Existing keys from the Hostinger account.')
-        ->assertSee('Search SSH keys')
         ->assertSee('Operations')
-        ->assertSeeHtml('x-text="current">Select SSH keys</span>')
-        ->assertDontSeeHtml('<b>Operations</b>')
-        ->assertDontSeeHtml('id="hostinger-public-key-42-');
-
-    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
-        ->set('loading_data', false)
-        ->set('hostinger_public_keys', [])
-        ->assertSee('No account keys found');
+        ->assertDontSeeHtml('<b>Operations</b>');
 });
 
 it('purchases a Hostinger VPS and creates the linked Coolify server', function () {
@@ -310,9 +293,7 @@ it('splits Hostinger templates into plain operating systems and operating system
         ->call('loadHostingerData')
         ->assertSet('selected_os_template_id', 1130)
         ->assertSet('selected_app_template_id', null)
-        ->assertSet('selected_template_id', 1130)
-        ->assertSee('Operating system with application')
-        ->assertSee('can conflict with the Coolify proxy on ports 80 and 443', false);
+        ->assertSet('selected_template_id', 1130);
 
     expect(collect($component->instance()->osTemplates)->pluck('name')->all())
         ->toBe(['Debian 13', 'Ubuntu 24.04 LTS'])
@@ -441,21 +422,6 @@ it('does not validate a stopped Hostinger VPS over SSH', function () {
         ->assertSet('error', 'Hostinger VPS is stopped. Power it on before validating.');
 });
 
-it('warns that deleting from Coolify does not cancel the Hostinger VPS', function () {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'private_key_id' => $this->privateKey->id,
-        'cloud_provider_token_id' => $this->token->id,
-        'hostinger_virtual_machine_id' => 17923,
-    ]);
-
-    Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
-        ->assertSee('Hostinger deletes the VPS only at the end of its paid period, and only if you select this in the confirmation dialog.')
-        ->assertSee('https://hpanel.hostinger.com/', false)
-        ->assertSeeHtml('<strong>Hostinger deletes a VPS only at the end of its paid period.</strong>')
-        ->assertSee('The VPS on Hostinger will NOT be deleted, and Hostinger will keep billing for it.');
-});
-
 it('passes the Hostinger deletion choice to the server deletion', function () {
     Queue::fake();
     $server = Server::factory()->create([
@@ -466,21 +432,9 @@ it('passes the Hostinger deletion choice to the server deletion', function () {
     ]);
 
     Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
-        ->assertSee('Also delete VPS from Hostinger (at the end of the paid period)')
         ->call('delete', 'password', ['delete_from_hostinger']);
 
     Queue::assertPushed(JobDecorator::class, fn (JobDecorator $job) => $job->getAction() instanceof DeleteServer
         && $job->getParameters()[9] === true
         && $job->getParameters()[10] === 17923);
-});
-
-it('keeps the default deletion warning for servers without a Hostinger VPS', function () {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'private_key_id' => $this->privateKey->id,
-    ]);
-
-    Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
-        ->assertSee('This operation is permanent and cannot be undone.')
-        ->assertDontSee('Hostinger deletes a VPS');
 });

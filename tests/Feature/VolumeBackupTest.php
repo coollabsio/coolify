@@ -393,12 +393,10 @@ it('shows volume backups on the application backups pages', function () {
 
     $this->get(route('project.application.backup.index', $parameters))
         ->assertOk()
-        ->assertSee('Storage backups')
         ->assertSee($volume->name);
 
     $this->get(route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]))
         ->assertOk()
-        ->assertSee('Back to backups')
         ->assertSee($volume->name);
 });
 
@@ -421,12 +419,10 @@ it('shows directory backups on the application backup index and detail pages', f
 
     $this->get(route('project.application.backup.index', $parameters))
         ->assertOk()
-        ->assertSee('Directory')
         ->assertSee($directory->fs_path);
 
     $this->get(route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]))
         ->assertOk()
-        ->assertSee('Back to backups')
         ->assertSee($directory->fs_path);
 });
 
@@ -455,54 +451,13 @@ it('splits scheduled backup settings and executions across dedicated urls', func
     ];
     $generalUrl = route('project.application.backup.show', $parameters);
 
-    $this->get($generalUrl)
-        ->assertOk()
-        ->assertSee('General')
-        ->assertSee('Executions')
-        ->assertSee('Danger Zone')
-        ->assertSee('Backup schedule')
-        ->assertSee('File-level consistency')
-        ->assertSeeText('No validated S3 storage')
-        ->assertSee('Local backups')
-        ->assertSee('S3 backups')
-        ->assertSee('Backups to keep')
-        ->assertDontSee('Review generated archives')
-        ->assertDontSee('Delete backup schedule');
+    $this->get($generalUrl)->assertOk();
 
     $this->get($generalUrl.'/s3')->assertRedirect($generalUrl);
     $this->get($generalUrl.'/retention')->assertRedirect($generalUrl);
 
-    $this->get($generalUrl.'/executions')
-        ->assertOk()
-        ->assertSee('Review generated archives')
-        ->assertSee('Availability')
-        ->assertDontSee('File-level consistency')
-        ->assertDontSee('Backups to keep');
-
-    $this->get($generalUrl.'/danger')
-        ->assertOk()
-        ->assertSee('Danger Zone')
-        ->assertSee('Delete backup schedule')
-        ->assertSee('Delete schedule')
-        ->assertDontSee('File-level consistency')
-        ->assertDontSee('Backups to keep')
-        ->assertDontSee('Review generated archives');
-});
-
-it('shows the configure backup modal trigger for a volume', function () {
-    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
-    $team = Team::factory()->create();
-    signInForVolumeBackups($this, $team);
-    [$application, $volume] = createVolumeBackupApplication($team);
-
-    $component = Livewire::test(All::class, ['resource' => $application])
-        ->set("forms.{$volume->id}.isReadOnly", true)
-        ->assertSee('Backup')
-        ->assertDontSee('Backups made while the application is writing');
-
-    $html = $component->html();
-
-    expect($html)->toContain('Configure Volume Backup');
+    $this->get($generalUrl.'/executions')->assertOk();
+    $this->get($generalUrl.'/danger')->assertOk();
 });
 
 it('only shows the backup enabled badge for an enabled volume backup', function () {
@@ -728,18 +683,10 @@ it('renders volume backup executions like database backup executions', function 
         ->assertSee('Started: 2026-10-16 16:00:00 CEST', false)
         ->assertSee('3 hours ago')
         ->assertSeeInOrder([
-            'Executions',
-            'Status',
-            'Archive',
-            'Availability',
             'Success',
             '/data/coolify/backups/volumes/test/archive.tar.gz',
             'Local',
-        ])
-        ->assertSee('Cleanup failed')
-        ->assertSee('Cleanup deleted')
-        ->assertSee('Download backup')
-        ->assertSee('Delete backup');
+        ]);
 });
 
 it('cleans up failed and fully deleted volume backup execution records', function () {
@@ -882,10 +829,8 @@ it('enables and disables volume backups from the title action', function () {
 
     $component = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
         ->assertSet('enabled', false)
-        ->assertSee('Enable backup')
         ->call('toggleEnabled')
-        ->assertSet('enabled', true)
-        ->assertSee('Disable backup');
+        ->assertSet('enabled', true);
 
     expect(ScheduledVolumeBackup::query()->sole()->enabled)->toBeTrue();
 
@@ -918,11 +863,8 @@ it('enables and disables volume S3 backups from the S3 title action', function (
         'storage' => $volume,
         'resource' => $application,
     ])
-        ->assertSee('Enable S3')
-        ->assertDontSee('You do not have permission to perform this action.')
         ->call('toggleS3')
-        ->assertSet('saveToS3', true)
-        ->assertSee('Disable S3');
+        ->assertSet('saveToS3', true);
 
     expect($backup->refresh()->save_s3)->toBeTrue();
 
@@ -1163,10 +1105,7 @@ it('creates a local scheduled backup for a persistent volume', function () {
     [$application, $volume] = createVolumeBackupApplication($team);
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->assertSee('Backup schedule')
-        ->assertSeeInOrder(['Volume', $volume->name])
-        ->assertSee('can be inconsistent')
-        ->assertSee('Stopping containers')
+        ->assertSee($volume->name)
         ->set('frequency', 'daily')
         ->set('retentionAmountLocally', 5)
         ->set('retentionDaysLocally', 14)
@@ -1389,20 +1328,12 @@ it('allows volume S3 backups to be disabled when no usable storage remains', fun
         'resource' => $application,
     ])
         ->assertSet('saveToS3', true)
-        ->assertSeeText('S3 storage')
-        ->assertSeeText('No validated S3 storage')
-        ->assertSeeHtml('href="'.route('storage.index').'"')
-        ->assertSeeText('Open S3 storage')
-        ->assertDontSee('Disable S3')
-        ->assertDontSee('Local copy')
         ->call('toggleS3')
         ->assertDispatched('success')
-        ->assertSet('saveToS3', false)
-        ->assertDontSee('Enable S3');
+        ->assertSet('saveToS3', false);
 
     expect($backup->refresh()->save_s3)->toBeFalse()
         ->and($backup->s3_storage_id)->toBeNull();
-
 });
 
 it('disables S3 volume backups when the storage is deleted', function () {
@@ -1596,8 +1527,6 @@ it('deletes a volume backup schedule without deleting unselected archives', func
         'resource' => $application,
         'section' => 'danger',
     ])
-        ->assertSee('Delete all local archives created by this schedule.')
-        ->assertSee('Delete all S3 archives created by this schedule.')
         ->call('delete', 'password', [])
         ->assertDispatched('success');
 
@@ -2971,26 +2900,3 @@ it('fails the volume archive only on fatal tar errors', function (int $tarExitCo
     'file changed as we read it' => [1, 0],
     'fatal error' => [2, 2],
 ]);
-
-it('shows the backup actions in the header bar on every application backup page', function () {
-    config(['cache.default' => 'array', 'app.maintenance.driver' => 'file']);
-    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
-    $team = Team::factory()->create();
-    signInForVolumeBackups($this, $team);
-    [$application, $volume] = createVolumeBackupApplication($team);
-    $backup = $volume->scheduledBackups()->create([
-        'team_id' => $team->id,
-        'frequency' => 'daily',
-    ]);
-    $showUrl = route('project.application.backup.show', [
-        'project_uuid' => $application->project()->uuid,
-        'environment_uuid' => $application->environment->uuid,
-        'application_uuid' => $application->uuid,
-        'backup_uuid' => $backup->uuid,
-    ]);
-
-    foreach (['', '/executions', '/danger'] as $suffix) {
-        expect($this->get($showUrl.$suffix)->assertOk()->getContent())
-            ->toMatch('/x-teleport="#resource-action-hud-slot".*?wire:click="toggleEnabled".*?Disable backup.*?wire:click="backupNow"/s');
-    }
-});

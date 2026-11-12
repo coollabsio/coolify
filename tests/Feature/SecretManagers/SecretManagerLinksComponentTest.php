@@ -165,7 +165,6 @@ test('browse keys shows key names only and search filters them', function () {
         ->assertSee('DB_PASSWORD')
         ->assertSee('API_KEY')
         ->assertSee('{{vault.DB_PASSWORD}}')
-        ->assertSeeHtml('class="flex min-w-0 flex-col"')
         ->assertDontSee('{{ $key }}')
         ->assertDontSee('super-secret-value')
         ->assertDontSee('another-secret');

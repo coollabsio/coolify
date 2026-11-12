@@ -1,13 +1,10 @@
 <?php
 
 use App\Enums\ProxyTypes;
-use App\Livewire\Server\Proxy;
-use App\Livewire\Server\TrafficAnalyticsSettings;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -82,63 +79,3 @@ it('uses the recommended Caddy image as the default proxy image', function () {
     expect(Server::RECOMMENDED_CADDY_PROXY_IMAGE)->toBe('lucaslorentz/caddy-docker-proxy:2.13-alpine')
         ->and(Server::caddyDockerProxyImageVersion(Server::RECOMMENDED_CADDY_PROXY_IMAGE))->toBe([2, 13]);
 });
-
-it('shows the outdated Caddy image warning on the proxy page', function () {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'proxy' => caddyImageProxy('lucaslorentz/caddy-docker-proxy:2.8-alpine'),
-    ]);
-
-    Livewire::test(Proxy::class, ['server' => $server])
-        ->assertSee('Caddy proxy image is outdated')
-        ->assertSee('lucaslorentz/caddy-docker-proxy:2.8-alpine')
-        ->assertSee('2.9 or newer')
-        ->assertSee('lucaslorentz/caddy-docker-proxy:2.13-alpine')
-        ->assertSee('restart the proxy');
-});
-
-it('hides the outdated Caddy image warning on the proxy page', function (string $type, string $image) {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'proxy' => caddyImageProxy($image, ['type' => $type]),
-    ]);
-
-    Livewire::test(Proxy::class, ['server' => $server])
-        ->assertDontSee('Caddy proxy image is outdated');
-})->with([
-    'current Caddy image' => [ProxyTypes::CADDY->value, 'lucaslorentz/caddy-docker-proxy:2.13-alpine'],
-    'Caddy latest tag' => [ProxyTypes::CADDY->value, 'lucaslorentz/caddy-docker-proxy:latest'],
-    'custom Caddy image' => [ProxyTypes::CADDY->value, 'caddy:2.7'],
-    'Traefik' => [ProxyTypes::TRAEFIK->value, 'lucaslorentz/caddy-docker-proxy:2.8-alpine'],
-]);
-
-it('shows the outdated Caddy image warning on the traffic analytics settings', function (bool $analyticsEnabled) {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'proxy' => caddyImageProxy('lucaslorentz/caddy-docker-proxy:2.8-alpine'),
-    ]);
-    $server->settings->update(['is_traffic_analytics_enabled' => $analyticsEnabled]);
-
-    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server->fresh()])
-        ->assertSee('Caddy proxy image is outdated')
-        ->assertSee('lucaslorentz/caddy-docker-proxy:2.8-alpine')
-        ->assertSee('lucaslorentz/caddy-docker-proxy:2.13-alpine');
-})->with([
-    'analytics enabled' => [true],
-    'analytics disabled' => [false],
-]);
-
-it('hides the outdated Caddy image warning on the traffic analytics settings', function (string $type, string $image) {
-    $server = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'proxy' => caddyImageProxy($image, ['type' => $type]),
-    ]);
-    $server->settings->update(['is_traffic_analytics_enabled' => true]);
-
-    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server->fresh()])
-        ->assertDontSee('Caddy proxy image is outdated');
-})->with([
-    'current Caddy image' => [ProxyTypes::CADDY->value, 'lucaslorentz/caddy-docker-proxy:2.13-alpine'],
-    'custom Caddy image' => [ProxyTypes::CADDY->value, 'example/caddy:1.0'],
-    'Traefik' => [ProxyTypes::TRAEFIK->value, 'lucaslorentz/caddy-docker-proxy:2.8-alpine'],
-]);

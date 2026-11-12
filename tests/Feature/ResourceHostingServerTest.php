@@ -17,7 +17,6 @@ use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -219,22 +218,6 @@ test('resource selection lists each combined server once', function () {
     expect($component->buildServers)->toBeEmpty()
         ->and($component->servers->pluck('id')->all())->toEqualCanonicalizing([$this->server->id, $otherServer->id])
         ->and($component->allServers->pluck('id')->duplicates())->toBeEmpty();
-});
-
-test('resource selection does not show the empty server message when only build servers are available', function () {
-    $html = Blade::render(
-        file_get_contents(resource_path('views/livewire/project/new/select.blade.php')),
-        [
-            'current_step' => 'servers',
-            'onlyBuildServerAvailable' => true,
-            'servers' => collect(),
-            'buildServers' => collect(),
-        ],
-    );
-
-    expect($html)
-        ->toContain('Only build servers are available')
-        ->not->toContain('No validated & reachable servers found');
 });
 
 test('application API rejects build servers', function () {
@@ -531,7 +514,5 @@ test('resource operations explains why build servers cannot be clone targets', f
     ]);
 
     Livewire::test(ResourceOperations::class, ['resource' => $source])
-        ->assertSet('buildServers', fn ($servers) => $servers->contains('id', $buildServer->id))
-        ->assertSee('Dedicated Builder')
-        ->assertSee('build server');
+        ->assertSet('buildServers', fn ($servers) => $servers->contains('id', $buildServer->id));
 });

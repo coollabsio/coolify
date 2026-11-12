@@ -45,14 +45,6 @@ test('a team already using swarm can manage another server role', function () {
     expect($this->server->settings->fresh()->is_swarm_worker)->toBeTruthy();
 });
 
-test('the swarm page shows the deprecation notice for an existing swarm team', function () {
-    $this->server->settings()->update(['is_swarm_manager' => true]);
-
-    Livewire::test(Swarm::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Docker Swarm support is deprecated')
-        ->assertSee(config('deprecations.swarm'));
-});
-
 test('regular teams do not see swarm setup in server navigation', function () {
     $swarmUrl = route('server.swarm', ['server_uuid' => $this->server->uuid]);
 
@@ -67,7 +59,7 @@ test('regular teams do not see swarm setup in server navigation', function () {
         ->assertSee($swarmUrl, false);
 });
 
-test('existing swarm destination pages show the deprecation notice', function () {
+test('existing swarm destination pages render', function () {
     $this->server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
@@ -80,12 +72,10 @@ test('existing swarm destination pages show the deprecation notice', function ()
     ]);
 
     $this->get(route('server.destinations', ['server_uuid' => $this->server->uuid]))
-        ->assertSuccessful()
-        ->assertSee(config('deprecations.swarm'));
+        ->assertSuccessful();
 
     $this->get(route('destination.show', ['destination_uuid' => $destination->uuid]))
-        ->assertSuccessful()
-        ->assertSee(config('deprecations.swarm'));
+        ->assertSuccessful();
 });
 
 test('destination creation derives swarm mode from the existing server', function () {

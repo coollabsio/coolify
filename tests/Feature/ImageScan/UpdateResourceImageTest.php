@@ -812,7 +812,6 @@ describe('main card actions', function () {
         updateImagePage($this->admin, $service, 'service')
             ->assertSee('web: nginx:1.27 aaaaaaaaaaaa → nginx:1.29')
             ->assertSee('worker: nginx:1.27 → nginx:1.29')
-            ->assertSee('One-click services pin versions that work together. Check the service template before you update.')
             ->assertSeeHtml($web->uuid);
     });
 

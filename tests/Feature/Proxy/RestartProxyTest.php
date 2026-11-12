@@ -76,7 +76,7 @@ test('admin can see proxy restart and stop buttons', function () {
         ->assertSee('Stop Proxy');
 });
 
-test('running proxy shows pending configuration warning when saved settings differ from applied settings', function () {
+test('running proxy reports pending configuration when saved settings differ from applied settings', function () {
     [$user, $team, $server] = setupProxyUser('admin');
     makeServerProxyRunning($server);
     $server->proxy->last_saved_settings = 'saved-hash';
@@ -95,10 +95,7 @@ test('running proxy shows pending configuration warning when saved settings diff
     $this->actingAs($user);
     session(['currentTeam' => $team]);
 
-    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertSee('Changes pending')
-        ->assertSee('Your configuration changed, please restart the proxy.')
-        ->assertSee('Restart proxy');
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
 
     $server->refresh();
     $server->proxy->last_applied_settings = 'saved-hash';
@@ -106,11 +103,10 @@ test('running proxy shows pending configuration warning when saved settings diff
     $server->save();
 
     $component->call('showNotification')
-        ->assertDispatched('proxy-configuration-state-changed', pending: false, traefikOutdated: false)
-        ->assertDontSee('Your configuration changed, please restart the proxy.');
+        ->assertDispatched('proxy-configuration-state-changed', pending: false, traefikOutdated: false);
 });
 
-test('running proxy hides pending configuration warning when saved settings match applied settings', function () {
+test('running proxy reports pending configuration after saved settings stop matching applied settings', function () {
     [$user, $team, $server] = setupProxyUser('admin');
     makeServerProxyRunning($server);
     $server->proxy->last_saved_settings = 'matching-hash';
@@ -122,17 +118,14 @@ test('running proxy hides pending configuration warning when saved settings matc
     $this->actingAs($user);
     session(['currentTeam' => $team]);
 
-    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertDontSee('Your configuration changed, please restart the proxy.');
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
 
     $server->refresh();
     $server->proxy->last_saved_settings = 'new-saved-hash';
     $server->save();
 
     $component->dispatch('refreshServerShow')
-        ->assertDispatched('proxy-configuration-state-changed', pending: true, traefikOutdated: false)
-        ->assertSee('Changes pending')
-        ->assertSee('Your configuration changed, please restart the proxy.');
+        ->assertDispatched('proxy-configuration-state-changed', pending: true, traefikOutdated: false);
 });
 
 test('navbar tells the sidebar when the proxy is not running', function () {

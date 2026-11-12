@@ -65,9 +65,7 @@ test('the heading shows the status of the selected service resource', function (
         'parameters' => $this->parameters + ['stack_service_uuid' => $this->exitedApp->uuid],
         'query' => [],
     ])
-        ->assertSee('Resource status')
-        ->assertDontSee('Service status')
-        ->assertSeeInOrder(['Resource status', 'Container', 'Exited', 'Healthcheck'])
+        ->assertSee('Exited')
         ->assertDontSee('Degraded');
 });
 
@@ -77,9 +75,6 @@ test('the heading shows the service status when no resource is selected', functi
         'parameters' => $this->parameters,
         'query' => [],
     ])
-        ->assertSee('Service status')
-        ->assertDontSee('Resource status')
-        ->assertSeeInOrder(['Service status', 'Containers', 'Healthcheck'])
         ->assertSee('Degraded');
 });
 

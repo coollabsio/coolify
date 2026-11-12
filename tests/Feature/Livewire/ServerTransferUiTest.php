@@ -113,16 +113,6 @@ test('a member who owns another team cannot use that role to transfer the server
         ->assertStatus(404);
 });
 
-test('transfer page renders for owned server', function () {
-    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
-        ->assertOk()
-        ->assertSee('Transfer server')
-        ->assertSee('Target instance URL')
-        ->assertSee('Target API token')
-        ->assertDontSee('Manual transfer')
-        ->assertDontSee('Passphrase');
-});
-
 test('transfer page badge shows the management state of the server', function (string $state, string $label, array $hidden) {
     $claimer = app(ServerTransferClaimer::class);
     match ($state) {

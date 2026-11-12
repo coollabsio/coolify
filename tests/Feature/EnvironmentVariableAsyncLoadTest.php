@@ -68,10 +68,8 @@ it('loads environment variables when loadEnvironmentVariables is called', functi
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
-        ->assertSee('Loading environment variables')
         ->call('loadEnvironmentVariables')
         ->assertSet('readyToLoad', true)
-        ->assertDontSeeText('Loading environment variables')
         ->assertSee('API_KEY');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())

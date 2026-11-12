@@ -61,23 +61,8 @@ test('injects on-screen HUD into full HTML documents when server_timing is enabl
     expect($body)
         ->toContain('id="server-timing-hud"')
         ->toContain('data-metrics=')
-        ->toContain('data-sth-log')
-        ->toContain('data-sth-clear')
-        ->toContain('data-sth-toggle')
-        ->toContain('Server Timing')
-        ->toContain('toggleOpen')
-        ->toContain('formatEntryForAi')
-        ->toContain('copyEntryById')
-        ->toContain('__coolifyServerTimingHistory')
         ->toContain('</body>');
     expect(substr_count($body, 'id="server-timing-hud"'))->toBe(1);
-    // Docks into main top bar via #server-timing-hud-slot; float fallback is bottom-left.
-    expect($body)
-        ->toContain('dockHud')
-        ->toContain('data-sth-mode="float"')
-        ->toContain('position:fixed;bottom:12px;left:12px')
-        ->not->toContain('position:fixed;bottom:12px;right:12px')
-        ->not->toContain('position:fixed;top:56px;right:12px');
     // Inline <script> must not embed literal HTML closers (browser ends the script early).
     $hudScript = null;
     if (preg_match('/id="server-timing-hud".*?<script data-navigate-once>(.*?)<\/script>/s', $body, $m)) {

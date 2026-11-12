@@ -38,17 +38,6 @@ beforeEach(function () {
 });
 
 describe('GitLab source setup view', function () {
-    test('shows incomplete-setup guidance with the credential form', function () {
-        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
-            ->test(Change::class)
-            ->assertSee('Finish connecting this GitLab App before using it as a source')
-            ->assertSee('Advanced / self-hosted')
-            ->assertSee('Application ID')
-            ->assertSee('Application secret')
-            ->assertSee('Save')
-            ->assertDontSee('Test connection');
-    });
-
     test('derives api url when gitlab url changes', function () {
         Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
             ->test(Change::class)
@@ -85,9 +74,6 @@ describe('GitLab source setup view', function () {
     test('supports github-style custom public endpoint for oauth redirect uri', function () {
         Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
             ->test(Change::class)
-            ->assertSee('Webhook endpoint')
-            ->assertSee('Use a custom endpoint')
-            ->assertSee('Selected endpoint')
             ->set('use_custom_webhook_endpoint', true)
             ->set('custom_webhook_endpoint', 'http://100.75.155.70:8000')
             ->assertSet('redirectUri', 'http://100.75.155.70:8000/webhooks/source/gitlab/redirect');

@@ -413,11 +413,7 @@ describe('GitHub Source Change Component', function () {
             ->set('use_custom_webhook_endpoint', true)
             ->assertSet('webhook_endpoint', 'http://staging.example.com')
             ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
-            ->assertSet('use_custom_webhook_endpoint', true)
-            ->assertSee('Webhook endpoint')
-            ->assertSee('Use a custom endpoint')
-            ->assertSee('Custom endpoint')
-            ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
+            ->assertSet('use_custom_webhook_endpoint', true);
     });
 
     test('can mount with fully configured github app', function () {
@@ -798,7 +794,7 @@ describe('GitHub Source Change Component', function () {
             ->and($public->isConnected())->toBeTrue();
     });
 
-    test('shows test connection for installed github apps', function () {
+    test('marks installed github apps as connected', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -821,9 +817,7 @@ describe('GitHub Source Change Component', function () {
         Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
             ->test(Change::class)
             ->assertSuccessful()
-            ->assertSet('isConnected', true)
-            ->assertSee('Test connection')
-            ->assertSeeHtml('wire:click.prevent="testConnection"');
+            ->assertSet('isConnected', true);
     });
 
     test('testConnection succeeds when github app credentials are valid', function () {

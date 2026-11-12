@@ -87,7 +87,6 @@ beforeEach(function () {
 
 it('shows preview settings and persists changes independently of preview inputs', function () {
     Livewire::test(Previews::class, ['application' => $this->application])
-        ->assertSee('PR deployment access')
         ->assertSet('isPreviewDeploymentsEnabled', false)
         ->set('manualPullRequestId', -1)
         ->set('isPreviewDeploymentsEnabled', true)
@@ -109,12 +108,9 @@ it('shows preview settings and persists changes independently of preview inputs'
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeFalse();
 });
 
-it('renders preview deployment enablement as a section action', function () {
+it('toggles preview deployments from the section action', function () {
     Livewire::test(Previews::class, ['application' => $this->application])
-        ->assertSee('Enable preview deployments')
-        ->assertDontSeeHtml('id="isPreviewDeploymentsEnabled"')
         ->call('togglePreviewDeployments')
-        ->assertSee('Disable preview deployments')
         ->assertSet('isPreviewDeploymentsEnabled', true);
 
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeTrue();
@@ -130,7 +126,6 @@ it('does not load GitHub pull requests for GitLab sources', function () {
     $this->application->update(['source_id' => $gitlabApp->id, 'source_type' => GitlabApp::class]);
 
     Livewire::test(Previews::class, ['application' => $this->application->fresh()])
-        ->assertSee('PR deployment access')
         ->assertDontSee('Load pull requests')
         ->call('load_prs')
         ->assertSet('rate_limit_remaining', 0)

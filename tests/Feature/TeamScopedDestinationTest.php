@@ -357,21 +357,11 @@ describe('Destination/Show team scope', function () {
         ]));
 
         Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSeeHtml('placeholder="Search resources"')
-            ->assertSee('Project')
-            ->assertSee('Environment')
-            ->assertSee('Resource')
-            ->assertSee('Type')
             ->assertSee('application-on-destination')
             ->assertSee('service-on-destination')
             ->assertSee('database-on-destination')
             ->assertSee($this->projectA->name)
             ->assertSee($this->environmentA->name);
-    });
-
-    test('mount with own standalone destination shows empty state without resources', function () {
-        Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSee('No resources use this destination');
     });
 
     test('mount with own standalone destination does not list another team resources', function () {

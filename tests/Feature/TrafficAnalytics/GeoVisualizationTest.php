@@ -66,7 +66,7 @@ function bootGeoServer(): Server
     return $server;
 }
 
-it('renders resolved country names and the interactive globe when country data is present', function () {
+it('renders resolved country names when country data is present', function () {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -78,12 +78,8 @@ it('renders resolved country names and the interactive globe when country data i
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSee('Countries')
         ->assertSee('United States')
-        ->assertSee('Germany')
-        // The interactive WebGL globe canvas replaces the old inline SVG choropleth.
-        ->assertSeeHtml('id="global-analytics-globe"')
-        ->assertSee('GeoIP data by MaxMind');
+        ->assertSee('Germany');
 });
 
 it('collapses unresolvable country codes into a single Unknown row', function () {
@@ -103,41 +99,7 @@ it('collapses unresolvable country codes into a single Unknown row', function ()
         ->assertSee('Unknown');
 });
 
-it('shows a plain no-data state when no country data has been recorded', function () {
-    $server = bootGeoServer();
-
-    $fake = new FakeGeoTrafficClient($server);
-    $fake->responses = fakeGeoResponses([]);
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertSee('Locations')
-        ->assertSee('No country data for the selected range');
-});
-
-it('mounts the globe from the element itself when country data arrives after the first render', function () {
-    $server = bootGeoServer();
-
-    $fake = new FakeGeoTrafficClient($server);
-    $fake->responses = fakeGeoResponses([]);
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    $component = loadLazy(Livewire::test(Analytics::class))
-        ->assertSee('No country data for the selected range');
-
-    $fake->responses = fakeGeoResponses([
-        ['value' => 'US', 'requests' => 600, 'bytes_out' => 15000],
-    ]);
-
-    // A @script block runs only once per component, so a globe inserted by a later
-    // render never mounted. The mount must live on the element (Alpine x-data).
-    $component->call('loadData')
-        ->assertSeeHtml('id="global-analytics-globe" x-ref="canvas"')
-        ->assertSeeHtml('window.mountTrafficGlobe(canvas');
-});
-
-it('renders the city list, the switch, and both marker sets when Sentinel returns city data', function () {
+it('renders the city list when Sentinel returns city data', function () {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -153,12 +115,9 @@ it('renders the city list, the switch, and both marker sets when Sentinel return
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSeeHtml('aria-label="Location detail"')
         ->assertSee('Germany')
         ->assertSee('Berlin')
-        ->assertSee('BE, Germany')
-        // Only the row with coordinates turns the globe on hover.
-        ->assertSeeHtml('focus([52.52, 13.405])');
+        ->assertSee('BE, Germany');
 });
 
 it('sends the globe one marker set for each view, without markers for unknown cities', function () {

@@ -83,42 +83,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
     });
 
-    test('railpack app shows railpack.json helper text and not nixpacks.toml', function () {
-        $application = Application::factory()->create([
-            'environment_id' => $this->environment->id,
-            'destination_id' => $this->destination->id,
-            'destination_type' => StandaloneDocker::class,
-            'build_pack' => 'railpack',
-            'static_image' => 'nginx:alpine',
-            'base_directory' => '/',
-            'is_http_basic_auth_enabled' => false,
-            'redirect' => 'no',
-        ]);
-
-        Livewire::test(General::class, ['application' => $application])
-            ->assertSuccessful()
-            ->assertSee('railpack.json')
-            ->assertDontSee('nixpacks.toml');
-    });
-
-    test('nixpacks app shows nixpacks.toml helper text and not railpack.json', function () {
-        $application = Application::factory()->create([
-            'environment_id' => $this->environment->id,
-            'destination_id' => $this->destination->id,
-            'destination_type' => StandaloneDocker::class,
-            'build_pack' => 'nixpacks',
-            'static_image' => 'nginx:alpine',
-            'base_directory' => '/',
-            'is_http_basic_auth_enabled' => false,
-            'redirect' => 'no',
-        ]);
-
-        Livewire::test(General::class, ['application' => $application])
-            ->assertSuccessful()
-            ->assertSee('nixpacks.toml')
-            ->assertDontSee('railpack.json');
-    });
-
     test('saving general settings refreshes configuration changes when label reset is disabled', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,

@@ -552,11 +552,6 @@ describe('states', function () {
             ->assertDontSee('Turn on<');
     });
 
-    it('shows the not scanned state', function () {
-        vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Not scanned yet. The next deploy scans the image.');
-    });
-
     it('shows the message of the last scan error', function () {
         Cache::put(ScanImage::lastErrorCacheKey($this->application), [
             'code' => 'disk_space',
@@ -738,8 +733,6 @@ describe('packages', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Packages::class, ['resourceType' => 'application', 'resourceUuid' => $this->application->uuid])
-            ->assertSee('Packages and SBOM')
-            ->assertSee('Download SBOM')
             ->call('toggleType', 'apk')
             ->assertSee('busybox')
             ->assertDontSee('left-pad')

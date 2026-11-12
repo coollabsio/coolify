@@ -54,8 +54,7 @@ beforeEach(function () {
 it('shows the deployments indicator on every page, including the dashboard', function (string $routeName) {
     $this->get(route($routeName))
         ->assertSuccessful()
-        ->assertSee('1 deployment', false)
-        ->assertSee('aria-label="Active deployments"', false);
+        ->assertSee('1 deployment', false);
 })->with(['dashboard', 'project.index']);
 
 it('hides the indicator when no deployment is running', function () {

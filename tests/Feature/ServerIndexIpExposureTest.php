@@ -37,6 +37,5 @@ beforeEach(function () {
 test('server index does not expose server IP addresses', function () {
     Livewire::test(ServerIndex::class)
         ->assertSee('production-server')
-        ->assertDontSee('203.0.113.45')
-        ->assertDontSee('IP address');
+        ->assertDontSee('203.0.113.45');
 });

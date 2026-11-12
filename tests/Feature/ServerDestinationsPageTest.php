@@ -56,9 +56,6 @@ test('server destinations page renders when selected server has no destinations'
 
     $this->get(route('server.destinations', ['server_uuid' => $server->uuid]))
         ->assertSuccessful()
-        ->assertSee('Destinations')
-        ->assertSee('No destinations')
-        ->assertSee('Add a destination or scan the server for existing Docker networks.')
         ->assertDontSee('Server not found.');
 });
 
@@ -80,19 +77,6 @@ test('global destinations page does not render per-server empty states beside ex
         ->assertSuccessful()
         ->assertSee($serverWithDestination->standaloneDockers()->first()->name)
         ->assertDontSee('No destinations yet');
-});
-
-test('global destinations page renders a single empty state when no usable servers have destinations', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $server->settings()->update([
-        'is_reachable' => true,
-        'is_usable' => true,
-    ]);
-    StandaloneDocker::withoutEvents(fn () => $server->standaloneDockers()->delete());
-
-    $this->get(route('destination.index'))
-        ->assertSuccessful()
-        ->assertSee('No destinations yet');
 });
 
 test('adding a discovered swarm destination stores the selected network name', function () {

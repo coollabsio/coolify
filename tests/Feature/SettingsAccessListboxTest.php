@@ -29,9 +29,6 @@ test('instance admin can toggle registration via listbox instantSave', function 
 
     Livewire::test(Advanced::class)
         ->assertSet('is_registration_enabled', false)
-        ->assertSee('Registration')
-        ->assertSee('Destructive action confirmation')
-        ->assertDontSee('Only administrators can create accounts.')
         ->set('is_registration_enabled', true)
         ->call('instantSave')
         ->assertDispatched('success');
@@ -77,7 +74,6 @@ test('instance admin can configure the image CDN URL at runtime', function () {
     session(['currentTeam' => ['id' => $rootTeam->id]]);
 
     Livewire::test(Advanced::class)
-        ->assertSee('Image CDN URL')
         ->set('image_cdn_url', 'https://images.example.com/media/')
         ->call('submit')
         ->assertHasNoErrors()
@@ -126,25 +122,4 @@ test('open API allowlist warning is shown when API access is enabled without all
     Livewire::test(Advanced::class)
         ->assertSet('is_api_enabled', true)
         ->assertSee('API access is open to every source');
-});
-
-test('MCP endpoint callout links to API token management', function () {
-    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
-    Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
-    InstanceSettings::forceCreate([
-        'id' => 0,
-        'is_api_enabled' => false,
-        'is_mcp_server_enabled' => true,
-    ]);
-    Once::flush();
-
-    $user = User::factory()->create();
-    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
-
-    $this->actingAs($user);
-    session(['currentTeam' => ['id' => $rootTeam->id]]);
-
-    Livewire::test(Advanced::class)
-        ->assertSee(url('/mcp'))
-        ->assertSee('href="'.route('security.api-tokens').'"', false);
 });

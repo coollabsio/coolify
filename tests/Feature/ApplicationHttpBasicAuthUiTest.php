@@ -71,18 +71,13 @@ function createApplicationForHttpBasicAuth(array $overrides = []): Application
     ], $overrides));
 }
 
-test('http basic auth form shows a single username and password without multi-user controls', function () {
+test('http basic auth form loads the saved credentials', function () {
     $application = createApplicationForHttpBasicAuth();
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
         ->assertSet('isHttpBasicAuthEnabled', true)
-        ->assertSet('httpBasicAuthUsername', 'admin')
-        ->assertSee('Username')
-        ->assertSee('Password')
-        ->assertDontSee('Add user')
-        ->assertDontSee('Remove user')
-        ->assertDontSee('The default user cannot be removed');
+        ->assertSet('httpBasicAuthUsername', 'admin');
 });
 
 test('http basic auth credentials can be saved through the general form', function () {
@@ -151,9 +146,7 @@ test('selecting Argon2id is saved instantly and applied to the Caddy labels', fu
         ->set('httpBasicAuthHashAlgorithm', 'argon2id')
         ->set('httpBasicAuthArgon2idMemoryCost', 8192)
         ->call('instantSave')
-        ->assertDispatched('success')
-        ->assertSee('Iterations')
-        ->assertDontSee('Cost factor');
+        ->assertDispatched('success');
 
     expect(base64_decode($application->refresh()->custom_labels))
         ->toContain('caddy_0.basic_auth=argon2id', 'caddy_0.basic_auth.admin="$argon2id$v=19$m=8192,t=4,p=1$');

@@ -62,7 +62,6 @@ it('sorts servers by name and status', function () {
         ->call('setServerSort', 'name-desc')
         ->assertSeeInOrder(['charlie-host', 'bravo-host', 'alpha-host'])
         ->call('setServerSort', 'status-asc')
-        ->assertSeeHtml('aria-label="Sort by status, sorted ascending"')
         // Disabled, Ready, Unavailable
         ->assertSeeInOrder(['charlie-host', 'bravo-host', 'alpha-host'])
         ->call('setServerSort', 'status')

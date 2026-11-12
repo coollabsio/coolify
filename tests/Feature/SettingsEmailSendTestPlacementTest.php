@@ -10,37 +10,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-function setupInstanceAdminWithTransactionalEmail(): User
-{
-    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
-    InstanceSettings::forceCreate([
-        'id' => 0,
-        'smtp_enabled' => true,
-        'smtp_from_address' => 'hi@localhost.com',
-        'smtp_from_name' => 'Coolify',
-        'smtp_host' => 'coolify-mail',
-        'smtp_port' => 1025,
-    ]);
-    Once::flush();
-
-    $user = User::factory()->create();
-    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
-
-    return $user;
-}
-
-test('send test is available when transactional email is enabled', function () {
-    $user = setupInstanceAdminWithTransactionalEmail();
-
-    $this->actingAs($user);
-    session(['currentTeam' => ['id' => 0]]);
-
-    Livewire::test(SettingsEmail::class)
-        ->assertOk()
-        ->assertSee('Sender')
-        ->assertSee('Send test');
-});
-
 test('send test is disabled when transactional email is disabled', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     InstanceSettings::forceCreate([

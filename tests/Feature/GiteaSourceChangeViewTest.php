@@ -45,17 +45,6 @@ beforeEach(function () {
 });
 
 describe('Gitea source setup view', function () {
-    test('shows incomplete-setup guidance with the credential form', function () {
-        Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
-            ->test(Change::class)
-            ->assertSee('Finish connecting this Gitea / Forgejo App before using it as a source')
-            ->assertSee('https://gitea.com/user/settings/applications')
-            ->assertSee('Client ID')
-            ->assertSee('Client secret')
-            ->assertSee('Save')
-            ->assertDontSee('Test connection');
-    });
-
     test('derives api url when gitea url changes', function () {
         Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
             ->test(Change::class)

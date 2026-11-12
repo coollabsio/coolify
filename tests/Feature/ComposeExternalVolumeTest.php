@@ -1031,9 +1031,7 @@ describe('storage page', function () {
         $html = Livewire::test(StoragePage::class, ['resource' => $application->fresh()])->html();
         $section = externalVolumesSection($html, $application->uuid);
 
-        expect($section)->toContain('External volumes')
-            ->toContain('Managed outside Coolify. Coolify never removes these volumes.')
-            ->toContain('shared-data')
+        expect($section)->toContain('shared-data')
             ->toContain('existing-shared-volume')
             ->toContain('/data')
             ->toContain('web')

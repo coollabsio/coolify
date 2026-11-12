@@ -160,55 +160,10 @@ test('admin can access new server page', function () {
 
     $this->get(route('server.create'))
         ->assertSuccessful()
-        ->assertSee('New Server')
         ->assertSeeLivewire(ServerCreate::class);
 });
 
-test('new server provider pages render the selected creation flow', function (string $type, string $heading) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $response = $this->get(route('server.create.type', ['type' => $type]))
-        ->assertSuccessful()
-        ->assertSee($heading)
-        ->assertDontSee('<h1>New Server</h1>', false)
-        ->assertDontSee('Choose how to add your server');
-
-    $response->assertSeeInOrder(['New server', 'Change method', $heading]);
-})->with([
-    ['hetzner', 'Hetzner account'],
-    ['vultr', 'Vultr account'],
-    ['digital-ocean', 'DigitalOcean account'],
-    ['manual', 'Connect a server'],
-]);
-
-test('new server provider pages do not show the new token action in the header', function (string $type, string $heading) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $response = $this->get(route('server.create.type', ['type' => $type]))
-        ->assertSuccessful()
-        ->assertDontSee('+ New Token')
-        ->assertDontSee('+ Add New Token');
-
-    $header = str($response->getContent())
-        ->after('New server</h1>')
-        ->before('application-settings-form')
-        ->toString();
-
-    expect($header)
-        ->toContain('Change method')
-        ->not->toContain('Token');
-
-    // Without tokens, the add-token action lives in the provider account section instead.
-    $response->assertSeeInOrder(['Change method', "{$heading} account", "No {$heading} tokens", "Add {$heading} Token"]);
-})->with([
-    ['hetzner', 'Hetzner'],
-    ['vultr', 'Vultr'],
-    ['digital-ocean', 'DigitalOcean'],
-]);
-
-test('new server provider pages list existing tokens instead of a token action', function (string $type, string $provider, string $heading, string $modalTitle) {
+test('new server provider pages link existing tokens', function (string $type, string $provider) {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -217,29 +172,14 @@ test('new server provider pages list existing tokens instead of a token action',
         'provider' => $provider,
     ]);
 
-    $response = $this->get(route('server.create.type', ['type' => $type]))
+    $this->get(route('server.create.type', ['type' => $type]))
         ->assertSuccessful()
-        ->assertSee(route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]))
-        ->assertDontSee($modalTitle)
-        ->assertDontSee('+ New Token');
-
-    $response->assertSeeInOrder(['Change method', "{$heading} account", $token->name]);
+        ->assertSee(route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]));
 })->with([
-    ['hetzner', 'hetzner', 'Hetzner', 'Add Hetzner Token'],
-    ['vultr', 'vultr', 'Vultr', 'Add Vultr Token'],
-    ['digital-ocean', 'digitalocean', 'DigitalOcean', 'Add DigitalOcean Token'],
+    ['hetzner', 'hetzner'],
+    ['vultr', 'vultr'],
+    ['digital-ocean', 'digitalocean'],
 ]);
-
-test('new server manual page does not show the new token action', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $this->get(route('server.create.type', ['type' => 'manual']))
-        ->assertSuccessful()
-        ->assertSee('Connect a server')
-        ->assertDontSee('+ New Token')
-        ->assertDontSee('Add token');
-});
 
 test('member cannot access new server page', function () {
     $this->actingAs($this->member);

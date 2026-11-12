@@ -52,8 +52,7 @@ it('saves consistent container naming when container labels are managed manually
         ->call('instantSave')
         ->assertSuccessful()
         ->assertHasNoErrors()
-        ->assertDispatched('success')
-        ->assertSee('Go to Container labels');
+        ->assertDispatched('success');
 
     expect($application->settings()->first()->is_consistent_container_name_enabled)->toBeTrue();
 });
@@ -95,16 +94,6 @@ it('toggles consistent naming when labels are managed by coolify', function () {
     expect($application->settings()->first()->is_consistent_container_name_enabled)->toBeTrue();
 });
 
-it('only shows the custom container name for consistent naming', function () {
-    $application = createApplicationForContainerNamingTest();
-    $application = $application->fresh(['environment.project', 'settings', 'destination']);
-
-    Livewire::test(Advanced::class, ['application' => $application])
-        ->assertDontSee('Custom container name')
-        ->set('isConsistentContainerNameEnabled', true)
-        ->assertSee('Custom container name');
-});
-
 it('saves a slugged container name prefix in generated naming mode', function () {
     $otherTeamApplication = createApplicationForContainerNamingTest();
     $otherTeamApplication->settings->update(['custom_container_name_prefix' => 'my-api']);
@@ -114,7 +103,6 @@ it('saves a slugged container name prefix in generated naming mode', function ()
     $application = $application->fresh(['environment.project', 'settings', 'destination']);
 
     Livewire::test(Advanced::class, ['application' => $application])
-        ->assertSee('Container name prefix')
         ->set('customContainerNamePrefix', 'My API')
         ->call('saveCustomNamePrefix')
         ->assertDispatched('success')

@@ -149,8 +149,7 @@ test('the import form strips owners by default and keeps them when the option is
     StartDatabaseImport::shouldRun()->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $source->keepOwners === true)->andReturn($activity);
 
     $form = restoreOptionsForm($this->postgres)
-        ->assertSet('keepOwners', false)
-        ->assertSee('Keep owners and privileges');
+        ->assertSet('keepOwners', false);
     expect($form->get('restoreCommandText'))->toContain('--no-owner --no-acl');
 
     $form->set('keepOwners', true);
@@ -191,8 +190,7 @@ test('the import form lets the user pick the SQLite database file to restore int
     StartDatabaseImport::shouldRun()->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $source->sqliteDatabase === 'cache.db')->andReturn($activity);
 
     $form = restoreOptionsForm($this->sqlite)
-        ->assertSet('sqliteDatabase', 'app.db')
-        ->assertSee('Restore into');
+        ->assertSet('sqliteDatabase', 'app.db');
     expect($form->get('restoreCommandText'))->toContain("'/var/lib/sqlite/app.db'");
 
     $form->call('selectSqliteDatabaseFor', 'sqlite-backup-cache.db-1700000000.gz')

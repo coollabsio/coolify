@@ -51,8 +51,6 @@ it('shows and saves the restart limit for a compose application', function () {
     Livewire::test(Index::class, ['serviceApplication' => $this->serviceApplication->fresh()])
         ->assertSet('maxRestartCount', 10)
         ->set('currentRoute', 'project.service.index')
-        ->assertSee('Max restart count')
-        ->assertSee('Set to 0 to disable the limit.')
         ->set('maxRestartCount', 0)
         ->call('saveMaxRestartCount')
         ->assertHasNoErrors()

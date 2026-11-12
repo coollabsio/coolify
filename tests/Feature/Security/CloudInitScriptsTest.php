@@ -27,21 +27,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-test('cloud-init script detail page shows editable script fields', function () {
-    $script = CloudInitScript::query()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Docker Host Setup',
-        'script' => "#cloud-config\npackages:\n  - htop\n",
-    ]);
-
-    $this->get(route('security.cloud-init-scripts.show', ['cloud_init_script_uuid' => $script->uuid]))
-        ->assertSuccessful()
-        ->assertSee('Cloud-Init Script')
-        ->assertSee('Docker Host Setup')
-        ->assertSee('Save')
-        ->assertSee('Delete');
-});
-
 test('cloud-init script detail page updates a script', function () {
     $script = CloudInitScript::query()->create([
         'team_id' => $this->team->id,

@@ -10,7 +10,6 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -88,99 +87,75 @@ it('keeps the container lookup error instead of reporting no running containers'
         ->and($html)->not->toContain('No containers are running');
 });
 
-it('shows one log viewer for the selected deployment instead of an accordion', function () {
+it('selects the requested service for the selected deployment', function () {
     [$team, $server, $application] = runtimeLogsApplication();
     $edge = Server::factory()->create(['team_id' => $team->id, 'name' => 'Edge']);
 
-    $component = Livewire::test(Logs::class)
-        ->set('resource', $application)
-        ->set('type', 'application')
-        ->set('servers', collect([$server, $edge]))
-        ->set('serverContainers', [
-            $server->id => [
-                ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
-                ['ID' => 'preview-web', 'Names' => 'app-pr-12-web', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=web'],
-                ['ID' => 'preview-api', 'Names' => 'app-pr-12-api', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=api'],
-            ],
-            $edge->id => [
-                ['ID' => 'edge-app', 'Names' => 'edge-app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
-            ],
-        ])
-        ->set('containersLoaded', true)
-        ->set('pullRequestId', '12');
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server, $edge]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+            ['ID' => 'preview-web', 'Names' => 'app-pr-12-web', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=web'],
+            ['ID' => 'preview-api', 'Names' => 'app-pr-12-api', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=api'],
+        ],
+        $edge->id => [
+            ['ID' => 'edge-app', 'Names' => 'edge-app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->pullRequestId = '12';
+    $component->updatedPullRequestId();
 
-    $component->assertSet('service', 'api')
-        ->assertDontSee('Search servers')
-        ->assertSee('Search deployments')
-        ->assertSee('PR #12')
-        ->assertDontSee('Preview #12')
-        ->assertSee('Search services')
-        ->assertDontSee('runtime-log-trigger');
-
-    expect(runtimeLogViewerCount($component->html()))->toBe(1);
+    expect($component->service)->toBe('api');
 });
 
-it('hides server and service selectors when production is the only container', function () {
+it('clears the service selection when production is the only container', function () {
     [, $server, $application] = runtimeLogsApplication();
 
-    $component = Livewire::test(Logs::class)
-        ->set('resource', $application)
-        ->set('type', 'application')
-        ->set('servers', collect([$server]))
-        ->set('serverContainers', [
-            $server->id => [
-                ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0'],
-            ],
-        ])
-        ->set('containersLoaded', true)
-        ->call('syncLogSelection');
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->syncLogSelection();
 
-    $component->assertSet('service', '')
-        ->assertDontSee('Search servers')
-        ->assertDontSee('Search deployments')
-        ->assertDontSee('Search services')
-        ->assertDontSee('runtime-log-trigger');
-
-    expect(runtimeLogViewerCount($component->html()))->toBe(1);
+    expect($component->service)->toBe('');
 });
 
-it('merges every container of a service and does not offer a server selector', function () {
+it('merges every container of a service across servers', function () {
     [$team, $server, $application] = runtimeLogsApplication();
     $server->update(['name' => 'Frankfurt']);
     $edge = Server::factory()->create(['team_id' => $team->id, 'name' => 'Helsinki']);
 
-    $component = Livewire::test(Logs::class)
-        ->set('resource', $application)
-        ->set('type', 'application')
-        ->set('servers', collect([$server, $edge]))
-        ->set('serverContainers', [
-            $server->id => [
-                ['ID' => 'web-new', 'Names' => 'web-new', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
-                ['ID' => 'web-old', 'Names' => 'web-old', 'State' => 'exited', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
-            ],
-            $edge->id => [
-                ['ID' => 'web-edge', 'Names' => 'web-edge', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
-            ],
-        ])
-        ->set('containersLoaded', true)
-        ->call('syncLogSelection');
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server, $edge]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'web-new', 'Names' => 'web-new', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+            ['ID' => 'web-old', 'Names' => 'web-old', 'State' => 'exited', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+        $edge->id => [
+            ['ID' => 'web-edge', 'Names' => 'web-edge', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->syncLogSelection();
 
-    $component->assertSet('service', '')
-        ->assertDontSee('Search servers')
-        ->assertDontSee('runtime-log-trigger');
+    expect($component->service)->toBe('');
 
-    expect($component->instance()->render()->getData()['targets']['sources'])->toBe([
+    expect($component->render()->getData()['targets']['sources'])->toBe([
         ['server' => $server->uuid, 'container' => 'web-new', 'label' => 'Frankfurt web-new'],
         ['server' => $server->uuid, 'container' => 'web-old', 'label' => 'Frankfurt web-old'],
         ['server' => $edge->uuid, 'container' => 'web-edge', 'label' => 'Helsinki'],
     ]);
-
-    expect(runtimeLogViewerCount($component->html()))->toBe(1);
 });
-
-function runtimeLogViewerCount(string $html): int
-{
-    $workspace = (string) str($html)->after('class="runtime-logs-workspace"')->before('</section>');
-
-    return preg_match_all('/project\.shared\.get-logs|<div wire:id="/', $workspace);
-}

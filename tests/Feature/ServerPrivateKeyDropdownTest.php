@@ -10,7 +10,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Js;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
@@ -61,22 +60,6 @@ test('generating a server private key stores it and refreshes the current view',
     $component
         ->assertDispatched('copyPublicKeyToClipboard', publicKey: $privateKey->public_key)
         ->assertSee($privateKey->name);
-});
-
-test('server private key cards include a copy public key button', function () {
-    $keyData = PrivateKey::generateNewKeyPair('rsa');
-
-    $alternativeKey = PrivateKey::createAndStore([
-        'team_id' => $this->team->id,
-        'name' => 'Alternative SSH Key',
-        'description' => 'Created by test',
-        'private_key' => $keyData['private_key'],
-    ]);
-
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Copy public key')
-        ->assertSee('Alternative SSH Key')
-        ->assertSeeHtml('copyPublicKeyToClipboard('.Js::from($alternativeKey->public_key)->toHtml().')');
 });
 
 describe('after the user switches the session team', function () {

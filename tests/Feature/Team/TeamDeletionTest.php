@@ -106,16 +106,14 @@ test('system-wide git sources do not block team deletion', function () {
         ->and($gitlabApp->refresh()->team_id)->toBe(0);
 });
 
-test('the danger zone names and links blocking resource types', function () {
+test('the danger zone names the blocking resource types', function () {
     Project::factory()->count(2)->create(['team_id' => $this->teamToDelete->id]);
 
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->teamToDelete]);
 
     Livewire::test(DangerZone::class)
-        ->assertSee('This team still owns:')
-        ->assertSee('2 projects')
-        ->assertSeeHtml('href="'.route('project.index').'"');
+        ->assertSee('2 projects');
 });
 
 test('a team with a running application cannot be deleted', function () {

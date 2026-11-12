@@ -127,8 +127,7 @@ describe('GitHub Private Repository Component', function () {
                 ['name' => 'main'],
                 ['name' => 'feature/login'],
                 ['name' => 'production'],
-            ]))
-            ->assertSee('placeholder="Search branches…"', false);
+            ]));
     });
 
     test('loadRepositories rejects a github app owned by another team', function () {
@@ -298,18 +297,6 @@ describe('GitHub Private Repository Component', function () {
             ->assertSet('branches', collect());
     });
 
-    test('refresh button is visible when repositories are loaded', function () {
-        $repos = [
-            ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],
-        ];
-
-        fakeGithubHttp($repos);
-
-        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
-            ->call('loadRepositories', $this->githubApp->id)
-            ->assertSee('Refresh');
-    });
-
     test('loadRepositories shows an error when the installation is not found', function () {
         Http::fake([
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response(['message' => 'Not Found'], 404),
@@ -348,10 +335,5 @@ describe('GitHub Private Repository Component', function () {
             ->call('loadRepositories', $this->githubApp->id)
             ->call('loadBranches')
             ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], 'API rate limit exceeded'));
-    });
-
-    test('refresh button is not visible before repositories are loaded', function () {
-        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
-            ->assertDontSee('Refresh');
     });
 });

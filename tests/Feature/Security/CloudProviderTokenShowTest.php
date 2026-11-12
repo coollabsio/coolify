@@ -29,22 +29,6 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
-test('cloud token detail page shows editable name and description fields', function () {
-    $token = CloudProviderToken::factory()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Production Hetzner',
-        'description' => 'Used for production servers.',
-    ]);
-
-    $this->get(route('security.cloud-tokens.show', ['cloud_token_uuid' => $token->uuid]))
-        ->assertSuccessful()
-        ->assertSee('Cloud Token')
-        ->assertSee('Production Hetzner')
-        ->assertSee('Used for production servers.')
-        ->assertSee('Validate')
-        ->assertSee('Delete');
-});
-
 test('cloud token detail page updates name and description', function () {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,

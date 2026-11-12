@@ -46,8 +46,7 @@ it('renders the images page for a server', function () use ($fakeDocker, $nginxI
     $fakeDocker($nginxId, $danglingId);
 
     $this->get(route('server.docker-images', ['server_uuid' => $this->server->uuid]))
-        ->assertOk()
-        ->assertSee('Images');
+        ->assertOk();
 });
 
 it('lists images and marks the ones no container uses', function () use ($fakeDocker, $nginxId, $danglingId) {

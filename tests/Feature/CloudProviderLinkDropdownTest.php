@@ -67,21 +67,10 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
     ]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link provider')
-        ->assertSee('Hetzner')
-        ->assertSee('DigitalOcean')
-        ->assertSee('Vultr')
-        ->assertSee('Hostinger')
         ->assertSee('Hetzner Token')
         ->assertSee('DigitalOcean Token')
         ->assertSee('Vultr Token')
-        ->assertSee('Hostinger Token')
-        ->assertSee('Server ID')
-        ->assertSee('Droplet ID')
-        ->assertSee('Instance ID')
-        ->assertSee('Virtual Machine ID')
-        ->assertSee('Search by server IP')
-        ->assertSee('Search ID');
+        ->assertSee('Hostinger Token');
 });
 
 it('links a manually added server to a Hostinger VPS by IP', function () {

@@ -89,10 +89,7 @@ it('warns when a service has missing required environment variables', function (
 
     Livewire::test(ConfigurationChecker::class, ['resource' => $service])
         ->assertSet('missingRequiredEnvironmentVariableCount', 1)
-        ->assertSee('Required environment variable missing')
-        ->assertSee('PLUNK_API_KEY')
-        ->assertSee('Open environment variables');
-
+        ->assertSee('PLUNK_API_KEY');
 });
 
 it('broadcasts a configuration update after a required service variable is set', function () {

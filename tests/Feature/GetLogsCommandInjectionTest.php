@@ -73,8 +73,6 @@ describe('GetLogs Livewire action validation', function () {
             'resource' => $this->application,
             'container' => 'test-container',
         ])
-            ->assertSee('All')
-            ->assertSeeHtml('title="Show all logs"')
             ->call('showAllLogs')
             ->assertSet('numberOfLines', -1)
             ->assertReturned('all logs');

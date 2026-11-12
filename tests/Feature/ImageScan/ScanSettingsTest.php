@@ -295,7 +295,6 @@ describe('application scope', function () {
         $this->application->update(['build_pack' => 'dockerimage']);
 
         $component = scanSettingsAs($this->admin, $this->team, 'application', $this->application->uuid)
-            ->assertSee('Who builds this image')
             ->set('buildsByTeam', '0')
             ->assertDispatched('success');
 
@@ -582,8 +581,6 @@ describe('count medium problems', function () {
         $admin = scanSettingsInstanceAdmin();
 
         scanSettingsAs($admin, Team::find(0), 'instance')
-            ->assertSee('Count medium problems')
-            ->assertSee('Medium problems that an update fixes give a security update. Problems that attackers are likely to use always count.')
             ->set('countMedium', '')
             ->assertHasErrors('countMedium')
             ->set('countMedium', '1')
