@@ -1,13 +1,13 @@
 # documentation: https://n8n.io
-# slogan: n8n is an extendable workflow automation tool with queue mode and workers.
+# slogan: n8n with queue mode, workers, PostgreSQL, and self-hosted AI Assistant sandbox.
 # category: automation
-# tags: n8n,workflow,automation,open,source,low,code,queue,worker,scalable
+# tags: n8n,workflow,automation,open,source,low,code,queue,worker,scalable,ai,sandbox
 # logo: svgs/n8n.png
 # port: 5678
 
 services:
   n8n:
-    image: n8nio/n8n:2.10.4
+    image: n8nio/n8n:2.36.5
     environment:
       - SERVICE_URL_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N}
@@ -24,7 +24,7 @@ services:
       - DB_POSTGRESDB_SCHEMA=public
       - DB_POSTGRESDB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - EXECUTIONS_MODE=queue
-      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_HOST=n8n-redis
       - QUEUE_HEALTH_CHECK_ACTIVE=true
       - N8N_ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTION}
       - N8N_RUNNERS_ENABLED=true
@@ -45,7 +45,9 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
-      redis:
+      n8n-redis:
+        condition: service_healthy
+      sandbox-api:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz"]
@@ -54,7 +56,7 @@ services:
       retries: 10
 
   n8n-worker:
-    image: n8nio/n8n:2.10.4
+    image: n8nio/n8n:2.36.5
     command: worker
     environment:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
@@ -67,7 +69,7 @@ services:
       - DB_POSTGRESDB_SCHEMA=public
       - DB_POSTGRESDB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - EXECUTIONS_MODE=queue
-      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_HOST=n8n-redis
       - QUEUE_HEALTH_CHECK_ACTIVE=true
       - N8N_ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTION}
       - N8N_RUNNERS_ENABLED=true
@@ -94,7 +96,7 @@ services:
         condition: service_healthy
       postgresql:
         condition: service_healthy
-      redis:
+      n8n-redis:
         condition: service_healthy
 
   postgresql:
@@ -111,7 +113,7 @@ services:
       timeout: 20s
       retries: 10
 
-  redis:
+  n8n-redis:
     image: redis:6-alpine
     volumes:
       - redis-data:/data
@@ -122,7 +124,7 @@ services:
       retries: 10
 
   task-runners:
-    image: n8nio/runners:2.10.4
+    image: n8nio/runners:2.36.5
     environment:
       - N8N_RUNNERS_TASK_BROKER_URI=${N8N_RUNNERS_TASK_BROKER_URI:-http://n8n-worker:5679}
       - N8N_RUNNERS_AUTH_TOKEN=$SERVICE_PASSWORD_N8N
@@ -137,3 +139,106 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
+  sandbox-certs:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:latest
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        bootstrap-mtls.sh --out-dir /tls --api-san sandbox-api
+        --control-san-prefix sandbox-runner &&
+        chown -R sandbox-api:sandbox-api /tls/api
+    environment:
+      - NUM_RUNNERS=1
+    volumes:
+      - sandbox-tls:/tls
+    restart: "no"
+    exclude_from_hc: true
+
+  sandbox-api:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:latest
+    restart: unless-stopped
+    depends_on:
+      sandbox-certs:
+        condition: service_completed_successfully
+    environment:
+      - SANDBOX_API_KEYS=$SERVICE_PASSWORD_N8N
+      - SANDBOX_API_RUNNER_REGISTRATION_TOKEN=$SERVICE_PASSWORD_ENCRYPTION
+      - SANDBOX_API_RUNNER_API_KEY=$SERVICE_PASSWORD_N8N
+      - SANDBOX_API_GRPC_TLS_CERT_FILE=/tls/api/grpc-server.crt
+      - SANDBOX_API_GRPC_TLS_KEY_FILE=/tls/api/grpc-server.key
+      - SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE=/tls/api/ca.crt
+      - SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE=/tls/api/ca.crt
+      - SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE=/tls/api/control-grpc-api-client.crt
+      - SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE=/tls/api/control-grpc-api-client.key
+      - SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME=sandbox-runner-1
+    volumes:
+      - sandbox-tls:/tls:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  sandbox-runner-1:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-runner-dind:latest
+    privileged: true
+    restart: unless-stopped
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    environment:
+      - SANDBOX_RUNNER_API_KEYS=$SERVICE_PASSWORD_N8N
+      - SANDBOX_RUNNER_REGISTRATION_TOKEN=$SERVICE_PASSWORD_ENCRYPTION
+      - SANDBOX_RUNNER_API_GRPC_ADDR=sandbox-api:9090
+      - SANDBOX_RUNNER_HTTP_BASE_URL=http://sandbox-runner-1:8080
+      - SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR=:9091
+      - SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR=sandbox-runner-1:9091
+      - SANDBOX_RUNNER_ID=runner-1
+      - SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE=ghcr.io/n8n-io/n8n-sandbox-service-sandbox:latest
+      - SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE=/tls/runner/ca.crt
+      - SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE=/tls/runner/grpc-client.crt
+      - SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE=/tls/runner/grpc-client.key
+      - SANDBOX_RUNNER_REGISTRATION_GRPC_SERVER_NAME=sandbox-api
+      - SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE=/tls/runner/control-grpc-server.crt
+      - SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE=/tls/runner/control-grpc-server.key
+      - SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE=/tls/runner/ca.crt
+    volumes:
+      - sandbox-tls:/tls:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 60s
+
+  searxng:
+    image: ghcr.io/searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNG}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /etc/searxng
+        cat > /etc/searxng/settings.yml << 'SEARXEOF'
+        use_default_settings: true
+        search:
+          formats:
+            - html
+            - json
+        SEARXEOF
+        exec /usr/local/searxng/entrypoint.sh
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  n8n-data:
+  postgresql-data:
+  redis-data:
+  sandbox-tls:
