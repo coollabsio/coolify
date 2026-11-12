@@ -24,7 +24,7 @@ stable need.
 | B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
 | B12 | ~~Instance setting for Nodes, labeled Beta~~ | [0015](decisions/0015-node-release-criteria.md) | Done: `is_nodes_enabled` in Settings > Advanced (instance admins only), Beta labels. Existing tests still set the old config key. |
 | B13 | Release Sentinel, Flux, and `coolify-builder` with every new command | 0011, 0013 | `main-ea82bdb` images exist. Build variables and inline Dockerfiles are in Sentinel commit `6784fcd`, not pushed yet. |
-| B15 | Traffic between applications on different Nodes is dropped | 0005 | Sentinel bug: netavark (Podman 6) masquerades in its own nftables table, so the iptables `RETURN` exemptions in `configure_mesh_nat` (`crates/control/src/network.rs`) do not apply, and the forward chain drops the masqueraded source. |
+| B15 | ~~Traffic between applications on different Nodes is dropped~~ | 0005 | Fixed in Sentinel `8ee8341`: a `mesh_nat` chain in `coolify_cluster` (priority srcnat - 5) keeps the workload source IP before the netavark masquerade. Also fixed `ae0217c`: discovery DNS answers every name of its zones and no longer loops through systemd-resolved. |
 | B16 | Production Flux (service, TLS certificate, signing keys, firewall) | 0002, 0015 | Needed before Nodes can leave development instances. Needs a design. |
 | B14 | ~~Dockerfile without Git (v4 "Dockerfile" type)~~ | 0006 | Done: source type `dockerfile_inline`, capability `image.build.inline_dockerfile.v1`. |
 
@@ -49,6 +49,7 @@ stable need.
 | L5 | Preview deployments | [0011](decisions/0011-node-git-sources.md) |
 | L6 | Ctrl+K search entries for cluster settings pages | — |
 | L7 | A clear error instead of a 500 when you create a database and the cluster network is not ready | 0010 |
+| L9 | Reverse lookups of external addresses from containers get NXDOMAIN | — | Discovery DNS claims all of `in-addr.arpa`; it must know its own reverse zones and forward the rest. |
 | L8 | Strict "serve files only" mode for Static | 0006. Needs a Sentinel builder change. |
 
 ## Postponed
