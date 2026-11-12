@@ -6,14 +6,17 @@ use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\Build\InspectNodeRegistry;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeCluster;
+use App\Actions\Node\UpgradeSentinel;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
+use App\Jobs\UpgradeClusterSentinelJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
@@ -25,6 +28,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -420,6 +424,32 @@ class Show extends Component
         $this->dispatch('success', 'Cluster network state restored over SSH. Reconcile the network to verify current state.');
     }
 
+    /** Upgrades Sentinel on the cluster's servers one at a time, stopping at the first failure. */
+    public function upgradeClusterSentinel(): void
+    {
+        $this->authorize('update', $this->cluster);
+        $release = FetchLatestSentinelRelease::run();
+        $nodes = UpgradeSentinel::clusterNodesToUpgrade($this->cluster, $release);
+        foreach ($nodes as $node) {
+            $this->authorize('manageSentinel', $node);
+        }
+        if ($nodes->isEmpty()) {
+            $this->dispatch('info', 'Sentinel is up to date on every server of this cluster.');
+
+            return;
+        }
+        $key = UpgradeSentinel::clusterUpgradeCacheKey($this->cluster->id);
+        if (in_array(data_get(Cache::get($key), 'status'), ['queued', 'running'], true)) {
+            $this->dispatch('error', 'A Sentinel upgrade is already running in this cluster.');
+
+            return;
+        }
+
+        Cache::put($key, UpgradeSentinel::newClusterRun('queued', $release['version'], $nodes), now()->addDay());
+        UpgradeClusterSentinelJob::dispatch($this->cluster->id, auth()->id());
+        $this->dispatch('success', 'Sentinel upgrade queued. Servers are upgraded one at a time.');
+    }
+
     public function render(): View
     {
         return view('livewire.node-cluster.show', [
@@ -496,8 +526,16 @@ class Show extends Component
     /** @return array<string, mixed> */
     private function nodesData(): array
     {
+        $sentinelRelease = FetchLatestSentinelRelease::run();
+        $sentinelUpgradeRun = Cache::get(UpgradeSentinel::clusterUpgradeCacheKey($this->cluster->id));
+        $operationIds = collect(data_get($sentinelUpgradeRun, 'nodes', []))->pluck('operation_id')->filter()->all();
+
         return [
             'nodes' => $this->clusterNodes()->get(),
+            'sentinelRelease' => $sentinelRelease,
+            'sentinelUpgradeNodes' => UpgradeSentinel::clusterNodesToUpgrade($this->cluster, $sentinelRelease),
+            'sentinelUpgradeRun' => $sentinelUpgradeRun,
+            'sentinelUpgradeOperations' => NodeOperation::query()->whereIn('id', $operationIds)->whereHas('node', fn (Builder $query) => $query->where('node_cluster_id', $this->cluster->id))->get()->keyBy('id'),
             'availableNodes' => auth()->user()->can('update', $this->cluster)
                 ? Node::query()->where('team_id', $this->cluster->team_id)->whereNull('node_cluster_id')->orderBy('name')->get()
                 : collect(),

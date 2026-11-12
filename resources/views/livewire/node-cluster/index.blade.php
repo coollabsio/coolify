@@ -1,19 +1,7 @@
 <section data-testid="server-index-clusters" class="w-full">
-    @php
-        $sentinelUpgradeRunning = in_array(data_get($sentinelUpgradeSummary, 'status'), ['queued', 'running'], true);
-    @endphp
     <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <x-section-heading class="mb-0!" title="Clusters" subtitle="Cluster servers share a private, encrypted network and run cluster applications." />
         <div class="flex w-fit shrink-0 flex-wrap items-center gap-2">
-            @if ($sentinelUpgradeNodes->isNotEmpty() && ! $sentinelUpgradeRunning)
-                @can('manageSentinel', $sentinelUpgradeNodes->first())
-                    <x-modal-confirmation title="Upgrade Sentinel on all cluster servers?" buttonTitle="Upgrade all"
-                        submitAction="upgradeAllSentinels" :actions="[
-                            'Sentinel ' . data_get($sentinelRelease, 'version') . ' is installed over SSH on ' . $sentinelUpgradeNodes->count() . ' ' . Str::plural('server', $sentinelUpgradeNodes->count()) . ', one at a time.',
-                            'The upgrade stops at the first server that fails. That server is restored to its previous version.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade all" />
-                @endcan
-            @endif
             @can('create', App\Models\NodeCluster::class)
                 {{-- Opened from the Add menu on the Servers page header. --}}
                 <x-modal-input title="New cluster" :wireIgnore="false" class="hidden">
@@ -33,22 +21,6 @@
             @endcan
         </div>
     </div>
-
-    @if ($sentinelUpgradeSummary !== null)
-        <div @if ($sentinelUpgradeRunning) wire:poll.5s @endif
-            class="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-neutral-600 dark:text-fg-dim">
-            <span>Sentinel upgrade</span>
-            <x-status-badge :status="str(data_get($sentinelUpgradeSummary, 'status'))->title()->toString()"
-                :type="match (data_get($sentinelUpgradeSummary, 'status')) { 'succeeded' => 'success', 'failed' => 'error', default => 'warning' }" />
-            <span>{{ count(data_get($sentinelUpgradeSummary, 'upgraded', [])) }} upgraded</span>
-            @if (filled(data_get($sentinelUpgradeSummary, 'failed_node_name')))
-                <span>&middot; Stopped at {{ data_get($sentinelUpgradeSummary, 'failed_node_name') }}</span>
-            @endif
-            @if (filled(data_get($sentinelUpgradeSummary, 'error')))
-                <p class="w-full text-red-600 dark:text-red-400">{{ data_get($sentinelUpgradeSummary, 'error') }}</p>
-            @endif
-        </div>
-    @endif
 
     @if ($clusters->isEmpty() && $unassignedNodes->isEmpty())
         <x-empty title="No clusters yet" description="Create a cluster, then add cluster servers to it." icon-name="cluster" />
@@ -70,6 +42,10 @@
                                     class="truncate text-[13px] font-semibold text-black hover:underline dark:text-fg">{{ $cluster->name }}</a>
                                 @if ($cluster->hasNetworkStatus())
                                     <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
+                                @endif
+                                @if ($cluster->nodes->contains(fn ($node) => $node->is_usable && $node->needsSentinelUpgrade($sentinelRelease)))
+                                    <a href="{{ route('node-cluster.nodes', ['cluster_uuid' => $cluster->uuid]) }}" {{ wireNavigate() }}
+                                        class="text-[11px] text-neutral-500 underline hover:text-black dark:text-fg-faint dark:hover:text-fg">Sentinel upgrade available</a>
                                 @endif
                             </div>
                             <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">

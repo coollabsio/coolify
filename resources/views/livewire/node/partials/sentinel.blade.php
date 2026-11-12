@@ -9,6 +9,7 @@
     $sentinelVersion = $node->runningSentinelVersion();
     $latestSentinelVersion = data_get($sentinelRelease, 'version');
     $sentinelUpgradeAvailable = $node->needsSentinelUpgrade($sentinelRelease);
+    $sentinelReconnectTimeout = Carbon\CarbonInterval::seconds(App\Actions\Node\UpgradeSentinel::reconnectTimeoutSeconds())->cascade()->forHumans();
     $sentinelUpgradeStatus = data_get($sentinelUpgrade, 'status');
     $sentinelUpgradeActive = in_array($sentinelUpgradeStatus, ['queued', 'dispatched', 'running', 'verifying', 'uncertain'], true);
     $sentinelUpgradeStatusLabel = match ($sentinelUpgradeStatus) {
@@ -82,7 +83,7 @@
         @can('manageSentinel', $node)
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                 <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                    Upgrades and updates install Sentinel over SSH and restart the service. If Sentinel does not reconnect within 60 seconds after an upgrade, the previous version is restored.
+                    Upgrades and updates install Sentinel over SSH and restart the service. If Sentinel does not reconnect within {{ $sentinelReconnectTimeout }} after an upgrade, the previous version is restored over SSH.
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
                     @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
@@ -90,7 +91,7 @@
                             submitAction="upgradeSentinel" :actions="[
                                 'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
                                 'The control connection drops briefly while Sentinel restarts.',
-                                'If Sentinel does not reconnect within 60 seconds, the previous version is restored.',
+                                'If Sentinel does not reconnect within ' . $sentinelReconnectTimeout . ', the previous version is restored over SSH.',
                             ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
                     @endif
                     <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>

@@ -5,9 +5,12 @@ namespace App\Actions\Node;
 use App\Actions\Sentinel\FetchNodeLogs;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\User;
+use Carbon\CarbonInterval;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Sleep;
@@ -18,7 +21,8 @@ use Throwable;
 
 /**
  * Upgrades host Sentinel over SSH as a coordinated Node operation. After the install, Sentinel must
- * reconnect to Flux with the expected version, otherwise the previous binary is restored.
+ * reconnect to Flux with the expected version and report its capabilities, otherwise the previous
+ * binary is restored over SSH.
  */
 class UpgradeSentinel
 {
@@ -26,9 +30,10 @@ class UpgradeSentinel
 
     public const COMMAND_TYPE = 'sentinel.upgrade.v1';
 
-    public const HEALTH_CHECK_ATTEMPTS = 30;
-
     public const HEALTH_CHECK_INTERVAL_SECONDS = 2;
+
+    /** Upper bound of the reconnect wait. UpgradeNodeSentinelJob::$timeout and the stale-operation limit assume it. */
+    public const MAX_RECONNECT_TIMEOUT_SECONDS = 300;
 
     private const ACTIVE_STATUSES = [
         NodeOperationStatus::QUEUED,
@@ -38,9 +43,58 @@ class UpgradeSentinel
         NodeOperationStatus::UNCERTAIN,
     ];
 
-    public static function upgradeAllCacheKey(int $teamId): string
+    public static function clusterUpgradeCacheKey(int $clusterId): string
     {
-        return "sentinel-host:upgrade-all:{$teamId}";
+        return "sentinel-host:upgrade-cluster:{$clusterId}";
+    }
+
+    public static function reconnectTimeoutSeconds(): int
+    {
+        return max(10, min(self::MAX_RECONNECT_TIMEOUT_SECONDS, (int) config('constants.sentinel.upgrade_reconnect_timeout_seconds')));
+    }
+
+    /**
+     * Usable cluster Nodes that run an older Sentinel than the release, in upgrade order.
+     *
+     * @param  array{version: string}|null  $release
+     * @return Collection<int, Node>
+     */
+    public static function clusterNodesToUpgrade(NodeCluster $cluster, ?array $release): Collection
+    {
+        if ($release === null) {
+            return collect();
+        }
+
+        return Node::query()
+            ->where('node_cluster_id', $cluster->id)
+            ->where('team_id', $cluster->team_id)
+            ->where('is_usable', true)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Node $node): bool => $node->needsSentinelUpgrade($release))
+            ->values()
+            ->toBase();
+    }
+
+    /**
+     * The run state shown on the cluster page. Each Node links to its upgrade operation once it starts.
+     *
+     * @param  Collection<int, Node>  $nodes
+     * @return array{status: string, version: ?string, nodes: list<array{uuid: string, name: string, previous_version: ?string, operation_id: ?int}>}
+     */
+    public static function newClusterRun(string $status, ?string $version, Collection $nodes): array
+    {
+        return [
+            'status' => $status,
+            'version' => $version,
+            'nodes' => $nodes->map(fn (Node $node): array => [
+                'uuid' => $node->uuid,
+                'name' => $node->name,
+                'previous_version' => $node->runningSentinelVersion(),
+                'operation_id' => null,
+            ])->values()->all(),
+        ];
     }
 
     /**
@@ -112,11 +166,14 @@ class UpgradeSentinel
 
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
             if (! $this->waitForReconnect($node, $version, $startedAt)) {
+                $within = CarbonInterval::seconds(self::reconnectTimeoutSeconds())->cascade()->forHumans();
                 try {
                     RollbackSentinel::run($node);
-                    $error = "Sentinel {$version} did not reconnect within 60 seconds. The previous version was restored.";
+                    $result['rolled_back'] = true;
+                    $error = "Sentinel {$version} did not reconnect with its capabilities within {$within}. The previous version was restored.";
                 } catch (Throwable $exception) {
-                    $error = "Sentinel {$version} did not reconnect within 60 seconds. Restoring the previous version failed: ".$exception->getMessage();
+                    $result['rolled_back'] = false;
+                    $error = "Sentinel {$version} did not reconnect with its capabilities within {$within}. Restoring the previous version failed: ".$exception->getMessage();
                 }
 
                 return $this->fail($operation, $error, $result);
@@ -131,43 +188,45 @@ class UpgradeSentinel
     }
 
     /**
-     * Upgrades the team's usable Nodes one at a time and stops at the first failure.
+     * Upgrades the cluster's Nodes one at a time and stops at the first failure. A Node starts only after
+     * the previous one reconnected with its capabilities, so at most one Node runs without Sentinel.
      *
-     * @return array{status: string, upgraded: list<string>, failed_node_uuid?: string, failed_node_name?: string, error?: string, finished_at?: string}
+     * @return array{status: string, version: ?string, nodes: list<array{uuid: string, name: string, previous_version: ?string, operation_id: ?int}>, failed_node_name?: string, error?: string, finished_at?: string}
      */
-    public function upgradeAll(int $teamId, User $user): array
+    public function upgradeCluster(NodeCluster $cluster, User $user): array
     {
-        $summary = ['status' => 'running', 'upgraded' => []];
-        Cache::put(self::upgradeAllCacheKey($teamId), $summary, now()->addDay());
-
+        $key = self::clusterUpgradeCacheKey($cluster->id);
         $release = FetchLatestSentinelRelease::run();
-        $nodes = $release === null ? collect() : Node::query()
-            ->where('team_id', $teamId)
-            ->where('is_usable', true)
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get()
-            ->filter(fn (Node $node): bool => $node->needsSentinelUpgrade($release));
+        $nodes = self::clusterNodesToUpgrade($cluster, $release);
+        $run = self::newClusterRun('running', $release['version'] ?? null, $nodes);
+        Cache::put($key, $run, now()->addDay());
+
         if ($release === null) {
-            $summary = [...$summary, 'status' => 'failed', 'error' => 'No valid Sentinel release is available. Try again later.'];
+            $run = [...$run, 'status' => 'failed', 'error' => 'No valid Sentinel release is available. Try again later.'];
+        } elseif (! $user->can('update', $cluster)) {
+            $run = [...$run, 'status' => 'failed', 'error' => 'You are not allowed to upgrade Sentinel in this cluster.'];
         }
 
-        foreach ($nodes as $node) {
+        foreach ($run['status'] === 'running' ? $nodes : [] as $index => $node) {
             try {
                 if (! $user->can('manageSentinel', $node)) {
                     throw new RuntimeException('You are not allowed to upgrade Sentinel on this server.');
                 }
-                $operation = $this->handle($this->start($node, $user));
+                if (! $node->hasRecentFluxHeartbeat()) {
+                    throw new RuntimeException('Sentinel on this server is not connected, so it was not upgraded. Fix the connection, then upgrade the cluster again.');
+                }
+                $operation = $this->start($node, $user);
+                $run['nodes'][$index]['operation_id'] = $operation->id;
+                Cache::put($key, $run, now()->addDay());
+
+                $operation = $this->handle($operation);
                 if ($operation->status !== NodeOperationStatus::SUCCEEDED) {
                     throw new RuntimeException($operation->error ?? 'The Sentinel upgrade did not complete.');
                 }
-                $summary['upgraded'][] = $node->uuid;
-                Cache::put(self::upgradeAllCacheKey($teamId), $summary, now()->addDay());
             } catch (Throwable $exception) {
-                $summary = [
-                    ...$summary,
+                $run = [
+                    ...$run,
                     'status' => 'failed',
-                    'failed_node_uuid' => $node->uuid,
                     'failed_node_name' => $node->name,
                     'error' => mb_substr(FetchNodeLogs::redact($exception->getMessage()), 0, 2000),
                 ];
@@ -175,13 +234,13 @@ class UpgradeSentinel
             }
         }
 
-        if ($summary['status'] === 'running') {
-            $summary['status'] = 'succeeded';
+        if ($run['status'] === 'running') {
+            $run['status'] = 'succeeded';
         }
-        $summary['finished_at'] = now()->toIso8601String();
-        Cache::put(self::upgradeAllCacheKey($teamId), $summary, now()->addDay());
+        $run['finished_at'] = now()->toIso8601String();
+        Cache::put($key, $run, now()->addDay());
 
-        return $summary;
+        return $run;
     }
 
     public static function isEnabled(): bool
@@ -191,11 +250,12 @@ class UpgradeSentinel
 
     private function waitForReconnect(Node $node, string $version, Carbon $startedAt): bool
     {
-        for ($attempt = 0; $attempt <= self::HEALTH_CHECK_ATTEMPTS; $attempt++) {
+        $attempts = intdiv(self::reconnectTimeoutSeconds(), self::HEALTH_CHECK_INTERVAL_SECONDS);
+        for ($attempt = 0; $attempt <= $attempts; $attempt++) {
             if ($this->reconnectedWithVersion($node, $version, $startedAt)) {
                 return true;
             }
-            if ($attempt < self::HEALTH_CHECK_ATTEMPTS) {
+            if ($attempt < $attempts) {
                 Sleep::for(self::HEALTH_CHECK_INTERVAL_SECONDS)->seconds();
             }
         }
@@ -207,7 +267,8 @@ class UpgradeSentinel
     {
         $connection = Cache::get($node->cacheKey());
         $connectedAt = data_get($connection, 'last_connected_at');
-        if (data_get($connection, 'status') !== 'connected' || data_get($connection, 'sentinel_version') !== $version || ! is_string($connectedAt)) {
+        $capabilities = data_get($connection, 'capabilities');
+        if (data_get($connection, 'status') !== 'connected' || data_get($connection, 'sentinel_version') !== $version || ! is_string($connectedAt) || ! is_array($capabilities) || $capabilities === []) {
             return false;
         }
 

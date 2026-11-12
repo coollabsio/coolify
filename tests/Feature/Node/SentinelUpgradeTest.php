@@ -5,12 +5,14 @@ use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RollbackSentinel;
 use App\Actions\Node\UpgradeSentinel;
 use App\Enums\NodeOperationStatus;
-use App\Jobs\UpgradeAllNodeSentinelsJob;
+use App\Jobs\UpgradeClusterSentinelJob;
 use App\Jobs\UpgradeNodeSentinelJob;
 use App\Livewire\Node\Show;
 use App\Livewire\NodeCluster\Index as NodeClusterIndex;
+use App\Livewire\NodeCluster\Show as NodeClusterShow;
 use App\Models\InstanceSettings;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -26,7 +28,7 @@ uses(RefreshDatabase::class);
 const SENTINEL_UPGRADE_DIGEST = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 beforeEach(function () {
-    InstanceSettings::forceCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_nodes_enabled' => true]);
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
     config()->set('constants.sentinel.host_repository', 'ghcr.io/coollabsio/sentinel-host');
@@ -72,6 +74,8 @@ function reconnectSentinel(Node $node, string $version): void
         'sentinel_version' => $version,
         'connected_at' => now()->subDay()->toIso8601String(),
         'last_connected_at' => now()->toIso8601String(),
+        'last_heartbeat_at' => now()->toIso8601String(),
+        'capabilities' => ['system.ping.v1'],
     ]);
 }
 
@@ -192,9 +196,9 @@ it('restores the previous Sentinel when the new version does not reconnect', fun
 
     $operation->refresh();
     expect($operation->status)->toBe(NodeOperationStatus::FAILED)
-        ->and($operation->error)->toBe('Sentinel 1.1.0 did not reconnect within 60 seconds. The previous version was restored.')
+        ->and($operation->error)->toBe('Sentinel 1.1.0 did not reconnect with its capabilities within 5 minutes. The previous version was restored.')
         ->and($this->node->refresh()->sentinel_version)->toBe('1.0.2');
-    Sleep::assertSleptTimes(30);
+    Sleep::assertSleptTimes(150);
 })->with([
     'no connection' => [null],
     'old version reconnected' => [fn () => [
@@ -206,6 +210,11 @@ it('restores the previous Sentinel when the new version does not reconnect', fun
         'status' => 'connected',
         'sentinel_version' => '1.1.0',
         'last_connected_at' => now()->subHour()->toIso8601String(),
+    ]],
+    'expected version without capabilities' => [fn () => [
+        'status' => 'connected',
+        'sentinel_version' => '1.1.0',
+        'last_connected_at' => now()->addMinute()->toIso8601String(),
     ]],
     'reconnecting' => [fn () => [
         'status' => 'reconnecting',
@@ -221,7 +230,7 @@ it('reports when restoring the previous Sentinel fails', function () {
     $operation = UpgradeSentinel::run(UpgradeSentinel::make()->start($this->node, $this->user));
 
     expect($operation->status)->toBe(NodeOperationStatus::FAILED)
-        ->and($operation->error)->toBe('Sentinel 1.1.0 did not reconnect within 60 seconds. Restoring the previous version failed: No previous Sentinel binary is available to restore.');
+        ->and($operation->error)->toBe('Sentinel 1.1.0 did not reconnect with its capabilities within 5 minutes. Restoring the previous version failed: No previous Sentinel binary is available to restore.');
 });
 
 it('fails without a rollback when the installer fails', function () {
@@ -271,12 +280,18 @@ it('fails the operation when the upgrade worker stops', function () {
         ->and($operation->error)->toBe('The Sentinel upgrade stopped before completion. Check the Sentinel version on the server.');
 });
 
-it('upgrades all Nodes one at a time and stops at the first failure', function () {
+it('upgrades the cluster Nodes one at a time and stops at the first failure', function () {
     $this->freezeSecond();
-    $bravo = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'bravo', 'is_usable' => true, 'sentinel_version' => 'main']);
-    $charlie = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'charlie', 'is_usable' => true, 'sentinel_version' => '1.0.0']);
-    $current = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'aardvark', 'is_usable' => true, 'sentinel_version' => '1.1.0']);
-    $unusable = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'aaa-unusable', 'is_usable' => false, 'sentinel_version' => '1.0.0']);
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $this->node->update(['node_cluster_id' => $cluster->id]);
+    $bravo = Node::factory()->create(['team_id' => $this->team->id, 'node_cluster_id' => $cluster->id, 'name' => 'bravo', 'is_usable' => true, 'sentinel_version' => 'main']);
+    $charlie = Node::factory()->create(['team_id' => $this->team->id, 'node_cluster_id' => $cluster->id, 'name' => 'charlie', 'is_usable' => true, 'sentinel_version' => '1.0.0']);
+    $current = Node::factory()->create(['team_id' => $this->team->id, 'node_cluster_id' => $cluster->id, 'name' => 'aardvark', 'is_usable' => true, 'sentinel_version' => '1.1.0']);
+    $unusable = Node::factory()->create(['team_id' => $this->team->id, 'node_cluster_id' => $cluster->id, 'name' => 'aaa-unusable', 'is_usable' => false, 'sentinel_version' => '1.0.0']);
+    $otherCluster = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'aaa-other', 'is_usable' => true, 'sentinel_version' => '1.0.0']);
+    foreach ([$this->node, $bravo, $charlie] as $node) {
+        reconnectSentinel($node, $node->sentinel_version);
+    }
     $installed = [];
     InstallSentinel::partialMock()->shouldReceive('handle')->twice()->andReturnUsing(function (Node $node) use (&$installed, $bravo) {
         $installed[] = $node->name;
@@ -288,25 +303,30 @@ it('upgrades all Nodes one at a time and stops at the first failure', function (
     });
     RollbackSentinel::partialMock()->shouldReceive('handle')->once()->andReturn('');
 
-    (new UpgradeAllNodeSentinelsJob($this->team->id, $this->user->id))->handle();
+    (new UpgradeClusterSentinelJob($cluster->id, $this->user->id))->handle();
 
-    $summary = Cache::get(UpgradeSentinel::upgradeAllCacheKey($this->team->id));
+    $run = Cache::get(UpgradeSentinel::clusterUpgradeCacheKey($cluster->id));
     expect($installed)->toBe(['alpha', 'bravo'])
-        ->and($summary)->toMatchArray([
+        ->and(collect($run['nodes'])->pluck('name')->all())->toBe(['alpha', 'bravo', 'charlie'])
+        ->and($run['nodes'][2]['operation_id'])->toBeNull()
+        ->and(NodeOperation::query()->find($run['nodes'][1]['operation_id'])->result)->toMatchArray(['rolled_back' => true])
+        ->and($run)->toMatchArray([
             'status' => 'failed',
-            'upgraded' => [$this->node->uuid],
-            'failed_node_uuid' => $bravo->uuid,
             'failed_node_name' => 'bravo',
-            'error' => 'Sentinel 1.1.0 did not reconnect within 60 seconds. The previous version was restored.',
+            'error' => 'Sentinel 1.1.0 did not reconnect with its capabilities within 5 minutes. The previous version was restored.',
         ])
         ->and($this->node->refresh()->sentinel_version)->toBe('1.1.0')
         ->and($charlie->operations()->exists())->toBeFalse()
         ->and($current->operations()->exists())->toBeFalse()
-        ->and($unusable->operations()->exists())->toBeFalse();
+        ->and($unusable->operations()->exists())->toBeFalse()
+        ->and($otherCluster->operations()->exists())->toBeFalse();
 });
 
-it('stops upgrading all Nodes when one Node has an active operation', function () {
-    $bravo = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'bravo', 'is_usable' => true, 'sentinel_version' => '1.0.0']);
+it('stops the cluster upgrade at a Node that has an active operation', function () {
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $this->node->update(['node_cluster_id' => $cluster->id]);
+    reconnectSentinel($this->node, '1.0.2');
+    $bravo = Node::factory()->create(['team_id' => $this->team->id, 'node_cluster_id' => $cluster->id, 'name' => 'bravo', 'is_usable' => true, 'sentinel_version' => '1.0.0']);
     NodeOperation::query()->create([
         'node_id' => $this->node->id,
         'command_type' => 'workload.deploy.v1',
@@ -316,11 +336,11 @@ it('stops upgrading all Nodes when one Node has an active operation', function (
     ]);
     InstallSentinel::partialMock()->shouldNotReceive('handle');
 
-    $summary = UpgradeSentinel::make()->upgradeAll($this->team->id, $this->user);
+    $run = UpgradeSentinel::make()->upgradeCluster($cluster, $this->user);
 
-    expect($summary)->toMatchArray([
+    expect($run)->toMatchArray([
         'status' => 'failed',
-        'failed_node_uuid' => $this->node->uuid,
+        'failed_node_name' => 'alpha',
         'error' => 'Another operation is active on this server. Wait for it to finish, then upgrade Sentinel.',
     ])->and($bravo->operations()->exists())->toBeFalse();
 });
@@ -381,10 +401,12 @@ describe('Livewire', function () {
             ->assertDontSee('Upgrade Sentinel')
             ->call('upgradeSentinel')
             ->assertForbidden();
+        $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+        $this->node->update(['node_cluster_id' => $cluster->id]);
         Livewire::test(NodeClusterIndex::class)
-            ->assertSee('Upgrade available')
-            ->assertDontSee('Upgrade all')
-            ->call('upgradeAllSentinels')
+            ->assertSee('Upgrade available');
+        Livewire::test(NodeClusterShow::class, ['cluster_uuid' => $cluster->uuid])
+            ->call('upgradeClusterSentinel')
             ->assertForbidden();
 
         Queue::assertNothingPushed();
@@ -397,34 +419,42 @@ describe('Livewire', function () {
         $this->actingAs($other);
         session(['currentTeam' => $other->teams()->firstOrFail()]);
 
+        $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+        $this->node->update(['node_cluster_id' => $cluster->id]);
+
         expect(fn () => Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel']))
+            ->toThrow(ModelNotFoundException::class)
+            ->and(fn () => Livewire::test(NodeClusterShow::class, ['cluster_uuid' => $cluster->uuid]))
             ->toThrow(ModelNotFoundException::class);
-        Livewire::test(NodeClusterIndex::class)
-            ->assertDontSee('Upgrade all')
-            ->call('upgradeAllSentinels')
-            ->assertDispatched('info', 'Sentinel is up to date on every cluster server.');
 
         Queue::assertNothingPushed();
     });
 
-    it('queues upgrade all only for the current team and shows the button when an upgrade is available', function () {
+    it('queues the cluster upgrade for the cluster and refuses a second run', function () {
         Queue::fake();
+        $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+        $this->node->update(['node_cluster_id' => $cluster->id]);
 
-        Livewire::test(NodeClusterIndex::class)
-            ->assertSee('Upgrade available')
-            ->assertSee('Upgrade all')
-            ->call('upgradeAllSentinels')
+        Livewire::test(NodeClusterShow::class, ['cluster_uuid' => $cluster->uuid])
+            ->call('upgradeClusterSentinel')
             ->assertDispatched('success', 'Sentinel upgrade queued. Servers are upgraded one at a time.')
-            ->assertDontSee('Upgrade all');
+            ->call('upgradeClusterSentinel')
+            ->assertDispatched('error', 'A Sentinel upgrade is already running in this cluster.');
 
-        Queue::assertPushed(UpgradeAllNodeSentinelsJob::class, fn ($job) => $job->teamId === $this->team->id && $job->userId === $this->user->id);
+        Queue::assertPushed(UpgradeClusterSentinelJob::class, 1);
+        Queue::assertPushed(UpgradeClusterSentinelJob::class, fn ($job) => $job->clusterId === $cluster->id && $job->userId === $this->user->id);
+        expect(Cache::get(UpgradeSentinel::clusterUpgradeCacheKey($cluster->id)))->toMatchArray(['status' => 'queued', 'version' => '1.1.0']);
     });
 
-    it('hides upgrade all when no Node needs an upgrade', function () {
-        $this->node->update(['sentinel_version' => '1.1.0']);
+    it('queues nothing when every cluster Node is current', function () {
+        Queue::fake();
+        $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+        $this->node->update(['node_cluster_id' => $cluster->id, 'sentinel_version' => '1.1.0']);
 
-        Livewire::test(NodeClusterIndex::class)
-            ->assertDontSee('Upgrade available')
-            ->assertDontSee('Upgrade all');
+        Livewire::test(NodeClusterShow::class, ['cluster_uuid' => $cluster->uuid])
+            ->call('upgradeClusterSentinel')
+            ->assertDispatched('info', 'Sentinel is up to date on every server of this cluster.');
+
+        Queue::assertNothingPushed();
     });
 });

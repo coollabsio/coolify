@@ -16,8 +16,8 @@ class UpgradeNodeSentinelJob implements ShouldQueue
 
     public int $tries = 1;
 
-    /** Install (600 s) + reconnect check (60 s) + rollback (120 s), below the 20 minute stale-operation limit. */
-    public int $timeout = 900;
+    /** Install (600 s) + reconnect wait (at most 300 s) + rollback (120 s) + margin, below the 20 minute stale-operation limit. */
+    public int $timeout = 1080;
 
     public function __construct(public int $operationId) {}
 

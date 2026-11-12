@@ -2,12 +2,23 @@
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $canCreateNode = auth()->user()->can('create', App\Models\Node::class);
     $nodeGridClasses = 'grid min-w-[820px] grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_16rem] items-center gap-3 px-4';
+    $sentinelUpgradeRunning = in_array(data_get($sentinelUpgradeRun, 'status'), ['queued', 'running'], true);
+    $canUpgradeSentinel = $canUpdateCluster && $sentinelUpgradeNodes->isNotEmpty() && ! $sentinelUpgradeRunning;
 @endphp
 
 <x-application.settings-section id="node-cluster-nodes-section" title="Servers"
     helper="Servers in this cluster share an encrypted private network." flush>
-    @if ($canCreateNode || ($canUpdateCluster && $availableNodes->isNotEmpty()))
+    @if ($canCreateNode || $canUpgradeSentinel || ($canUpdateCluster && $availableNodes->isNotEmpty()))
         <x-slot:actions>
+            @if ($canUpgradeSentinel)
+                <x-modal-confirmation title="Upgrade Sentinel in this cluster?" buttonTitle="Upgrade Sentinel"
+                    submitAction="upgradeClusterSentinel" :actions="[
+                        'Sentinel ' . data_get($sentinelRelease, 'version') . ' is installed over SSH on ' . $sentinelUpgradeNodes->count() . ' ' . Str::plural('server', $sentinelUpgradeNodes->count()) . ', one at a time.',
+                        'Each server must reconnect to Coolify before the next one starts.',
+                        'If a server does not reconnect within ' . Carbon\CarbonInterval::seconds(App\Actions\Node\UpgradeSentinel::reconnectTimeoutSeconds())->cascade()->forHumans() . ', its previous version is restored over SSH and the upgrade stops.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel"
+                    warningMessage="The control connection of each server drops briefly while Sentinel restarts." />
+            @endif
             @if ($canCreateNode)
                 <a class="button" href="{{ route('node.onboarding') }}" {{ wireNavigate() }}>
                     <x-reicon name="plus" class="size-3.5" />
@@ -32,6 +43,49 @@
                 </x-modal-input>
             @endif
         </x-slot:actions>
+    @endif
+
+    @if ($sentinelUpgradeRun !== null)
+        <div data-testid="cluster-sentinel-upgrade" @if ($sentinelUpgradeRunning) wire:poll.5s @endif
+            class="flex flex-col gap-2 border-b border-neutral-200 px-4 py-3 text-[12px] dark:border-white/[0.08]">
+            <div class="flex flex-wrap items-center gap-2 text-neutral-600 dark:text-fg-dim">
+                <span class="font-medium text-black dark:text-fg">Sentinel upgrade to {{ data_get($sentinelUpgradeRun, 'version') ?? 'the latest version' }}</span>
+                <x-status-badge :status="str(data_get($sentinelUpgradeRun, 'status'))->title()->toString()"
+                    :type="match (data_get($sentinelUpgradeRun, 'status')) { 'succeeded' => 'success', 'failed' => 'error', default => 'warning' }" />
+                @if (filled(data_get($sentinelUpgradeRun, 'finished_at')))
+                    <span>&middot; Finished {{ \Illuminate\Support\Carbon::parse(data_get($sentinelUpgradeRun, 'finished_at'))->diffForHumans() }}</span>
+                @endif
+            </div>
+            @foreach (data_get($sentinelUpgradeRun, 'nodes', []) as $upgradeNode)
+                @php
+                    $upgradeOperation = $sentinelUpgradeOperations->get(data_get($upgradeNode, 'operation_id'));
+                    [$upgradeLabel, $upgradeType] = match (true) {
+                        $upgradeOperation === null && $sentinelUpgradeRunning => ['Waiting', 'neutral'],
+                        $upgradeOperation === null => ['Not started', 'neutral'],
+                        $upgradeOperation->status->value === 'running' => ['Installing', 'warning'],
+                        $upgradeOperation->status->value === 'verifying' => ['Waiting for reconnect', 'warning'],
+                        $upgradeOperation->status->value === 'succeeded' => ['Upgraded', 'success'],
+                        data_get($upgradeOperation->result, 'rolled_back') === true => ['Rolled back', 'error'],
+                        $upgradeOperation->status->isFinal() => ['Failed', 'error'],
+                        default => ['Starting', 'warning'],
+                    };
+                @endphp
+                <div wire:key="sentinel-upgrade-{{ data_get($upgradeNode, 'uuid') }}" class="flex flex-wrap items-center gap-2">
+                    <x-status-badge :status="$upgradeLabel" :type="$upgradeType" />
+                    <span class="font-medium text-black dark:text-fg">{{ data_get($upgradeNode, 'name') }}</span>
+                    <span class="font-mono text-[11px] text-neutral-500 dark:text-fg-faint">{{ data_get($upgradeNode, 'previous_version') ?? 'unknown' }} &rarr; {{ data_get($sentinelUpgradeRun, 'version') }}</span>
+                    @if (filled($upgradeOperation?->error))
+                        <p class="w-full text-red-600 dark:text-red-400">{{ $upgradeOperation->error }}</p>
+                    @endif
+                </div>
+            @endforeach
+            @if (filled(data_get($sentinelUpgradeRun, 'failed_node_name')))
+                <p class="text-neutral-600 dark:text-fg-dim">Stopped at {{ data_get($sentinelUpgradeRun, 'failed_node_name') }}. The servers after it were not touched.</p>
+            @endif
+            @if (filled(data_get($sentinelUpgradeRun, 'error')) && ! $sentinelUpgradeOperations->contains('error', data_get($sentinelUpgradeRun, 'error')))
+                <p class="text-red-600 dark:text-red-400">{{ data_get($sentinelUpgradeRun, 'error') }}</p>
+            @endif
+        </div>
     @endif
 
     @if ($nodes->isEmpty())
