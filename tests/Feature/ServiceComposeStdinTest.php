@@ -84,7 +84,7 @@ esac
 exit 0
 SH);
     File::put("{$stubDirectory}/touch", "#!/bin/sh\nexit 0\n");
-    File::put("{$stubDirectory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    File::put("{$stubDirectory}/sudo", "#!/bin/sh\nexec env \"\$@\"\n");
     foreach (['docker', 'touch', 'sudo'] as $stub) {
         chmod("{$stubDirectory}/{$stub}", 0755);
     }
@@ -135,7 +135,7 @@ it('gives service compose up and pull no stdin and never answers the recreate pr
 
     expect($lines)->toHaveCount(3);
     foreach ($lines as $line) {
-        expect($line)->toStartWith('sudo docker compose ')
+        expect($line)->toStartWith('sudo DOCKER_CONTEXT=default DOCKER_CONFIG="$(sudo find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" docker compose ')
             ->toEndWith(' < /dev/null')
             ->not->toContain(' --yes')
             ->not->toContain(' -y ');

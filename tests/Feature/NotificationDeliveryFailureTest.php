@@ -66,6 +66,7 @@ dataset('configuration errors', [
     'discord deleted webhook' => ['discord', 404, ['message' => 'Unknown Webhook', 'code' => 10015]],
     'slack archived channel' => ['slack', 410, 'channel_is_archived'],
     'telegram invalid token' => ['telegram', 401, ['ok' => false, 'description' => 'Unauthorized']],
+    'telegram malformed token' => ['telegram', 404, ['ok' => false, 'error_code' => 404, 'description' => 'Not Found']],
     'telegram wrong chat' => ['telegram', 400, ['ok' => false, 'description' => 'Bad Request: chat not found']],
     'pushover invalid token' => ['pushover', 400, ['token' => 'invalid', 'errors' => ['application token is invalid'], 'status' => 0]],
     'webhook not found' => ['webhook', 404, 'Not Found'],

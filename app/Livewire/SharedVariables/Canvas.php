@@ -59,7 +59,7 @@ class Canvas extends Component
             default => 'team',
         };
         $owner = $this->owner();
-        $this->authorize('view', $owner);
+        $this->authorize('viewSharedVariables', $owner);
 
         $this->endpoint = $this->scope === 'team'
             ? '/shared-variables/team/canvas'

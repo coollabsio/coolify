@@ -2,8 +2,6 @@
 
 namespace App\Notifications\Dto;
 
-use Illuminate\Support\Facades\Log;
-
 class PushoverMessage
 {
     public function __construct(
@@ -42,8 +40,6 @@ class PushoverMessage
             }
             $payload['message'] .= "&nbsp;<a href='".$buttonUrl."'>".$text.'</a>';
         }
-
-        Log::info('Pushover message', $payload);
 
         return $payload;
     }

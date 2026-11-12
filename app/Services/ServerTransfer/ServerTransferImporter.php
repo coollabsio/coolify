@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\BackupStorageType;
 use App\Enums\GithubRunnerDockerMode;
 use App\Enums\ServerRole;
 use App\Jobs\ValidateAndInstallServerJob;
@@ -15,6 +16,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -28,6 +31,7 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -50,6 +54,7 @@ use App\Notifications\Internal\GeneralNotification;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ProjectIconStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
@@ -134,6 +139,9 @@ class ServerTransferImporter
     /** @var array<string, ServiceApplication> */
     private array $serviceApplicationMap = [];
 
+    /** @var array<string, ServiceDatabase> */
+    private array $serviceDatabaseMap = [];
+
     /** @var array<string, Model> */
     private array $databaseMap = [];
 
@@ -201,14 +209,15 @@ class ServerTransferImporter
 
         $serverUuid = (string) data_get($bundle, 'server.uuid');
         $serverIp = (string) data_get($bundle, 'server.ip');
+        $serverPort = (int) data_get($bundle, 'server.port', 22);
 
         // A server that comes back replaces the archived copy that this instance kept from the first transfer.
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
         $uuidConflict = $archive === null && $preserveUuids && Server::withTrashed()->where('uuid', $serverUuid)->exists();
-        $ipConflict = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipConflict = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         if (! $dryRun) {
-            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids);
+            $this->assertCanImport($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort);
             // The import validates the server over SSH, so it uses the same Cloud limit as a new server.
             Server::throttleValidation($teamId, $serverIp);
         }
@@ -217,7 +226,7 @@ class ServerTransferImporter
             $warnings[] = "A server with UUID {$serverUuid} already exists on this instance.";
         }
         if ($ipConflict) {
-            $warnings[] = "A server with IP/domain {$serverIp} already exists on this instance.";
+            $warnings[] = "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance.";
         }
 
         $created = [
@@ -236,6 +245,8 @@ class ServerTransferImporter
             'integration_tokens' => 0,
             'managed_dns_records' => 0,
             'ssl_certificates' => 0,
+            'image_scan_policies' => 0,
+            'image_scan_ignores' => 0,
             'volume_backups' => 0,
             'previews' => 0,
         ];
@@ -266,6 +277,8 @@ class ServerTransferImporter
             $created['integration_tokens'] = count(data_get($bundle, 'integration_tokens', []));
             $created['managed_dns_records'] = count(data_get($bundle, 'managed_dns_records', []));
             $created['ssl_certificates'] = count(data_get($bundle, 'ssl_certificates', []));
+            $created['image_scan_policies'] = count(data_get($bundle, 'image_scan_policies', []));
+            $created['image_scan_ignores'] = count(data_get($bundle, 'image_scan_ignores', []));
             $created['volume_backups'] = count(data_get($bundle, 'volume_backups', []));
 
             return [
@@ -304,6 +317,7 @@ class ServerTransferImporter
             $this->previewMap = [];
             $this->serviceMap = [];
             $this->serviceApplicationMap = [];
+            $this->serviceDatabaseMap = [];
             $this->databaseMap = [];
             $this->pendingSqliteLinks = [];
             $this->importWarnings = [];
@@ -424,6 +438,8 @@ class ServerTransferImporter
             $created['managed_dns_records'] = $this->importManagedDnsRecords(data_get($bundle, 'managed_dns_records', []), $server, $teamId, $preserveUuids);
 
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
+            $created['image_scan_policies'] = $this->importImageScanPolicies(data_get($bundle, 'image_scan_policies', []), $server);
+            $created['image_scan_ignores'] = $this->importImageScanIgnores(data_get($bundle, 'image_scan_ignores', []), $teamId);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
             $warnings = array_merge($warnings, $this->importWarnings);
 
@@ -503,7 +519,7 @@ class ServerTransferImporter
      *
      * @return list<array{field: string, label: string, ok: bool, message: string|null}>
      */
-    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): array
+    public function importChecks(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): array
     {
         $team = Team::find($teamId);
         $archive = $preserveUuids ? $this->replaceableArchive($serverUuid, $teamId) : null;
@@ -518,7 +534,7 @@ class ServerTransferImporter
             default => "A server with UUID {$serverUuid} already exists on this instance. Delete/transfer it first, or import with preserve_uuids=false.",
         };
 
-        $ipExists = Server::where('ip', Server::normalizeIp($serverIp))->when($archive, fn ($query) => $query->whereKeyNot($archive->id))->exists();
+        $ipExists = Server::sshEndpointInUse($serverIp, $serverPort, $archive?->id);
 
         return [
             [
@@ -535,9 +551,9 @@ class ServerTransferImporter
             ],
             [
                 'field' => 'server.ip',
-                'label' => 'no server with the same IP exists',
+                'label' => 'no server with the same IP and SSH port exists',
                 'ok' => ! $ipExists,
-                'message' => $ipExists ? "A server with IP/domain {$serverIp} already exists on this instance. Remove it first." : null,
+                'message' => $ipExists ? "A server with IP/domain {$serverIp} and SSH port {$serverPort} already exists on this instance. Remove it first." : null,
             ],
         ];
     }
@@ -572,9 +588,9 @@ class ServerTransferImporter
     /**
      * @throws ValidationException with the first failed import check
      */
-    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true): void
+    public function assertCanImport(string $serverUuid, string $serverIp, int $teamId, bool $preserveUuids = true, int $serverPort = 22): void
     {
-        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids) as $check) {
+        foreach ($this->importChecks($serverUuid, $serverIp, $teamId, $preserveUuids, $serverPort) as $check) {
             if (! $check['ok']) {
                 throw ValidationException::withMessages([$check['field'] => [$check['message']]]);
             }
@@ -642,6 +658,7 @@ class ServerTransferImporter
             'is_git_related' => (bool) data_get($payload, 'is_git_related', false),
         ]);
         $key->uuid = $uuid;
+        $key->allowLegacyKey = true;
 
         try {
             $key->save();
@@ -713,6 +730,8 @@ class ServerTransferImporter
 
         $settingsPayload = data_get($payload, 'settings', []);
         if (is_array($settingsPayload) && $server->settings) {
+            // Bundles of older instances have a flag and columns for each log drain.
+            $settingsPayload = LegacyLogDrainFields::convert($settingsPayload);
             $safe = collect($settingsPayload)
                 ->except([
                     'id', 'server_id', 'created_at', 'updated_at',
@@ -722,9 +741,21 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'auto_security_updates_last_run',
+                    'image_candidate_scans_today', 'image_candidate_scans_date',
+                    'ssh_host_key_pending',
                 ])
                 ->all();
             $server->settings->fill($safe);
+            // The pinned host key moves with the server, so the target does not trust a new key on its first connection.
+            $sshHostKey = ServerSetting::normalizeSshHostKeys(data_get($settingsPayload, 'ssh_host_key'));
+            $server->settings->forceFill([
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => filled($sshHostKey) ? 'transfer' : null,
+                'ssh_host_key_trusted_at' => filled($sshHostKey) ? data_get($settingsPayload, 'ssh_host_key_trusted_at') : null,
+                'is_ssh_host_key_check_disabled' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_disabled', false),
+                'is_ssh_host_key_check_enforced' => (bool) data_get($settingsPayload, 'is_ssh_host_key_check_enforced', false),
+            ]);
             $server->settings->cloudflare_tunnel_integration_token_id = $this->importedIntegrationTokenId(
                 data_get($settingsPayload, 'cloudflare_tunnel_integration_token_uuid'),
                 'The Cloudflare tunnel of this server: its Cloudflare API token was not found on this instance; select it again in the Cloudflare tunnel settings.',
@@ -1432,7 +1463,8 @@ class ServerTransferImporter
         }
 
         foreach (data_get($payload, 'databases', []) as $dbPayload) {
-            $this->importServiceDatabase($dbPayload, $service, $preserveUuids, $adoptMode, $teamId);
+            $serviceDatabase = $this->importServiceDatabase($dbPayload, $service, $preserveUuids, $adoptMode, $teamId);
+            $this->serviceDatabaseMap[(string) data_get($dbPayload, 'uuid', $serviceDatabase->uuid)] = $serviceDatabase;
         }
 
         return $service;
@@ -1520,6 +1552,10 @@ class ServerTransferImporter
      */
     private function importEnvVars(array $variables, object $resource, bool $isPreview): void
     {
+        // Older sources can export duplicate keys of one resource; Docker Compose uses the last one.
+        $variables = collect($variables)
+            ->keyBy(fn (array $variable): string => ((bool) data_get($variable, 'is_preview', false) || $isPreview ? 'preview:' : 'production:').data_get($variable, 'key'));
+
         foreach ($variables as $variable) {
             EnvironmentVariable::withoutEvents(function () use ($variable, $resource, $isPreview) {
                 $uuid = filled(data_get($variable, 'uuid')) ? (string) data_get($variable, 'uuid') : new_public_id();
@@ -1533,6 +1569,7 @@ class ServerTransferImporter
                     'is_literal' => (bool) data_get($variable, 'is_literal', false),
                     'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
                     'is_preview' => $isPreview || (bool) data_get($variable, 'is_preview', false),
+                    'is_production_value_copy' => (bool) data_get($variable, 'is_production_value_copy', false),
                     'is_runtime' => (bool) data_get($variable, 'is_runtime', true),
                     'is_buildtime' => (bool) data_get($variable, 'is_buildtime', true),
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
@@ -1687,7 +1724,9 @@ class ServerTransferImporter
                 'frequency' => data_get($task, 'frequency'),
                 'container' => data_get($task, 'container'),
                 'timeout' => data_get($task, 'timeout'),
+                'use_shell' => (bool) data_get($task, 'use_shell', true),
                 'enabled' => (bool) data_get($task, 'enabled', true),
+                'disabled_reason' => data_get($task, 'disabled_reason'),
                 'team_id' => $teamId,
             ];
 
@@ -1697,7 +1736,7 @@ class ServerTransferImporter
                 $payload['service_id'] = $resource->id;
             }
 
-            ScheduledTask::create($payload);
+            ScheduledTask::forceCreate($payload);
         }
     }
 
@@ -1855,6 +1894,7 @@ class ServerTransferImporter
             'contents' => data_get($payload, 'contents'),
             'metadata' => data_get($payload, 'metadata'),
             'pull_requests' => data_get($payload, 'pull_requests'),
+            'deployments' => data_get($payload, 'deployments'),
             'administration' => data_get($payload, 'administration'),
             'organization_self_hosted_runners' => data_get($payload, 'organization_self_hosted_runners'),
             'actions' => data_get($payload, 'actions'),
@@ -1976,6 +2016,11 @@ class ServerTransferImporter
      */
     private function importS3Storage(array $payload, int $teamId, bool $preserveUuids): S3Storage
     {
+        $privateKeyUuid = (string) data_get($payload, 'private_key_uuid');
+        if ($privateKeyUuid !== '' && ! isset($this->privateKeyMap[$privateKeyUuid])) {
+            throw new RuntimeException('Backup storage private key is missing.');
+        }
+
         $uuid = $preserveUuids && filled(data_get($payload, 'uuid'))
             ? (string) data_get($payload, 'uuid')
             : new_public_id();
@@ -1984,14 +2029,21 @@ class ServerTransferImporter
         if ($existing) {
             return $existing;
         }
-        // Reuse by endpoint+bucket+key if already present for team
-        $byIdentity = S3Storage::query()
-            ->where('team_id', $teamId)
-            ->where('endpoint', data_get($payload, 'endpoint'))
-            ->where('bucket', data_get($payload, 'bucket'))
-            ->first();
-        if ($byIdentity) {
-            return $byIdentity;
+        // Bundles of older instances have no type: they only had S3 storages.
+        $type = BackupStorageType::tryFrom((string) data_get($payload, 'type')) ?? BackupStorageType::S3;
+        // An S3 storage of the team with the same bucket and access key is the same storage. Other types match by UUID
+        // only: several logins can use one host, and the key column is encrypted, so it is compared after loading.
+        if ($type === BackupStorageType::S3) {
+            $sameS3Storage = S3Storage::query()
+                ->s3Only()
+                ->where('team_id', $teamId)
+                ->where('endpoint', data_get($payload, 'endpoint'))
+                ->where('bucket', data_get($payload, 'bucket'))
+                ->get()
+                ->first(fn (S3Storage $storage): bool => $storage->key === data_get($payload, 'key'));
+            if ($sameS3Storage) {
+                return $sameS3Storage;
+            }
         }
         if (S3Storage::where('uuid', $uuid)->exists()) {
             $uuid = new_public_id();
@@ -2000,6 +2052,7 @@ class ServerTransferImporter
         $storage = new S3Storage;
         $storage->forceFill([
             'team_id' => $teamId,
+            'type' => $type,
             'name' => data_get($payload, 'name') ?: 'Imported S3',
             'description' => data_get($payload, 'description'),
             'region' => data_get($payload, 'region'),
@@ -2007,6 +2060,13 @@ class ServerTransferImporter
             'secret' => data_get($payload, 'secret'),
             'bucket' => data_get($payload, 'bucket'),
             'endpoint' => data_get($payload, 'endpoint'),
+            // After the endpoint: a new endpoint removes the host key.
+            'sftp_host_key' => data_get($payload, 'sftp_host_key'),
+            'use_path_style_endpoint' => (bool) data_get($payload, 'use_path_style_endpoint', true),
+            'private_key_id' => isset($this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')])
+                ? $this->privateKeyMap[(string) data_get($payload, 'private_key_uuid')]->id
+                : null,
+            'skip_tls_verification' => (bool) data_get($payload, 'skip_tls_verification', false),
             'is_usable' => (bool) data_get($payload, 'is_usable', true),
         ]);
         $storage->uuid = $uuid;
@@ -2332,6 +2392,7 @@ class ServerTransferImporter
                 'docker_registry_image_tag' => data_get($previewPayload, 'docker_registry_image_tag'),
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
+                'keeps_production_values' => (bool) data_get($previewPayload, 'keeps_production_values', false),
             ];
 
             if ($preview) {
@@ -2406,6 +2467,106 @@ class ServerTransferImporter
                 'resource_id' => $resourceId,
             ]);
             $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Scan rules of the server and of its applications. A rule that fails the validation of the UI, or whose scope is not in the bundle, is dropped.
+     * A bundle of an older version has `gate_enabled` (on: strict, off: off) and `alert_level` (no longer used).
+     *
+     * @param  list<array<string, mixed>>  $policies
+     */
+    private function importImageScanPolicies(array $policies, Server $server): int
+    {
+        $count = 0;
+        foreach ($policies as $policyPayload) {
+            $scope = match (data_get($policyPayload, 'scope_kind')) {
+                'server' => $server,
+                'application' => $this->applicationMap[(string) data_get($policyPayload, 'scope_uuid')] ?? null,
+                default => null,
+            };
+            $gateMode = array_key_exists('gate_mode', (array) $policyPayload)
+                ? data_get($policyPayload, 'gate_mode')
+                : match ($gateEnabled = data_get($policyPayload, 'gate_enabled')) {
+                    true => 'strict',
+                    false => 'off',
+                    // Anything else is not a value of an old bundle: the validation rejects it.
+                    default => $gateEnabled,
+                };
+            $fields = [
+                'gate_mode' => $gateMode,
+                'on_scan_error' => data_get($policyPayload, 'on_scan_error'),
+                // Bundles before the rule have no value: the server inherits it.
+                'count_medium' => data_get($policyPayload, 'count_medium'),
+            ];
+            if ($scope === null) {
+                $this->importWarnings[] = 'Vulnerability scan rules were not imported, because their server or application is not in the bundle. Set the scan rules again.';
+
+                continue;
+            }
+            $validator = Validator::make($fields, ImageScanPolicy::validationRules());
+            if ($validator->fails()) {
+                $this->importWarnings[] = 'The vulnerability scan rules of '.($scope instanceof Server ? 'the server' : "application {$scope->name}").' were not imported, because they are not valid: '.$validator->errors()->first().' Set the scan rules again.';
+
+                continue;
+            }
+
+            ImageScanPolicy::query()->updateOrCreate(
+                ['scope_type' => $scope->getMorphClass(), 'scope_id' => $scope->id],
+                $validator->validated(),
+            );
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Ignores of the transferred resources, owned by the target team. A row that fails the validation of the UI is dropped.
+     *
+     * @param  list<array<string, mixed>>  $ignores
+     */
+    private function importImageScanIgnores(array $ignores, int $teamId): int
+    {
+        $count = 0;
+        foreach ($ignores as $ignorePayload) {
+            $uuid = (string) data_get($ignorePayload, 'resource_uuid');
+            $resource = match (data_get($ignorePayload, 'resource_kind')) {
+                'application' => $this->applicationMap[$uuid] ?? null,
+                'database' => $this->databaseMap[$uuid] ?? null,
+                'service_application' => $this->serviceApplicationMap[$uuid] ?? null,
+                'service_database' => $this->serviceDatabaseMap[$uuid] ?? null,
+                default => null,
+            };
+            $fields = [
+                'vulnerability_id' => data_get($ignorePayload, 'vulnerability_id'),
+                'package' => data_get($ignorePayload, 'package'),
+                'reason' => data_get($ignorePayload, 'reason'),
+                'expires_at' => data_get($ignorePayload, 'expires_at'),
+            ];
+            $validator = Validator::make($fields, ImageScanIgnore::validationRules());
+            if ($resource === null || $validator->fails()) {
+                $label = filled($fields['vulnerability_id']) ? $fields['vulnerability_id'] : (filled($fields['package']) ? 'package '.$fields['package'] : 'an unknown entry');
+                $this->importWarnings[] = "The vulnerability ignore for {$label} was not imported, because ".($resource === null ? 'its resource is not in the bundle' : 'it is not valid: '.$validator->errors()->first()).'.';
+
+                continue;
+            }
+
+            // A retried import (adopt mode) finds the ignore it created before.
+            $ignore = ImageScanIgnore::query()->firstOrCreate([
+                'team_id' => $teamId,
+                'resource_type' => $resource->getMorphClass(),
+                'resource_id' => $resource->id,
+                'vulnerability_id' => filled($fields['vulnerability_id']) ? $fields['vulnerability_id'] : null,
+                'package' => filled($fields['package']) ? $fields['package'] : null,
+            ], [
+                'reason' => $fields['reason'],
+                'expires_at' => $fields['expires_at'],
+                'created_by' => null,
+            ]);
+            $count += $ignore->wasRecentlyCreated ? 1 : 0;
         }
 
         return $count;

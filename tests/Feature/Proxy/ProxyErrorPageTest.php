@@ -54,7 +54,7 @@ function errorPageScriptLines(): array
 {
     $lines = [];
     Process::assertRan(function ($process) use (&$lines) {
-        array_push($lines, ...explode("\n", $process->command));
+        array_push($lines, ...explode("\n", remoteProcessScript($process)));
 
         return true;
     });

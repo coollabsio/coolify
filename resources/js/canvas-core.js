@@ -108,9 +108,9 @@ export function zoomShortcut(e) {
 }
 
 /**
- * Wheel zoom (ctrl/cmd) and pan, and drag-to-pan on the viewport background.
+ * Wheel zoom (ctrl/cmd) and pan, drag-to-pan on the viewport background, and middle-button drag-to-pan anywhere.
  * getView() returns the current { x, y, z }, which is changed in place.
- * canPan(event) decides which presses pan; onPanEnd(moved) runs on release.
+ * canPan(event) decides which left-button presses pan; onPanEnd(moved) runs on their release.
  */
 export function panZoom({ root, viewport, world, zoomLabel, getView, onChange, canPan, onPanStart, onPanEnd }) {
   function apply() {
@@ -196,8 +196,18 @@ export function panZoom({ root, viewport, world, zoomLabel, getView, onChange, c
   viewport.addEventListener('pointerup', liftFinger, true);
   viewport.addEventListener('pointercancel', liftFinger, true);
 
-  viewport.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || pinch || !canPan(e)) return;
+  // A native drag (card logos, links) cancels the pointer, so the card or pan drag stops after a few pixels.
+  viewport.addEventListener('dragstart', e => e.preventDefault());
+  // A middle-button pan that moved does not also open the link under the pointer in a new tab.
+  let panned = false;
+  viewport.addEventListener('auxclick', e => {
+    if (!panned) return;
+    panned = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  function startPan(e, middle) {
     onPanStart?.();
     const view = getView();
     const start = { cx: e.clientX, cy: e.clientY, x: view.x, y: view.y };
@@ -220,11 +230,25 @@ export function panZoom({ root, viewport, world, zoomLabel, getView, onChange, c
       viewport.removeEventListener('pointermove', move);
       viewport.removeEventListener('pointerup', up);
       viewport.removeEventListener('pointercancel', up);
-      onPanEnd?.(moved);
+      if (middle) panned = moved;
+      else onPanEnd?.(moved);
     };
     viewport.addEventListener('pointermove', move);
     viewport.addEventListener('pointerup', up);
     viewport.addEventListener('pointercancel', up);
+  }
+  // The middle mouse button pans from anywhere (also from cards and frames).
+  // Capture phase: the press does not reach the card, zone or link drags.
+  viewport.addEventListener('pointerdown', e => {
+    panned = false; // the auxclick of the last pan did not come (released elsewhere)
+    if (pinch || e.pointerType !== 'mouse' || e.button !== 1) return;
+    e.preventDefault(); // no autoscroll on middle press
+    e.stopPropagation();
+    startPan(e, true);
+  }, true);
+  viewport.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || pinch || !canPan(e)) return;
+    startPan(e, false);
   });
 
   return { apply, toWorld, zoomTo };

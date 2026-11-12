@@ -113,7 +113,8 @@ class RunRemoteProcess
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
         try {
-            $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
+            [$command, $input] = $this->getCommand();
+            $process = Process::timeout($timeout)->input($input)->start($command, $this->handleOutput(...));
             // Start from the stored properties and save now, so later output writes only change the log and
             // never write back an old copy over a status that Coolify set meanwhile (for example a stopped import).
             $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties ?? $this->activity->properties;
@@ -214,13 +215,19 @@ class RunRemoteProcess
         event(new $eventClass($eventData));
     }
 
-    protected function getCommand(): string
+    /**
+     * The SSH command and its input. The command batch goes to ssh on stdin, so its secrets are
+     * not in a command line on the Coolify host.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function getCommand(): array
     {
         $server_uuid = $this->activity->getExtraProperty('server_uuid');
         $command = RemoteProcessCommand::read($this->activity) ?? throw new \RuntimeException('The command of this task was already removed.');
         $server = Server::whereUuid($server_uuid)->firstOrFail();
 
-        return SshMultiplexingHelper::generateSshCommand($server, $command);
+        return [SshMultiplexingHelper::generateSshBatchCommand($server), SshMultiplexingHelper::sshBatchInput($command)];
     }
 
     protected function handleOutput(string $type, string $output)

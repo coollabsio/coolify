@@ -14,12 +14,14 @@
 - The checkout is shared with other sessions. When the full suite fails, rerun each failing file alone and compare with a clean `git archive HEAD` copy before you connect a failure to your change. The dev instance of the checkout runs its live files, so a live repro also runs the uncommitted edits of other sessions: run `git diff` on the code under test before you trust the result.
 - Run seeders and other artisan commands that write SSH keys in a dev container as `www-data` (`docker exec -u www-data`). Root-owned files in `storage/app/ssh` make every SSH call from the web process fail.
 - Files written on a server with `tee` get the server umask (027/077 on hardened hosts). Set the mode explicitly (`chmod 644`) for files that a non-root container user reads through a read-only bind mount.
+- Each new (non-multiplexed) SSH connection opens a systemd-logind session on the server, and some systemd versions leak closed sessions until logins fail at 8192. Send repeated or scheduled commands through the mux connection; open a fresh connection only when the check must prove a new login.
 - `sshd` keeps the login shell of an open multiplexed SSH connection. Call `SshMultiplexingHelper::removeMuxFile()` before a live test of SSH or login-shell behavior.
 - Remote command batches run in `bash -se` (`sh -se` only when the host has no bash). A command that can fail without being an error (such as `cat` of an optional file) stops the batch unless it ends with `|| true`. `Process::fake()` cannot show this, so run such a command once in a real `bash -se` on the target host.
 - SSH retries replay the full command batch. Only exit code 255 is an SSH transport failure; other exit codes come from the remote command, so do not retry them. Keep batches safe to run twice (for example `docker rm -f <name> || true` before `docker run --name <name>`).
+- When one job timeout covers several remote steps, give each step only the time that is left of the job budget, and keep a margin below the worker timeout. If each step gets the full timeout, the worker kills the job mid-step and no `catch`/`finally` cleanup runs (leftover containers, files, and `running` rows).
 - Do not put `pkill -f "playwright run-server"` in the same shell command as other work; the pattern matches that shell and kills it. Run it as its own command.
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
-- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors.
+- Browser `click()`/`assertSee()` wait forever when nothing matches, so a bad selector hangs the run instead of failing it. `click('Text')` can match a hidden element first (use `button:visible:has-text("Text")`); `:text-is()` on an element with child elements and `assertSee()` text with double quotes never match. Prefer plain CSS selectors. `click()` also hung on a button far down the long `/analytics` page; click it with `$page->script("document.querySelector('...').click()")` there.
 - A new worktree has no `vendor/` or `public/build/`. Run `composer install --ignore-platform-req=ext-zip` on the host and copy `public/build` from the main checkout before page-rendering tests; otherwise they fail with a Vite manifest error.
 - A dev deployment that stays `in_progress` with no log lines and no `horizon_job_id` is waiting in a queue that Horizon does not serve. With `SELF_HOSTED=false` in `.env`, deployments go to the cloud `deployments` queue; run `./scripts/dev exec php artisan queue:work redis --queue=deployments --once` or fix the env.
 - Never run `php artisan test` inside a dev container (`./scripts/dev exec` or `docker exec coolify-dev-*`). The container sets `DB_CONNECTION=pgsql` as a real environment variable, which wins over `phpunit.xml`, so `RefreshDatabase` runs `migrate:fresh` on the dev database and wipes it. Run tests on the host only.
@@ -29,11 +31,25 @@
 - In browser tests, address `x-forms.input` fields by `name` (`type('fieldName', ...)`); its HTML `id` is not always the Livewire property, so `#property` waits forever.
 - For load tests against a dev VM, use your own instance (`COOLIFY_DEV_INSTANCE=<name> COOLIFY_DEV_SIDE_BY_SIDE=1 ./scripts/dev start`); other sessions can reseed the localhost VM of a shared instance. The 1 GiB VM drops packets when its conntrack table is full (`dmesg`: `nf_conntrack: table full`), so raise `net.netfilter.nf_conntrack_max` on it and run an idle load first to prove a clean baseline.
 - Do not call `sleep()` in a browser test. The app server runs in the test process, so `sleep()` stops it; use `$page->wait()`.
-- `Queue::fake()` also captures `dispatchSync()` of a `ShouldQueue` job, so the job never runs. Fake only the jobs to block (`Queue::fake([SomeJob::class])`).
+- `Queue::fake()` also captures `dispatchSync()` of a `ShouldQueue` job, so the job never runs. Fake only the jobs to block (`Queue::fake([SomeJob::class])`). Exception: actions (`AsAction`) are queued as `JobDecorator`, so `Queue::fake([SomeAction::class])` does not stop them; use `Queue::fake()` and `SomeAction::assertPushed()`.
+- Call `instant_remote_process()` with named arguments after the server (`throwError:`, `timeout:`). The 4th positional parameter is `no_sudo`, so `instant_remote_process($cmds, $server, false, 900)` runs without sudo on a non-root server and fails with misleading permission errors.
+- `Notification::fake()` records nothing for a team that has no enabled channel. Turn one on (for example `emailNotificationSettings()->update(['use_instance_email_settings' => true, '<event>_email_notifications' => true])`) before `assertSentTo`.
 - In tests, turning on `is_metrics_enabled` (and other Sentinel settings) with `save()`/`update()` runs the settings hook, which starts Sentinel over a real SSH connection on the sync queue. Use `saveQuietly()` or `Queue::fake()`.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 - The root team (id 0) has `personal_team = true`, so `personal_team` does not identify a user's own team. To clean up test users, detach them from shared teams and then delete the user; never delete a team selected by a filter. A Team delete revokes the team's API tokens and deletes its private keys before any guard can stop it.
-- SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely.
+- SQLite returns `0`/`1` for boolean columns without a `boolean` cast, while Postgres returns real booleans. A strict `=== false` check on such a column never matches in tests, so tests can pass on behavior that Postgres blocks. Add the cast or compare loosely. `Rule::exists()->where('column', false)` sends `false` as `""`, which Postgres rejects for a boolean column; use a closure (`->where(fn ($query) => $query->where('column', false))`).
+- SQLite does not enforce `varchar(255)` lengths, while Postgres rejects a longer value (`SQLSTATE[22001]`). Tests cannot show a too-long name, so assert the length or the exact value of generated strings.
+
+- `docker compose up` gives a recreated container the old mount at each path that the image declares with `VOLUME`, also a named volume or bind mount that the Compose file no longer has. Remove the old container first when a mount must go (`composeContainersWithRemovedVolumes()`); do not use `--renew-anon-volumes`, because it deletes the data of anonymous volumes.
+
+- The Compose parsers (`parse()`, `applicationParser`, `serviceParser`) run on page mounts, refreshes, and deployments. Do not dispatch jobs or run server commands from them; let the caller that changes data start the work. Code that only needs the service names reads `docker_compose_raw` (`Application::composeServicesWithoutParse()`).
+
+- MCP tools that call REST routes remove response keys from `BuildsResponse::$sensitiveKeys` (for example `content`, `client_id`, `logs`) when the token has no `read:sensitive`, and `CallsRestApi::$blockedRestPaths` blocks some routes. Check both lists when you name the fields of a new API response or add an MCP tool for a route.
+
+- To prove BuildKit cache behavior, use a new Dockerfile with a unique step for each experiment and repeat each build. Old cache records can make a changed input look cached. BuildKit keys `RUN` steps on the `--add-host` names and their order, but not on the IPs.
+
+## Add dependencies through the trust gate
+- `composer require` stops until `vendor/bin/vet` records the new packages in `vet.json`. Read the package source first, then record it with `vendor/bin/vet` in a terminal (it needs a TTY). Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -42,6 +58,8 @@
 - When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
 - Horizon workers in a dev instance keep the code they loaded. Run `./scripts/dev exec php artisan horizon:terminate` after a code change and before a live test of queued jobs.
 - To prove that a server side effect is blocked, check the server itself after the request. A model hook or job can be one of several write paths (for example `ServerStorageSaveJob` and `ServerFilesFromServerJob` both write file storages).
+
+- When you add a gate that lets a user through only after a step (2FA, password reset, onboarding), test it with users who have no known password (OAuth, magic-link invites) and together with the other redirecting gates. Two gates that each allow only their own page make a redirect loop, and a step that needs password confirmation blocks users who cannot confirm one.
 
 ## Preserve product scope
 - Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
@@ -149,3 +167,10 @@
 
 ## Validate input safely
 - In PCRE, `$` also matches before a final `\n`. In validation regexes, use `\z` or reject control characters first, or a trailing newline passes.
+
+## Application queries carry hidden counts
+- `Application` has a global scope `withRelations` that adds two `withCount` subqueries and `applications.*`, also to `pluck('id')` and eager loads. For ID lookups and lean eager loads, call `withoutGlobalScope('withRelations')`.
+
+## Measure database reads end to end
+- On PostgreSQL 15, `EXPLAIN (ANALYZE, BUFFERS)` does not detoast or send the selected columns, so a wide `jsonb`/`json`/`text` column does not show in it. Time the full fetch (`psql \timing` with `-o /dev/null`, or PDO `fetchAll`) as well before you blame or rule out an index.
+- Do not put a required write (audit rows, state that matches a committed change) or required cleanup in `defer()` or `dispatch()->afterResponse()`. Both run in the terminate phase, which PHP-FPM skips when the client or proxy closes the connection (`ignore_user_abort` is off) or the script hits a fatal error. Write it in `DB::afterCommit()`, or queue the job normally, instead. `afterResponse()` also runs a queued job on the `sync` connection in the web worker.

@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -193,6 +193,14 @@ class HostingerController extends Controller
             }
         }
 
+        $request->offsetSet('instant_validate', $request->filled('instant_validate') ? $request->boolean('instant_validate') : $this->hasDeployAbility($request));
+        if ($request->instant_validate) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Instant validation installs Docker and starts the proxy on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         $team = Team::find($teamId);
         if (Team::serverLimitReached($team)) {
             return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
@@ -267,8 +275,8 @@ class HostingerController extends Controller
 
             $ipAddress = $server->fresh()->ip;
 
-            if ($request->boolean('instant_validate') && ! $server->hasPlaceholderIp()) {
-                ValidateServer::dispatch($server);
+            if ($request->instant_validate) {
+                ValidateNewCloudServerJob::dispatch($server);
             }
 
             auditLog('api.hostinger_virtual_machine.created', [

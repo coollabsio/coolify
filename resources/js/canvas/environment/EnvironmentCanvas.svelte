@@ -238,7 +238,7 @@
       left: Math.max(0, deploymentsRight, ...panels.map(r => r.right + gap - v.left)),
     };
   }
-  /** Desktop: the toolbar sits in the zoom controls bar (bottom left), not in its own panel. */
+  /** Desktop: the toolbar sits in the zoom controls bar (bottom center), not in its own panel. */
   const inControls = () => !!bar?.closest('[data-canvas-controls]');
   function alignFloatingBar() {
     if (!floatingBar()) {
@@ -264,7 +264,7 @@
     panelTop = `${coveredInsets().top}px`;
   }
   function placeBar() {
-    // Desktop (every nav style): the toolbar joins the zoom controls bar at the bottom left.
+    // Desktop (every nav style): the toolbar joins the zoom controls bar at the bottom center.
     // Small screens: a rounded box above the canvas.
     bar.removeAttribute('style');
     if (desktop.matches) {
@@ -1077,12 +1077,15 @@
       </div>
     {/if}
 
-    <!-- Bottom left: zoom controls, then the dashboard's recent deployments next to them. -->
-    <div class="pointer-events-none absolute bottom-3 left-3 right-3 z-20 flex items-end gap-2 *:pointer-events-auto" data-ec-dock>
+    <!-- Bottom: the dashboard's recent deployments on the left, the zoom controls in the center.
+         On desktop, an open side panel shifts the center to the free area. -->
+    <div class="pointer-events-none absolute bottom-3 left-3 right-3 z-20 grid grid-cols-[1fr_auto_1fr] items-end gap-2 *:pointer-events-auto {panelNode || panelLink ? 'lg:pr-[20.5rem]' : ''}" data-ec-dock>
+      <div class="justify-self-start">
+        {#if graph?.deployments?.length}
+          <Deployments deployments={graph.deployments} {nodeById} onshow={showNode} />
+        {/if}
+      </div>
       <CanvasControls inline {zoom} {loading} onzoom={z => pz.zoomTo(z)} onfit={() => fit()} onrefresh={() => load()} />
-      {#if graph?.deployments?.length}
-        <Deployments deployments={graph.deployments} {nodeById} onshow={showNode} />
-      {/if}
     </div>
 
     {#if graph && (panelNode || panelLink)}
@@ -1107,7 +1110,8 @@
       {/key}
     {/if}
 
-    <div class="pointer-events-none absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
+    <!-- Above the zoom controls. -->
+    <div class="pointer-events-none absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
       {#if toastMessage}
         <div
           class={toastMessage.bad

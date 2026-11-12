@@ -17,6 +17,7 @@ class TwoFactorRequired extends Component
     {
         return view('livewire.two-factor-required', [
             'teamName' => data_get(session('currentTeam'), 'name'),
+            'teamsWithoutTwoFactor' => auth()->user()->teams()->where('is_two_factor_required', false)->get(),
         ])->layout('layouts.simple');
     }
 }

@@ -47,10 +47,12 @@ $server->settings->forceFill([
     'is_metrics_enabled' => true, 'sentinel_metrics_refresh_rate_seconds' => 10, 'sentinel_metrics_history_days' => 14, 'sentinel_push_interval_seconds' => 30,
     'is_traffic_analytics_enabled' => true, 'traffic_topn' => 20, 'traffic_sample_threshold' => 9, 'traffic_retention_1h_days' => 3, 'traffic_retention_1d_days' => 60,
     'traffic_ip_mode' => 'anonymized', 'is_geoip_enabled' => true, 'geoip_maxmind_license_key' => 'fake-maxmind-key', 'geoip_refresh_days' => 14,
-    'logdrain_newrelic_license_key' => 'fake-newrelic', 'logdrain_newrelic_base_uri' => 'https://log-api.eu.newrelic.com/log/v1',
-    'logdrain_highlight_project_id' => 'fake-highlight', 'logdrain_axiom_dataset_name' => 'fake-dataset', 'logdrain_axiom_api_key' => 'fake-axiom',
-    'logdrain_custom_config' => "[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name fake\n",
-    'logdrain_cloudwatch_region' => 'eu-central-1', 'logdrain_cloudwatch_group' => 'fake-group', 'logdrain_cloudwatch_stream_prefix' => 'fake-prefix',
+    'logdrain_config' => [
+        'newrelic' => ['license_key' => 'fake-newrelic', 'base_uri' => 'https://log-api.eu.newrelic.com/log/v1'],
+        'axiom' => ['dataset_name' => 'fake-dataset', 'api_key' => 'fake-axiom'],
+        'custom' => ['config' => "[OUTPUT]\n    Name stdout\n", 'parser_config' => "[PARSER]\n    Name fake\n"],
+        'cloudwatch' => ['region' => 'eu-central-1', 'group' => 'fake-group', 'stream_prefix' => 'fake-prefix'],
+    ],
 ])->saveQuietly();
 
 // 2. Shared variables: server (multiline, literal, comment, empty), project, environment

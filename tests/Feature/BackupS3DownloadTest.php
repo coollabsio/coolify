@@ -271,10 +271,10 @@ it('uploads the backup file from the server host with curl', function () {
     (new PrepareFileDownloadJob('dl-host', $this->user->id, $this->server->id, null, BACKUP_S3_DOWNLOAD_FILE, false, 'pg.dmp', $this->downloadStorage->id))->handle($downloads);
 
     expect(Cache::get(PrepareFileDownloadJob::cacheKey('dl-host')))->toMatchArray(['status' => 'ready', 'url' => 'https://s3.example.com/get']);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'curl -fsS')
-        && str_contains($process->command, BACKUP_S3_DOWNLOAD_FILE)
-        && str_contains($process->command, 'X-Amz-Signature=abc&x=1')
-        && ! str_contains($process->command, 'docker exec'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'curl -fsS')
+        && str_contains(remoteProcessScript($process), BACKUP_S3_DOWNLOAD_FILE)
+        && str_contains(remoteProcessScript($process), 'X-Amz-Signature=abc&x=1')
+        && ! str_contains(remoteProcessScript($process), 'docker exec'));
 });
 
 it('builds host file commands that the non-root sudo parser keeps whole', function () {

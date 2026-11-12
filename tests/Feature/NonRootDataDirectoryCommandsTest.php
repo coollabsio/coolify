@@ -47,7 +47,7 @@ function nonRootDataDirectoryRemoteLines(): array
 {
     $lines = [];
     Process::assertRan(function ($process) use (&$lines) {
-        array_push($lines, ...explode("\n", $process->command));
+        array_push($lines, ...explode("\n", remoteProcessScript($process)));
 
         return true;
     });
@@ -75,6 +75,8 @@ it('starts a database through the queued executor on a non-root server', functio
     expect(implode("\n", $lines))
         ->toContain("| sudo tee {$configurationDirectory}/README.md > /dev/null")
         ->toContain("sudo find {$configurationDirectory}/docker-entrypoint-initdb.d -mindepth 1 -maxdepth 1 -exec rm -rf {} +")
+        // The pull uses the SSH user's Docker config, where the registry logins are; sudo would read /root/.docker.
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$configurationDirectory}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$configurationDirectory}/docker-compose.yml up -d");
 });
 
@@ -122,7 +124,7 @@ it('stages clone archives in a random mktemp directory only for a non-root SSH u
     };
     $rootServer = Server::factory()->create(['team_id' => $this->server->team_id, 'user' => 'root', 'private_key_id' => $this->server->private_key_id]);
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'mktemp -d') ? '/var/tmp/coolify-clone.Ab3dE6gH9k' : '',
+        output: str_contains(remoteProcessScript($process), 'mktemp -d') ? '/var/tmp/coolify-clone.Ab3dE6gH9k' : '',
     ));
 
     $nonRootDirectory = $stager->createCloneArchiveDirectory($this->server, 'volume-a');
@@ -130,7 +132,7 @@ it('stages clone archives in a random mktemp directory only for a non-root SSH u
 
     $commands = [];
     Process::assertRan(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return true;
     });
@@ -154,11 +156,11 @@ it('rejects a clone archive directory that mktemp did not create', function (str
         }
     };
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'mktemp -d') ? $output : '',
+        output: str_contains(remoteProcessScript($process), 'mktemp -d') ? $output : '',
     ));
 
     expect(fn () => $stager->createCloneArchiveDirectory($this->server, 'volume-a'))->toThrow(RuntimeException::class);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'chown') || str_contains($process->command, 'chmod'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'chown') || str_contains(remoteProcessScript($process), 'chmod'));
 })->with([
     'empty' => [''],
     'predictable path' => ['/var/tmp/coolify-clone/volume-a'],

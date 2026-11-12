@@ -28,10 +28,11 @@ beforeEach(function () {
     $this->server->settings->updateQuietly([
         'sentinel_token' => 'SENTINEL-MARKER-SECRET',
         'sentinel_custom_url' => 'https://sentinel.example.test/MARKER-SECRET',
-        'logdrain_newrelic_license_key' => 'NEWRELIC-MARKER-SECRET',
-        'logdrain_axiom_api_key' => 'AXIOM-MARKER-SECRET',
-        'logdrain_custom_config' => 'CUSTOM-CONFIG-MARKER-SECRET',
-        'logdrain_custom_config_parser' => 'CUSTOM-PARSER-MARKER-SECRET',
+        'logdrain_config' => [
+            'newrelic' => ['license_key' => 'NEWRELIC-MARKER-SECRET'],
+            'axiom' => ['api_key' => 'AXIOM-MARKER-SECRET'],
+            'custom' => ['config' => 'CUSTOM-CONFIG-MARKER-SECRET', 'parser_config' => 'CUSTOM-PARSER-MARKER-SECRET'],
+        ],
     ]);
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
@@ -73,18 +74,18 @@ test('server overview redacts the Sentinel token from a member snapshot', functi
 test('log drain page redacts provider keys from a member snapshot', function () {
     useSecretExposureUser($this->member, $this->team);
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->assertSuccessful()->assertSet('logDrainNewRelicLicenseKey', null)->assertSet('logDrainAxiomApiKey', null)
-        ->assertSet('logDrainCustomConfig', null)->assertSet('logDrainCustomConfigParser', null);
+        ->assertSuccessful()->assertSet('logDrainConfig.newrelic.license_key', null)->assertSet('logDrainConfig.axiom.api_key', null)
+        ->assertSet('logDrainConfig.custom.config', null)->assertSet('logDrainConfig.custom.parser_config', null);
     $this->get(route('server.log-drains', ['server_uuid' => $this->server->uuid]))
         ->assertSuccessful()->assertDontSee('NEWRELIC-MARKER-SECRET')->assertDontSee('AXIOM-MARKER-SECRET')
         ->assertDontSee('CUSTOM-CONFIG-MARKER-SECRET')->assertDontSee('CUSTOM-PARSER-MARKER-SECRET');
 
     useSecretExposureUser($this->admin, $this->team);
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->assertSuccessful()->assertSet('logDrainNewRelicLicenseKey', 'NEWRELIC-MARKER-SECRET')
-        ->assertSet('logDrainAxiomApiKey', 'AXIOM-MARKER-SECRET')
-        ->assertSet('logDrainCustomConfig', 'CUSTOM-CONFIG-MARKER-SECRET')
-        ->assertSet('logDrainCustomConfigParser', 'CUSTOM-PARSER-MARKER-SECRET');
+        ->assertSuccessful()->assertSet('logDrainConfig.newrelic.license_key', 'NEWRELIC-MARKER-SECRET')
+        ->assertSet('logDrainConfig.axiom.api_key', 'AXIOM-MARKER-SECRET')
+        ->assertSet('logDrainConfig.custom.config', 'CUSTOM-CONFIG-MARKER-SECRET')
+        ->assertSet('logDrainConfig.custom.parser_config', 'CUSTOM-PARSER-MARKER-SECRET');
 });
 
 test('application page redacts HTTP basic password from a member snapshot', function () {

@@ -7,10 +7,12 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ServerStorageSaveJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
@@ -35,7 +37,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
@@ -250,25 +251,16 @@ class DatabasesController extends Controller
                 'mysql_root_password',
                 'mariadb_password',
                 'mariadb_root_password',
+                ...$database::CONFIGURATION_ATTRIBUTES,
             ]);
+        }
+        if (canReadServerSecretsFromApi()) {
             $this->exposeNestedServerSecrets($database);
         } else {
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        $payload = serializeApiResponse($database);
-
-        // A locked password variable is never shown again, also not inside the connection URLs.
-        if (request()->attributes->get('can_read_sensitive', false) === true
-            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
-            foreach (['internal_db_url', 'external_db_url'] as $key) {
-                if ($payload->has($key)) {
-                    $payload->put($key, null);
-                }
-            }
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($database, serializeApiResponse($database));
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -292,26 +284,18 @@ class DatabasesController extends Controller
             return;
         }
 
-        $server->makeHidden([
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
-        ]);
-
         if ($loadRelations || $server->relationLoaded('settings')) {
             $server->settings->makeHidden([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
     }
 
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
-     * relations for callers with the `read:sensitive` or `root` token ability.
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
      */
     private function exposeNestedServerSecrets(Model $model): void
     {
@@ -320,19 +304,11 @@ class DatabasesController extends Controller
             return;
         }
 
-        $server->makeVisible([
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
-        ]);
-
         if ($server->settings !== null) {
             $server->settings->makeVisible([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
     }
@@ -351,8 +327,8 @@ class DatabasesController extends Controller
                 response: 200,
                 description: 'Get all databases',
                 content: new OA\JsonContent(
-                    type: 'string',
-                    example: 'Content is very complex. Will be implemented later.',
+                    type: 'array',
+                    items: new OA\Items(ref: '#/components/schemas/Database'),
                 ),
             ),
             new OA\Response(
@@ -373,7 +349,7 @@ class DatabasesController extends Controller
         }
         $projects = Project::where('team_id', $teamId)->get();
         $databases = collect();
-        $databaseRelations = $request->attributes->get('can_read_sensitive', false) === true
+        $databaseRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
@@ -510,11 +486,8 @@ class DatabasesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all databases',
-                content: new OA\JsonContent(
-                    type: 'string',
-                    example: 'Content is very complex. Will be implemented later.',
-                ),
+                description: 'Get database by UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/Database'),
             ),
             new OA\Response(
                 response: 401,
@@ -672,8 +645,8 @@ class DatabasesController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable|between:1024,65535',
@@ -689,7 +662,7 @@ class DatabasesController extends Controller
             'redact_all_env_values_in_logs' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'is_log_drain_enabled' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -1257,6 +1230,11 @@ class DatabasesController extends Controller
         if (! isset($backupData['enabled'])) {
             $backupData['enabled'] = true;
         }
+        $backupData['save_s3'] ??= false;
+
+        if ($s3Storages?->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
+        }
 
         $backupConfig = ScheduledDatabaseBackup::create($backupData);
         if ($s3Storages !== null) {
@@ -1510,6 +1488,10 @@ class DatabasesController extends Controller
             }
         }
 
+        if ($storageIds !== null && $backupConfig->newS3StorageIds($storageIds)->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
+        }
+
         $backupConfig->update($backupData);
         if ($storageIds !== null) {
             $backupConfig->syncS3Storages($storageIds->all());
@@ -1549,7 +1531,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1622,7 +1604,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1691,7 +1673,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1743,8 +1725,8 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Redis)',
-        description: 'Create a new Redis database.',
+        summary: 'Create (Redis / Valkey)',
+        description: 'Create a new Redis or Valkey database. Valkey (valkey/valkey:9-alpine) is the default. Set image to a Redis image (for example redis:8) for Redis.',
         path: '/databases/redis',
         operationId: 'create-database-redis',
         security: [
@@ -1759,7 +1741,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1770,7 +1752,7 @@ class DatabasesController extends Controller
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
-                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker image of the database. Default: valkey/valkey:9-alpine. For Redis, use a Redis image, for example redis:8.'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
                         'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
@@ -1828,7 +1810,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1897,7 +1879,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1969,7 +1951,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2041,7 +2023,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2110,7 +2092,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2217,6 +2199,7 @@ class DatabasesController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('placeResource', $server);
         if (! $server->canHostResources()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2250,8 +2233,8 @@ class DatabasesController extends Controller
         }
         $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
@@ -2271,7 +2254,7 @@ class DatabasesController extends Controller
             'instant_deploy' => 'boolean',
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2899,13 +2882,6 @@ class DatabasesController extends Controller
 
         $container = $containers->first();
 
-        $status = getContainerStatus($database->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Database is not running.',
-            ], 400);
-        }
-
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
         $logs = sanitizeLogsForExport(
@@ -3089,7 +3065,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3225,7 +3201,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3944,7 +3920,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -4021,7 +3997,9 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
-        $env->value = $request->value;
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
         if ($request->has('is_literal')) {
             $env->is_literal = $request->is_literal;
         }
@@ -4034,14 +4012,19 @@ class DatabasesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the database context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.database.env_updated', [
-            'team_id' => $teamId,
-            'database_uuid' => $database->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.database.env_updated', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }
@@ -4085,7 +4068,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4147,6 +4130,7 @@ class DatabasesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
@@ -4216,7 +4200,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -4757,7 +4741,7 @@ class DatabasesController extends Controller
 
     #[OA\Patch(
         summary: 'Update Storage',
-        description: 'Update a persistent storage or file storage by database UUID.',
+        description: 'Update a persistent storage or file storage by database UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
         path: '/databases/{uuid}/storages',
         operationId: 'update-storage-by-database-uuid',
         security: [
@@ -4791,7 +4775,7 @@ class DatabasesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content of a file outside the resource directory needs the deploy permission.'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'],
                         ],
                         additionalProperties: false,
                     ),
@@ -4923,7 +4907,7 @@ class DatabasesController extends Controller
             }
         }
 
-        if (! $isReadOnly && ($forbidden = $this->outsideContentChangeForbiddenResponse($request, $storage))) {
+        if (! $isReadOnly && ($forbidden = $this->contentChangeForbiddenResponse($request, $storage))) {
             return $forbidden;
         }
 
@@ -4952,6 +4936,10 @@ class DatabasesController extends Controller
         }
 
         $storage->save();
+
+        if ($storage instanceof LocalFileVolume && $storage->wasChanged('content')) {
+            ServerStorageSaveJob::dispatch($storage);
+        }
 
         auditLog('api.database.storage_updated', [
             'team_id' => $teamId,
@@ -5012,7 +5000,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         $storageUuid = $request->route('storage_uuid');
 
@@ -5246,9 +5234,9 @@ class DatabasesController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'destination_uuid' => 'required|string',
-            'name' => 'string|max:255|nullable',
+            'name' => ValidationPatterns::nameRules(required: false),
             'clone_volumes' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -5281,11 +5269,12 @@ class DatabasesController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
-            : $database->name.'-clone-'.$uuid;
+            : clone_resource_name($database->name, $uuid);
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
         $newDatabase = $database->replicate([
@@ -5347,33 +5336,11 @@ class DatabasesController extends Controller
             }
         }
 
-        // Stop once, clone all volumes, then start once — avoids per-volume stop/start races.
-        if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
-            try {
-                $chain = [
-                    function () use ($database) {
-                        StopDatabase::run($database);
-                    },
-                ];
-
-                foreach ($pendingVolumeClones as $clone) {
-                    $chain[] = new VolumeCloneJob(
-                        $clone['source'],
-                        $clone['target'],
-                        $sourceServer,
-                        $targetServer,
-                        $clone['model'],
-                    );
-                }
-
-                $chain[] = function () use ($database) {
-                    StartDatabase::run($database);
-                };
-
-                Bus::chain($chain)->onQueue('high')->dispatch();
-            } catch (\Exception $e) {
-                \Log::error('Failed to queue database volume clone for '.$database->uuid.': '.$e->getMessage());
-            }
+        if ($sourceServer && $targetServer) {
+            CloneVolumeDataWithSourceStopped::run($database, array_map(
+                fn (array $clone) => new VolumeCloneJob($clone['source'], $clone['target'], $sourceServer, $targetServer, $clone['model']),
+                $pendingVolumeClones,
+            ));
         }
 
         foreach ($database->fileStorages()->get() as $storage) {

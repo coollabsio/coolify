@@ -56,7 +56,7 @@ function fakeApplicationContainers(array $containers): void
         ->map(fn (string $state, string $name) => json_encode(['ID' => $name, 'Names' => $name, 'Labels' => 'coolify.applicationId=1', 'State' => $state]))
         ->implode("\n");
 
-    Process::fake(fn ($process) => str_contains($process->command, 'docker ps -a --filter')
+    Process::fake(fn ($process) => str_contains(remoteProcessScript($process), 'docker ps -a --filter')
         ? Process::result(output: $output)
         : Process::result(output: 'done'));
 }
@@ -67,8 +67,8 @@ test('a scheduled task ignores stopped application containers', function () {
 
     (new ScheduledTaskJob($this->task))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec '{$uuid}-222222222222' sh -c"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, "docker exec '{$uuid}-111111111111'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-222222222222' sh -c"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-111111111111'"));
     expect($this->task->executions()->sole()->status)->toBe('success');
 });
 
@@ -79,6 +79,6 @@ test('a scheduled task runs in the application container with the exact name', f
 
     (new ScheduledTaskJob($this->task->refresh()))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec '{$uuid}-222222222222' sh -c"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-222222222222' sh -c"));
     expect($this->task->executions()->sole()->status)->toBe('success');
 });

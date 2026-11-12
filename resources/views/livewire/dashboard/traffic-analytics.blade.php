@@ -56,7 +56,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
                 class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['requests'] ?? 0) }} requests">{{ compactNumber($overview['requests'] ?? 0) }}</span>
                 <div class="mt-auto pt-3">
                     @include('livewire.traffic._sparkline', [
                         'id' => $chartId.'-spark-requests',
@@ -75,7 +75,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                         {!! $approxBadge('Summed across '.$servers->count().' servers; visitors seen on multiple servers may be double-counted.') !!}
                     @endif
                 </span>
-                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg" title="{{ number_format($overview['uniqueVisitors'] ?? 0) }} unique visitors">{{ compactNumber($overview['uniqueVisitors'] ?? 0) }}</span>
                 <div class="mt-auto pt-3">
                     @include('livewire.traffic._sparkline', [
                         'id' => $chartId.'-spark-visitors',

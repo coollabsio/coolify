@@ -17,11 +17,13 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasConfiguration;
+use App\Traits\HasImageScans;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
@@ -55,6 +57,7 @@ use Symfony\Component\Yaml\Yaml;
         'git_branch' => ['type' => 'string', 'description' => 'Git branch.'],
         'git_commit_sha' => ['type' => 'string', 'description' => 'Git commit SHA.'],
         'git_full_url' => ['type' => 'string', 'nullable' => true, 'description' => 'Git full URL.'],
+        'git_ssh_known_hosts' => ['type' => 'string', 'nullable' => true, 'description' => 'SSH host keys (known_hosts lines) of self-hosted Git hosts that git over SSH accepts. Saved on the first deployment.'],
         'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host. The password or token is never returned.'],
         'docker_registry_image_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image name.'],
         'docker_registry_image_tag' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker registry image tag.'],
@@ -140,7 +143,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -162,6 +165,7 @@ class Application extends BaseModel
         'git_branch',
         'git_commit_sha',
         'git_full_url',
+        'git_ssh_known_hosts',
         'git_https_username',
         'git_https_password',
         'docker_registry_image_name',
@@ -215,6 +219,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'docker_compose_domains',
+        'docker_compose_image_overrides',
         'domain_dns_statuses',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
@@ -259,12 +264,31 @@ class Application extends BaseModel
     protected $appends = ['server_status'];
 
     /**
+     * Free-form commands and configuration that can embed credentials. Only users who can
+     * update the application and `read:sensitive` tokens may read them.
+     */
+    public const COMMAND_AND_CONFIGURATION_ATTRIBUTES = [
+        'install_command',
+        'build_command',
+        'start_command',
+        'pre_deployment_command',
+        'post_deployment_command',
+        'health_check_command',
+        'health_check_response_text',
+        'custom_docker_run_options',
+        'docker_compose_custom_start_command',
+        'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability. Internal serializers (deployment
      * job, compose generation) must makeVisible explicitly before toArray().
      */
     protected $hidden = [
+        ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
         'http_basic_auth_password',
         'git_https_password',
         'manual_webhook_secret_github',
@@ -292,12 +316,15 @@ class Application extends BaseModel
             'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
+            'docker_compose_image_overrides' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'restart_limit_reached' => 'boolean',
             'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
             'is_maintenance_enabled' => 'boolean',
+            'health_check_enabled' => 'boolean',
+            'custom_healthcheck_found' => 'boolean',
         ];
     }
 
@@ -308,6 +335,7 @@ class Application extends BaseModel
             $application->manual_webhook_secret_gitlab ??= Str::random(40);
             $application->manual_webhook_secret_bitbucket ??= Str::random(40);
             $application->manual_webhook_secret_gitea ??= Str::random(40);
+            $application->compose_parsing_version = self::$parserVersion;
         });
         static::addGlobalScope('withRelations', function ($builder) {
             $builder->withCount([
@@ -316,6 +344,9 @@ class Application extends BaseModel
             ]);
         });
         static::saving(function ($application) {
+            if ($application->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($application, $application->getOriginal('docker_compose_raw'), $application->docker_compose_raw, 'docker_compose_raw');
+            }
             $payload = [];
             if ($application->isDirty('fqdn')) {
                 if ($application->fqdn === '') {
@@ -405,8 +436,6 @@ class Application extends BaseModel
                 'application_id' => $application->id,
                 'use_build_secrets' => true,
             ]);
-            $application->compose_parsing_version = self::$parserVersion;
-            $application->save();
 
             // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
             if ($application->build_pack === 'nixpacks') {
@@ -615,6 +644,22 @@ class Application extends BaseModel
     }
 
     /**
+     * The custom container labels, when the user edits them. Docker Compose applications
+     * take their labels from the compose file, so their domain routes apply.
+     *
+     * @return Collection<int, string>|null
+     */
+    public function maintenanceProxyLabels(): ?Collection
+    {
+        if ($this->build_pack === 'dockercompose' || $this->settings?->is_container_label_readonly_enabled !== false || blank($this->custom_labels)) {
+            return null;
+        }
+        $labels = decodeBase64EncodedLabels($this->custom_labels) ?? $this->custom_labels;
+
+        return collect(preg_split("/\r\n|\n|\r/", $labels));
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     public function maintenanceServers(): Collection
@@ -694,13 +739,13 @@ class Application extends BaseModel
         return false;
     }
 
-    public function is_github_based(): bool
+    /**
+     * Watch paths filter Git webhook deployments. Deploy-key applications have no
+     * source but receive manual webhooks, so a source is not required.
+     */
+    public function supportsWatchPaths(): bool
     {
-        if (data_get($this, 'source')) {
-            return true;
-        }
-
-        return false;
+        return $this->git_based() && ! $this->is_public_repository();
     }
 
     public function isGithubAppSource(): bool
@@ -1095,6 +1140,64 @@ class Application extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    /**
+     * A deployments-only server cannot build this application, so a build server must build it.
+     * Docker image applications build nothing, and Compose applications do not use build servers.
+     */
+    public function mustBuildOnBuildServer(Server $server): bool
+    {
+        return ! $server->canBuildApplications()
+            && ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+    }
+
+    /**
+     * The build servers that can build a deployment of this application on $server. It is empty when
+     * the deployment builds on $server, or when $server is an additional server that pulls the image.
+     *
+     * @return Collection<int, Server>
+     */
+    public function buildServerCandidates(Server $server): Collection
+    {
+        $pullsImage = str($this->docker_registry_image_name)->isNotEmpty()
+            && $this->additional_servers()->wherePivot('server_id', $server->id)->exists();
+        if ($pullsImage) {
+            return collect();
+        }
+        if (! $this->mustBuildOnBuildServer($server) && ! data_get($this, 'settings.is_build_server_enabled')) {
+            return collect();
+        }
+        $teamId = $this->team()?->id;
+        if ($teamId === null) {
+            return collect();
+        }
+
+        return Server::buildServers($teamId)->whereKeyNot($server->id)->get();
+    }
+
+    /**
+     * Another application of the team that builds and pushes an image with the same Docker image name.
+     * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
+     */
+    public function otherApplicationBuildingSameImage(): ?Application
+    {
+        $buildPacksWithoutPushedImage = ['dockerimage', 'dockercompose'];
+        if (blank($this->docker_registry_image_name) || in_array($this->build_pack, $buildPacksWithoutPushedImage, true)) {
+            return null;
+        }
+
+        return Application::query()
+            ->whereRelation('environment.project.team', 'id', $this->team()->id)
+            ->when($this->exists, fn ($query) => $query->whereKeyNot($this->id))
+            ->where('docker_registry_image_name', $this->docker_registry_image_name)
+            ->whereNotIn('build_pack', $buildPacksWithoutPushedImage)
+            ->first();
+    }
+
+    public function sharedImageNameMessage(Application $otherApplication): string
+    {
+        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. Both push the same image tags, so one application can run the image of the other. Set a different Docker image name for each application in the General settings.";
+    }
+
     public function serviceType()
     {
         $found = str(collect(SPECIFIC_SERVICES)->filter(function ($service) {
@@ -1204,15 +1307,44 @@ class Application extends BaseModel
     public function environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+            ->where('is_preview', true);
+    }
+
+    /**
+     * IDs of preview variables that have the production value: automatic copies of a production variable that
+     * the user did not change, and preview variables with the same value as the production variable with the
+     * same key. An automatic copy stays in the list after production changes (for example a rotated secret),
+     * because the old production value can still be valid. Empty values do not count, because they hold no
+     * production data. Give $previewIds to check only those preview variables.
+     *
+     * @param  array<int, int>|null  $previewIds
+     * @return array<int, int>
+     */
+    public function previewEnvironmentVariableIdsWithProductionValues(?array $previewIds = null): array
+    {
+        if ($previewIds === []) {
+            return [];
+        }
+
+        $previewVariables = $this->environment_variables_preview()
+            ->when($previewIds !== null, fn ($query) => $query->whereKey($previewIds))
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value));
+
+        if ($previewVariables->isEmpty()) {
+            return [];
+        }
+
+        $productionValues = $this->environment_variables()
+            ->whereIn('key', $previewVariables->pluck('key')->unique()->values()->all())
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->pluck('value', 'key');
+
+        return $previewVariables
+            ->filter(fn (EnvironmentVariable $env) => $env->is_production_value_copy || $productionValues->get($env->key) === $env->value)
+            ->pluck('id')
+            ->all();
     }
 
     public function runtime_environment_variables_preview()
@@ -1281,14 +1413,14 @@ class Application extends BaseModel
         return false;
     }
 
-    public function get_last_successful_deployment()
+    public function get_last_successful_deployment(array $columns = ['*'])
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::FINISHED->value)->where('pull_request_id', 0)->orderBy('created_at', 'desc')->first($columns);
     }
 
-    public function get_last_days_deployments()
+    public function hasDeploymentsInLastDays(int $days = 7): bool
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays($days))->exists();
     }
 
     /**
@@ -1302,6 +1434,7 @@ class Application extends BaseModel
         ?string $search = null,
         array $filters = [],
         string $sort = 'newest',
+        array $columns = ['*'],
     ): array {
         $deployments = ApplicationDeploymentQueue::query()
             ->where('application_id', $this->id);
@@ -1340,12 +1473,14 @@ class Application extends BaseModel
                     'webhook', 'webhooks' => $query->orWhere('is_webhook', true),
                     'rollback', 'rollbacks' => $query->orWhere('rollback', true),
                     'api' => $query->orWhere('is_api', true),
+                    'mcp' => $query->orWhere('is_mcp', true),
                     'manual' => $query->orWhere(function ($sourceQuery) {
                         $sourceQuery
                             ->where('pull_request_id', '<=', 0)
                             ->where('is_webhook', false)
                             ->where('rollback', false)
-                            ->where('is_api', false);
+                            ->where('is_api', false)
+                            ->where('is_mcp', false);
                     }),
                     default => null,
                 };
@@ -1371,7 +1506,8 @@ class Application extends BaseModel
                             'webhook' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', true),
                             'rollback' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', true),
                             'api' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', true),
-                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false),
+                            'mcp' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_mcp', true),
+                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false)->where('is_mcp', false),
                             default => $sourceQuery->where('id', -1),
                         };
                     });
@@ -1394,7 +1530,7 @@ class Application extends BaseModel
             ->orderBy('id', $sort === 'oldest' ? 'asc' : 'desc')
             ->skip($skip)
             ->take($take)
-            ->get();
+            ->get($columns);
 
         return [
             'count' => $count,
@@ -1562,6 +1698,90 @@ class Application extends BaseModel
         return convertGitUrl($this->git_repository, $this->deploymentType(), $this->source);
     }
 
+    /**
+     * The host and port that git connects to over SSH, or null when the repository does not use SSH.
+     *
+     * @return array{host: string, port: int}|null
+     */
+    public function gitSshHost(): ?array
+    {
+        ['repository' => $repository, 'port' => $port] = $this->customRepository();
+        if (str_contains($repository, '://')) {
+            $url = parse_url($repository) ?: [];
+            if (($url['scheme'] ?? null) !== 'ssh') {
+                return null;
+            }
+            $host = $url['host'] ?? null;
+        } else {
+            $host = parseScpStyleGitUrl($repository)['host'] ?? null;
+        }
+        if ($this->deploymentType() === 'source' && filled($this->source?->custom_port)) {
+            $port = $this->source->custom_port;
+        }
+        $host = trim((string) $host, '[]');
+        if (preg_match('/\A[A-Za-z0-9._:][A-Za-z0-9._:-]*\z/', $host) !== 1 || ! is_numeric($port)) {
+            return null;
+        }
+
+        return ['host' => $host, 'port' => (int) $port];
+    }
+
+    /**
+     * The SSH hosts whose keys "Fetch current host key" reads: the repository host and the hosts of the
+     * saved keys (for example submodule hosts), without the hosts of gitHostsWithPublishedKeys().
+     *
+     * @return list<array{host: string, port: int}>
+     */
+    public function gitSshHostsToScan(): array
+    {
+        $hosts = array_filter([$this->gitSshHost()]);
+        foreach (gitKnownHostsLines($this->git_ssh_known_hosts) as $line) {
+            $entry = explode(',', explode(' ', $line)[0])[0];
+            $hosts[] = preg_match('/\A\[(.+)\]:([0-9]+)\z/', $entry, $match) === 1
+                ? ['host' => $match[1], 'port' => (int) $match[2]]
+                : ['host' => $entry, 'port' => 22];
+        }
+
+        return collect($hosts)
+            ->filter(fn (array $host) => preg_match('/\A[A-Za-z0-9._:][A-Za-z0-9._:-]*\z/', $host['host']) === 1
+                && ! in_array(strtolower($host['host']), gitHostsWithPublishedKeys(), true))
+            ->unique(fn (array $host) => strtolower($host['host']).':'.$host['port'])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Reads the SSH host keys that the hosts of gitSshHostsToScan() send now, from where the deployment helper
+     * container runs: a build server when the application builds on one, else the server of the application
+     * on the Docker network of the destination. The first server that reads keys is used.
+     *
+     * @return list<string> known_hosts lines
+     */
+    public function fetchGitSshHostKeys(): array
+    {
+        $hosts = $this->gitSshHostsToScan();
+        if ($hosts === []) {
+            return [];
+        }
+        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+        $server = $this->destination->server;
+        $targets = $this->buildServerCandidates($server)
+            ->map(fn (Server $buildServer) => [$buildServer, ''])
+            ->push([$server, '--network '.escapeshellarg($this->destination->network).' ']);
+        foreach ($targets as [$target, $network]) {
+            $commands = array_map(
+                fn (array $host) => "docker run --rm {$network}--entrypoint ssh-keyscan {$image} -T 10 -p {$host['port']} -- ".escapeshellarg($host['host']).' 2>/dev/null || true',
+                $hosts,
+            );
+            $lines = gitKnownHostsLines(instant_remote_process($commands, $target, false));
+            if ($lines !== []) {
+                return $lines;
+            }
+        }
+
+        return [];
+    }
+
     public function generateBaseDir(string $uuid)
     {
         return "/artifacts/{$uuid}";
@@ -1585,7 +1805,9 @@ class Application extends BaseModel
             ? (str_starts_with($resolvedGitSshCommand, 'GIT_SSH_COMMAND=')
                 ? $resolvedGitSshCommand
                 : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
-            : 'GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"';
+            : 'GIT_SSH_COMMAND="'.gitSshCommand($deployment_uuid).'"';
+
+        $git_clone_command = $this->gitLfsSkipSmudgePrefix($onlyCheckout).$git_clone_command;
 
         // Use the explicitly passed commit (e.g. from rollback), falling back to the application's git_commit_sha.
         // Invalid refs will cause the git checkout/fetch command to fail on the remote server.
@@ -1594,9 +1816,18 @@ class Application extends BaseModel
         if ($commitToUse !== 'HEAD') {
             $escapedCommit = escapeshellarg($commitToUse);
             // If shallow clone is enabled and we need a specific commit,
-            // we need to fetch that specific commit with depth=1
+            // we need to fetch that specific commit with depth=1.
+            // A remote cannot fetch a short SHA (Bitbucket sends one for pull requests),
+            // so fetch the tip of each branch and let the checkout expand it. When the
+            // commit is not a branch tip, fetch the full history of the branches.
             if ($isShallowCloneEnabled) {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                if (preg_match('/\A[0-9a-fA-F]{7,39}\z/', $commitToUse) === 1) {
+                    $branchesRefspec = escapeshellarg('+refs/heads/*:refs/remotes/origin/*');
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$branchesRefspec} && ({$checkoutCommand} || (echo 'The commit is not a branch tip. Fetching the full history.' && {$sshCommand} {$gitCommand} fetch --unshallow origin {$branchesRefspec} && {$checkoutCommand}))";
+                } else {
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
+                }
             } else {
                 $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
@@ -1625,7 +1856,7 @@ class Application extends BaseModel
     {
         try {
             ['commands' => $lsRemoteCommand] = $this->generateGitLsRemoteCommands(deployment_uuid: $deployment_uuid, exec_in_docker: false);
-            instant_remote_process([$this->gitCommandsAsShellCommand($lsRemoteCommand)], $this->destination->server, true);
+            instant_remote_process([$this->serverGitSshSetupPrefix($deployment_uuid).$this->gitCommandsAsShellCommand($lsRemoteCommand)], $this->destination->server, true);
 
             return [
                 'is_accessible' => true,
@@ -1645,7 +1876,8 @@ class Application extends BaseModel
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
         $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
-        $base_command = 'git ls-remote';
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $base_command = 'git ls-remote --';
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
@@ -1725,7 +1957,7 @@ class Application extends BaseModel
                     $private_key = base64_encode($private_key);
                     $gitlabPort = $oauthSource->custom_port ?? 22;
                     $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
-                    $sshCommand = gitSshCommand($gitlabPort, $customSshKeyLocation);
+                    $sshCommand = gitSshCommand($deployment_uuid, $gitlabPort, $customSshKeyLocation);
                     $base_command = "GIT_SSH_COMMAND=\"{$sshCommand}\" {$base_command} '{$escapedCustomRepository}'";
 
                     $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
@@ -1771,7 +2003,7 @@ class Application extends BaseModel
             // When used with executeInDocker (which uses bash -c '...'), we need to escape for bash context
             // Replace ' with '\'' to safely escape within single-quoted bash strings
             $escapedCustomRepository = str_replace("'", "'\\''", $customRepository);
-            $sshCommand = gitSshCommand($customPort, $customSshKeyLocation);
+            $sshCommand = gitSshCommand($deployment_uuid, $customPort, $customSshKeyLocation);
             $base_command = "GIT_SSH_COMMAND=\"{$sshCommand}\" {$base_command} '{$escapedCustomRepository}'";
 
             $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
@@ -1794,7 +2026,11 @@ class Application extends BaseModel
             $escapedCustomRepository = escapeshellarg($customRepository);
             $gitConfigOption = $this->gitHttpsCredentialConfigOption();
             if ($gitConfigOption) {
-                $base_command = "git {$gitConfigOption} ls-remote";
+                $base_command = "git {$gitConfigOption} ls-remote --";
+            }
+            if ($this->gitUsesSsh()) {
+                $sshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
+                $base_command = "GIT_SSH_COMMAND=\"{$sshCommand}\" {$base_command}";
             }
             $base_command = "{$base_command} {$escapedCustomRepository}";
 
@@ -1867,6 +2103,16 @@ class Application extends BaseModel
         ];
     }
 
+    /**
+     * The helper image installs the Git LFS filter system-wide, so every checkout downloads
+     * LFS objects unless the smudge filter is skipped. A checkout that only reads files (the
+     * Compose file) never needs LFS objects.
+     */
+    private function gitLfsSkipSmudgePrefix(bool $onlyCheckout = false): string
+    {
+        return $this->settings->is_git_lfs_enabled && ! $onlyCheckout ? '' : 'export GIT_LFS_SKIP_SMUDGE=1 && ';
+    }
+
     private function gitCommandsAsShellCommand(Collection|array|string $commands): string
     {
         if (is_string($commands)) {
@@ -1884,7 +2130,7 @@ class Application extends BaseModel
         $commands = collect([]);
 
         if (! $execInDocker) {
-            $commands->push($this->gitCommand("trap 'rm -f {$customSshKeyLocation}' EXIT"));
+            $commands->push($this->gitCommand("trap 'rm -f {$customSshKeyLocation} ".gitSshConfigFile($deploymentUuid).' '.gitKnownHostsFile($deploymentUuid)."' EXIT"));
         }
 
         $commands->push($this->gitCommand($execInDocker ? executeInDocker($deploymentUuid, 'mkdir -p /root/.ssh') : 'mkdir -p /root/.ssh'));
@@ -1900,8 +2146,57 @@ class Application extends BaseModel
         return $commands;
     }
 
+    /**
+     * gitSshSetupCommand() and ' && ' for git commands that run on the server, not in a helper container.
+     * The files are removed when the script exits. Git over HTTP(S) gets no setup: for a non-root SSH user
+     * the setup makes the sudo parser run the whole line with bash, which the server may not have.
+     */
+    private function serverGitSshSetupPrefix(string $uuid): string
+    {
+        if (! $this->gitUsesSsh()) {
+            return '';
+        }
+
+        return "trap 'rm -f ".gitSshConfigFile($uuid).' '.gitKnownHostsFile($uuid)."' EXIT && ".gitSshSetupCommand($uuid, $this->git_ssh_known_hosts, onServer: true).' && ';
+    }
+
+    /**
+     * Whether git can reach the repository over SSH. Only an http(s) URL without a deploy key, a GitHub App,
+     * and a connected GitLab or Gitea source (which clone with a token over HTTPS) never use SSH.
+     */
+    private function gitUsesSsh(): bool
+    {
+        $deploymentType = $this->deploymentType();
+        if ($deploymentType === 'deploy_key') {
+            return true;
+        }
+        if ($deploymentType === 'source') {
+            if ($this->source instanceof GithubApp) {
+                return false;
+            }
+            if (($this->source instanceof GitlabApp || $this->source instanceof GiteaApp) && $this->source->isConnected()) {
+                return false;
+            }
+        }
+
+        return preg_match('#\Ahttps?://#i', (string) $this->git_repository) !== 1;
+    }
+
+    /**
+     * The COOLIFY_BRANCH value of a deployment. Preview deployments use the pull request ref.
+     */
+    public function coolifyBranch(int $pullRequestId = 0): ?string
+    {
+        if ($pullRequestId !== 0) {
+            return "pull/{$pullRequestId}/head";
+        }
+
+        return $this->git_branch;
+    }
+
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
+        $commit = $commit ?: ($this->git_commit_sha ?: 'HEAD');
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $baseDir = $custom_base_dir ?? $this->generateBaseDir($deployment_uuid);
@@ -1925,9 +2220,10 @@ class Application extends BaseModel
             }
         }
 
-        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
+        // `--` ends the options, so a repository value that starts with `-` is not read as a git option.
+        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch} --";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch} --";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
@@ -1943,9 +2239,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
                     $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                    if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout);
-                    }
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
                     } else {
@@ -1970,9 +2264,7 @@ class Application extends BaseModel
                         $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
                         $fullRepoUrl = $repoUrl;
                     }
-                    if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
-                    }
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
                     } else {
@@ -1982,12 +2274,13 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOption ?? null);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
+                    $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
-                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command")));
+                        $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_pr_command)));
                     } else {
-                        $commands->push($this->gitCommand("cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command"));
+                        $commands->push($this->gitCommand($git_pr_command));
                     }
                 }
 
@@ -2018,11 +2311,7 @@ class Application extends BaseModel
                     $escapedRepoUrl = escapeshellarg($repoUrl);
                     $fullRepoUrl = $repoUrl;
                     $git_clone_command_base = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                    if ($only_checkout) {
-                        $git_clone_command = $git_clone_command_base;
-                    } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
-                    }
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
 
                     if ($pull_request_id !== 0) {
                         $branch = "{$pullRequestRef}:{$pr_branch_name}";
@@ -2031,7 +2320,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out {$branch}'");
                         }
-                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOption);
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption);
                         $escapedPrBranch = escapeshellarg($branch);
                         $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOption} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
                     }
@@ -2057,14 +2346,10 @@ class Application extends BaseModel
                     $private_key = base64_encode($private_key);
                     $gitlabPort = $oauthSource->custom_port ?? 22;
                     $escapedCustomRepository = escapeshellarg($customRepository);
-                    $gitlabSshCommand = gitSshCommand($gitlabPort, $customSshKeyLocation);
+                    $gitlabSshCommand = gitSshCommand($deployment_uuid, $gitlabPort, $customSshKeyLocation);
                     $gitlabGitSshCommand = "GIT_SSH_COMMAND=\"{$gitlabSshCommand}\"";
                     $git_clone_command_base = "{$gitlabGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-                    if ($only_checkout) {
-                        $git_clone_command = $git_clone_command_base;
-                    } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
-                    }
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
 
                     if ($pull_request_id !== 0) {
@@ -2118,14 +2403,10 @@ class Application extends BaseModel
             }
             $private_key = base64_encode($private_key);
             $escapedCustomRepository = escapeshellarg($customRepository);
-            $deployKeySshCommand = gitSshCommand($customPort, $customSshKeyLocation);
+            $deployKeySshCommand = gitSshCommand($deployment_uuid, $customPort, $customSshKeyLocation);
             $deployKeyGitSshCommand = "GIT_SSH_COMMAND=\"{$deployKeySshCommand}\"";
             $git_clone_command_base = "{$deployKeyGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-            if ($only_checkout) {
-                $git_clone_command = $git_clone_command_base;
-            } else {
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
-            }
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
             $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -2175,7 +2456,7 @@ class Application extends BaseModel
             $git_clone_command = str_replace('git clone', "{$gitCommand} clone", $git_clone_command);
             $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
-            $otherSshCommand = gitSshCommand($customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
+            $otherSshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
 
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -2283,6 +2564,92 @@ class Application extends BaseModel
         instant_remote_process($commands, $this->destination->server, false);
     }
 
+    /**
+     * The services of the Compose file, read without parse(). A parse saves volumes and variables, so
+     * code that only needs the service names uses this.
+     *
+     * @return array<string, mixed>
+     */
+    public function composeServicesWithoutParse(): array
+    {
+        try {
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($services) ? $services : [];
+    }
+
+    /**
+     * The image that a security update set for a Compose service, while the compose file still names the image it
+     * replaced. When the user changes that image in the compose file (in Git), the compose file wins again.
+     */
+    public function composeImageOverride(string $serviceName, ?string $composeImage): ?string
+    {
+        $override = data_get($this->docker_compose_image_overrides, $serviceName);
+        if (! is_array($override) || ! is_string($override['from'] ?? null) || ! is_string($override['to'] ?? null)) {
+            return null;
+        }
+
+        return $composeImage !== null && trim($composeImage) === trim($override['from']) ? $override['to'] : null;
+    }
+
+    /**
+     * The overrides that still apply to the compose file, keyed by the service name.
+     *
+     * @return array<string, array{from: string, to: string}>
+     */
+    public function activeComposeImageOverrides(): array
+    {
+        try {
+            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services', []);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $active = [];
+        foreach ((array) $this->docker_compose_image_overrides as $serviceName => $override) {
+            $image = is_array($services) ? ($services[$serviceName]['image'] ?? null) : null;
+            if ($this->composeImageOverride((string) $serviceName, is_string($image) ? $image : null) !== null) {
+                $active[(string) $serviceName] = ['from' => (string) $override['from'], 'to' => (string) $override['to']];
+            }
+        }
+
+        return $active;
+    }
+
+    /**
+     * Removes the overrides whose image the compose file no longer names, so a later compose file that names that
+     * image again does not turn them on. Keeps them all when the compose file cannot be read.
+     */
+    public function forgetStaleComposeImageOverrides(): void
+    {
+        $stored = (array) $this->docker_compose_image_overrides;
+        if ($stored === []) {
+            return;
+        }
+
+        try {
+            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            return;
+        }
+        if (! is_array($services)) {
+            return;
+        }
+
+        $active = $this->activeComposeImageOverrides();
+        if (count($active) === count($stored)) {
+            return;
+        }
+
+        $value = $active === [] ? null : $active;
+        static::query()->whereKey($this->getKey())->update(['docker_compose_image_overrides' => $value === null ? null : json_encode($value)]);
+        $this->docker_compose_image_overrides = $value;
+        $this->syncOriginalAttribute('docker_compose_image_overrides');
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
@@ -2295,7 +2662,8 @@ class Application extends BaseModel
     }
 
     /**
-     * Logs a failed git command on the server and returns its last error line for the user.
+     * Logs a failed git command on the server and returns its last error line for the user, or a hint
+     * to review the SSH host key when the host key check failed.
      * Credentials in URLs (such as GitHub App or GitLab tokens) are removed from both, and the
      * line is HTML-escaped because error toasts render HTML.
      */
@@ -2308,9 +2676,29 @@ class Application extends BaseModel
             'error' => $errorOutput,
         ]);
 
-        $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();
+        if (str_contains($errorOutput, 'you have requested strict checking')) {
+            return '<br><br>Reason: '.e('No SSH host key is saved for this Git host, and the SSH client on the server (OpenSSH older than 7.6) cannot trust a new host key on first use. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
+        }
+        if (str_contains($errorOutput, 'Host key verification failed')) {
+            return '<br><br>Reason: '.e('The Git host sent an SSH host key that is not the saved or published key. Open Source > SSH host keys and use Fetch current host key. Compare the fingerprint with the Git host administrator before you accept it.');
+        }
 
-        return $reason ? '<br><br>Reason: '.e(str($reason)->limit(300)->value()) : '';
+        $lines = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->values();
+        // Git and SSH print progress, known-hosts and multiplexing notes, and a generic access hint around the real cause.
+        $reasonLines = $lines->reject(fn (string $line) => Str::startsWith($line, [
+            'Cloning into',
+            'Warning: Permanently added',
+            'Control socket connect(',
+            'ControlSocket ',
+            'mux_client_',
+            'Please make sure you have the correct access rights',
+            'and the repository exists.',
+        ]))->take(-10);
+        if ($reasonLines->isEmpty()) {
+            $reasonLines = $lines->take(-1);
+        }
+
+        return $reasonLines->isEmpty() ? '' : '<br><br>Reason: '.$reasonLines->map(fn (string $line) => e(str($line)->limit(300)->value()))->implode('<br>');
     }
 
     /**
@@ -2331,8 +2719,9 @@ class Application extends BaseModel
     {
         ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
 
+        // Callers read data from stdout after the checkout, so progress lines of the checkout go to stderr.
         return [
-            'command' => str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand)),
+            'command' => 'exec >&2 && '.$this->serverGitSshSetupPrefix($uuid).str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand)),
             'git' => $git,
         ];
     }
@@ -2351,9 +2740,9 @@ class Application extends BaseModel
         $checkoutDir = "/tmp/{$uuid}/checkout";
         ['command' => $cloneCommand, 'git' => $git] = $this->serverCheckout($uuid, $checkoutDir);
         $composeFile = ltrim(rtrim($this->base_directory, '/').$this->docker_compose_location, '/');
-        $submoduleCommands = $this->composeFileSubmoduleCommands($git, $composeFile);
+        $submoduleCommand = $this->composeFileSubmoduleCommand($git, $composeFile, $checkoutDir);
         // Go into the submodule that contains the Compose file, and read the file from the objects of that submodule.
-        $enterSubmodule = $submoduleCommands === [] ? '' : implode(' ', [
+        $enterSubmodule = $submoduleCommand === null ? '' : implode(' ', [
             'while sub=$(git ls-tree -r HEAD | while read -r mode type object path; do',
             'if [ "$mode" = 160000 ]; then case "$file" in "$path"/*) echo "$path"; break ;; esac; fi; done) && [ -n "$sub" ];',
             'do cd "$sub" || exit 1; file="${file#"$sub"/}"; done;',
@@ -2378,9 +2767,9 @@ class Application extends BaseModel
             "mkdir -p /tmp/{$uuid}",
             "cd /tmp/{$uuid}",
             // One sh -c line: the non-root sudo parser would turn `&& if ...; then` into invalid `&& sudo if`.
-            'sh -c '.escapeshellarg($cloneCommand),
+            // The submodule step runs in the same script, because a deploy key is removed when the script exits.
+            'sh -c '.escapeshellarg($submoduleCommand === null ? $cloneCommand : "{$cloneCommand} && {$submoduleCommand}"),
             "cd {$checkoutDir}",
-            ...$submoduleCommands,
             'sh -c '.escapeshellarg($readComposeFile),
         ]);
     }
@@ -2389,23 +2778,21 @@ class Application extends BaseModel
      * The clone has no checkout and no submodules. If the Compose file is inside a submodule, this fills the
      * index (without a working tree) and clones only that submodule, with the credentials of the clone.
      *
-     * @return list<string>
+     * The command is appended to the clone script, so it must not be a separate sh -c line.
      */
-    private function composeFileSubmoduleCommands(string $git, string $composeFile): array
+    private function composeFileSubmoduleCommand(string $git, string $composeFile, string $checkoutDir): ?string
     {
         if (! $this->settings?->is_git_submodules_enabled) {
-            return [];
+            return null;
         }
 
         $depthFlag = $this->settings->is_git_shallow_clone_enabled ? ' --depth=1' : '';
         $escapedComposeFile = escapeshellarg($composeFile);
 
-        // One sh -c line: the non-root sudo parser cannot change commands inside a loop.
-        return ['git read-tree HEAD', 'sh -c '.escapeshellarg(
-            'git ls-files -s | while read -r mode object stage path; do '
+        return 'cd '.escapeshellarg($checkoutDir).' && git read-tree HEAD && '
+            .'git ls-files -s | while read -r mode object stage path; do '
             ."if [ \"\$mode\" = 160000 ]; then case {$escapedComposeFile} in \"\$path\"/*) "
-            ."{$git} submodule update --init --recursive{$depthFlag} -- \"\$path\" >/dev/null || exit 1 ;; esac; fi; done"
-        )];
+            ."{$git} submodule update --init --recursive{$depthFlag} -- \"\$path\" >/dev/null || exit 1 ;; esac; fi; done";
     }
 
     /**
@@ -2492,7 +2879,7 @@ class Application extends BaseModel
             $this->base_directory = $initialBaseDirectory;
             $this->save();
 
-            throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
+            throw new RuntimeException("Docker Compose file at $workdir$composeFile (branch: {$this->git_branch}) is empty.<br><br>Check that the file in the repository has content and that your changes are committed and pushed.");
         }
     }
 
@@ -2550,15 +2937,14 @@ class Application extends BaseModel
         );
     }
 
-    protected function buildGitCheckoutCommand($target, ?string $gitSshCommand = null, ?string $gitConfigOptions = null): string
+    protected function buildGitCheckoutCommand(string $target, string $gitSshCommand, ?string $gitConfigOptions = null): string
     {
         $escapedTarget = escapeshellarg($target);
         $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
         $command = "{$gitCommand} checkout {$escapedTarget}";
 
         if ($this->settings->is_git_submodules_enabled) {
-            $sshCommand = $gitSshCommand ?? 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
-            $command .= " && GIT_SSH_COMMAND=\"{$sshCommand}\" {$gitCommand} submodule update --init --recursive";
+            $command .= " && GIT_SSH_COMMAND=\"{$gitSshCommand}\" {$gitCommand} submodule update --init --recursive";
         }
 
         return $command;
@@ -2775,8 +3161,8 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
-        $dockerfile = str($dockerfile)->trim()->explode("\n");
-        $hasHealthcheck = str($dockerfile)->contains('HEALTHCHECK');
+        $healthcheckCommand = dockerfileHealthcheckInstruction($dockerfile, $this->dockerfile_target_build);
+        $hasHealthcheck = $healthcheckCommand !== null;
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
@@ -2792,46 +3178,14 @@ class Application extends BaseModel
         }
 
         if ($hasHealthcheck && ($this->isHealthcheckDisabled() || $isInit)) {
-            $healthcheckCommand = null;
-            $lines = $dockerfile->toArray();
-            foreach ($lines as $line) {
-                $trimmedLine = trim($line);
-                if (str_starts_with($trimmedLine, 'HEALTHCHECK')) {
-                    $healthcheckCommand .= trim($trimmedLine, '\\ ');
+            $options = dockerfileHealthcheckOptions($healthcheckCommand);
 
-                    continue;
-                }
-                if (isset($healthcheckCommand) && str_contains($trimmedLine, '\\')) {
-                    $healthcheckCommand .= ' '.trim($trimmedLine, '\\ ');
-                }
-                if (isset($healthcheckCommand) && ! str_contains($trimmedLine, '\\') && ! empty($healthcheckCommand)) {
-                    $healthcheckCommand .= ' '.$trimmedLine;
-                    break;
-                }
-            }
-            if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
-                $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
-
-                if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = parseDockerfileInterval($interval);
-                }
-                if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = parseDockerfileInterval($timeout);
-                }
-                if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = parseDockerfileInterval($start_period);
-                }
-                if ($retries->isNotEmpty()) {
-                    $this->health_check_retries = $retries->toInteger();
-                }
-                if ($interval || $timeout || $start_period || $retries) {
-                    $this->custom_healthcheck_found = true;
-                    $this->save();
-                }
-            }
+            $this->health_check_interval = $options['interval'] ?? $this->health_check_interval;
+            $this->health_check_timeout = $options['timeout'] ?? $this->health_check_timeout;
+            $this->health_check_start_period = $options['start_period'] ?? $this->health_check_start_period;
+            $this->health_check_retries = $options['retries'] ?? $this->health_check_retries;
+            $this->custom_healthcheck_found = true;
+            $this->save();
         }
     }
 
@@ -2897,5 +3251,16 @@ class Application extends BaseModel
         } catch (\Exception $e) {
             throw new \Exception('Failed to update application settings');
         }
+    }
+
+    /**
+     * The server of a deployment when it is the destination server or an additional server of the application.
+     */
+    public function deploymentServer(ApplicationDeploymentQueue $deployment): ?Server
+    {
+        return collect([$this->destination?->server])
+            ->concat($this->additional_servers()->get())
+            ->filter(fn ($server): bool => $server instanceof Server)
+            ->first(fn (Server $server): bool => (int) $server->id === (int) $deployment->server_id);
     }
 }

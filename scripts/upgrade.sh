@@ -14,6 +14,7 @@ else
 fi
 SKIP_BACKUP=${4:-false}
 STATUS_FILE="/data/coolify/source/.upgrade-status"
+STATUS_LOCK_FILE="/data/coolify/source/.upgrade-status.lock"
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
@@ -32,10 +33,17 @@ log_section() {
 }
 
 # Helper function to write upgrade status for API polling
+# Holds the lock that Coolify takes when it writes an error before an upgrade starts, so neither write is lost.
 write_status() {
-    local step="$1"
-    local message="$2"
-    echo "${step}|${message}|$(date -Iseconds)" > "$STATUS_FILE"
+    local line="${1}|${2}|$(date -Iseconds)"
+    if command -v flock >/dev/null 2>&1; then
+        (
+            flock -w 10 9 || true
+            echo "$line" > "$STATUS_FILE"
+        ) 9>"$STATUS_LOCK_FILE"
+    else
+        echo "$line" > "$STATUS_FILE"
+    fi
 }
 
 # Print the first gateway of a network that Docker reports with a prefix length (fd00::1/64).
@@ -205,7 +213,45 @@ set_env_var() {
     fi
 }
 
+# Quote a value so that Docker Compose and phpdotenv both read it back unchanged (same as install.sh).
+quote_env_value() {
+    local value="$1"
+    case "$value" in
+    *\'*)
+        value=${value//\\/\\\\}
+        value=${value//\"/\\\"}
+        value=${value//\$/\\\$}
+        printf '"%s"' "$value"
+        ;;
+    *)
+        printf "'%s'" "$value"
+        ;;
+    esac
+}
+
+# Installers before 4.5.1 (and manual edits) wrote root user credentials with spaces without quotes.
+# phpdotenv cannot parse such a line, so the recreated Coolify container returns HTTP 500 for every page.
+# Only quote lines that phpdotenv rejects: unquoted values that contain whitespace but no comment.
+quote_root_user_env_values() {
+    local key value
+    for key in ROOT_USERNAME ROOT_USER_EMAIL ROOT_USER_PASSWORD; do
+        value=$(grep -m1 "^${key}=" "$ENV_FILE" | cut -d '=' -f2-) || continue
+        # phpdotenv ignores whitespace around an unquoted value (also the \r of CRLF line endings)
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        case "$value" in
+        \"* | \'* | *[[:space:]]\#*) continue ;;
+        *[[:space:]]*) ;;
+        *) continue ;;
+        esac
+        # awk reads the value from the environment, so characters such as | & \ in it stay literal
+        KEY="$key" VALUE="$(quote_env_value "$value")" awk '!done && index($0, ENVIRON["KEY"] "=") == 1 { $0 = ENVIRON["KEY"] "=" ENVIRON["VALUE"]; done = 1 } { print }' "$ENV_FILE" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+        log "Quoted ${key} (its value has spaces)"
+    done
+}
+
 log "Checking environment variables..."
+quote_root_user_env_values
 set_env_var "REGISTRY_URL" "$REGISTRY_URL"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
@@ -280,7 +326,7 @@ log "All images pulled successfully"
 echo "     All images pulled successfully."
 
 set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
-set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
+sed -i '/^COOLIFY_VERSION=/d' "$ENV_FILE"
 
 log_section "Step 4/6: Stopping and restarting containers"
 write_status "4" "Stopping containers"

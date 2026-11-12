@@ -12,6 +12,10 @@
                 description="Automate database backups and track the latest execution for each schedule.">
                 @can('update', $database)
                     <x-slot:actions>
+                        <x-modal-input title="Import backup" buttonTitle="Import backup">
+                            <livewire:project.database.import :resource="$database"
+                                wire:key="database-import-{{ $database->uuid }}" />
+                        </x-modal-input>
                         <x-modal-input title="New Scheduled Backup" isHighlightedButton buttonTitle="+ Add">
                             <livewire:project.database.create-scheduled-backup :database="$database" />
                         </x-modal-input>

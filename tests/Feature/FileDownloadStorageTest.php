@@ -167,7 +167,7 @@ it('uploads to S3, stores the link, and queues the delete', function () {
     (new PrepareFileDownloadJob('dl-1', 7, $server->id, 'app-123', '/data/a.txt', false, 'a.txt', $this->storage->id))->handle($downloads);
 
     expect(Cache::get(PrepareFileDownloadJob::cacheKey('dl-1')))->toBe(['user_id' => 7, 'status' => 'ready', 'url' => 'https://s3.example.com/get']);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'https://s3.example.com/put'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'https://s3.example.com/put'));
     Bus::assertDispatched(DeleteFileDownloadJob::class, fn (DeleteFileDownloadJob $job) => $job->s3StorageId === $this->storage->id
         && str_starts_with($job->key, FileDownloadStorageService::PREFIX)
         && $job->delay->equalTo(now()->addHours(6)));
@@ -224,9 +224,7 @@ it('accepts a bucket that denies anonymous listing', function () {
         fn (CommandInterface $command) => new S3Exception('denied', $command, ['code' => 'AccessDenied']),
     ]));
 
-    $downloads->ensureBucketIsPrivate($this->storage);
-
-    expect(true)->toBeTrue();
+    expect(fn () => $downloads->ensureBucketIsPrivate($this->storage))->not->toThrow(Throwable::class);
 });
 
 it('refuses the bundled MinIO because servers and browsers cannot reach it', function () {

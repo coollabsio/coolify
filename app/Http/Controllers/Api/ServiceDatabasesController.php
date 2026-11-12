@@ -405,7 +405,7 @@ class ServiceDatabasesController extends Controller
 
         [$serviceDatabase, $server] = $resolved;
         $containerName = $serviceDatabase->name.'-'.$serviceDatabase->service->uuid;
-        if (getContainerStatus($server, $containerName) !== 'running') {
+        if (! is_array(getContainerStatus($server, $containerName, all_data: true))) {
             return response()->json(['message' => 'Service database container is not running.'], 400);
         }
 

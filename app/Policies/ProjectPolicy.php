@@ -26,6 +26,15 @@ class ProjectPolicy
     }
 
     /**
+     * Determine whether the user can read the shared variables of the project.
+     * Opening a project for navigation is not enough; this needs read access on the project.
+     */
+    public function viewSharedVariables(User $user, Project $project): bool
+    {
+        return $user->canAccess(AccessLevel::Read, $project);
+    }
+
+    /**
      * Determine whether the user can create projects in the current team.
      */
     public function create(User $user): bool

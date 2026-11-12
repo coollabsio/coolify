@@ -33,25 +33,7 @@ class ServerCloudProviderStatusCheckJob implements ShouldBeEncrypted, ShouldQueu
     public function handle(): void
     {
         try {
-            if (! $this->server->cloudProviderToken) {
-                return;
-            }
-
-            match ($this->server->cloudProviderToken->provider) {
-                'hetzner' => $this->server->hetzner_server_id
-                    ? $this->server->refreshHetznerState()
-                    : null,
-                'vultr' => $this->server->vultr_instance_id
-                    ? $this->server->refreshVultrState()
-                    : null,
-                'digitalocean' => $this->server->digitalocean_droplet_id
-                    ? $this->server->refreshDigitalOceanState()
-                    : null,
-                'hostinger' => $this->server->hostinger_virtual_machine_id
-                    ? $this->server->refreshHostingerState()
-                    : null,
-                default => null,
-            };
+            $this->server->refreshCloudProviderState();
         } catch (\Throwable $e) {
             Log::debug('Cloud provider status check failed', [
                 'server_id' => $this->server->id,

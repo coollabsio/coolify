@@ -147,6 +147,7 @@ class Index extends Component
             $this->syncData(true);
             $this->team->save();
             refreshSession();
+            $this->dispatch('team-updated');
             $this->dispatch('success', 'Team updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

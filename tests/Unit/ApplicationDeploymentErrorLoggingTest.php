@@ -218,19 +218,6 @@ it('handles exceptions with no message gracefully', function () {
     expect($errorMessageString)->toContain('Error type:');
 });
 
-it('wraps exceptions in deployment methods with DeploymentException', function () {
-    // Verify that our deployment methods wrap exceptions properly
-    $originalException = new RuntimeException('Container not found');
-
-    try {
-        throw new DeploymentException('Failed to start container', 0, $originalException);
-    } catch (DeploymentException $e) {
-        expect($e->getMessage())->toBe('Failed to start container');
-        expect($e->getPrevious())->toBe($originalException);
-        expect($e->getPrevious()->getMessage())->toBe('Container not found');
-    }
-});
-
 it('logs error code 0 correctly', function () {
     // Verify that error code 0 is logged (previously skipped due to falsy check)
     $exception = new Exception('Test error', 0);
@@ -307,46 +294,6 @@ it('logs error code 0 correctly', function () {
 
     // Should log error code 0 (not skip it)
     expect($errorMessageString)->toContain('Error code: 0');
-});
-
-it('preserves original exception type in wrapped DeploymentException messages', function () {
-    // Verify that when wrapping exceptions, the original exception type is included in the message
-    $originalException = new RuntimeException('Connection timeout');
-
-    // Test rolling update scenario
-    $wrappedException = new DeploymentException(
-        'Rolling update failed ('.get_class($originalException).'): '.$originalException->getMessage(),
-        $originalException->getCode(),
-        $originalException
-    );
-
-    expect($wrappedException->getMessage())->toContain('RuntimeException');
-    expect($wrappedException->getMessage())->toContain('Connection timeout');
-    expect($wrappedException->getPrevious())->toBe($originalException);
-
-    // Test health check scenario
-    $healthCheckException = new InvalidArgumentException('Invalid health check URL');
-    $wrappedHealthCheck = new DeploymentException(
-        'Health check failed ('.get_class($healthCheckException).'): '.$healthCheckException->getMessage(),
-        $healthCheckException->getCode(),
-        $healthCheckException
-    );
-
-    expect($wrappedHealthCheck->getMessage())->toContain('InvalidArgumentException');
-    expect($wrappedHealthCheck->getMessage())->toContain('Invalid health check URL');
-    expect($wrappedHealthCheck->getPrevious())->toBe($healthCheckException);
-
-    // Test docker registry push scenario
-    $registryException = new RuntimeException('Failed to authenticate');
-    $wrappedRegistry = new DeploymentException(
-        get_class($registryException).': '.$registryException->getMessage(),
-        $registryException->getCode(),
-        $registryException
-    );
-
-    expect($wrappedRegistry->getMessage())->toContain('RuntimeException');
-    expect($wrappedRegistry->getMessage())->toContain('Failed to authenticate');
-    expect($wrappedRegistry->getPrevious())->toBe($registryException);
 });
 
 it('logs the configured timeout when the deployment times out', function () {

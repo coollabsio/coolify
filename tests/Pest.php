@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
@@ -31,6 +33,7 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
 require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 require_once __DIR__.'/Support/StripeTestHelpers.php';
+require_once __DIR__.'/Support/RemoteProcessTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -179,4 +182,24 @@ function writtenProxyFile(array $lines, string $file): ?string
     }
 
     return $content;
+}
+
+/**
+ * Inserts an environment variable next to one with the same key, like older versions could do.
+ * The model refuses such a row, so the insert skips it.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function insertDuplicateEnvironmentVariable(array $attributes): EnvironmentVariable
+{
+    $id = DB::table('environment_variables')->insertGetId([
+        'uuid' => new_public_id(),
+        'is_preview' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+        ...$attributes,
+        'value' => encrypt((string) ($attributes['value'] ?? '')),
+    ]);
+
+    return EnvironmentVariable::query()->findOrFail($id);
 }

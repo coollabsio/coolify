@@ -5,10 +5,14 @@ use App\Actions\Proxy\DeleteTraefikCertificate;
 use App\Actions\Proxy\GetTraefikCertificates;
 use App\Enums\ProxyTypes;
 use App\Livewire\Server\Proxy\Certificates;
+use App\Models\Application;
 use App\Models\AuditEvent;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\TraefikAcmeService;
@@ -39,13 +43,19 @@ beforeEach(function () {
     $this->acmeContents = json_encode(['letsencrypt' => ['Certificates' => $certificates]]);
 
     $this->uploadedContents = null;
+    // Every certificate except app1 and app2 is unused unless a test adds a route or a resource.
+    $this->routingOutput = '{"traefik.http.routers.http-0-app1.rule":"Host(`app1.example.com`)"}';
     Process::fake(function ($process) {
-        $command = $process->command;
+        $command = remoteProcessScript($process);
         if (str_starts_with($command, 'timeout') && str_contains($command, ' scp ')
             && preg_match("~'(".preg_quote(sys_get_temp_dir(), '~')."/coolify-acme-[^']+)'~", $command, $matches)) {
             $this->uploadedContents = file_get_contents($matches[1]);
 
             return Process::result();
+        }
+
+        if (str_contains($command, 'docker ps -aq --filter label=traefik.enable=true')) {
+            return Process::result(output: $this->routingOutput);
         }
 
         return Process::result(output: str_contains($command, 'head -c') ? base64_encode($this->acmeContents) : '');
@@ -56,24 +66,24 @@ it('reads the ACME file with sudo on non-root servers', function () {
     $certificates = GetTraefikCertificates::run($this->server);
 
     expect($certificates)->toHaveCount(40);
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'if [ ! -f")
-        && str_contains($process->command, 'head -c'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\nsudo sh -c 'if [ ! -f")
+        && str_contains(remoteProcessScript($process), 'head -c'));
 });
 
 it('uploads a large ACME file instead of passing it as a shell argument', function () {
     $certificate = GetTraefikCertificates::run($this->server)[0];
 
-    DeleteTraefikCertificate::run($this->server, $certificate['id']);
+    DeleteTraefikCertificate::run($this->server, [$certificate['id']]);
 
     $remaining = json_decode($this->uploadedContents, true)['letsencrypt']['Certificates'];
     expect(strlen($this->acmeContents))->toBeGreaterThan(128 * 1024)
         ->and($remaining)->toHaveCount(39)
         ->and(collect($remaining)->pluck('domain.main'))->not->toContain('app1.example.com');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'set -e;")
-        && str_contains($process->command, 'umask 077')
-        && str_contains($process->command, 'chmod 600')
-        && str_contains($process->command, 'mv --'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\nsudo sh -c 'set -e;")
+        && str_contains(remoteProcessScript($process), 'umask 077')
+        && str_contains(remoteProcessScript($process), 'chmod 600')
+        && str_contains(remoteProcessScript($process), 'mv --'));
     Process::assertDidntRun(fn ($process) => strlen($process->command) > 128 * 1024);
     expect(glob(sys_get_temp_dir().'/coolify-acme-*'))->toBeEmpty();
 });
@@ -81,7 +91,7 @@ it('uploads a large ACME file instead of passing it as a shell argument', functi
 it('asks for a proxy restart after a certificate is deleted until the proxy is restarted', function () {
     expect($this->server->hasPendingProxyConfiguration())->toBeFalse();
 
-    DeleteTraefikCertificate::run($this->server, GetTraefikCertificates::run($this->server)[0]['id']);
+    DeleteTraefikCertificate::run($this->server, [GetTraefikCertificates::run($this->server)[0]['id']]);
 
     expect($this->server->fresh()->hasPendingProxyConfiguration())->toBeTrue();
 
@@ -164,7 +174,7 @@ it('does not show or delete certificates of another team', function () {
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('error');
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'acme.json'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'acme.json'));
     expect($this->uploadedContents)->toBeNull()
         ->and($this->server->fresh()->hasPendingProxyConfiguration())->toBeFalse();
 });
@@ -221,3 +231,70 @@ it('does not load certificate controls for a Caddy server', function () {
         ->assertDontSeeLivewire(Certificates::class)
         ->assertSee('Traefik required');
 });
+
+it('marks certificates that no route and no resource on the server uses', function () {
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->server->team_id]);
+    // A stopped application has no container, so only the database names its domain.
+    Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => $project->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app2.example.com',
+    ]);
+
+    $usage = collect(GetTraefikCertificates::run($this->server))->pluck('in_use', 'main_domain');
+
+    expect($usage['app1.example.com'])->toBeTrue()
+        ->and($usage['app2.example.com'])->toBeTrue()
+        ->and($usage->filter(fn (bool $inUse): bool => ! $inUse))->toHaveCount(38);
+});
+
+it('does not mark certificates as unused when the routes cannot be read', function () {
+    Process::fake(function ($process) {
+        $command = remoteProcessScript($process);
+        if (str_contains($command, 'docker ps -aq')) {
+            return Process::result(errorOutput: 'Connection refused', exitCode: 255);
+        }
+
+        return Process::result(output: str_contains($command, 'head -c') ? base64_encode($this->acmeContents) : '');
+    });
+
+    expect(collect(GetTraefikCertificates::run($this->server))->pluck('in_use')->unique()->all())->toBe([null]);
+});
+
+it('lets an admin delete all unused certificates in one write', function () {
+    $this->withoutDefer();
+    actingAsTraefikCertificateUser($this->server->team, 'admin');
+
+    Livewire::test(Certificates::class, ['server' => $this->server])
+        ->call('loadTraefikCertificates')
+        ->assertSee('Delete unused (39)')
+        ->assertSee('Not used')
+        ->call('deleteUnusedTraefikCertificates')
+        ->assertDispatched('success')
+        ->assertDispatched('refreshServerShow');
+
+    $remaining = json_decode($this->uploadedContents, true)['letsencrypt']['Certificates'];
+    expect(collect($remaining)->pluck('domain.main')->all())->toBe(['app1.example.com'])
+        ->and($this->server->fresh()->hasPendingProxyConfiguration())->toBeTrue()
+        ->and(AuditEvent::query()->where('event', 'ui.proxy.certificate_deleted')->count())->toBe(39);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'mv --'), 1);
+});
+
+it('does not let a member or another team delete unused certificates', function (string $role, bool $ownTeam) {
+    actingAsTraefikCertificateUser($ownTeam ? $this->server->team : Team::factory()->create(), $role);
+
+    Livewire::test(Certificates::class, ['server' => $this->server])
+        ->call('loadTraefikCertificates')
+        ->assertDontSeeHtml('deleteUnusedTraefikCertificates')
+        ->call('deleteUnusedTraefikCertificates')
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+
+    expect($this->uploadedContents)->toBeNull()
+        ->and($this->server->fresh()->hasPendingProxyConfiguration())->toBeFalse();
+})->with([
+    'member' => ['member', true],
+    'owner of another team' => ['owner', false],
+]);

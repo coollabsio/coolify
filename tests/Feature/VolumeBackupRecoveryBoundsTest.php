@@ -250,7 +250,7 @@ it('cleans the S3 upload even when container recovery fails', function () {
     Storage::fake('ssh-mux');
     [, , , $backup] = createRecoveryBoundsBackup(Team::factory()->create(), ['stop_during_backup' => true]);
     $execution = createRecoveryBoundsExecution($backup, ['stop_recovery_pending' => true]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(errorOutput: 'ssh: connect to host 203.0.113.20 port 22: Connection refused', exitCode: 255),
     ]);
     $disk = Mockery::mock();
@@ -314,7 +314,7 @@ it('only blocks new scheduled backups while stopped containers await recovery', 
 ]);
 
 it('keeps executions with pending recovery during retention cleanup', function () {
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);

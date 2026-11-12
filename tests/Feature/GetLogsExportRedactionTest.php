@@ -105,9 +105,9 @@ it('redacts stored and effective database passwords in exported logs', function 
         $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
     }
     Process::fake(fn ($process) => match (true) {
-        str_contains($process->command, 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
-        str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
-        str_contains($process->command, 'docker logs') => Process::result(output: 'booted xy effective-database-canary'),
+        str_contains(remoteProcessScript($process), 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
+        str_contains(remoteProcessScript($process), 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        str_contains(remoteProcessScript($process), 'docker logs') => Process::result(output: 'booted xy effective-database-canary'),
         default => Process::result(output: ''),
     });
 
@@ -151,9 +151,9 @@ it('still exports database logs when its remote secret source fails', function (
     ]);
     $database->secretManagerLink()->create(['integration_token_id' => $token->id]);
     Process::fake(fn ($process) => match (true) {
-        str_contains($process->command, 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
-        str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
-        str_contains($process->command, 'docker logs') => Process::result(output: 'booted xy {{vault.DB_PASSWORD}}'),
+        str_contains(remoteProcessScript($process), 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => $database->uuid, 'Labels' => '', 'State' => 'running'])),
+        str_contains(remoteProcessScript($process), 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        str_contains(remoteProcessScript($process), 'docker logs') => Process::result(output: 'booted xy {{vault.DB_PASSWORD}}'),
         default => Process::result(output: ''),
     });
 

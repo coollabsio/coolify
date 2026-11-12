@@ -64,3 +64,20 @@ it('does not count running rows older than their job timeout', function () {
     $this->travel(60)->minutes();
     expect(runningScheduledJobCount())->toBe(0);
 });
+
+it('records the worker host on new runs and hides it from responses', function () {
+    $execution = ScheduledTaskExecution::create(['scheduled_task_id' => $this->task->id, 'status' => 'running']);
+
+    expect($execution->fresh()->worker_host)->toBe(gethostname())
+        ->and($execution->toArray())->not->toHaveKey('worker_host');
+});
+
+it('counts only runs on this host and runs without a recorded host', function () {
+    ScheduledTaskExecution::create(['scheduled_task_id' => $this->task->id, 'status' => 'running']);
+    (new ScheduledTaskExecution(['scheduled_task_id' => $this->task->id, 'status' => 'running']))->forceFill(['worker_host' => 'other-host'])->save();
+    (new ScheduledDatabaseBackupExecution(['scheduled_database_backup_id' => $this->databaseBackup->id, 'database_name' => 'db', 'status' => 'running']))->forceFill(['worker_host' => 'other-host'])->save();
+    $this->volumeBackup->executions()->make()->forceFill(['worker_host' => 'other-host'])->save();
+    $this->volumeBackup->executions()->create()->forceFill(['worker_host' => null])->save();
+
+    expect(runningScheduledJobCount())->toBe(2);
+});

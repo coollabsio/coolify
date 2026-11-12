@@ -735,7 +735,6 @@ class Github extends Controller
         $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
-            ->connectTimeout(5)
             ->post("$api_url/app-manifests/$code/conversions")
             ->throw()
             ->json();
@@ -841,8 +840,10 @@ class Github extends Controller
                 'Accept' => 'application/vnd.github+json',
             ])
                 ->timeout(10)
-                ->connectTimeout(5)
                 ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+            if (! $response->successful()) {
+                assertGithubClockInSync($response);
+            }
         } catch (\Throwable $e) {
             return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
         }
@@ -877,6 +878,7 @@ class Github extends Controller
         $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
             ->where('team_id', $team_id)
             ->firstOrFail();
+        abort_unless($request->user()->can('update', $github_app), 403);
 
         if ($request->user()->currentTeam()?->id !== $team_id) {
             refreshSession($github_app->team);

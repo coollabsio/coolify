@@ -92,3 +92,38 @@ test('validate rejects an unsafe id in an id list', function () {
 
     expect(ServerTransferBundle::validate($bundle)['errors'])->toContain('volume_backups.0.s3_storage_uuids.1 is not a valid id. An id may only contain letters, digits, hyphens, and underscores (at most 64 characters).');
 });
+
+function bundleTestWithDatabasePorts(array $attributes): array
+{
+    $bundle = bundleTestMinimalBundle();
+    $bundle['projects'] = [['environments' => [['databases' => [['attributes' => $attributes]]]]]];
+
+    return $bundle;
+}
+
+test('validate accepts the port values that older databases have', function (array $attributes) {
+    expect(ServerTransferBundle::validate(bundleTestWithDatabasePorts($attributes))['errors'])->toBe([]);
+})->with([
+    'no ports' => [['ports_mappings' => null, 'public_port' => null]],
+    'empty mappings' => [['ports_mappings' => '']],
+    'mapping list' => [['ports_mappings' => '5432:5432,8080:80']],
+    'spaces and a trailing comma' => [['ports_mappings' => '5432:5432, 8080:80,']],
+    'container port only' => [['ports_mappings' => '5432']],
+    'ip, range and protocol' => [['ports_mappings' => '127.0.0.1:8000-8010:8000-8010/udp,[::1]::80']],
+    'public port below 1024' => [['public_port' => 543]],
+    'public port as digit string' => [['public_port' => '5432']],
+]);
+
+test('validate rejects garbage database port values', function (array $attributes, string $field) {
+    $errors = ServerTransferBundle::validate(bundleTestWithDatabasePorts($attributes))['errors'];
+
+    expect(implode(' ', $errors))->toContain("projects.0.environments.0.databases.0.{$field}");
+})->with([
+    'shell in mappings' => [['ports_mappings' => '5432:5432; rm -rf /'], 'ports_mappings'],
+    'yaml in mappings' => [['ports_mappings' => "5432:5432\nprivileged: true"], 'ports_mappings'],
+    'letters in mappings' => [['ports_mappings' => 'abc:def'], 'ports_mappings'],
+    'mappings as array' => [['ports_mappings' => ['5432:5432']], 'ports_mappings'],
+    'public port zero' => [['public_port' => 0], 'public_port'],
+    'public port too high' => [['public_port' => 70000], 'public_port'],
+    'public port text' => [['public_port' => '5432; id'], 'public_port'],
+]);

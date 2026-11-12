@@ -2,14 +2,20 @@
 
 namespace App\Notifications\Database;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupSuccessWithS3Warning extends CustomEmailNotification
+/**
+ * Sent on the first failed S3 upload, then at most once a day until a run of the backup has no problem again.
+ */
+class BackupSuccessWithS3Warning extends CustomEmailNotification implements ThrottledNotification
 {
     public string $name;
 
@@ -17,7 +23,7 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public ?string $s3_storage_url = null;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name, public $s3_error)
+    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $database_name, public $s3_error)
     {
         $this->onQueue('high');
 
@@ -29,6 +35,16 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
         }
     }
 
+    public function throttleSubject(): ?Model
+    {
+        return $this->backup;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
+    }
+
     public function via(object $notifiable): array
     {
         return $notifiable->getEnabledChannels('backup_failure');
@@ -37,7 +53,7 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: Backup succeeded locally but S3 upload failed for {$this->database->name}");
+        $mail->subject("Coolify: Backup succeeded locally but the storage upload failed for {$this->database->name}");
         $mail->view('emails.backup-success-with-s3-warning', [
             'name' => $this->name,
             'database_name' => $this->database_name,
@@ -52,16 +68,16 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':warning: Database backup succeeded locally, S3 upload failed',
-            description: "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to S3.",
+            title: ':warning: Database backup succeeded locally, storage upload failed',
+            description: "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to the backup storage.",
             color: DiscordMessage::warningColor(),
         );
 
         $message->addField('Frequency', $this->frequency, true);
-        $message->addField('S3 Error', $this->s3_error);
+        $message->addField('Storage Error', $this->s3_error);
 
         if ($this->s3_storage_url) {
-            $message->addField('S3 Storage', '[Check Configuration]('.$this->s3_storage_url.')');
+            $message->addField('Storage', '[Check Configuration]('.$this->s3_storage_url.')');
         }
 
         return $message;
@@ -69,10 +85,10 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} succeeded locally but failed to upload to S3.\n\nS3 Error:\n{$this->s3_error}";
+        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} succeeded locally but failed to upload to the backup storage.\n\nStorage Error:\n{$this->s3_error}";
 
         if ($this->s3_storage_url) {
-            $message .= "\n\nCheck S3 Configuration: {$this->s3_storage_url}";
+            $message .= "\n\nCheck Storage Configuration: {$this->s3_storage_url}";
         }
 
         return [
@@ -82,14 +98,14 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to S3.<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>S3 Error:</b> {$this->s3_error}";
+        $message = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to the backup storage.<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>Storage Error:</b> {$this->s3_error}";
 
         if ($this->s3_storage_url) {
-            $message .= "<br/><br/><a href=\"{$this->s3_storage_url}\">Check S3 Configuration</a>";
+            $message .= "<br/><br/><a href=\"{$this->s3_storage_url}\">Check Storage Configuration</a>";
         }
 
         return new PushoverMessage(
-            title: 'Database backup succeeded locally, S3 upload failed',
+            title: 'Database backup succeeded locally, storage upload failed',
             level: 'warning',
             message: $message,
         );
@@ -97,14 +113,14 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = 'Database backup succeeded locally, S3 upload failed';
-        $description = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to S3.";
+        $title = 'Database backup succeeded locally, storage upload failed';
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to the backup storage.";
 
         $description .= "\n\n*Frequency:* {$this->frequency}";
-        $description .= "\n\n*S3 Error:* {$this->s3_error}";
+        $description .= "\n\n*Storage Error:* {$this->s3_error}";
 
         if ($this->s3_storage_url) {
-            $description .= "\n\n*S3 Storage:* <{$this->s3_storage_url}|Check Configuration>";
+            $description .= "\n\n*Storage:* <{$this->s3_storage_url}|Check Configuration>";
         }
 
         return new SlackMessage(
@@ -116,7 +132,7 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
 
     public function toWebhook(): array
     {
-        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+        $url = $this->database->link() ?? base_url();
 
         $data = [
             'success' => true,

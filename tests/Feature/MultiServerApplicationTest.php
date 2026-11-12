@@ -475,6 +475,8 @@ test('file storages of an application belong to all of its servers', function ()
 describe('adding a server in the UI', function () {
     beforeEach(function () {
         $this->application->additional_networks()->detach();
+        $this->extraServer->settings->update(['is_reachable' => true, 'is_usable' => true]);
+        Server::flushIdentityMap();
         $this->actingAs($this->user);
         session(['currentTeam' => $this->team]);
     });
@@ -619,6 +621,7 @@ describe('adding a volume to an application with additional servers', function (
     test('connecting a SQLite database rejects the volume', function () {
         $sqlite = StandaloneSqlite::create([
             'name' => 'app-sqlite',
+            'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
             'environment_id' => $this->application->environment_id,
             'destination_id' => $this->mainDestination->id,
             'destination_type' => $this->mainDestination->getMorphClass(),

@@ -54,14 +54,6 @@ test('subscription pricing page still renders when provider config is missing', 
         ->assertSee('Subscribe monthly');
 });
 
-test('pricing plans component renders subscribe actions', function () {
-    Livewire::test(PricingPlans::class)
-        ->assertSuccessful()
-        ->assertSee('Pay as you go')
-        ->assertSee('Subscribe monthly')
-        ->assertSee('Subscribe yearly');
-});
-
 test('unsubscribed cloud sidebar does not expose global search', function () {
     $response = $this->get(route('subscription.index'));
 

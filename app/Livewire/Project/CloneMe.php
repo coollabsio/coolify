@@ -2,17 +2,20 @@
 
 namespace App\Livewire\Project;
 
-use App\Actions\Database\StartDatabase;
-use App\Actions\Database\StopDatabase;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
+use App\Enums\AccessLevel;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class CloneMe extends Component
@@ -63,8 +66,10 @@ class CloneMe extends Component
         $this->servers = Server::query()
             ->where('team_id', $this->project->team_id)
             ->get()
-            ->reject(fn ($server) => $server->isBuildServer());
-        $this->newName = str($this->project->name.'-clone-'.new_public_id())->slug();
+            ->reject(fn ($server) => $server->isBuildServer())
+            ->filter(fn ($server) => Gate::allows('placeResource', $server))
+            ->values();
+        $this->newName = str(clone_resource_name($this->project->name, new_public_id()))->slug();
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -100,13 +105,22 @@ class CloneMe extends Component
                 'newName' => ValidationPatterns::nameRules(),
             ]);
             $teamId = $this->project->team_id;
+            if ($type === 'project' && ! app(AccessResolver::class)->allowsTeamWide(auth()->user(), AccessLevel::Write, $teamId)) {
+                throw new AuthorizationException('You are not allowed to create projects in this team.');
+            }
             if (! $this->environment || (int) $this->environment->project_id !== (int) $this->project->id) {
                 throw new \Exception('Environment not found.');
+            }
+            if ($this->cloneVolumeData) {
+                foreach ([...$this->environment->applications, ...$this->environment->databases(), ...$this->environment->services] as $source) {
+                    $this->authorize(CloneVolumeDataWithSourceStopped::sourceAbility($source), $source);
+                }
             }
             $selectedDestination = $this->findProjectTeamDestination($this->selectedDestination);
             if (! $selectedDestination) {
                 throw new \Exception('Destination not found.');
             }
+            $this->authorize('placeResource', $selectedDestination->server);
             auditLog('ui.project.clone_started', [
                 'team_id' => $this->project->team_id,
                 'project_uuid' => $this->project->uuid,
@@ -192,6 +206,7 @@ class CloneMe extends Component
             }
 
             $newDatabase->persistentStorages()->delete();
+            $pendingVolumeClones = [];
             $persistentVolumes = $database->persistentStorages()->get();
             foreach ($persistentVolumes as $volume) {
                 $originalName = $volume->name;
@@ -235,21 +250,17 @@ class CloneMe extends Component
                 $newPersistentVolume->save();
 
                 if ($this->cloneVolumeData) {
-                    try {
-                        StopDatabase::dispatch($database);
-                        $sourceVolume = $volume->name;
-                        $targetVolume = $newPersistentVolume->name;
-                        $sourceServer = $database->destination->server;
-                        $targetServer = $newDatabase->destination->server;
-
-                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                        StartDatabase::dispatch($database);
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                    }
+                    $pendingVolumeClones[] = new VolumeCloneJob(
+                        $volume->name,
+                        $newPersistentVolume->name,
+                        $database->destination->server,
+                        $newDatabase->destination->server,
+                        $newPersistentVolume,
+                    );
                 }
             }
+
+            CloneVolumeDataWithSourceStopped::run($database, $pendingVolumeClones);
 
             $fileStorages = $database->fileStorages()->get();
             foreach ($fileStorages as $storage) {

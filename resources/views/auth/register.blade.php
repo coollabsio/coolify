@@ -14,7 +14,15 @@ $email = getOldOrLocal('email', 'test3@example.com');
     <x-auth.shell title="Coolify"
         :description="$isFirstUser ? 'Create the root account for this instance.' : 'Create your account to get started.'">
         <div class="flex flex-col gap-4">
-            @if ($isRootSetupWindowClosed)
+            @if ($isRootSetupWindowPending)
+                <x-auth.alert type="warning">
+                    <p class="font-medium">Coolify is starting</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">Coolify has not finished its start-up tasks.
+                        Wait a few seconds, then reload this page. If this message stays, run this command on the
+                        server:</p>
+                    <code class="mt-2 block font-mono text-xs">docker restart coolify</code>
+                </x-auth.alert>
+            @elseif ($isRootSetupWindowClosed)
                 <x-auth.alert type="warning">
                     <p class="font-medium">Setup window closed</p>
                     <p class="mt-0.5 text-black/70 dark:text-white/70">You can create the root account only in the

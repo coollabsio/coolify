@@ -111,3 +111,64 @@ test('write and deploy token creates a file storage with content', function (str
     expect($resource->fileStorages()->where('mount_path', '/etc/app.conf')->value('content'))->toBe('listen 8080;');
     Queue::assertPushed(ServerStorageSaveJob::class);
 })->with(['applications', 'services', 'databases']);
+
+function createSavedFileStorage(mixed $resource): LocalFileVolume
+{
+    $storage = LocalFileVolume::create([
+        'fs_path' => '/data/coolify/app.conf',
+        'mount_path' => '/etc/app.conf',
+        'content' => 'listen 80;',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+    Queue::fake();
+
+    return $storage;
+}
+
+test('updating file storage content writes the file on the server', function (string $type) {
+    [$url, , $resource] = $this->targets[$type];
+    $storage = createSavedFileStorage($resource);
+
+    $this->withHeaders(storageContentAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+        ->patchJson($url, ['uuid' => $storage->uuid, 'type' => 'file', 'content' => 'listen 8080;'])
+        ->assertOk();
+
+    expect($storage->fresh()->content)->toBe('listen 8080;');
+    Queue::assertPushed(ServerStorageSaveJob::class, fn (ServerStorageSaveJob $job) => $job->localFileVolume->is($storage));
+})->with(['applications', 'services', 'databases']);
+
+test('write-only token cannot change file storage content', function (string $type) {
+    [$url, , $resource] = $this->targets[$type];
+    $storage = createSavedFileStorage($resource);
+
+    $this->withHeaders(storageContentAbilityHeaders($this->user, $this->team->id, ['write']))
+        ->patchJson($url, ['uuid' => $storage->uuid, 'type' => 'file', 'content' => 'listen 8080;'])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Missing required permissions: deploy. Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+
+    expect($storage->fresh()->content)->toBe('listen 80;');
+    Queue::assertNotPushed(ServerStorageSaveJob::class);
+})->with(['applications', 'services', 'databases']);
+
+test('write-only token can update a file storage without changing its content', function (string $type) {
+    [$url, , $resource] = $this->targets[$type];
+    $storage = createSavedFileStorage($resource);
+
+    $this->withHeaders(storageContentAbilityHeaders($this->user, $this->team->id, ['write']))
+        ->patchJson($url, ['uuid' => $storage->uuid, 'type' => 'file', 'content' => 'listen 80;', 'mount_path' => '/etc/app2.conf'])
+        ->assertOk();
+
+    expect($storage->fresh()->mount_path)->toBe('/etc/app2.conf');
+})->with(['applications', 'services', 'databases']);
+
+test('updating a file storage without changing its content does not write the file', function (string $type) {
+    [$url, , $resource] = $this->targets[$type];
+    $storage = createSavedFileStorage($resource);
+
+    $this->withHeaders(storageContentAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']))
+        ->patchJson($url, ['uuid' => $storage->uuid, 'type' => 'file', 'content' => 'listen 80;', 'is_preview_suffix_enabled' => false])
+        ->assertOk();
+
+    Queue::assertNotPushed(ServerStorageSaveJob::class);
+})->with(['applications', 'services', 'databases']);

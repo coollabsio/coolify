@@ -152,6 +152,7 @@ class AuthServiceProvider extends ServiceProvider
     {
         // Register gates for resource creation policy
         Gate::define('createAnyResource', [ResourceCreatePolicy::class, 'createAny']);
+        Gate::define('useTeamCredentials', [ResourceCreatePolicy::class, 'useTeamCredentials']);
 
         // Register gate for terminal access
         Gate::define('canAccessTerminal', function ($user) {

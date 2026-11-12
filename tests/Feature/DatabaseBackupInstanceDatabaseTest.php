@@ -53,7 +53,7 @@ it('backs up a user database named coolify-db as an ordinary database', function
     ])->save();
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
 
         return Process::result(output: str_contains($command, 'du -b') ? '128' : '');

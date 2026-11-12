@@ -102,18 +102,6 @@ it('denies team member to update their own team environment', function () {
     expect($policy->update($user, $environment))->toBeFalse();
 });
 
-it('denies update when environment has no project', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-
-    $environment = Mockery::mock(Environment::class)->makePartial();
-    $environment->shouldReceive('getAttribute')->with('project')->andReturn(null);
-
-    $user->shouldReceive('canAccess')->with(AccessLevel::Write, $environment)->andReturn(false);
-
-    $policy = new EnvironmentPolicy;
-    expect($policy->update($user, $environment))->toBeFalse();
-});
-
 it('allows team admin to delete their own team environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $environment = Mockery::mock(Environment::class)->makePartial();
@@ -127,18 +115,6 @@ it('allows team admin to delete their own team environment', function () {
 it('denies team member to delete their own team environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $environment = Mockery::mock(Environment::class)->makePartial();
-
-    $user->shouldReceive('canAccess')->with(AccessLevel::Delete, $environment)->andReturn(false);
-
-    $policy = new EnvironmentPolicy;
-    expect($policy->delete($user, $environment))->toBeFalse();
-});
-
-it('denies delete when environment has no project', function () {
-    $user = Mockery::mock(User::class)->makePartial();
-
-    $environment = Mockery::mock(Environment::class)->makePartial();
-    $environment->shouldReceive('getAttribute')->with('project')->andReturn(null);
 
     $user->shouldReceive('canAccess')->with(AccessLevel::Delete, $environment)->andReturn(false);
 

@@ -99,7 +99,7 @@ it('redacts the database password from the stored execution and the failure noti
     $backup = redactionMysqlBackup($this->team, $this->environment, $this->destination);
     $password = $backup->database->mysql_root_password;
     Process::fake(function ($process) use ($password) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'mysqldump')) {
             return Process::result(errorOutput: "mysqldump: Got error: 1045: Access denied for user 'root' with password {$password}", exitCode: 1);
         }

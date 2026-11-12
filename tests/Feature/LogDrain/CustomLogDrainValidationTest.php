@@ -2,6 +2,7 @@
 
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
+use App\Enums\LogDrainType;
 use App\Livewire\Server\LogDrains;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -118,8 +119,8 @@ describe('custom log drain API', function () {
             ->assertJsonPath('message', 'Missing required permissions: deploy');
 
         $settings = $this->server->settings->fresh();
-        expect((bool) $settings->is_logdrain_custom_enabled)->toBeFalse()
-            ->and($settings->logdrain_custom_config)->toBeNull();
+        expect($settings->logdrain_type)->toBeNull()
+            ->and($settings->logdrain_config)->toBeNull();
         Queue::assertNothingPushed();
     })->with([
         'enable with config' => [['is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => SAFE_CUSTOM_LOG_DRAIN_CONFIG]],
@@ -136,7 +137,7 @@ describe('custom log drain API', function () {
             'logdrain_axiom_api_key' => 'axiom-key-123',
         ])->assertForbidden();
 
-        expect($this->server->settings->fresh()->logdrain_axiom_dataset_name)->toBeNull();
+        expect($this->server->settings->fresh()->logdrain_config)->toBeNull();
     });
 
     test('a deploy token can save a safe custom log drain', function () {
@@ -150,8 +151,8 @@ describe('custom log drain API', function () {
         ])->assertOk();
 
         $settings = $this->server->settings->fresh();
-        expect((bool) $settings->is_logdrain_custom_enabled)->toBeTrue()
-            ->and($settings->logdrain_custom_config)->toBe(SAFE_CUSTOM_LOG_DRAIN_CONFIG);
+        expect($settings->logdrain_type)->toBe(LogDrainType::Custom)
+            ->and($settings->logDrainConfig()['config'])->toBe(SAFE_CUSTOM_LOG_DRAIN_CONFIG);
     });
 
     test('a deploy token cannot save an unsupported custom log drain', function (array $payload, string $errorField) {
@@ -162,7 +163,7 @@ describe('custom log drain API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors($errorField);
 
-        expect((bool) $this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
         Queue::assertNothingPushed();
     })->with([
         'lua filter' => [
@@ -179,9 +180,11 @@ describe('custom log drain API', function () {
 test('StartLogDrain does not start a stored unsupported custom log drain', function () {
     StopLogDrain::mock()->shouldReceive('handle')->andReturn('stopped');
     $this->server->settings->forceFill([
-        'is_logdrain_custom_enabled' => true,
-        'logdrain_custom_config' => customLogDrainConfigWith("[FILTER]\n    Name lua\n    Match *\n    script /parsers.conf\n    call cb"),
-        'logdrain_custom_config_parser' => SAFE_CUSTOM_LOG_DRAIN_PARSERS,
+        'logdrain_type' => LogDrainType::Custom,
+        'logdrain_config' => ['custom' => [
+            'config' => customLogDrainConfigWith("[FILTER]\n    Name lua\n    Match *\n    script /parsers.conf\n    call cb"),
+            'parser_config' => SAFE_CUSTOM_LOG_DRAIN_PARSERS,
+        ]],
     ])->save();
 
     expect(fn () => StartLogDrain::run($this->server->fresh()))
@@ -193,23 +196,25 @@ test('the UI does not enable an unsupported custom log drain', function () {
     StartLogDrain::mock()->shouldNotReceive('handle');
 
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainCustomConfig', customLogDrainConfigWith("[FILTER]\n    Name wasm\n    Match *"))
+        ->set('logDrainConfig.custom.config', customLogDrainConfigWith("[FILTER]\n    Name wasm\n    Match *"))
         ->call('toggleLogDrain', 'custom')
         ->assertDispatched('error')
-        ->assertSet('isLogDrainCustomEnabled', false);
+        ->assertHasErrors('logDrainConfig.custom.config')
+        ->assertSet('logDrainType', null);
 
-    expect((bool) $this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeFalse();
+    expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
 });
 
 test('the UI saves a cleared custom config while the custom log drain is disabled', function () {
     $this->actingAs($this->user);
-    $this->server->settings->update(['logdrain_custom_config' => SAFE_CUSTOM_LOG_DRAIN_CONFIG]);
+    $this->server->settings->update(['logdrain_config' => ['custom' => ['config' => SAFE_CUSTOM_LOG_DRAIN_CONFIG]]]);
 
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainCustomConfig', '')
+        ->assertSet('logDrainConfig.custom.config', SAFE_CUSTOM_LOG_DRAIN_CONFIG)
+        ->set('logDrainConfig.custom.config', '')
         ->call('submit')
         ->assertHasNoErrors()
         ->assertDispatched('success');
 
-    expect($this->server->settings->fresh()->logdrain_custom_config)->toBeEmpty();
+    expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Custom))->toBe([]);
 });

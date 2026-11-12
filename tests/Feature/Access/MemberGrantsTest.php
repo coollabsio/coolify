@@ -81,10 +81,10 @@ it('lets an owner save grants for a member through the access editor', function 
     memberGrantsActAs($this->owner, $this->team);
 
     Livewire::test(Access::class)->call('openFor', $member->id)
-        ->call('applyPreset', 'developer', $this->shop->uuid)
-        ->call('addGrant')
-        ->set('grants.1.target', 'resource:'.$this->blogWeb->uuid)
-        ->set('grants.1.levels.Read', true)
+        ->set('grants', [
+            ['key' => 'a', 'targets' => ['project:'.$this->shop->uuid], 'levels' => ['Write' => true, 'Deploy' => true]],
+            ['key' => 'b', 'targets' => ['resource:'.$this->blogWeb->uuid], 'levels' => ['Read' => true]],
+        ])
         ->call('save')
         ->assertHasNoErrors();
 
@@ -94,12 +94,31 @@ it('lets an owner save grants for a member through the access editor', function 
     ]);
 });
 
+it('saves one grant for each target of a scope and groups them again on open', function () {
+    $member = memberGrantsUser($this->team, 'member', null);
+    memberGrantsActAs($this->owner, $this->team);
+
+    Livewire::test(Access::class)->call('openFor', $member->id)
+        ->set('grants.0.targets', ['project:'.$this->shop->uuid, 'resource:'.$this->blogWeb->uuid])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(memberGrantsStoredAccess($this->team, $member))->toBe([
+        ['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['read']],
+        ['scope' => 'resource', 'uuid' => $this->blogWeb->uuid, 'levels' => ['read']],
+    ]);
+
+    Livewire::test(Access::class)->call('openFor', $member->id)
+        ->assertCount('grants', 1)
+        ->assertSet('grants.0.targets', ['project:'.$this->shop->uuid, 'resource:'.$this->blogWeb->uuid]);
+});
+
 it('stores an empty list when the owner removes every grant', function () {
     $member = memberGrantsUser($this->team, 'member', null);
     memberGrantsActAs($this->owner, $this->team);
 
-    $editor = Livewire::test(Access::class)->call('openFor', $member->id);
-    $editor->call('removeGrant', $editor->get('grants.0.key'))
+    Livewire::test(Access::class)->call('openFor', $member->id)
+        ->set('grants', [])
         ->call('save')
         ->assertHasNoErrors();
 
@@ -118,7 +137,7 @@ it('does not let a member open the editor or save grants', function () {
     memberGrantsActAs($this->owner, $this->team);
     $editor = Livewire::test(Access::class)
         ->call('openFor', $target->id)
-        ->call('applyPreset', 'full');
+        ->set('grants', [['key' => 'a', 'targets' => ['team'], 'levels' => ['Root' => true]]]);
 
     memberGrantsActAs($member->fresh(), $this->team);
     $editor->call('save')->assertForbidden();
@@ -133,9 +152,9 @@ it('rejects a scope from another team', function () {
     memberGrantsActAs($this->owner, $this->team);
 
     Livewire::test(Access::class)->call('openFor', $member->id)
-        ->set('grants.0.target', 'project:'.$foreignProject->uuid)
+        ->set('grants.0.targets', ['team', 'project:'.$foreignProject->uuid])
         ->call('save')
-        ->assertHasErrors(['grants.0.target']);
+        ->assertHasErrors(['grants.0.targets']);
 
     expect(memberGrantsStoredAccess($this->team, $member))->toBeNull();
 });

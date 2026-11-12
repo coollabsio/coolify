@@ -3,8 +3,12 @@
 namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Events\ServiceStartFinished;
+use App\Jobs\NotifyResourceStoppedJob;
+use App\Jobs\ScanResourceImagesJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\ImageScan\ImageStartPin;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -18,8 +22,10 @@ class DeployServiceApplication
     {
         $service = $serviceApplication->service;
         $composeServiceName = $serviceApplication->name;
+        NotifyResourceStoppedJob::expectStop($serviceApplication);
 
         $service->parse();
+        StartService::queueFileStorageSync($service);
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
 
@@ -39,8 +45,11 @@ class DeployServiceApplication
 
         if ($pullLatestImages) {
             $commands->push('echo Pulling image for service.');
-            $commands->push("docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
+            $commands->push(serverDockerConfigPrefix($service->server)."docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} pull {$safeComposeServiceName} < /dev/null");
         }
+
+        // After the pull: the scanned build of a "Pull latest" security update keeps the tag of the compose file.
+        $commands->push(...ImageStartPin::commands(ImageStartPin::take($service), serverDockerConfigPrefix($service->server)));
 
         if ($service->networks()->count() > 0) {
             $commands->push('echo Creating Docker network.');
@@ -48,7 +57,7 @@ class DeployServiceApplication
         }
 
         $connectToPredefinedNetwork = (bool) data_get($service, 'connect_to_docker_network');
-        $upCommand = "docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} up -d --no-deps";
+        $upCommand = serverDockerConfigPrefix($service->server)."docker compose --project-directory {$safeWorkdir} -f {$safeComposeFile} --project-name {$safeProjectName} up -d --no-deps";
         if ($forceRebuild) {
             $upCommand .= ' --build';
         }
@@ -57,12 +66,13 @@ class DeployServiceApplication
         }
         // No stdin for Compose prompts: they would read the next script lines (see StartService).
         $upCommand .= " {$safeComposeServiceName} < /dev/null";
+        $commands->push(...StartService::removeContainersWithRemovedVolumesCommands($service, $composeServiceName));
         $commands->push('echo Starting service container.');
         $commands->push($upCommand);
 
         if ($connectToPredefinedNetwork) {
             // Connect to the predefined network before the container starts (see StartService).
-            $serviceConfig = data_get(parseDockerComposeYaml($service->docker_compose ?? ''), "services.{$composeServiceName}");
+            $serviceConfig = data_get(parseDockerComposeYaml($service->docker_compose ?? ''), ['services', $composeServiceName]);
             if ($command = StartService::predefinedNetworkConnectCommand($service, $composeServiceName, $serviceConfig)) {
                 $commands->push($command);
             }
@@ -71,6 +81,9 @@ class DeployServiceApplication
 
         $commands->push("docker network connect {$safeProjectName} coolify-proxy >/dev/null 2>&1 || true");
 
-        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
+        $activity = remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: ServiceStartFinished::dataFor($service), queue: deployment_queue());
+        ScanResourceImagesJob::dispatchAfterStart($service);
+
+        return $activity;
     }
 }

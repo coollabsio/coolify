@@ -16,11 +16,12 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
 
     public function handle(ProxyStatusChanged $event)
     {
-        $serverId = $event->data;
-        if (is_null($serverId)) {
+        $serverId = data_get($event->data, 'server_id');
+        $teamId = data_get($event->data, 'team_id');
+        if (is_null($serverId) || is_null($teamId)) {
             return;
         }
-        $server = Server::where('id', $serverId)->first();
+        $server = Server::where('id', $serverId)->where('team_id', $teamId)->first();
         if (is_null($server)) {
             return;
         }

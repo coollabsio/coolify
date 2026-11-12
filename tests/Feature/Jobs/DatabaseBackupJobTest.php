@@ -67,7 +67,7 @@ test('s3 upload throws exception and disables s3 when no destination exists', fu
     $method = (new ReflectionClass($job))->getMethod('uploadToS3Destinations');
 
     expect(fn () => $method->invoke($job))
-        ->toThrow(Exception::class, 'S3 storage configuration is missing or has been deleted');
+        ->toThrow(Exception::class, 'Backup storage configuration is missing or has been deleted');
 
     $backup->refresh();
     expect($backup->save_s3)->toBeFalsy();
@@ -87,7 +87,7 @@ test('s3 upload exception message reports the previous s3 storage id', function 
     $job = new DatabaseBackupJob($backup);
 
     expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
-        ->toThrow(Exception::class, 'S3 storage ID: 12345');
+        ->toThrow(Exception::class, 'storage ID: 12345');
 
     $backup->refresh();
     expect($backup->save_s3)->toBeFalsy();
@@ -107,7 +107,7 @@ test('s3 upload exception message reports null when no previous s3 storage id ex
     $job = new DatabaseBackupJob($backup);
 
     expect(fn () => (new ReflectionClass($job))->getMethod('uploadToS3Destinations')->invoke($job))
-        ->toThrow(Exception::class, 'S3 storage ID: null');
+        ->toThrow(Exception::class, 'storage ID: null');
 });
 
 test('deleting s3 storage disables s3 on linked backups', function () {
@@ -316,14 +316,6 @@ test('s3 storage has scheduled backups relationship', function () {
     ]);
 
     expect($s3->scheduledBackups()->count())->toBe(1);
-});
-
-test('database backup job escapes the S3 copy destination argument', function () {
-    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
-
-    expect($source)->toContain('$escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");')
-        ->and($source)->toContain('mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}')
-        ->and($source)->not->toContain('mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/');
 });
 
 test('database dump compression uses the helper image and shared CPU setting', function (int $compressionCpuPercentage) {

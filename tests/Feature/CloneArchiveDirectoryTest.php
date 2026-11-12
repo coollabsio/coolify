@@ -47,17 +47,17 @@ beforeEach(function () {
 function fakeCloneArchiveServers(object $test, bool $failScp = false): void
 {
     Process::fake(function ($process) use ($test, $failScp) {
-        if (str_contains($process->command, 'mktemp -d')) {
+        if (str_contains(remoteProcessScript($process), 'mktemp -d')) {
             $directory = '/var/tmp/coolify-clone.'.Str::random(10);
             $test->mktempDirectories[] = $directory;
 
             return Process::result(output: $directory);
         }
-        if ($failScp && str_contains($process->command, ' scp ')) {
+        if ($failScp && str_contains(remoteProcessScript($process), ' scp ')) {
             return Process::result(output: '', errorOutput: 'scp failed', exitCode: 1);
         }
 
-        return Process::result(output: str_contains($process->command, 'docker volume inspect') ? '[]' : '');
+        return Process::result(output: str_contains(remoteProcessScript($process), 'docker volume inspect') ? '[]' : '');
     });
 }
 
@@ -68,7 +68,7 @@ function cloneArchiveCommands(): array
 {
     $commands = [];
     Process::assertRan(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return true;
     });

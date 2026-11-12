@@ -39,6 +39,12 @@ class Advanced extends Component
     public bool $isAutoDeployEnabled = true;
 
     #[Validate(['boolean'])]
+    public bool $isAutoCancelQueuedDeploymentsEnabled = true;
+
+    #[Validate(['boolean'])]
+    public bool $isAutoCancelBuildingDeploymentsEnabled = false;
+
+    #[Validate(['boolean'])]
     public bool $disableBuildCache = false;
 
     #[Validate(['boolean'])]
@@ -46,6 +52,9 @@ class Advanced extends Component
 
     #[Validate(['boolean'])]
     public bool $includeSourceCommitInBuild = false;
+
+    #[Validate(['boolean'])]
+    public bool $includeNetworkHostsInBuild = true;
 
     #[Validate(['boolean'])]
     public bool $isLogDrainEnabled = false;
@@ -121,6 +130,10 @@ class Advanced extends Component
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
             $this->application->settings->is_git_shallow_clone_enabled = $this->isGitShallowCloneEnabled;
             $this->application->settings->is_auto_deploy_enabled = $this->isAutoDeployEnabled;
+            // Stopping older builds also cancels older queued deployments.
+            $this->isAutoCancelQueuedDeploymentsEnabled = $this->isAutoCancelQueuedDeploymentsEnabled || $this->isAutoCancelBuildingDeploymentsEnabled;
+            $this->application->settings->is_auto_cancel_queued_deployments_enabled = $this->isAutoCancelQueuedDeploymentsEnabled;
+            $this->application->settings->is_auto_cancel_building_deployments_enabled = $this->isAutoCancelBuildingDeploymentsEnabled;
             $this->application->settings->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->application->settings->is_gpu_enabled = $this->isGpuEnabled;
             $this->application->settings->gpu_driver = $this->gpuDriver;
@@ -138,6 +151,7 @@ class Advanced extends Component
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
             $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
+            $this->application->settings->include_network_hosts_in_build = $this->includeNetworkHostsInBuild;
             $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
             $this->auditSettingsUpdate($changedFields);
@@ -152,6 +166,8 @@ class Advanced extends Component
             $this->isGitLfsEnabled = $this->application->settings->is_git_lfs_enabled;
             $this->isGitShallowCloneEnabled = $this->application->settings->is_git_shallow_clone_enabled ?? false;
             $this->isAutoDeployEnabled = $this->application->settings->is_auto_deploy_enabled;
+            $this->isAutoCancelQueuedDeploymentsEnabled = $this->application->settings->is_auto_cancel_queued_deployments_enabled ?? true;
+            $this->isAutoCancelBuildingDeploymentsEnabled = $this->application->settings->is_auto_cancel_building_deployments_enabled ?? false;
             $this->isGpuEnabled = $this->application->settings->is_gpu_enabled;
             $this->gpuDriver = $this->application->settings->gpu_driver;
             $this->gpuCount = $this->application->settings->gpu_count;
@@ -166,6 +182,7 @@ class Advanced extends Component
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
+            $this->includeNetworkHostsInBuild = $this->application->settings->include_network_hosts_in_build ?? true;
             $this->maxRestartCount = $this->application->max_restart_count ?? 0;
         }
 

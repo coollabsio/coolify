@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\S3Storage;
 use App\Models\Server;
-use App\Rules\SafeWebhookUrl;
 use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
 use Illuminate\Support\Str;
@@ -40,7 +39,7 @@ class FileDownloadStorageService
             return null;
         }
 
-        return S3Storage::query()->whereTeamId(0)->where('is_usable', true)->find($storageId);
+        return S3Storage::query()->s3Only()->whereTeamId(0)->where('is_usable', true)->find($storageId);
     }
 
     public static function newObjectKey(): string
@@ -119,10 +118,10 @@ class FileDownloadStorageService
             'version' => 'latest',
             'region' => $storage->region,
             'endpoint' => $storage->endpoint,
-            'use_path_style_endpoint' => true,
+            'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'credentials' => false,
             'retries' => 0,
-            'http' => array_merge(SafeWebhookUrl::httpClientOptions($storage->endpoint, $storage->trustedInternalHosts()), [
+            'http' => array_merge($storage->httpClientOptions(), [
                 'connect_timeout' => 15,
                 'timeout' => 15,
             ]),

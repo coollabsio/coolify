@@ -113,7 +113,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
         })->first();
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
-            if ($status !== 'running') {
+            if ($status !== 'running' || StartLogDrain::claimOutdatedRefresh($this->server, data_get($foundLogDrainContainer, 'Config.Labels'))) {
                 StartLogDrain::dispatch($this->server);
             }
         } else {

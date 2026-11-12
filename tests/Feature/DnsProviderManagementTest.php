@@ -24,6 +24,7 @@ use App\Services\Dns\CloudflareDnsProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -485,6 +486,40 @@ describe('domain DNS configuration after add', function () {
         Queue::assertNotPushed(CheckDomainDnsJob::class);
     });
 
+    test('service domains queues a dns record job when a generated domain is edited to a managed zone', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        $webApp = ServiceApplication::create([
+            'uuid' => (string) Str::uuid(),
+            'service_id' => $service->id,
+            'name' => 'web',
+            'human_name' => 'Web',
+            'image' => 'nginx:alpine',
+            'fqdn' => 'https://web-generated.203.0.113.10.sslip.io',
+        ]);
+
+        Livewire::test(ServiceDomains::class, ['service' => $service->fresh(['applications', 'server'])])
+            ->call('startEdit', 0)
+            ->set('editingDomainParts.host', 'app.example.com')
+            ->call('updateDomain')
+            ->assertHasNoErrors()
+            ->assertDispatched('success', 'Domain updated.')
+            ->assertDispatched('info', 'Adding DNS record for app.example.com.');
+
+        expect($webApp->fresh()->fqdn)->toBe('https://app.example.com');
+        Queue::assertPushed(ConfigureDnsRecordJob::class, 1);
+        Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'app.example.com'
+            && $job->content === '203.0.113.10'
+            && $job->zoneId === $this->zone->id
+            && (string) $job->resourceId === (string) $webApp->id);
+        Queue::assertNotPushed(CheckDomainDnsJob::class);
+    });
+
     test('private server addresses are never queued as dns records', function (string $address) {
         $this->server->update(['ip' => $address]);
         $application = Application::factory()->create([
@@ -552,19 +587,17 @@ describe('domain DNS configuration after add', function () {
     });
 });
 
-test('dns provider action controls declare update authorization against the resource', function () {
-    $dnsMenu = file_get_contents(resource_path('views/livewire/project/shared/cloudflare-autoconfigure.blade.php'));
-    $providerModal = file_get_contents(resource_path('views/livewire/project/shared/dns-provider-management.blade.php'));
+test('a team member cannot create or replace a managed dns record', function (string $method) {
+    ['application' => $application, 'zone' => $zone] = prepareManagedDnsApplication();
+    actingAsDnsTeamMember($application->team());
+    Http::fake();
 
-    expect($dnsMenu)
-        ->toContain('$dnsAuthResource = property_exists($this, \'application\') ? $this->application : $this->service')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="createManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/');
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call($method, 'app.example.com', $zone->id)
+        ->assertForbidden();
 
-    expect($providerModal)
-        ->toContain('$dnsAuthResource = property_exists($this, \'application\') ? $this->application : $this->service')
-        ->toMatch('/<x-modal-confirmation(?=[^>]*submitAction="replaceManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/')
-        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="createManagedDnsRecord)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$dnsAuthResource")[^>]*>/');
-});
+    Http::assertNothingSent();
+})->with(['createManagedDnsRecord', 'replaceManagedDnsRecord']);
 
 test('removing a domain deletes only the managed dns record for that resource', function () {
     $this->withoutVite();
@@ -928,4 +961,23 @@ test('a team member cannot mark a service domain managed with a forged dns compl
         ->assertNotDispatched('success');
 
     expect($webApp->fresh()->domain_dns_statuses)->toBeEmpty();
+});
+
+test('cloudflare dns reads are retried after a connection failure but record creation is not', function () {
+    $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret']);
+    $zone = DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::sequence()
+            ->pushFailedConnection()
+            ->push(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records' => Http::failedConnection(),
+    ]);
+
+    expect(fn () => app(CloudflareDnsProvider::class)->createRecord($zone, 'app.example.com', '203.0.113.10'))
+        ->toThrow(ConnectionException::class);
+
+    Http::assertSequencesAreEmpty();
+    expect(collect(Http::recorded())->filter(fn (array $pair) => $pair[0]->method() === 'POST'))->toHaveCount(1);
+    expect(ManagedDnsRecord::query()->count())->toBe(0);
 });

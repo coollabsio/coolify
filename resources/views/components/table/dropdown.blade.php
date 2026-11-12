@@ -15,14 +15,22 @@
 
         this.panelStyle = 'position: fixed; min-width: 0; visibility: hidden;';
         this.open = true;
-        this.$nextTick(() => this.updatePosition());
+        // x-show shows the panel after this tick; measure it in the next frame, when it has a size.
+        this.$nextTick(() => requestAnimationFrame(() => this.updatePosition()));
     },
     close() {
         this.open = false;
     },
-    updatePosition() {
+    updatePosition(retried = false) {
+        if (! this.open) {
+            return;
+        }
         const trigger = this.$refs.trigger.getBoundingClientRect();
         const panel = this.$refs.panel.getBoundingClientRect();
+        if (panel.width === 0 && ! retried) {
+            requestAnimationFrame(() => this.updatePosition(true));
+            return;
+        }
         const viewportPadding = 8;
         const left = Math.max(viewportPadding, Math.min(trigger.right - panel.width, window.innerWidth - panel.width - viewportPadding));
         const spaceBelow = window.innerHeight - trigger.bottom - viewportPadding;

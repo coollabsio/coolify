@@ -5,11 +5,13 @@ namespace App\Providers;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use App\Services\Access\AccessResolver;
 use App\Support\AtomicFilesystem;
+use App\Support\RetryHttpConnectionFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ConfigCacheCommand;
 use Illuminate\Foundation\Console\RouteCacheCommand;
@@ -25,6 +27,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use Livewire\Livewire;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
@@ -45,11 +48,22 @@ class AppServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
+        $this->configureHttpClient();
         $this->configureGitHubHttp();
         $this->configureGitLabHttp();
         $this->configureOidcSocialite();
         $this->configureQueue();
         $this->configureServerTransferImport();
+        $this->configureLivewire();
+    }
+
+    /**
+     * Livewire updates skip route middleware. Run the team-wide access check again on each update,
+     * so a page that is already open stops working when an admin limits the member to some projects.
+     */
+    private function configureLivewire(): void
+    {
+        Livewire::addPersistentMiddleware([EnsureTeamWideAccess::class]);
     }
 
     /**
@@ -106,6 +120,9 @@ class AppServiceProvider extends ServiceProvider
     private function configureSanctumModel(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid && ! $token->isPaused()
+        );
     }
 
     private function configureOidcSocialite(): void
@@ -124,6 +141,12 @@ class AppServiceProvider extends ServiceProvider
                 '',
             );
         });
+    }
+
+    private function configureHttpClient(): void
+    {
+        Http::globalOptions(['connect_timeout' => 10, 'timeout' => 30]);
+        Http::globalMiddleware(new RetryHttpConnectionFailures);
     }
 
     private function configureGitHubHttp(): void

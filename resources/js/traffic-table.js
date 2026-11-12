@@ -2,7 +2,8 @@
 // its sort values as JSON in `data-row`. Rows are moved in the DOM, so keyboard
 // and screen-reader order match the visual order. A Livewire morph puts the rows
 // back in server order (they are keyed) and can add or remove rows, so the rows
-// are sorted again after it.
+// are sorted again after it. Rows marked `data-hidable` (container tooling user
+// agents) are left out of the sort and the pages until `showHidden` is on.
 function compareValues(a, b) {
     if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
@@ -23,6 +24,8 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
         key,
         dir,
         tick: 0,
+        showHidden: false,
+        hiddenCount: 0,
 
         init() {
             this.resort();
@@ -65,9 +68,19 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
             this.resort();
         },
 
+        toggleHidden() {
+            this.showHidden = !this.showHidden;
+            this.page = 0;
+            this.resort();
+        },
+
         resort() {
             const sign = this.dir === 'asc' ? 1 : -1;
-            const rows = [...this.$root.querySelectorAll('[data-row]')].map((el, index) => {
+            const all = [...this.$root.querySelectorAll('[data-row]')];
+            const hidable = all.filter((el) => 'hidable' in el.dataset);
+            hidable.forEach((el) => ranks.delete(el));
+            this.hiddenCount = hidable.length;
+            const rows = all.filter((el) => this.showHidden || !('hidable' in el.dataset)).map((el, index) => {
                 let values = {};
                 try {
                     values = JSON.parse(el.dataset.row) || {};
@@ -97,7 +110,10 @@ function trafficTable({ per = 10, key = 'requests', dir = 'desc' } = {}) {
 
         shown(el) {
             this.tick;
-            const rank = ranks.get(el) ?? 0;
+            const rank = ranks.get(el);
+            if (rank === undefined) {
+                return false;
+            }
 
             return rank >= this.page * this.per && rank < (this.page + 1) * this.per;
         },

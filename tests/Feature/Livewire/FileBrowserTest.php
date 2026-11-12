@@ -384,7 +384,7 @@ it('rejects unsafe child names without deleting the current folder', function (s
         ->call('loadFiles')
         ->call('deleteEntry', $name)
         ->assertDispatched('error');
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'rm -rf'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -rf'));
 })->with(['', '.', '..', '../data', 'a/b', 'a\\b']);
 
 it('saves the opened file and clears editor state', function () {
@@ -560,8 +560,8 @@ it('lists files for a running application and excludes stopped and preview conta
     ])->map(fn ($container) => json_encode($container))->implode("\n");
     Process::fake(function ($process) use ($containers) {
         $output = match (true) {
-            str_contains($process->command, 'docker ps') => $containers,
-            str_contains($process->command, 'docker inspect') => '/app',
+            str_contains(remoteProcessScript($process), 'docker ps') => $containers,
+            str_contains(remoteProcessScript($process), 'docker inspect') => '/app',
             default => "file\t12\t1\t644\tconfig.yml",
         };
 
@@ -622,7 +622,7 @@ it('allows retrying a failed initial container lookup', function () {
     ]);
     $fail = true;
     Process::fake(function ($process) use (&$fail) {
-        if (str_contains($process->command, 'docker ps')) {
+        if (str_contains(remoteProcessScript($process), 'docker ps')) {
             if ($fail) {
                 $fail = false;
 
@@ -634,7 +634,7 @@ it('allows retrying a failed initial container lookup', function () {
             ]));
         }
 
-        return Process::result(output: str_contains($process->command, 'docker inspect') ? '/app' : '');
+        return Process::result(output: str_contains(remoteProcessScript($process), 'docker inspect') ? '/app' : '');
     });
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);

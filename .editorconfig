@@ -16,3 +16,12 @@ indent_size = 2
 
 [docker-compose.yml]
 indent_size = 4
+
+[{release.json,upstream.json}]
+indent_style = tab
+
+[scripts/{clean-manifests,plan-version,release,size,sync-cdn,tmp-remove-arch-tags,undo-release}.sh]
+indent_style = tab
+binary_next_line = true
+switch_case_indent = true
+space_redirects = true

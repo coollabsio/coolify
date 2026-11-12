@@ -16,12 +16,19 @@ use App\Http\Controllers\Api\SharedVariableCanvasController;
 use App\Http\Controllers\Api\TagCanvasController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FileBrowserDownloadController;
+use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
+use App\Http\Controllers\StarredMenuItemsController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
+use App\Http\Middleware\CheckForcePasswordReset;
+use App\Http\Middleware\DecideWhatToDoWithUser;
+use App\Http\Middleware\EnsureTeamWideAccess;
+use App\Http\Middleware\RequireTeamTwoFactor;
 use App\Http\Middleware\UseSessionTeamApiToken;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -34,6 +41,10 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\Fleet\Metrics as FleetMetrics;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\ImageScan\FleetVulnerabilities;
+use App\Livewire\ImageScan\InstanceImageScanning;
+use App\Livewire\ImageScan\ServerImageScanning;
+use App\Livewire\ImageScan\TeamImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -61,7 +72,6 @@ use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
-use App\Livewire\Project\Service\ImportBackup as ServiceImportBackup;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Service\VolumeBackup\Index;
 use App\Livewire\Project\Service\VolumeBackup\Show;
@@ -76,7 +86,6 @@ use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenS
 use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
-use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Analytics\Show as ServerAnalytics;
@@ -101,8 +110,8 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Registries as ServerRegistries;
 use App\Livewire\Server\Resources as ResourcesShow;
-use App\Livewire\Server\Security\Patches;
-use App\Livewire\Server\Security\TerminalAccess;
+use App\Livewire\Server\Security\Index as ServerSecurityIndex;
+use App\Livewire\Server\Security\Patches as ServerSecurityPatches;
 use App\Livewire\Server\Sentinel\Logs as SentinelLogs;
 use App\Livewire\Server\Sentinel\Show as SentinelShow;
 use App\Livewire\Server\Show as ServerShow;
@@ -193,8 +202,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
     Route::get('/two-factor-required', TwoFactorRequired::class)->name('two-factor.required');
+    // A member without 2FA can leave a team that requires it, but only for a team that does not.
+    Route::post('/two-factor-required/switch-team', function (Request $request) {
+        $team = $request->user()->teams()
+            ->whereKey($request->integer('team_id'))
+            ->where('is_two_factor_required', false)
+            ->first();
+        if (! $team) {
+            return redirect()->route('two-factor.required');
+        }
+        refreshSession($team);
+
+        return redirect()->route('dashboard');
+    })->name('two-factor.required.switch-team');
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    // Members limited to some projects see the resources they have access to.
+    Route::get('/vulnerabilities', FleetVulnerabilities::class)->name('vulnerabilities');
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');
@@ -269,6 +293,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', SettingsIndex::class)->name('settings.index');
         Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
         Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+        Route::get('/settings/image-scanning', InstanceImageScanning::class)->name('settings.image-scanning');
 
         Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
@@ -280,6 +305,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::put('/profile/starred-menu-items', StarredMenuItemsController::class)->name('profile.starred-menu-items');
     Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
         ->middleware('password.confirm')
         ->name('profile.passkeys.confirm');
@@ -324,6 +350,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index')->middleware('access.team-wide');
         Route::get('/members/{user_id}/avatar', ProfileAvatarController::class)->whereNumber('user_id')->name('team.member.avatar');
         Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log')->middleware('access.team-wide');
+        Route::get('/image-scanning', TeamImageScanning::class)->name('team.image-scanning')->middleware('access.team-wide');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view')->middleware('access.team-wide');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone')->middleware('access.team-wide');
     });
@@ -365,10 +392,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
         $request->validate(['token' => ['required', 'string', 'size:64']]);
 
-        return response()->json([
-            'command' => $terminalSessionService->redeem($request->user(), $request->string('token')->toString()),
-        ]);
+        return response()->json($terminalSessionService->redeem($request->user(), $request->string('token')->toString()));
     })->name('terminal.session')->middleware('can.access.terminal');
+
+    // No page gates: the check uses the team of the server, and the user can switch teams in another tab.
+    Route::post('/terminal/session/check', function (Request $request, TerminalSessionService $terminalSessionService) {
+        $request->validate(['session_id' => ['required', 'string', 'size:64']]);
+        $terminalSessionService->check($request->user(), $request->string('session_id')->toString());
+
+        return response()->json(['active' => true]);
+    })->name('terminal.session.check')->withoutMiddleware([CheckForcePasswordReset::class, DecideWhatToDoWithUser::class, RequireTeamTwoFactor::class, EnsureTeamWideAccess::class]);
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
@@ -394,6 +427,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
         Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
+        Route::get('/maintenance', ApplicationConfiguration::class)->name('project.application.maintenance');
         Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/recommendations', ApplicationConfiguration::class)->name('project.application.recommendations');
@@ -417,6 +451,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
         Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
+        Route::get('/vulnerabilities', ApplicationConfiguration::class)->name('project.application.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.application.vulnerabilities.sbom');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -432,13 +468,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
-        Route::get('/import-backup', DatabaseConfiguration::class)->name('project.database.import-backup')->middleware('can.update.resource');
+        // Import opens in a modal on the backups page; keep old links working.
+        Route::redirect('/import-backup', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups')->name('project.database.import-backup');
         Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
         Route::get('/healthcheck', DatabaseConfiguration::class)->name('project.database.healthcheck');
         Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
         Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/vulnerabilities', DatabaseConfiguration::class)->name('project.database.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.database.vulnerabilities.sbom');
         Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
@@ -456,12 +495,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
+        Route::get('/maintenance', ServiceConfiguration::class)->name('project.service.maintenance');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/analytics', ServiceConfiguration::class)->name('project.service.analytics');
+        Route::get('/vulnerabilities', ServiceConfiguration::class)->name('project.service.vulnerabilities');
+        Route::get('/vulnerabilities/sbom/{scan_uuid}/{format}', ImageScanSbomController::class)->name('project.service.vulnerabilities.sbom');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
-        Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
-        Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
+        // Import opens in a modal on the backups page; keep old links working.
+        Route::redirect('/import-backup', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/storage-backups')->name('project.service.import-backup');
+        Route::redirect('/import-backup/{stack_service_uuid}', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups')->name('project.service.import-backup.database');
         Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
         Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
         // S3 and retention settings moved into the general page; keep old links working.
@@ -482,7 +525,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::redirect('/{stack_service_uuid}/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups/{backup_uuid}');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
-        Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
+        Route::redirect('/{stack_service_uuid}/import', '/project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}/{stack_service_uuid}/backups')->name('project.service.database.import');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         // Tasks open in a modal on the list page; keep old links (e.g. notifications) working.
@@ -524,9 +567,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/images', DockerImages::class)->name('server.docker-images');
             Route::get('/github-runners', GithubRunners::class)->name('server.github-runners');
             Route::get('/registries', ServerRegistries::class)->name('server.registries')->middleware('can.update.resource');
-            Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
-            Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
-            Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
+            Route::get('/security', ServerSecurityIndex::class)->name('server.security')->middleware('can.update.resource');
+            Route::get('/security/patches', ServerSecurityPatches::class)->name('server.security.patches')->middleware('can.update.resource');
+            Route::get('/security/vulnerabilities', ServerImageScanning::class)->name('server.security.vulnerabilities')->middleware('can.update.resource');
+            // Old sub pages. Links in sent notifications still use them.
+            Route::get('/security/image-scanning', fn (string $server_uuid) => redirect(route('server.security.vulnerabilities', ['server_uuid' => $server_uuid])))
+                ->name('server.security.image-scanning');
+            foreach (['terminal-access' => 'server-terminal-access-section', 'host-key' => 'server-host-key-section'] as $page => $section) {
+                Route::get("/security/{$page}", fn (string $server_uuid) => redirect(route('server.security', ['server_uuid' => $server_uuid]).'#'.$section))
+                    ->name("server.security.{$page}");
+            }
         });
         Route::get('/destinations', DestinationIndex::class)->name('destination.index');
         Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
@@ -535,8 +585,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Route::get('/security', fn () => view('security.index'))->name('security.index');
         Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
+        // The key page was merged into the list; keep old bookmarks working.
+        Route::get('/security/private-key/{private_key_uuid}', fn () => redirect()->route('security.private-key.index'))
+            ->name('security.private-key.show');
         // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
-        Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
         Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
         Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
@@ -550,6 +602,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/select-team', SelectTeam::class)->name('team.select');
 });
+
+// Called by the terminal server when a PTY ends, also after a logout. The secret session id authenticates it.
+Route::post('/terminal/session/end', function (Request $request, TerminalSessionService $terminalSessionService) {
+    $request->validate([
+        'session_id' => ['required', 'string', 'size:64'],
+        'reason' => ['required', 'string', 'in:exited,disconnected,replaced,rejected,idle,max_duration,revoked'],
+    ]);
+    $terminalSessionService->end($request->string('session_id')->toString(), $request->string('reason')->toString());
+
+    return response()->noContent();
+})->name('terminal.session.end')->withoutMiddleware(VerifyCsrfToken::class);
 
 Route::middleware(['auth', 'access.team-wide'])->group(function () {
     Route::get('/sources', function () {
@@ -571,27 +634,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
-            if ($team->id !== 0) {
-                if (is_null($execution_team_id)) {
-                    return response()->json(['message' => 'Team not found.'], 404);
-                }
-                if ($team->id !== $execution_team_id) {
-                    return response()->json(['message' => 'Permission denied.'], 403);
-                }
-                if (is_null($execution)) {
-                    return response()->json(['message' => 'Backup not found.'], 404);
-                }
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -609,11 +659,11 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the database can serve the copy.
-            $s3DownloadUrl = is_null($execution_team_id)
+            $s3Download = is_null($execution_team_id)
                 ? null
-                : $execution->s3DownloadUrl($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+                : $execution->s3Download($execution_team_id, $execution->scheduledDatabaseBackup->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if ($execution->scheduledDatabaseBackup->disable_local_backup && $execution->scheduledDatabaseBackup->save_s3) {
@@ -628,20 +678,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/download/volume-backup/{executionId}', function () {
         try {
-            $user = auth()->user();
-            $team = $user->currentTeam();
-            if (is_null($team)) {
-                return response()->json(['message' => 'Team not found.'], 404);
-            }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
-            }
-
             $execution = ScheduledVolumeBackupExecution::query()
                 ->with('scheduledVolumeBackup.backupable.resource')
                 ->findOrFail(request()->route('executionId'));
-            if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
-                return response()->json(['message' => 'Permission denied.'], 403);
+            $execution_team_id = $execution->scheduledVolumeBackup->team_id;
+            if (is_null($execution_team_id)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);
@@ -657,9 +702,9 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Only storages of the team that owns the backup can serve the copy.
-            $s3DownloadUrl = $execution->s3DownloadUrl($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
-            if ($s3DownloadUrl) {
-                return redirect()->away($s3DownloadUrl);
+            $s3Download = $execution->s3Download($execution->scheduledVolumeBackup->team_id, $execution->s3_storage_id);
+            if ($s3Download) {
+                return $s3Download;
             }
 
             if (! $execution->local_storage_deleted && ! $server) {

@@ -13,6 +13,7 @@ use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRepositoryDetection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -40,9 +41,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public ?string $publish_directory = null;
 
-    // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
+    // In case of docker compose
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
 
@@ -71,6 +72,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
@@ -82,6 +84,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
+        'base_directory' => 'Base directory',
     ];
 
     public function mount()
@@ -91,7 +94,9 @@ class GithubPrivateRepositoryDeployKey extends Component
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        if (isDev()) {
+        if (! Gate::allows('useTeamCredentials')) {
+            $this->private_keys = [];
+        } elseif (isDev()) {
             $this->private_keys = PrivateKey::where('team_id', currentTeam()->id)->get();
         } else {
             $this->private_keys = PrivateKey::where('team_id', currentTeam()->id)->where('id', '!=', 0)->get();
@@ -131,6 +136,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
         $this->authorize('create', [Application::class, $environment]);
+        $this->authorize('useTeamCredentials');
 
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($private_key_id);
         $this->private_key_id = $privateKey->id;
@@ -153,6 +159,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     {
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
+        $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'] ?? null;
@@ -170,6 +177,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             $this->authorize('create', [Application::class, $environment]);
+            $this->authorize('useTeamCredentials');
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
@@ -182,6 +190,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'private_key_id' => $privateKey->id,
+                    'base_directory' => $this->base_directory,
                 ];
             } else {
                 $application_init = [
@@ -197,6 +206,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
+                    'base_directory' => $this->base_directory,
                 ];
             }
             if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
@@ -207,7 +217,6 @@ class GithubPrivateRepositoryDeployKey extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();
@@ -264,7 +273,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
 
         if ($this->git_host === 'github.com') {
-            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+            $this->git_source = GithubApp::query()->whereKey(0)->where('is_public', true)->first();
 
             return;
         }

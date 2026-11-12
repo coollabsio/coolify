@@ -507,6 +507,89 @@ function dockerRemoveCommand(string $container): string
     return dockerCommandIgnoringError($command, 'No such container:');
 }
 
+/**
+ * Lists the containers of a Compose project, one JSON object per line, for composeContainersWithRemovedVolumes().
+ */
+function composeProjectMountsCommand(string $projectName): string
+{
+    $format = '{"name":{{json .Name}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"imageVolumes":{{json .Config.Volumes}},"mounts":{{json .Mounts}}}';
+
+    return 'docker ps -aq --filter '.escapeshellarg("label=com.docker.compose.project={$projectName}")
+        .' | xargs -r docker inspect --format '.escapeshellarg($format).' 2>/dev/null || true';
+}
+
+/**
+ * `docker compose up` gives a recreated container the mount of the old container at each path
+ * that the image declares with VOLUME. This also keeps a volume that the user deleted in Coolify,
+ * so its old data comes back (#6875). Returns the containers to remove before `up`.
+ *
+ * Only a volume that Coolify made (its name starts with "{uuid}_") and that has no storage row
+ * anymore counts. A volume that is only removed from the Compose file still has its row, and an
+ * external volume or a bind mount is not Coolify's, so Compose keeps using them as before.
+ *
+ * @param  string  $projectMounts  output of composeProjectMountsCommand()
+ * @param  array<string, mixed>  $composeServices  the services of the Compose file that `up` starts
+ * @param  list<string>  $storageNames  names of the storage rows that the resource still has
+ * @return array<string, string> container name => volume that the user deleted
+ */
+function composeContainersWithRemovedVolumes(string $projectMounts, array $composeServices, string $uuid, array $storageNames): array
+{
+    $normalize = fn (string $path): string => rtrim($path, '/') ?: '/';
+    $containers = [];
+    foreach (preg_split('/\R/', trim($projectMounts)) as $line) {
+        $container = json_decode($line, true);
+        $service = data_get($container, 'service');
+        if (! is_array($container) || ! is_string($service) || ! is_array(data_get($composeServices, $service))) {
+            continue;
+        }
+        $targets = composeServiceVolumeTargets(data_get($composeServices, "{$service}.volumes", []));
+        if ($targets === null) {
+            continue;
+        }
+        $imageVolumes = array_map($normalize, array_keys(data_get($container, 'imageVolumes') ?? []));
+        foreach (data_get($container, 'mounts') ?? [] as $mount) {
+            $name = (string) data_get($mount, 'Name');
+            $path = $normalize((string) data_get($mount, 'Destination'));
+            if (data_get($mount, 'Type') !== 'volume' || ! str_starts_with($name, "{$uuid}_") || in_array($name, $storageNames, true)
+                || ! in_array($path, $imageVolumes, true) || in_array($path, $targets, true)) {
+                continue;
+            }
+            $containers[ltrim((string) data_get($container, 'name'), '/')] = $name;
+        }
+    }
+
+    return $containers;
+}
+
+/**
+ * The container paths of the volumes of a Compose service, or null when a path is not literal
+ * (for example `${DATA_PATH}`).
+ *
+ * @return list<string>|null
+ */
+function composeServiceVolumeTargets(mixed $volumes): ?array
+{
+    $targets = [];
+    foreach (is_array($volumes) ? $volumes : [] as $volume) {
+        if (is_array($volume)) {
+            $target = data_get($volume, 'target');
+        } else {
+            // source:target:mode, where the source can contain colons, for example ${DATA:-/data}.
+            $parts = explode(':', (string) $volume);
+            if (count($parts) > 1 && preg_match('/^[a-zA-Z,]+$/', end($parts))) {
+                array_pop($parts);
+            }
+            $target = end($parts);
+        }
+        if (! is_string($target) || ! str_starts_with($target, '/')) {
+            return null;
+        }
+        $targets[] = rtrim($target, '/') ?: '/';
+    }
+
+    return $targets;
+}
+
 function dockerNetworkRemoveCommand(string $network): string
 {
     $command = 'docker network rm '.escapeShellValue($network);
@@ -524,6 +607,20 @@ function dockerCommandIgnoringError(string $command, string $ignoredError): stri
 function escapeShellValue(string $value): string
 {
     return "'".str_replace("'", "'\\''", $value)."'";
+}
+
+/**
+ * Prefix for a Docker command that pulls on the server itself, outside the helper container. It makes the CLI use
+ * the SSH user's Docker config, where the registry logins are and which the helper container mounts. On a non-root
+ * server the command runs with sudo, which resets HOME to /root, so without it a private image pull is anonymous.
+ * The SSH user's shell expands $HOME before sudo runs. Without a config of the SSH user, DOCKER_CONFIG is empty and
+ * the CLI keeps /root/.docker, so a login made with `sudo docker login` still works. DOCKER_CONTEXT=default keeps the
+ * pull on the host daemon if that config selects another context, because the next commands use the host daemon.
+ */
+function serverDockerConfigPrefix(Server $server): string
+{
+    // No && or pipe: with them, the sudo parser can wrap the line in `sudo bash -c`, where $HOME is /root.
+    return $server->isNonRoot() ? 'DOCKER_CONTEXT=default DOCKER_CONFIG="$(find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" ' : '';
 }
 
 function executeInDocker(string $containerId, string $command)
@@ -787,7 +884,7 @@ function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnable
     return "{$scheme}://{$host}";
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -840,11 +937,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
-        if ($is_retry_enabled) {
-            // A failed connection, for example to the old container that stops during a rolling
-            // update, is retried on another upstream. Caddy always retries a connection that failed.
-            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.lb_try_duration=5s");
-        }
+        $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
@@ -949,7 +1042,7 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, bool $is_retry_enabled = false)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -1003,14 +1096,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         })->flatten()
             ->filter()
             ->unique();
-    }
-    if ($is_retry_enabled) {
-        // Sends a request to another container when the connection fails, for example to the old
-        // container that stops during a rolling update. Traefik does not retry after a response.
-        // A retry can pick the old container again under load; 3 attempts left about 5% of the
-        // requests failing in a live test, 5 attempts less than 1% (#8627).
-        $labels->push("traefik.http.middlewares.retry-{$uuid}.retry.attempts=5");
-        $middlewares_from_labels->push("retry-{$uuid}");
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -1277,7 +1362,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
-                            is_retry_enabled: true,
                             certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
@@ -1302,7 +1386,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                             supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                             domainPortOverrides: $application->domain_port_overrides ?? [],
-                            is_retry_enabled: true,
                         ));
                         break;
                 }
@@ -1323,7 +1406,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
-                    is_retry_enabled: true,
                     certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
@@ -1346,7 +1428,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                     supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                     domainPortOverrides: $application->domain_port_overrides ?? [],
-                    is_retry_enabled: true,
                 ));
             }
         }
@@ -2127,7 +2208,7 @@ function generateDockerBuildArgs($variables): Collection
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key' and 'value'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
@@ -2141,11 +2222,6 @@ function generateDockerEnvFlags($variables): string
 
             if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
                 throw new InvalidArgumentException('Invalid environment variable key.');
-            }
-
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
-            if ($isMultiline) {
-                $value = trim($value, "'");
             }
 
             return '-e '.escapeshellarg("{$key}={$value}");
@@ -2258,6 +2334,21 @@ function railpackBuilderLockedScript(string $command): string
         ."{$command}; status=\$?; "
         .'if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi; '
         .'exit $status';
+}
+
+/**
+ * Start the Railpack builder and wait until buildkitd accepts connections. Run it inside
+ * railpackBuilderLockedScript(), so that no other process stops the builder after it starts.
+ *
+ * buildx waits for buildkitd only when it starts the builder itself. A concurrent build that sees
+ * the container already running connects at once and fails while the BuildKit socket is missing.
+ * The lock makes the other builds wait until the first bootstrap is complete.
+ */
+function railpackBuilderBootstrapScript(): string
+{
+    return 'exec 8>/root/.docker/buildx/coolify-railpack-bootstrap.lock; flock -x 8; '
+        .'DOCKER_CONFIG=/root/.docker docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; '
+        .'flock -u 8';
 }
 
 /**

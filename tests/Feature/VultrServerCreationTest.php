@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByVultr;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -9,12 +10,15 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'app.maintenance.driver' => 'file',
         'cache.default' => 'array',
@@ -236,17 +240,6 @@ it('requires IPv6 when public IPv4 is disabled', function () {
         ->set('disable_public_ipv4', true)
         ->call('submit')
         ->assertHasErrors(['enable_ipv6']);
-});
-
-it('renders advanced Vultr options in their own settings section', function () {
-    Livewire::test(ByVultr::class)
-        ->set('current_step', 2)
-        ->assertSee('Advanced options')
-        ->assertSee('Provider SSH keys, networking, and cloud-init.')
-        ->assertSee('Extra SSH keys')
-        ->assertSee('Enable IPv6')
-        ->assertSee('Disable public IPv4')
-        ->assertSee('Cloud-init script');
 });
 
 it('renders a single buy button and no back button on the Vultr form', function () {

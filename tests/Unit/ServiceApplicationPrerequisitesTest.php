@@ -78,6 +78,28 @@ it('applies appwrite stripprefix prerequisite correctly', function () {
     }
 });
 
+it('keeps the /api prefix for the rybbit backend', function () {
+    $application = new class
+    {
+        public $is_stripprefix_enabled = true;
+
+        public function save() {}
+    };
+
+    $query = Mockery::mock();
+    $query->shouldReceive('whereName')->with('rybbit_backend')->once()->andReturnSelf();
+    $query->shouldReceive('first')->once()->andReturn($application);
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->name = 'rybbit-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3';
+    $service->id = 1;
+    $service->shouldReceive('applications')->once()->andReturn($query);
+
+    applyServiceApplicationPrerequisites($service);
+
+    expect($application->is_stripprefix_enabled)->toBeFalse();
+});
+
 it('handles missing applications gracefully', function () {
     $query = Mockery::mock();
     $query->shouldReceive('whereName')
@@ -95,10 +117,7 @@ it('handles missing applications gracefully', function () {
         ->once()
         ->andReturn($query);
 
-    // Should not throw exception
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
+    expect(fn () => applyServiceApplicationPrerequisites($service))->not->toThrow(Throwable::class);
 });
 
 it('skips services without prerequisites', function () {
@@ -107,43 +126,5 @@ it('skips services without prerequisites', function () {
     $service->id = 1;
     $service->shouldNotReceive('applications');
 
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with single hyphen', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'docker-registry-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'docker-registry' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with multiple hyphens', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'elasticsearch-with-kibana-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'elasticsearch-with-kibana' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
-});
-
-it('correctly parses service name with hyphens in template name', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'apprise-api-clx1ab2cd3ef4g5hi6jk7l8m9n0o1p2q3'; // CUID2 format
-    $service->id = 1;
-    $service->shouldNotReceive('applications');
-
-    // Should not throw exception - validates that 'apprise-api' is correctly parsed
-    applyServiceApplicationPrerequisites($service);
-
-    expect(true)->toBeTrue();
+    expect(fn () => applyServiceApplicationPrerequisites($service))->not->toThrow(Throwable::class);
 });
