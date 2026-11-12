@@ -44,6 +44,7 @@ class ServerProxyController extends Controller
      *     status: string|null,
      *     redirect_enabled: bool,
      *     redirect_url: string|null,
+     *     unknown_host_status: int,
      *     generate_exact_labels: bool,
      *     traefik_certificate_resolver: string|null,
      *     configuration?: string|null
@@ -56,6 +57,7 @@ class ServerProxyController extends Controller
             'status' => data_get($server->proxy, 'status'),
             'redirect_enabled' => (bool) data_get($server->proxy, 'redirect_enabled', true),
             'redirect_url' => data_get($server->proxy, 'redirect_url'),
+            'unknown_host_status' => $server->unknownHostStatus(),
             'proxy_error_page' => $server->proxy_error_page,
             'generate_exact_labels' => (bool) ($server->settings->generate_exact_labels ?? false),
             'traefik_certificate_resolver' => $server->traefikCertificateResolver(),
@@ -92,6 +94,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true, example: 'running'),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true, example: 'https://example.com'),
+                        new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], example: 404, description: 'Status of the catch-all for hosts that no resource on the server uses. The domains of resources on the server get 503 while the resource is down.'),
                         new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean', example: false),
                         new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, example: 'letsencrypt', description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'),
@@ -138,6 +141,7 @@ class ServerProxyController extends Controller
                 properties: [
                     new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                     new OA\Property(property: 'redirect_url', type: 'string', nullable: true, description: 'Public http(s) redirect URL, or null to clear.'),
+                    new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], description: 'Status of the catch-all for hosts that no resource on the server uses (when redirect_url is empty). The domains of resources on the server get 503 while the resource is down.'),
                     new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true, description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'),
                     new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                     new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'),
@@ -156,6 +160,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true),
+                        new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503]),
                         new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                         new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true),
@@ -182,10 +187,11 @@ class ServerProxyController extends Controller
             return $return;
         }
 
-        $allowedFields = ['redirect_enabled', 'redirect_url', 'proxy_error_page', 'generate_exact_labels', 'traefik_certificate_resolver', 'proxy_type'];
+        $allowedFields = ['redirect_enabled', 'redirect_url', 'unknown_host_status', 'proxy_error_page', 'generate_exact_labels', 'traefik_certificate_resolver', 'proxy_type'];
         $validator = customApiValidator($request->all(), [
             'redirect_enabled' => 'boolean',
             'redirect_url' => ['nullable', 'string', new SafeExternalUrl],
+            'unknown_host_status' => 'integer|in:404,503',
             'proxy_error_page' => ['nullable', 'string', proxyPageSizeRule('custom error page')],
             'generate_exact_labels' => 'boolean',
             'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
@@ -238,6 +244,11 @@ class ServerProxyController extends Controller
 
         if ($request->exists('redirect_url')) {
             $server->proxy->redirect_url = $request->input('redirect_url') ?: null;
+            $redirectChanged = true;
+        }
+
+        if ($request->has('unknown_host_status')) {
+            $server->proxy->set('unknown_host_status', $request->integer('unknown_host_status'));
             $redirectChanged = true;
         }
 
@@ -324,6 +335,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true),
+                        new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503]),
                         new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true),

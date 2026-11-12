@@ -725,6 +725,10 @@ class ServerTransferImporter
             foreach ($proxy as $key => $value) {
                 $server->proxy->set($key, $value);
             }
+            // A bundle of an older Coolify has no status for unknown hosts: keep the status of the source.
+            if (! array_key_exists('unknown_host_status', $proxy)) {
+                $server->proxy->set('unknown_host_status', Server::LEGACY_UNKNOWN_HOST_STATUS);
+            }
             $server->save();
         }
 

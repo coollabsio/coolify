@@ -12658,6 +12658,7 @@ paths:
                   status: { type: [string, 'null'], example: running }
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
+                  unknown_host_status: { description: 'Status of the catch-all for hosts that no resource on the server uses. The domains of resources on the server get 503 while the resource is down.', type: integer, example: 404, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean, example: false }
                   traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
@@ -12697,6 +12698,10 @@ paths:
                 redirect_url:
                   description: 'Public http(s) redirect URL, or null to clear.'
                   type: [string, 'null']
+                unknown_host_status:
+                  description: 'Status of the catch-all for hosts that no resource on the server uses (when redirect_url is empty). The domains of resources on the server get 503 while the resource is down.'
+                  type: integer
+                  enum: [404, 503]
                 proxy_error_page:
                   description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'
                   type: [string, 'null']
@@ -12721,6 +12726,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   traefik_certificate_resolver: { type: [string, 'null'] }
@@ -12778,6 +12784,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   configuration: { type: [string, 'null'] }
