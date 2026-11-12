@@ -98,6 +98,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                         $this->server->save();
+                        if ($this->server->proxy->status === 'running' && $this->server->claimOutdatedDefaultRedirectRefresh()) {
+                            RefreshDefaultRedirectJob::dispatch($this->server);
+                        }
                     }
                 }
             }

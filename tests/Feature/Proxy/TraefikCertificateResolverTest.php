@@ -114,7 +114,7 @@ test('the catch-all router follows the server certificate resolver', function (?
     Process::assertRan(function ($process) use (&$command) {
         $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
-        return str_contains($command, 'default_redirect_503.yaml') && str_contains($command, 'base64 -d');
+        return str_contains($command, 'default_redirect_404.yaml') && str_contains($command, 'base64 -d');
     });
     preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d/", $command, $matches);
     $catchall = Yaml::parse(base64_decode($matches[1]))['http']['routers']['catchall'];
