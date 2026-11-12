@@ -191,9 +191,10 @@ report `volume.transfer.v1`, when the source does not report
 
 This decision does not define:
 
-- the volume backup and restore format, schedule, and S3 layout;
+- the volume backup and restore format, schedule, and S3 layout (see decision
+  0009);
 - replication of volumes (asynchronous snapshots, DRBD, or another engine);
 - database replication managed by Coolify;
 - shared network volumes such as NFS;
 - volume size limits, quotas, and resize;
-- automatic failover when a Node fails.
+- automatic failover when a Node fails (see decision 0014).

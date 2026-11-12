@@ -99,6 +99,15 @@ nginx template) are copied into v5 classes.
 - A move starts an empty registry on the new Node. The next deploy of each
   application rebuilds its image. The previous Node stops zot but keeps its
   image volume, so a role that returns finds its images again.
+- A cluster with one Node runs no zot, when its Sentinel has
+  `image.load.v1`. The build exports a docker archive in place of a push, and
+  `image.load.v1` loads it into the Podman store of that Node as
+  `localhost/<workload>:<build>`. Sentinel keeps the newest `keep_tags` local
+  tags of each application. Only one Node exists, so no other Node needs the
+  image. When a second Node joins, the next network reconcile starts zot, and
+  the next build of each application pushes again. Until then, Coolify
+  refuses to move an application with a local image, because the target Node
+  cannot pull it. When one Node remains, zot stops and keeps its volume.
 - The Image registry section of the cluster shows the registry health, the
   disk use of the registry and the build cache on each Node, and the images
   of each application (`registry.inspect.v1`, read only).
@@ -120,8 +129,8 @@ nginx template) are copied into v5 classes.
 - Auth: zot htpasswd with a push user for builders and a pull user for all
   Nodes. Anonymous access is denied. `workload.deploy` passes the pull
   credential to Podman with `--authfile` for images in the cluster registry.
-- Storage: `dedupe`, `gc`, and a retention policy that keeps the last 5 pushed
-  tags of each workload and removes untagged manifests. Coolify deletes a
+- Storage: `dedupe`, `gc`, and a retention policy that keeps the last 10 pushed
+  tags of each workload (decision 0017; it was 5) and removes untagged manifests. Coolify deletes a
   workload's repository when the workload is deleted.
 
 ### Storage limits on builder Nodes
@@ -167,13 +176,13 @@ For now, cluster applications use the cluster registry (zot) for built images,
 and pull other images only from public registries. These items must be done
 before v5 ships:
 
-- [ ] **Private registry pulls.** v4 runs `docker login` on each server over SSH
+- [x] **Private registry pulls.** v4 runs `docker login` on each server over SSH
   (Server → Docker Registries). Nodes have no Docker and no SSH deploy path, so
   v5 needs its own flow: registry credentials for each team in Coolify
   (encrypted), and an optional registry auth on `workload.deploy` that Sentinel
   passes to Podman as a temporary `--authfile` and never journals. The v4
   logins cannot be imported, because they exist only on each v4 server.
-- [ ] **Push built images to an external registry** (the v4 "Docker registry
+- [x] **Push built images to an external registry** (the v4 "Docker registry
   image name" setting), as an extra target next to the cluster registry.
 - [ ] **Release Sentinel and Flux** with the build and registry commands. The
   latest Sentinel release does not have them, and **Upgrade Sentinel** installs
@@ -182,9 +191,10 @@ before v5 ships:
 
 ## Left open
 
-- Private repositories, webhooks, preview builds, and build-time secrets.
+- Private repositories, webhooks, preview builds, and build-time secrets (see
+  decisions 0011 and 0012).
 - External registries and registry replication to a second Node.
-- Builds for a different CPU architecture.
+- Builds for a different CPU architecture (see decision 0020).
 - The registry port and the exact `buildkitd.toml` defaults.
 - Whether the sandboxed rootless mode needs both `systempaths=unconfined` and
   `/dev/fuse`. The test passed with both and did not check each one alone.

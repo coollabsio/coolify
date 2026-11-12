@@ -78,6 +78,11 @@ environment, so a PaaS must keep environment variables as the default.
 
 ## Left open
 
-- The owner and mode of a secret file. Podman uses root and 0444.
-- Build-time secrets for builder Nodes (decision 0006).
 - Secret manager references for cluster applications.
+
+## Amendment (2026-11-11)
+
+- A secret file is owned by root with mode 0444 by default. A user can set the
+  uid, gid, and mode of each secret file. Sentinel passes them to Podman with
+  `--secret <name>,type=mount,uid=<uid>,gid=<gid>,mode=<mode>`.
+- Build-time secrets are decided in decision 0012.

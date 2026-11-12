@@ -96,6 +96,6 @@ HTTPS is the next slice. The plan is:
 This decision does not define:
 
 - wildcard domains, path routing, or redirects;
-- TCP or UDP ingress for non-HTTP services;
+- TCP or UDP ingress for non-HTTP services (see decision 0016);
 - rate limiting, authentication, or other proxy middleware;
-- an automatic DNS integration.
+- an automatic DNS integration (see decision 0019).

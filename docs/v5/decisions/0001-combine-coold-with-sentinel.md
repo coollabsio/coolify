@@ -97,3 +97,11 @@ This decision does not define:
 
 Those subjects require separate decisions before implementation commits to
 them.
+
+## Amendment (2026-11-11)
+
+Nodes do not run the Sentinel container. `InstallSentinel` installs only the
+host-native binary and its systemd service on a Node, and `StartSentinel`
+starts the container only on legacy servers. The transition with two processes
+on one Node is not necessary, so the question of when to retire a Node's
+container is closed.

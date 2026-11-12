@@ -84,3 +84,14 @@ This decision does not define:
 - the WireGuard address allocation and key-rotation protocol;
 - the firewall implementation and rollback mechanism;
 - the procedure for a future explicit Docker-to-Podman migration.
+
+## Amendment (2026-11-11)
+
+v5.0 narrows the fresh-install modes:
+
+- `node-controller` is the current installer. Coolify runs in Docker Compose.
+- `node-worker` Nodes join over SSH from the Coolify UI, as they do today.
+- `node-controller-worker` is postponed. Docker with Traefik and Podman with
+  Caddy on one host both need ports 80 and 443, and that needs its own design.
+
+A join without SSH (for example with a token) is also postponed.
