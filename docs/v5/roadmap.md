@@ -16,7 +16,7 @@ stable need.
 | B3 | ~~Push built images to an external registry~~ | 0006 "Before release" | Done (uncommitted, verified on dev): image name + tag on Git apps, second push after the cluster push. |
 | B4 | ~~Static build source~~ | 0006 | Done (uncommitted): built by the Railpack job with the base directory. Railpack serves files only when the folder has `index.html`, `Staticfile`, or `public/`. |
 | B5 | Bring the status documents up to date | — | `architecture/current-state.md` still lists HTTPS ingress, volumes, secrets, and health gates as not implemented. Decision 0005 still says "HTTP only". Check that HTTPS follows the 0005 plan first. |
-| B6 | Merge `next` into `v5-progress` | — | On 2026-11-11 the branch was 248 commits behind `next`. |
+| B6 | ~~Merge `next` into `v5-progress`~~ | — | Done on 2026-11-12 (merge `37aefab058`). |
 | B7 | ~~Volume backups and restore~~ | [0009](decisions/0009-node-volume-backups.md) | Done (uncommitted, verified on dev with one Node). Restore to another Node is untested; restore from a dead Node is not built. |
 | B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (uncommitted, verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews come after beta. |
 | B9 | Build-time secrets | [0012](decisions/0012-node-build-secrets.md) | |
