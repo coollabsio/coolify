@@ -66,7 +66,7 @@ class Onboarding extends Component
         }
 
         $this->name = generate_random_name();
-        $this->coolifyUrl = rtrim((string) config('app.url'), '/');
+        $this->coolifyUrl = rtrim(base_url(), '/');
         $this->privateKeyId = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->value('id');
         $firstCluster = NodeCluster::query()->where('team_id', currentTeam()->id)->orderBy('name')->first();
         if ($firstCluster === null) {
