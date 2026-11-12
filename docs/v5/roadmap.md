@@ -49,7 +49,7 @@ stable need.
 | L5 | Preview deployments | [0011](decisions/0011-node-git-sources.md) |
 | L6 | Ctrl+K search entries for cluster settings pages | — |
 | L7 | A clear error instead of a 500 when you create a database and the cluster network is not ready | 0010 |
-| L9 | Reverse lookups of external addresses from containers get NXDOMAIN | — | Discovery DNS claims all of `in-addr.arpa`; it must know its own reverse zones and forward the rest. |
+| L9 | ~~Reverse lookups of external addresses from containers get NXDOMAIN~~ | — | Fixed in Sentinel `26334ea`: the discovery DNS claims only the mesh and workload reverse zones and forwards the rest. A restart of systemd-resolved drops the routing domains and is not detected as drift (older gap). |
 | L8 | Strict "serve files only" mode for Static | 0006. Needs a Sentinel builder change. |
 
 ## Postponed
