@@ -51,6 +51,8 @@ fi
 systemctl daemon-reload
 systemctl restart sentinel.service
 systemctl is-active --quiet sentinel.service
+# The discovery DNS runs the same binary, so it must run the restored version too.
+systemctl try-restart coolify-discovery-dns.service || true
 SCRIPT;
     }
 }
