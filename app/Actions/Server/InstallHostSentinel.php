@@ -38,6 +38,8 @@ class InstallHostSentinel
     public function handle(Server $server, array $environment, string $image): bool
     {
         $environment['DATA_DIR'] = devHostDockerPath($server, base_configuration_dir().'/sentinel');
+        // On the host, bind mount sources are real paths, so Sentinel can measure their size.
+        $environment['HOST_MOUNT_PREFIX'] = '/';
         $script = self::installationScript($environment, $image);
 
         try {

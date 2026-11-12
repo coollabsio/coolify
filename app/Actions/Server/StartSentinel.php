@@ -24,6 +24,9 @@ class StartSentinel
     /** A host whose install failed is not tried again with the same image for this long. */
     public const HOST_RETRY_AFTER_SECONDS = 86400;
 
+    /** The first Sentinel version that reads DATA_DIR. */
+    public const MINIMUM_HOST_VERSION = '1.1.6';
+
     public static function lockKey(Server $server): string
     {
         return 'sentinel-start:'.$server->uuid;
@@ -32,12 +35,16 @@ class StartSentinel
     /**
      * The pinned image that contains the host binary, or null when the versions data has no digest.
      * The image is published only to GHCR, so it does not use the Docker registry setting.
+     * Versions before MINIMUM_HOST_VERSION ignore DATA_DIR and would write a new, empty database to /app/db on the host.
      */
     public static function hostImage(): ?string
     {
         $digest = data_get(get_versions_data(), 'sentinel-host.digest');
+        if (blank($digest) || version_compare(self::latestHostVersion(), self::MINIMUM_HOST_VERSION, '<')) {
+            return null;
+        }
 
-        return filled($digest) ? 'ghcr.io/coollabsio/sentinel-host@'.$digest : null;
+        return 'ghcr.io/coollabsio/sentinel-host@'.$digest;
     }
 
     public static function latestHostVersion(): string
