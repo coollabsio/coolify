@@ -111,8 +111,8 @@ it('does not put database credentials into the backup execution or the failure n
     $execution = $backup->executions()->latest('id')->firstOrFail();
     expect($execution->status)->toBe('failed')
         ->and($execution->message)->toStartWith('The backup stopped with exit code 124: it did not finish within the backup timeout of 600 seconds.')
-        ->and($execution->message)->toEndWith('The command on the server timed out after 600 seconds.')
+        ->and($execution->message)->toEndWith('The backup timeout of 600 seconds has passed.')
         ->and($execution->message)->not->toContain('TopSecretPass');
     Notification::assertSentTo($team, BackupFailed::class, fn (BackupFailed $notification) => ! str_contains((string) $notification->output, 'TopSecretPass')
-        && str_contains((string) $notification->output, 'timed out after 600 seconds'));
+        && str_contains((string) $notification->output, 'The backup timeout of 600 seconds has passed.'));
 });

@@ -602,10 +602,23 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $remaining = $this->deadline - Carbon::now()->getTimestamp();
         if ($remaining < 1) {
-            throw new \RuntimeException("The backup timeout of {$timeout} seconds has passed.", 124);
+            throw $this->backupTimeoutError();
         }
 
         return $remaining;
+    }
+
+    /**
+     * A command that ran out of time reports only the seconds that were left of the run for it. The error names
+     * the backup timeout instead, which is the value that the user sets.
+     */
+    private function backupTimeoutError(?Throwable $exception = null): Throwable
+    {
+        if ($exception !== null && $exception->getCode() !== 124) {
+            return $exception;
+        }
+
+        return new \RuntimeException('The backup timeout of '.((int) ($this->backup->timeout ?? 3600)).' seconds has passed.', 124);
     }
 
     /**
@@ -617,7 +630,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function runBackupCommands(array $commands): void
     {
-        $output = trim((string) instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true, maxAttempts: 1));
+        try {
+            $output = trim((string) instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true, maxAttempts: 1));
+        } catch (Throwable $e) {
+            throw $this->backupTimeoutError($e);
+        }
         $this->backup_output = $output === '' ? null : $output;
     }
 
@@ -979,6 +996,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             ));
 
         } catch (Throwable $e) {
+            $e = $this->backupTimeoutError($e);
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
