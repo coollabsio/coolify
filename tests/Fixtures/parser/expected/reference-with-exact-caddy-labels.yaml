@@ -215,6 +215,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=web
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -324,6 +325,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=api
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -379,6 +381,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=my-app
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -434,6 +437,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=www
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -489,6 +493,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=blog
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -544,6 +549,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -599,6 +605,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway-ws
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -1043,6 +1050,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=web
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1152,6 +1160,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=api
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -1207,6 +1216,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=my-app
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1262,6 +1272,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=www
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1317,6 +1328,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=blog
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -1372,6 +1384,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1427,6 +1440,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway-ws
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -1874,6 +1888,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=web
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1983,6 +1998,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=api
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -2038,6 +2054,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=my-app
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2093,6 +2110,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=www
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2148,6 +2166,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=blog
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -2203,6 +2222,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2258,6 +2278,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=gateway-ws
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -2317,6 +2338,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2374,6 +2396,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2464,6 +2487,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=sidecar
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server

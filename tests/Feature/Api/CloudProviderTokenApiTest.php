@@ -80,6 +80,27 @@ describe('GET /api/v1/cloud-tokens', function () {
         $response->assertJsonCount(1);
     });
 
+    test('rejects a team member with a read token', function () {
+        CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'name' => 'Production Hetzner',
+            'provider' => 'hetzner',
+        ]);
+
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        session(['currentTeam' => $this->team]);
+        $memberToken = $member->createToken('member-read', ['read'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$memberToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/cloud-tokens');
+
+        $response->assertForbidden();
+        expect($response->getContent())->not->toContain('Production Hetzner');
+    });
+
     test('rejects request without authentication', function () {
         $response = $this->getJson('/api/v1/cloud-tokens');
         $response->assertStatus(401);

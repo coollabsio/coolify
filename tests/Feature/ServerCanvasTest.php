@@ -221,22 +221,22 @@ test('the servers page reopens the canvas when the user left it on the canvas vi
     serverCanvasSession($this, $this->admin, $this->team)
         ->get(route('server.canvas.index'))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_servers_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_servers_view", 'canvas');
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
         ->get(route('server.index'))
         ->assertRedirect(route('server.canvas.index'));
 
     // The table / grid links on the canvas pick the list view again.
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
         ->get(route('server.index', ['view' => 'grid']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_servers_view", 'grid');
+        ->assertPlainCookie("coolify_{$this->admin->id}_servers_view", 'grid');
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_servers_view", 'grid')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_servers_view", 'grid')
         ->get(route('server.index'))
         ->assertOk();
 });
@@ -247,18 +247,18 @@ test('the environment page reopens the canvas when the user left it on the canva
     serverCanvasSession($this, $this->admin, $this->team)
         ->get(route('project.environment.canvas', $parameters))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_environment_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_environment_view", 'canvas');
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_environment_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_environment_view", 'canvas')
         ->get(route('project.resource.index', $parameters))
         ->assertRedirect(route('project.environment.canvas', $parameters));
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_environment_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_environment_view", 'canvas')
         ->get(route('project.resource.index', [...$parameters, 'view' => 'table']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_environment_view", 'table');
+        ->assertPlainCookie("coolify_{$this->admin->id}_environment_view", 'table');
 });
 
 test('the server resources page reopens the one server canvas when the user left it on the canvas view', function () {
@@ -267,18 +267,18 @@ test('the server resources page reopens the one server canvas when the user left
     serverCanvasSession($this, $this->admin, $this->team)
         ->get(route('server.canvas', $parameters))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas');
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas')
         ->get(route('server.resources', $parameters))
         ->assertRedirect(route('server.canvas', $parameters));
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_server_resources_view", 'canvas')
         ->get(route('server.resources', [...$parameters, 'view' => 'list']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_server_resources_view", 'list');
+        ->assertPlainCookie("coolify_{$this->admin->id}_server_resources_view", 'list');
 });
 
 test('the canvas API works with the browser session when the instance API is disabled', function () {
@@ -295,7 +295,7 @@ test('the remembered view belongs to the user, not to the browser', function () 
     $this->team->members()->attach($other->id, ['role' => 'admin']);
 
     serverCanvasSession($this, $other, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_servers_view", 'canvas')
         ->get(route('server.index'))
         ->assertOk();
 });
@@ -315,7 +315,7 @@ test('the list page remembers the table or grid choice and opens it again', func
     expect(Cookie::getQueuedCookies())->toBeEmpty();
 
     serverCanvasSession($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'grid')
+        ->withUnencryptedCookie($cookie, 'grid')
         ->get(route('server.index'))
         ->assertOk()
         ->assertSee("viewMode: 'grid'", false);

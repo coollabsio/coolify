@@ -88,7 +88,7 @@ services:
       retries: 3
 
   postgres:
-    image: postgres:12-alpine
+    image: postgres:16-alpine
     volumes:
       - database-data:/var/lib/postgresql/data
     environment:

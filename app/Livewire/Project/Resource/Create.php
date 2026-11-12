@@ -5,12 +5,12 @@ namespace App\Livewire\Project\Resource;
 use App\Actions\Node\CreateClusterDatabaseWorkload;
 use App\Enums\NodeDatabaseType;
 use App\Livewire\Project\New\DockerImage;
-use App\Models\EnvironmentVariable;
 use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Rules\DockerImageFormat;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Create extends Component
@@ -19,7 +19,20 @@ class Create extends Component
 
     public $type;
 
+    #[Locked]
     public $project;
+
+    #[Locked]
+    public ?string $pendingType = null;
+
+    #[Locked]
+    public $environment = null;
+
+    #[Locked]
+    public $destination = null;
+
+    #[Locked]
+    public ?string $databaseImage = null;
 
     public function mount()
     {
@@ -74,104 +87,155 @@ class Create extends Component
             if (! $destination) {
                 return redirect()->route('dashboard');
             }
-            $services = get_service_templates();
 
-            if (in_array($type, DATABASE_TYPES)) {
-                if ($type->value() === 'postgresql') {
-                    // PostgreSQL requires database_image to be explicitly set
-                    // If not provided, fall through to Select component for version selection
-                    if (! $database_image) {
-                        $this->type = $type->value();
+            $isDatabase = in_array($type, DATABASE_TYPES);
+            // PostgreSQL and Redis (Redis or Valkey) require database_image to be explicitly set
+            // If not provided, fall through to Select component for image selection
+            if ($isDatabase && in_array($type->value(), ['postgresql', 'redis'], true) && ! $database_image) {
+                $this->type = $type->value();
 
-                        return;
-                    }
-                    $database = create_standalone_postgresql(
-                        environmentId: $environment->id,
-                        destination: $destination,
-                        databaseImage: $database_image
-                    );
-                } elseif ($type->value() === 'redis') {
-                    $database = create_standalone_redis($environment->id, $destination);
-                } elseif ($type->value() === 'mongodb') {
-                    $database = create_standalone_mongodb($environment->id, $destination);
-                } elseif ($type->value() === 'mysql') {
-                    $database = create_standalone_mysql($environment->id, $destination);
-                } elseif ($type->value() === 'mariadb') {
-                    $database = create_standalone_mariadb($environment->id, $destination);
-                } elseif ($type->value() === 'keydb') {
-                    $database = create_standalone_keydb($environment->id, $destination);
-                } elseif ($type->value() === 'dragonfly') {
-                    $database = create_standalone_dragonfly($environment->id, $destination);
-                } elseif ($type->value() === 'clickhouse') {
-                    $database = create_standalone_clickhouse($environment->id, $destination);
-                } elseif ($type->value() === 'sqlite') {
-                    $database = create_standalone_sqlite($environment->id, $destination);
-                }
-
-                return redirect()->route('project.database.configuration', [
-                    'project_uuid' => $project->uuid,
-                    'environment_uuid' => $environment->uuid,
-                    'database_uuid' => $database->uuid,
-                ]);
+                return;
             }
-            if ($type->startsWith('one-click-service-')) {
+            $isOneClickService = false;
+            if (! $isDatabase && $type->startsWith('one-click-service-')) {
+                $services = get_service_templates();
                 $oneClickServiceName = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
-                $oneClickService = data_get($services, "$oneClickServiceName.compose");
-                $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
-                if ($oneClickDotEnvs) {
-                    $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
-                        return ! empty($value);
-                    });
-                }
-                if ($oneClickService) {
-                    $service_payload = [
-                        'docker_compose_raw' => base64_decode($oneClickService),
-                        'environment_id' => $environment->id,
-                        'service_type' => $oneClickServiceName,
-                        'server_id' => $destination->server_id,
-                        'destination_id' => $destination->id,
-                        'destination_type' => $destination->getMorphClass(),
-                    ];
-                    if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
-                        data_set($service_payload, 'connect_to_docker_network', true);
-                    }
-                    $service = new Service($service_payload);
-                    $service->save();
-                    $service->name = "$oneClickServiceName-".$service->uuid;
-                    $service->save();
-                    if ($oneClickDotEnvs?->count() > 0) {
-                        $oneClickDotEnvs->each(function ($value) use ($service) {
-                            $key = str()->before($value, '=');
-                            $value = str(str()->after($value, '='));
-                            if ($value) {
-                                EnvironmentVariable::create([
-                                    'key' => $key,
-                                    'value' => $value,
-                                    'resourceable_id' => $service->id,
-                                    'resourceable_type' => $service->getMorphClass(),
-                                    'is_preview' => false,
-                                ]);
-                            }
-                        });
-                    }
-                    $service->parse(isNew: true);
+                $isOneClickService = filled(data_get($services, "$oneClickServiceName.compose"));
+            }
+            if ($isDatabase || $isOneClickService) {
+                $this->pendingType = $type->value();
+                $this->environment = $environment;
+                $this->destination = $destination;
+                $this->databaseImage = $database_image;
 
-                    // Apply service-specific application prerequisites
-                    applyServiceApplicationPrerequisites($service);
-
-                    return redirect()->route('project.service.configuration', [
-                        'service_uuid' => $service->uuid,
-                        'environment_uuid' => $environment->uuid,
-                        'project_uuid' => $project->uuid,
-                    ]);
-                }
+                return;
             }
             $this->type = $type->value();
         }
     }
 
+    public function createResource()
+    {
+        if (! $this->pendingType) {
+            return;
+        }
+        $type = str($this->pendingType);
+        $project = $this->project;
+        $environment = $this->environment;
+        $destination = $this->destination;
+        $this->authorize('createAnyResource', [$environment]);
+        abort_unless((int) $environment->project_id === (int) $project->id, 403);
+        abort_unless((int) $destination->server->team_id === (int) $project->team_id, 403);
+        $this->pendingType = null;
+
+        if (in_array($type, DATABASE_TYPES)) {
+            if ($type->value() === 'postgresql') {
+                $database = create_standalone_postgresql(
+                    environmentId: $environment->id,
+                    destination: $destination,
+                    databaseImage: $this->databaseImage
+                );
+            } elseif ($type->value() === 'redis') {
+                $database = create_standalone_redis($environment->id, $destination, ['image' => $this->databaseImage]);
+            } elseif ($type->value() === 'mongodb') {
+                $database = create_standalone_mongodb($environment->id, $destination);
+            } elseif ($type->value() === 'mysql') {
+                $database = create_standalone_mysql($environment->id, $destination);
+            } elseif ($type->value() === 'mariadb') {
+                $database = create_standalone_mariadb($environment->id, $destination);
+            } elseif ($type->value() === 'keydb') {
+                $database = create_standalone_keydb($environment->id, $destination);
+            } elseif ($type->value() === 'dragonfly') {
+                $database = create_standalone_dragonfly($environment->id, $destination);
+            } elseif ($type->value() === 'clickhouse') {
+                $database = create_standalone_clickhouse($environment->id, $destination);
+            } elseif ($type->value() === 'sqlite') {
+                $database = create_standalone_sqlite($environment->id, $destination);
+            }
+
+            return redirect()->route('project.database.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $environment->uuid,
+                'database_uuid' => $database->uuid,
+            ]);
+        }
+
+        $services = get_service_templates();
+        $oneClickServiceName = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
+        $oneClickService = data_get($services, "$oneClickServiceName.compose");
+        $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
+        if ($oneClickDotEnvs) {
+            $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
+                return ! empty($value);
+            });
+        }
+        if (! $oneClickService) {
+            return redirect()->route('dashboard');
+        }
+        $service_payload = [
+            'docker_compose_raw' => base64_decode($oneClickService),
+            'environment_id' => $environment->id,
+            'service_type' => $oneClickServiceName,
+            'server_id' => $destination->server_id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ];
+        if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
+            data_set($service_payload, 'connect_to_docker_network', true);
+        }
+        $service = new Service($service_payload);
+        $service->save();
+        $service->name = "$oneClickServiceName-".$service->uuid;
+        $service->save();
+        if ($oneClickDotEnvs?->count() > 0) {
+            $oneClickDotEnvs->each(function ($value) use ($service) {
+                $key = str()->before($value, '=');
+                $value = str(str()->after($value, '='));
+                if ($value) {
+                    $service->environment_variables()->updateOrCreate(['key' => $key], [
+                        'value' => $value,
+                        'resourceable_id' => $service->id,
+                        'resourceable_type' => $service->getMorphClass(),
+                        'is_preview' => false,
+                    ]);
+                }
+            });
+        }
+        $service->parse(isNew: true);
+
+        // Apply service-specific application prerequisites
+        applyServiceApplicationPrerequisites($service);
+
+        return redirect()->route('project.service.configuration', [
+            'service_uuid' => $service->uuid,
+            'environment_uuid' => $environment->uuid,
+            'project_uuid' => $project->uuid,
+        ]);
+    }
+
     public function render()
     {
-        return view('livewire.project.resource.create');
+        return view('livewire.project.resource.create', $this->pendingResource());
+    }
+
+    /**
+     * @return array{pendingName: ?string, pendingLogo: ?string}
+     */
+    private function pendingResource(): array
+    {
+        if (! $this->pendingType) {
+            return ['pendingName' => null, 'pendingLogo' => null];
+        }
+        $type = str($this->pendingType);
+        if (in_array($type->value(), DATABASE_TYPES, true)) {
+            return ['pendingName' => $type->headline()->value(), 'pendingLogo' => null];
+        }
+        $services = get_service_templates();
+        $key = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
+
+        return [
+            'pendingName' => str($key)->headline()->value(),
+            'pendingLogo' => service_logo_urls(data_get($services, "$key.logo"))['logo'],
+        ];
     }
 }

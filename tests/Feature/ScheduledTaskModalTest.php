@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Shared\ScheduledTask\Add;
 use App\Livewire\Project\Shared\ScheduledTask\All;
 use App\Livewire\Project\Shared\ScheduledTask\Show;
 use App\Models\Application;
@@ -99,4 +100,23 @@ test('old task page url redirects to the list with the modal open', function () 
         'application_uuid' => $application->uuid,
         'task_uuid' => $this->task->uuid,
     ]));
+});
+
+test('the run in a shell setting is saved when a task is added and edited', function () {
+    Livewire::test(Add::class, ['id' => (string) $this->application->id, 'type' => 'application', 'containerNames' => collect(), 'resource' => $this->application])
+        ->set('name', 'export')
+        ->set('command', '/surreal export')
+        ->set('frequency', 'daily')
+        ->set('useShell', false)
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertSet('useShell', true);
+    expect(ScheduledTask::where('name', 'export')->sole()->use_shell)->toBeFalse();
+
+    Livewire::test(Show::class, ['resource' => $this->application, 'task' => $this->task])
+        ->assertSet('useShell', true)
+        ->set('useShell', false)
+        ->call('submit')
+        ->assertHasNoErrors();
+    expect($this->task->refresh()->use_shell)->toBeFalse();
 });

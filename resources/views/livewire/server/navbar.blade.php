@@ -1,4 +1,7 @@
 <nav class="w-full max-w-none pb-3 lg:pb-0" wire:poll.30s="refreshAgentStatus">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$server" :wire:key="'star-mobile-'.$server->getMorphClass().'-'.$server->uuid" />
+    @endteleport
     <x-process-dialog @startproxy.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
@@ -70,9 +73,10 @@
             ],
             [
                 'label' => 'Security',
-                'route' => 'server.security.patches',
-                'active' => request()->routeIs('server.security.*'),
-                'visible' => $server->isFunctional() && auth()->user()?->can('update', $server),
+                'route' => 'server.security',
+                'active' => request()->routeIs('server.security*'),
+                // Also for a server that is not functional: a changed host key stops the connection, and the page to trust the new key is here.
+                'visible' => auth()->user()?->can('update', $server),
             ],
         ];
 
@@ -90,6 +94,7 @@
             && $server->isSentinelEnabled()
             && auth()->user()?->can('viewSentinel', $server);
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
+        $showProxyActions = $currentRoute === 'server.proxy' || str_starts_with((string) $currentRoute, 'server.proxy.');
     @endphp
 
     @if ($this->hasPendingProxyConfiguration)
@@ -113,18 +118,22 @@
             <span class="relative flex min-w-0 shrink items-center gap-2 px-1"
                 x-data="{ open: false, search: '', servers: @js($serverSwitcherOptions) }"
                 @click.outside="open = false" @keydown.escape.window="open = false">
-                <button type="button"
-                    class="flex h-8 max-w-56 min-w-0 items-center gap-1.5 rounded-md px-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05] xl:max-w-72"
-                    @click="open = !open" :aria-expanded="open" aria-label="Switch server">
-                    <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
-                        {{ $server->name }}
-                    </span>
-                    <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
-                        fill="none" aria-hidden="true">
-                        <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </button>
+                <div class="flex h-8 max-w-56 min-w-0 items-center rounded-md xl:max-w-72">
+                    <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }} title="Go to server"
+                        class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                        <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
+                            {{ $server->name }}
+                        </span>
+                    </a>
+                    <button type="button" class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]"
+                        @click="open = !open" :aria-expanded="open" aria-label="Switch server">
+                        <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
+                            fill="none" aria-hidden="true">
+                            <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </div>
                 <div x-cloak x-show="open" x-transition.origin.top.left
                     class="listbox-panel top-9! left-1! z-[90]! w-64! min-w-0!">
                     <div class="border-b border-neutral-200 p-1.5 dark:border-white/[0.08]">
@@ -151,6 +160,7 @@
             </span>
             <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                 :show-sentinel-status="$showSentinelStatus" />
+            <livewire:star-toggle :resource="$server" :wire:key="'star-server-'.$server->uuid" />
         </div>
     @endteleport
 
@@ -168,7 +178,7 @@
                     <div class="flex w-full min-w-0 items-center gap-2">
                         <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
                             :show-sentinel-status="$showSentinelStatus" />
-                        @if ($traefikDashboardAvailable)
+                        @if ($showProxyActions && $traefikDashboardAvailable)
                             <a target="_blank" href="http://{{ formatHostForUrl((string) $serverIp) }}:8080" title="Open Traefik dashboard"
                                 class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
                                 <x-reicon name="external-link" class="size-3" />
@@ -183,6 +193,7 @@
             <div class="ml-auto shrink-0">
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
+                        @if ($showProxyActions)
                         <x-split-action id="server-mobile-actions">
                             @if ($proxyCanBeStopped)
                                 <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
@@ -208,9 +219,10 @@
                                 Refresh Proxy Status
                             </button>
                         </x-split-action>
+                        @endif
 
-                        {{-- Programmatic open only (clicked from the Actions menu). Keep fully
-                             display:none so the modal shells never reserve a layout row. --}}
+                        {{-- Programmatic open only (proxy actions menu and the pending-changes warning).
+                             Keep fully display:none so the modal shells never reserve a layout row. --}}
                         <div class="hidden" aria-hidden="true">
                             <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
                                 submitAction="restart" :actions="[
@@ -261,7 +273,7 @@
         @php
             $canManageProxy = auth()->user()?->can('manageProxy', $server) ?? false;
         @endphp
-        @if ($server->proxySet() && ($canManageProxy || $traefikDashboardAvailable))
+        @if ($showProxyActions && $server->proxySet() && ($canManageProxy || $traefikDashboardAvailable))
         {{-- Teleport only with content: a filled slot renders as a floating panel. --}}
         @teleport('#resource-action-hud-slot')
         <div class="hidden xl:flex xl:w-auto xl:items-center">

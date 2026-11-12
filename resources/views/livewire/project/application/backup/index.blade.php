@@ -206,9 +206,9 @@
                                 </span>
                                 <span>{{ $backup->frequency }}</span>
                                 <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                                <span title="{{ $backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? $s3StorageNames->join(', ') : 'S3 storage unavailable') : 'S3 storage is not configured' }}">
-                                    <x-status-badge :status="$backup->save_s3 ? match ($s3StorageNames->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $s3StorageNames->count().' storages' } : 'Not set'"
-                                        :type="$backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? 'success' : 'error') : 'neutral'" />
+                                <span class="min-w-0">
+                                    <x-backup-s3-storage :enabled="$backup->save_s3" :names="$s3StorageNames"
+                                        :tooltip="$backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? 'S3 storage: '.$s3StorageNames->join(', ') : 'S3 storage: Unavailable') : 'S3 storage: Not configured'" />
                                 </span>
                                 <span>
                                     {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}

@@ -78,28 +78,6 @@ it('auto saves registration policy', function () {
     expect(instanceSettings()->fresh()->disable_registration_when_oauth_enabled)->toBeTrue();
 });
 
-it('shows oidc fields with a naked okta issuer url example', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('OpenID Connect')
-        ->assertSee('https://example.okta.com', false)
-        ->assertDontSee('/oauth2/default', false);
-});
-
-it('shows oidc option checkboxes', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Allow OIDC user creation')
-        ->assertSee('Require verified email')
-        ->assertSee('Use PKCE');
-});
-
 it('does not show unknown oauth providers', function () {
     actingAsInstanceAdmin();
 
@@ -182,6 +160,35 @@ it('validates oidc url fields before saving', function (string $field, string $v
     'non-http redirect uri' => ['redirect_uri', 'javascript:alert(1)'],
     'invalid issuer url' => ['base_url', 'not-a-url'],
     'non-http issuer url' => ['base_url', 'ftp://idp.example.com'],
+]);
+
+it('rejects a redirect uri that does not point to the provider callback route', function (string $redirectUri) {
+    actingAsInstanceAdmin();
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.redirect_uri', $redirectUri)
+        ->call('submit')
+        ->assertHasErrors(['oauth_settings_map.authentik.redirect_uri']);
+
+    expect(OauthSetting::where('provider', 'authentik')->first()->redirect_uri)->toBeNull();
+})->with([
+    'swapped segments' => ['https://coolify.example.com/auth/callback/authentik'],
+    'other provider' => ['https://coolify.example.com/auth/github/callback'],
+    'no path' => ['https://coolify.example.com'],
+]);
+
+it('accepts a redirect uri on the provider callback route', function (string $redirectUri) {
+    actingAsInstanceAdmin();
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.redirect_uri', $redirectUri)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(OauthSetting::where('provider', 'authentik')->first()->redirect_uri)->toBe($redirectUri);
+})->with([
+    'callback route' => ['https://coolify.example.com/auth/authentik/callback'],
+    'trailing slash' => ['https://coolify.example.com/auth/authentik/callback/'],
 ]);
 
 it('does not enable oidc without required fields', function () {

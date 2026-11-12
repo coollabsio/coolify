@@ -2,7 +2,7 @@
     description="The first reached limit removes the oldest backup. Use 0 for unlimited retention.">
     <div class="space-y-6">
         <div>
-            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Local backups</h3>
+            <h4 class="mb-2 text-xs! font-medium! text-neutral-500! dark:text-fg-dim!">Local backups</h4>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <x-forms.input label="Backups to keep" id="databaseBackupRetentionAmountLocally"
                     type="number" min="0" helper="Maximum number of recent local backups." required />
@@ -14,8 +14,8 @@
             </div>
         </div>
 
-        <div class="border-t border-neutral-200 pt-6 dark:border-white/[0.06]">
-            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">S3 backups</h3>
+        <div>
+            <h4 class="mb-2 text-xs! font-medium! text-neutral-500! dark:text-fg-dim!">S3 backups</h4>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <x-forms.input label="Backups to keep" id="databaseBackupRetentionAmountS3"
                     type="number" min="0" helper="Maximum number of recent S3 backups." required />

@@ -13,7 +13,6 @@
         ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
         ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
         ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
-        ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
         ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Files', 'route' => 'project.service.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
@@ -21,6 +20,9 @@
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'webhook'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
+        ['label' => 'Maintenance Mode', 'route' => 'project.service.maintenance', 'icon' => 'bandage'],
+        ['label' => 'Security', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert',
+            'security' => \App\Services\ImageScan\SecurityStatus::stored($service)->status->value],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
@@ -30,16 +32,14 @@
                 || ($item['route'] === 'project.service.scheduled-tasks.show'
                     && str($currentRoute)->startsWith('project.service.scheduled-tasks'))
                 || ($item['route'] === 'project.service.volume-backups.index'
-                    && str($currentRoute)->startsWith('project.service.volume-backups'))
-                || ($item['route'] === 'project.service.import-backup'
-                    && str($currentRoute)->startsWith('project.service.import-backup')),
+                    && str($currentRoute)->startsWith('project.service.volume-backups')),
         ]);
 
     $menuGroups = [
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics'],
-        'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
-        'Operations' => ['Resource Operations', 'Tags'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics', 'Security'],
+        'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+        'Operations' => ['Resource Operations', 'Maintenance Mode', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
     ];
 
@@ -49,17 +49,29 @@
             ->filter()
             ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
+
+    // Pages that the user can star (components/starred-menu)
+    $starrableMenuItems = $configurationItems->map(fn (array $item): array => [
+        'key' => $item['route'],
+        'label' => $item['label'],
+        'icon' => $item['icon'],
+        'href' => route($item['route'], $serviceRouteParameters),
+        'active' => $item['active'],
+        'navigate' => $item['navigate'] ?? true,
+    ])->values()->all();
 @endphp
 
 <x-main-nav-menu back-label="Dashboard" :name="$service->name" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="service" :items="$starrableMenuItems" />
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
+                <div class="starred-menu-row">
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
@@ -68,10 +80,13 @@
                     @if ($menuItem['label'] === 'Files')
                         <x-beta-badge class="ml-auto shrink-0" />
                     @endif
+                    <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                     @if ($menuItem['hasWarning'] ?? false)
                         <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                     @endif
                 </a>
+                <x-starred-menu.toggle menu="service" :page="$menuItem['route']" :label="$menuItem['label']" />
+                </div>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
                     <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{ activeSection: '' }">

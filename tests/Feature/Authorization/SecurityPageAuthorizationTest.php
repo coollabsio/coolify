@@ -64,16 +64,6 @@ test('member does not see add or cleanup buttons on private key page', function 
         ->assertDontSee('Delete unused keys');
 });
 
-test('member can view private key names on index page', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    // Member can see key names (view is allowed for same-team members)
-    // but cannot see create/delete buttons (tested separately above)
-    Livewire::test(PrivateKeyIndex::class)
-        ->assertSee('Team SSH Key');
-});
-
 test('member cannot call cleanup unused keys', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);

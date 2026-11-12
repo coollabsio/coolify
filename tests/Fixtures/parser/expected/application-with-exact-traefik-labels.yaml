@@ -1587,7 +1587,9 @@
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - web
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-7'
@@ -1669,7 +1671,9 @@
           - traefik.http.services.http-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
           - traefik.http.services.https-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - api
         env_file:
           - .env
       my-app-pr-7:
@@ -1737,7 +1741,9 @@
           - traefik.http.services.http-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - my-app
         env_file:
           - .env
       api.v2-pr-7:
@@ -1769,7 +1775,9 @@
           - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls=true
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - api.v2
         environment:
           COOLIFY_BRANCH: '"pull/7/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
@@ -1839,7 +1847,9 @@
         networks:
           internal:
             ipv4_address: 172.30.0.10
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - admin
         container_name: admin-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1938,7 +1948,9 @@
           - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls=true
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - blog
         env_file:
           - .env
       db-pr-7:
@@ -1979,7 +1991,9 @@
           - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
         networks:
           internal: null
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - db
         healthcheck:
           test:
             - CMD-SHELL
@@ -2102,7 +2116,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          referenceapplication0001-7: null
+          referenceapplication0001-7:
+            aliases:
+              - worker
         env_file:
           - .env
     volumes:
@@ -2308,7 +2324,9 @@
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - web
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-8'
@@ -2359,7 +2377,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - api
         env_file:
           - .env
       my-app-pr-8:
@@ -2396,7 +2416,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - my-app
         env_file:
           - .env
       api.v2-pr-8:
@@ -2415,7 +2437,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - api.v2
         environment:
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
@@ -2457,7 +2481,9 @@
         networks:
           internal:
             ipv4_address: 172.30.0.10
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - admin
         container_name: admin-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2507,7 +2533,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - blog
         env_file:
           - .env
       db-pr-8:
@@ -2536,7 +2564,9 @@
           - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
         networks:
           internal: null
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - db
         healthcheck:
           test:
             - CMD-SHELL
@@ -2635,7 +2665,9 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          referenceapplication0001-8: null
+          referenceapplication0001-8:
+            aliases:
+              - worker
         env_file:
           - .env
     volumes:

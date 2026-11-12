@@ -34,7 +34,7 @@ function resourcePermissionCalloutApplicationFor(string $role): Application
     ]);
 }
 
-it('shows one red insufficient permissions callout for resource operations when update is denied', function () {
+it('shows one insufficient permissions callout for resource operations when update is denied', function () {
     $application = resourcePermissionCalloutApplicationFor('member');
 
     $component = Livewire::test(ResourceOperations::class, ['resource' => $application])
@@ -45,12 +45,10 @@ it('shows one red insufficient permissions callout for resource operations when 
         ->assertDontSee("You don't have permission to clone resources")
         ->assertDontSee("You don't have permission to move resources");
 
-    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1)
-        ->and($component->html())->toContain('bg-red-50')
-        ->and($component->html())->not->toContain('bg-warning-50');
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1);
 });
 
-it('shows the red insufficient permissions callout for tags when update is denied', function () {
+it('shows the insufficient permissions callout for tags when update is denied', function () {
     $application = resourcePermissionCalloutApplicationFor('member');
 
     $component = Livewire::test(Tags::class, ['resource' => $application])
@@ -59,7 +57,5 @@ it('shows the red insufficient permissions callout for tags when update is denie
         ->assertDontSee('Access Restricted')
         ->assertDontSee("You don't have permission to manage tags");
 
-    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1)
-        ->and($component->html())->toContain('bg-red-50')
-        ->and($component->html())->not->toContain('bg-warning-50');
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1);
 });

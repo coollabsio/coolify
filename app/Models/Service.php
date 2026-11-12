@@ -12,6 +12,7 @@ use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -47,7 +48,7 @@ use OpenApi\Attributes as OA;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -100,10 +101,7 @@ class Service extends BaseModel
             if (blank($service->name)) {
                 $service->name = 'service-'.new_public_id();
             }
-        });
-        static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
-            $service->save();
         });
         static::saving(function ($service) {
             if ($service->isDirty('docker_compose_raw')) {
@@ -330,6 +328,11 @@ class Service extends BaseModel
         $resources = $applications->concat($databases);
 
         foreach ($resources as $resource) {
+            // A part that is not in the compose file has no container, so it does not count.
+            if ($resource->is_removed_from_compose ?? false) {
+                continue;
+            }
+
             $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
 
             // Filter based on excludedOnly flag

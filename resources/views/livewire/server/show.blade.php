@@ -10,6 +10,14 @@
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full min-w-0">
+            {{-- Outside the layout switch, so that the localhost server shows it too. --}}
+            @if (filled($server->settings->ssh_host_key_pending))
+                <x-callout type="danger" title="The SSH host key of this server changed" class="mb-4">
+                    The server sent a host key that does not match the key that Coolify trusts. Check it on the
+                    <a href="{{ route('server.security', ['server_uuid' => $server->uuid]).'#server-host-key-section' }}" {{ wireNavigate() }}
+                        class="underline">Security</a> page.
+                </x-callout>
+            @endif
             @if ($server->isLocalhost())
                 @include('livewire.server.partials.localhost-general')
             @else
@@ -80,7 +88,7 @@
                             @if ($server->isTransferredAway())
                                 <x-status-badge label="Transferred away" type="warning" />
                             @else
-                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                <x-status-badge :label="$server->isFunctional() ? 'Operational' : 'Validation required'"
                                     :type="$server->isFunctional() ? 'success' : 'warning'" />
                             @endif
                         </x-slot:badges>
@@ -143,7 +151,8 @@
                             @endif
 
                             @if ($server->canBeValidated())
-                                <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
+                                <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating"
+                                    x-on:background-validation-finished.window="processDialogOpen = false">
                                     <x-slot:title>Validate and configure</x-slot:title>
                                     <x-slot:content>
                                         <livewire:server.validate-and-install :server="$server"
@@ -211,6 +220,8 @@
                                 This server is disabled because the current plan server limit was exceeded.
                             </x-callout>
                         @endif
+
+                        @include('livewire.server.partials.force-disabled-callout')
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input canGate="update" :canResource="$server" id="name" label="Name"

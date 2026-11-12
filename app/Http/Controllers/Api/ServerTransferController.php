@@ -112,7 +112,7 @@ class ServerTransferController extends Controller
         auditLog('api.server.migrate', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
-            'target_url' => data_get($server->server_metadata, 'migration.target_url'),
+            'target_url' => auditUrl(data_get($server->server_metadata, 'migration.target_url')),
         ]);
 
         return response()->json([
@@ -249,7 +249,7 @@ class ServerTransferController extends Controller
                 'message' => $schemaVersion === ServerTransferBundle::SCHEMA_VERSION ? null
                     : 'This instance reads transfer bundle version '.ServerTransferBundle::SCHEMA_VERSION.", but the source sends version {$schemaVersion}. Upgrade both instances to the same Coolify version.",
             ],
-            ...collect($this->importer->importChecks((string) $request->query('server_uuid'), $ip, $teamId))
+            ...collect($this->importer->importChecks((string) $request->query('server_uuid'), $ip, $teamId, serverPort: $port))
                 ->map(fn (array $check) => collect($check)->only(['label', 'ok', 'message'])->all())
                 ->all(),
             [

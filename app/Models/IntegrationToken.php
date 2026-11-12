@@ -118,6 +118,7 @@ class IntegrationToken extends BaseModel
             'accountId' => '*',
             'zoneId' => 'all',
             'name' => in_array('tunnel', $capabilities, true) ? 'Coolify DNS and Tunnel Management' : 'Coolify DNS Management',
+            'ref' => 'coolify.io',
         ], '', '&', PHP_QUERY_RFC3986);
     }
 

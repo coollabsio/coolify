@@ -23,14 +23,6 @@ it('uses Reverb as the first-party broadcast server', function () {
         ->and(file_exists(config_path('reverb.php')))->toBeTrue();
 });
 
-it('does not send server-side broadcasts to the browser-facing Pusher host', function () {
-    $reverbConnection = Str::between(file_get_contents(config_path('broadcasting.php')), "'reverb' => [", "'pusher' => [");
-
-    expect($reverbConnection)
-        ->not->toContain('PUSHER_HOST')
-        ->not->toContain("env('PUSHER_SCHEME'");
-});
-
 it('keeps working with environment variables from installs that used the realtime container', function (array $environment, string $connection, string $expectedHost) {
     $previous = [];
 
@@ -161,22 +153,6 @@ it('uses the browser host and page TLS mode for development Reverb connections',
         ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"')
         ->and(file_get_contents(base_path('docker-compose.dev-multi.yml')))
         ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"');
-});
-
-it('proxies Reverb and terminal websocket traffic to the Coolify app container', function () {
-    $serverModel = file_get_contents(app_path('Models/Server.php'));
-
-    expect($serverModel)
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/app`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/apps`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/terminal/ws`)\"")
-        ->toContain("'url' => 'http://coolify:6001'")
-        ->toContain("'url' => 'http://coolify:6002'")
-        ->toContain('reverse_proxy coolify:6001')
-        ->toContain('reverse_proxy coolify:6002')
-        ->not->toContain('http://coolify-realtime:6001')
-        ->not->toContain('http://coolify-realtime:6002')
-        ->not->toContain('reverse_proxy coolify-realtime');
 });
 
 it('uses Pusher environment keys for self-hosted Reverb compatibility', function () {

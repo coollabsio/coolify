@@ -83,7 +83,6 @@ class Member extends Component
                 'team_id' => $teamId,
                 'member_id' => $this->member->id,
                 'member_name' => $this->member->name,
-                'member_email' => $this->member->email,
             ]);
             // Clear cache for the removed user - both old and new key formats
             Cache::forget("team:{$this->member->id}");
@@ -117,7 +116,6 @@ class Member extends Component
             'team_id' => $teamId,
             'member_id' => $this->member->id,
             'member_name' => $this->member->name,
-            'member_email' => $this->member->email,
             'role' => $role->value,
         ]);
     }

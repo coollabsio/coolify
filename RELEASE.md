@@ -17,6 +17,7 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 | `v4.4.x`       | backports and hotfixes, cut from the newest tag of v4.4    | stable `4.4.x` versions                |
 
 - `main` takes fixes only. A new minor or major reaches it as a merge of `next` or a release branch
+- Merge `next` or a release branch into `main` only right before you release it, on the same day. To freeze a minor for longer, publish an RC on `next` or cut `release/v4.7`
 - `next` and the release branches publish prereleases only, their stable versions are released on `main`
 - Name a branch after what it changes: `fix/<topic>`, `feat/<topic>`, and `fix/<topic>-v4.4.8` for a backport, after the version that releases it
 - Squash merge pull requests from contributors and pull requests with a single change, such as dependency updates
@@ -35,11 +36,12 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > [!NOTE]
 > `next` publishes prereleases only. For its stable version, merge `next` into `main` with a merge commit and create the release on `main`.
 
-1. Describe the changes under `## [Unreleased]` in `CHANGELOG.md`, they become the release notes
-2. Check what the branch releases:
+1. Describe the changes in change files with `scripts/change.sh`, they become the release notes, see [Change files](#change-files)
+2. Check what the branch releases and the entries it lists:
 
     ```sh
     scripts/plan-version.sh
+    scripts/change.sh --notes
     ```
 
 3. Select the stage and the version, the script commits them and asks to push:
@@ -57,6 +59,27 @@ Every release is tagged `v<version>`, such as `v4.6.0-beta.1`, and publishes the
 > ```sh
 > scripts/undo-release.sh
 > ```
+
+## Change files
+
+Every change has a file in `.changes/`, `AGENTS.md` describes the types and the wording:
+
+```markdown
+---
+type: fixed
+commit: e0b94662e9
+---
+Ignored concurrent build limit of build servers
+
+- Each build counts on the server that runs it
+- A freed build server slot starts the waiting deployments of other servers
+```
+
+- `scripts/change.sh` writes a file, it asks for what its flags leave out, and `--notes` prints the entries of the next release
+- `scripts/release.sh` preselects the version the files need and writes them into `CHANGELOG.md`, the release workflow reads its notes from there
+- A prerelease writes the files under `## [Unreleased]`, keeps them and adds its version to the files that have none
+- A stable release writes the files under `## [v4.6.1] - <date>` and removes them
+- `scripts/undo-release.sh` brings the files back as they were
 
 ## Backport a fix
 
@@ -169,6 +192,7 @@ The pull request workflow builds every pull request and publishes the image of a
 | `nightly` | `/coolify/nightly/` | the nightly workflow after every nightly, pushed to main  |
 
 - The preview channel takes betas and release candidates, alphas reach the nightly channel only
+- The stable channel opens a pull request from `sync/stable-v<version>`, squash merge it. A new sync of the same version updates it, a sync of a newer version closes it
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
 - `/coolify/versions.json` has a `stable`, `preview` and `nightly` block, each with the Coolify version of its channel and the helper, Sentinel and Traefik versions of the `upstream.json` it was synced from. An instance takes the newest version of its channel and the more stable ones
 - Every stable sync also sets the `coolify` and `traefik` keys, which older instances read, to the stable versions, so older instances upgrade to a version that reads the blocks

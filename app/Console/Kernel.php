@@ -11,6 +11,7 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\CleanupUnusedSshKeys;
 use App\Jobs\DeleteExpiredNodeVolumeCopiesJob;
 use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\InspectNodeClusterNetworksJob;
@@ -54,6 +55,11 @@ class Kernel extends ConsoleKernel
         if (validate_timezone($this->instanceTimezone) === false) {
             $this->instanceTimezone = config('app.timezone');
         }
+
+        // Files are local to each cloud node; do not dispatch to the shared queue.
+        $this->scheduleInstance->call(fn () => app(CleanupUnusedSshKeys::class)->handle())
+            ->name('cleanup:ssh-keys')
+            ->hourly();
 
         $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
             ->name('cleanup:ssh-mux')

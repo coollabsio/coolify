@@ -85,6 +85,23 @@ describe('Team shared environment variables API', function () {
         expect(SharedEnvironmentVariable::query()->whereKey($envId)->exists())->toBeFalse();
     });
 
+    test('cannot unlock a locked team shared env', function () {
+        $env = SharedEnvironmentVariable::create([
+            'key' => 'LOCKED_TEAM_SECRET',
+            'value' => 'locked-secret',
+            'is_shown_once' => true,
+            'type' => 'team',
+            'team_id' => $this->team->id,
+        ]);
+
+        $this->withHeaders(sharedEnvHeaders($this->bearerToken))
+            ->patchJson("/api/v1/team/envs/{$env->id}", ['is_shown_once' => false])
+            ->assertOk()
+            ->assertDontSee('locked-secret');
+
+        expect((bool) $env->fresh()->is_shown_once)->toBeTrue();
+    });
+
     test('hides value without can_read_sensitive', function () {
         SharedEnvironmentVariable::create([
             'key' => 'HIDDEN_SECRET',

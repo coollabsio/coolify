@@ -40,6 +40,9 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
@@ -52,6 +55,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -73,9 +77,6 @@ use Nubs\RandomNameGenerator\Alliteration;
 use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
-use PurplePixie\PhpDns\DNSQuery;
-use PurplePixie\PhpDns\DNSResult;
-use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
@@ -607,6 +608,8 @@ function find_resource_destination_for_current_team(?string $uuid): StandaloneDo
         return null;
     }
 
+    Gate::authorize('placeResource', $destination->server);
+
     return $destination;
 }
 
@@ -743,10 +746,13 @@ function generate_random_name(?string $cuid = null): string
 
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-function generateSSHKey(string $type = 'rsa')
+/**
+ * RSA keys get 4096 bits: GitHub rejects new RSA SSH keys smaller than 3072 bits, and phpseclib makes 2048-bit keys by default.
+ */
+function generateSSHKey(string $type = 'ed25519')
 {
     if ($type === 'rsa') {
-        $key = RSA::createKey();
+        $key = RSA::createKey(4096);
 
         return [
             'private' => $key->toString('PKCS1'),
@@ -1137,6 +1143,18 @@ function maintenance_queue(): string
 function webhooks_queue(): string
 {
     return isCloud() ? 'webhooks' : 'high';
+}
+
+/**
+ * Resolve the queue for PushServerUpdateJob, which processes Sentinel pushes.
+ *
+ * On cloud these jobs run on a dedicated `sentinel` queue, so a burst of pushes from many
+ * servers cannot use the workers of the other queues. Self-hosted returns null, so the jobs
+ * stay on the default queue of the connection, as before.
+ */
+function sentinel_queue(): ?string
+{
+    return isCloud() ? 'sentinel' : null;
 }
 
 function translate_cron_expression($expression_to_validate): string
@@ -1823,11 +1841,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 
     return null;
 }
+/**
+ * Finds a standalone database of the team for the API and MCP. The instance database (coolify-db) is never returned.
+ */
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
     foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
         $database = $modelClass::whereUuid($uuid)->first();
-        if ($database && $database->team()->id == $teamId) {
+        if ($database instanceof StandalonePostgresql && $database->isInstanceDatabase()) {
+            return null;
+        }
+        if ($database && $database->team()?->id == $teamId) {
             return $database->unsetRelation('environment');
         }
     }
@@ -2528,19 +2552,19 @@ function validateDNSEntry(string $fqdn, Server $server)
     $dns_servers = str($dns_servers)->explode(',');
     $ip = serverDnsTargetIp($server);
     $found_matching_ip = false;
-    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
+    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DnsResolver::TYPE_AAAA : DnsResolver::TYPE_A;
     foreach ($dns_servers as $dns_server) {
         try {
             $results = queryDnsServer($dns_server, $host, $type);
             if ($results !== false) {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (isCloudflareIp($result->getData())) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
                             $found_matching_ip = true;
                             break 2;
                         }
-                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
-                            $found_matching_ip = true;
+                        if (isCloudflareIp($result->getData())) {
+                            $found_matching_ip = ! app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $ip);
                             break 2;
                         }
                     }
@@ -2553,9 +2577,9 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DNSQuery
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DnsResolver
 {
-    return app()->make(DNSQuery::class, [
+    return app()->make(DnsResolver::class, [
         'server' => formatHostForUrl($dnsServer),
         'port' => 53,
         'timeout' => $timeout,
@@ -2568,7 +2592,7 @@ function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): 
  * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
  * records would otherwise be silently dropped.
  *
- * @return iterable<int, DNSResult>|false
+ * @return iterable<int, DnsRecord>|false
  */
 function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
 {
@@ -3473,12 +3497,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                                 $savedService->save();
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $fqdn,
+                            EnvironmentVariable::firstOrCreate([
+                                'key' => $key->value(),
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                            ], [
+                                'value' => $fqdn,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
@@ -4472,7 +4497,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
-                        $composeRedirect = data_get($domains, "$serviceName.redirect");
+                        $composeRedirect = data_get($domains, [$serviceName, 'redirect']);
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
@@ -4636,8 +4661,10 @@ function generate_fluentd_configuration(): array
             'fluentd-address' => 'tcp://127.0.0.1:24224',
             'fluentd-async' => 'true',
             'fluentd-sub-second-precision' => 'true',
-            // env vars are used in the LogDrain configurations
+            // The env vars exist only when the resource includes the Coolify default variables.
             'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+            // Every Coolify container has these labels. Docker skips a label that a container does not have.
+            'labels' => 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName',
         ],
     ];
 }
@@ -5141,36 +5168,140 @@ function getJobStatus(?string $jobId = null)
     return $jobFound->first()->status;
 }
 
-function parseDockerfileInterval(string $something)
+/**
+ * Find the HEALTHCHECK instruction that applies to the image built from the Dockerfile.
+ *
+ * Docker builds the target stage, or the last stage when no target is set. A stage keeps the
+ * HEALTHCHECK of an earlier stage that it starts FROM, and the last HEALTHCHECK of a stage wins.
+ * Returns null when no HEALTHCHECK applies or when it is HEALTHCHECK NONE.
+ */
+function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target = null): ?string
 {
-    $value = preg_replace('/[^0-9]/', '', $something);
-    $unit = preg_replace('/[0-9]/', '', $something);
-
-    // Default to seconds if no unit specified
-    $unit = $unit ?: 's';
-
-    // Convert to seconds based on unit
-    $seconds = (int) $value;
-    switch ($unit) {
-        case 'ns':
-            $seconds = (int) ($value / 1000000000);
-            break;
-        case 'us':
-        case 'µs':
-            $seconds = (int) ($value / 1000000);
-            break;
-        case 'ms':
-            $seconds = (int) ($value / 1000);
-            break;
-        case 'm':
-            $seconds = (int) ($value * 60);
-            break;
-        case 'h':
-            $seconds = (int) ($value * 3600);
-            break;
+    $dockerfile = (string) $dockerfile;
+    // The "# escape=`" parser directive (Windows Dockerfiles) is valid only in the comment lines at the top of the file.
+    $escape = preg_match('/\A(?:[ \t]*#[ \t]*[a-z]+[ \t]*=[^\r\n]*\R)*?[ \t]*#[ \t]*escape[ \t]*=[ \t]*([\\\\`])[ \t]*$/im', $dockerfile, $directive)
+        ? $directive[1]
+        : '\\';
+    $instructions = [];
+    $current = '';
+    foreach (preg_split('/\R/', $dockerfile) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $continues = str_ends_with($line, $escape);
+        $current = trim($current.' '.($continues ? substr($line, 0, -1) : $line));
+        if (! $continues) {
+            $instructions[] = $current;
+            $current = '';
+        }
+    }
+    if ($current !== '') {
+        $instructions[] = $current;
     }
 
-    return $seconds;
+    /** @var array<int, array{name: ?string, parent: string, healthcheck: ?string}> $stages */
+    $stages = [];
+    foreach ($instructions as $instruction) {
+        if (preg_match('/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i', $instruction, $matches)) {
+            $stages[] = [
+                'name' => isset($matches[2]) ? strtolower($matches[2]) : null,
+                'parent' => strtolower($matches[1]),
+                'healthcheck' => null,
+            ];
+        } elseif ($stages !== [] && preg_match('/^HEALTHCHECK(\s|$)/i', $instruction)) {
+            $stages[array_key_last($stages)]['healthcheck'] = $instruction;
+        }
+    }
+    if ($stages === []) {
+        return null;
+    }
+
+    $target = filled($target) ? strtolower(trim($target)) : null;
+    $index = $target === null ? array_key_last($stages) : null;
+    foreach ($stages as $i => $stage) {
+        if ($target !== null && $stage['name'] === $target) {
+            $index = $i;
+        }
+    }
+
+    while ($index !== null) {
+        $stage = $stages[$index];
+        if ($stage['healthcheck'] !== null) {
+            return preg_match('/^HEALTHCHECK(?:\s+--\S+)*\s+NONE$/i', $stage['healthcheck']) ? null : $stage['healthcheck'];
+        }
+        $parentIndex = null;
+        foreach ($stages as $i => $candidate) {
+            if ($i < $index && $candidate['name'] === $stage['parent']) {
+                $parentIndex = $i;
+            }
+        }
+        $index = $parentIndex;
+    }
+
+    return null;
+}
+
+/**
+ * Read the options of a HEALTHCHECK instruction like Docker does: only the --name=value flags before CMD count.
+ * An option is null when it is missing or not valid. Docker uses its default for a zero interval, timeout, or retries
+ * (30s, 30s, 3), so those are returned instead of 0.
+ *
+ * @return array{interval: ?int, timeout: ?int, start_period: ?int, retries: ?int}
+ */
+function dockerfileHealthcheckOptions(string $instruction): array
+{
+    preg_match('/^HEALTHCHECK((?:\s+--[a-z-]+=(?:"[^"]*"|\'[^\']*\'|\S+))*)/i', $instruction, $flagsPart);
+    preg_match_all('/--([a-z-]+)=("[^"]*"|\'[^\']*\'|\S+)/i', $flagsPart[1] ?? '', $flags, PREG_SET_ORDER);
+    $values = [];
+    foreach ($flags as [, $name, $value]) {
+        $values[$name] = preg_replace('/^(["\'])(.*)\1$/', '$2', $value);
+    }
+
+    $interval = parseDockerfileInterval($values['interval'] ?? '');
+    $timeout = parseDockerfileInterval($values['timeout'] ?? '');
+    $retries = preg_match('/^\+?\d{1,9}$/', $values['retries'] ?? '') ? (int) $values['retries'] : null;
+
+    return [
+        'interval' => $interval === 0 ? 30 : $interval,
+        'timeout' => $timeout === 0 ? 30 : $timeout,
+        'start_period' => parseDockerfileInterval($values['start-period'] ?? ''),
+        'retries' => $retries === 0 ? 3 : $retries,
+    ];
+}
+
+/**
+ * Convert a Dockerfile HEALTHCHECK duration (Go duration syntax, for example "1m30s" or "1.5m") to whole seconds.
+ * A value without a unit is read as seconds. A positive value below one second becomes 1, so it does not read as zero.
+ * Returns null when the value is not a valid duration or does not fit the integer column.
+ */
+function parseDockerfileInterval(string $duration): ?int
+{
+    if (str_starts_with($duration, '+')) {
+        $duration = substr($duration, 1);
+    }
+    if (preg_match('/^\d+$/', $duration)) {
+        return (int) $duration <= 2147483647 ? (int) $duration : null;
+    }
+
+    $unitSeconds = ['ns' => 1e-9, 'us' => 1e-6, 'µs' => 1e-6, 'μs' => 1e-6, 'ms' => 1e-3, 's' => 1, 'm' => 60, 'h' => 3600];
+    preg_match_all('/(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)/u', $duration, $parts, PREG_SET_ORDER);
+    if ($parts === [] || implode('', array_column($parts, 0)) !== $duration) {
+        return null;
+    }
+
+    $seconds = 0.0;
+    foreach ($parts as [, $value, $unit]) {
+        $seconds += (float) $value * $unitSeconds[$unit];
+    }
+    if ($seconds > 0 && $seconds < 1) {
+        return 1;
+    }
+
+    // Round away float noise (0.3m = 17.999...s), then drop the fraction: the columns store whole seconds.
+    $seconds = floor(round($seconds, 6));
+
+    return $seconds <= 2147483647 ? (int) $seconds : null;
 }
 
 function addPreviewDeploymentSuffix(string $name, int $pull_request_id = 0): string
@@ -5871,7 +6002,7 @@ function convertContainerMemoryBytesToMegabytes(array $metrics): array
 }
 
 /**
- * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}.
+ * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}, {{server.VAR}}.
  *
  * This is the canonical implementation used by both EnvironmentVariable::realValue and the compose parsers
  * to ensure shared variable references are replaced with their actual values.
@@ -5899,6 +6030,8 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             $id = $resource->environment->project->id;
         } elseif ($type->value() === 'team') {
             $id = $resource->team()->id;
+        } elseif ($type->value() === 'server') {
+            $id = data_get($resource, 'destination.server_id');
         }
         if (is_null($id)) {
             continue;
@@ -5922,7 +6055,7 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
  * The compose parsers write resolved values into `docker_compose`: environment variables, database
  * overrides, and shared variable references. Deployments need those values, so only the displayed
  * copy is redacted. Covered: the resource's locked variables (also variables that reference a locked
- * shared variable) and locked team, project, and environment variables that the raw compose references.
+ * shared variable) and locked team, project, environment, and server variables that the raw compose references.
  * Values shorter than 4 characters are not replaced, because they would match unrelated text.
  * A parsed compose (array or collection) gets the same replacement in every string value.
  *
@@ -5940,13 +6073,14 @@ function redactLockedValuesInGeneratedCompose(string|array|Collection|null $comp
     $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
 
     preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
-    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], ['team', 'project', 'environment'], true));
+    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], SHARED_VARIABLE_TYPES, true));
     $teamId = $resource->team()?->id;
     if ($references->isNotEmpty() && $teamId !== null) {
         $scopeIds = [
             'team' => $teamId,
             'project' => $resource->environment?->project_id,
             'environment' => $resource->environment_id,
+            'server' => data_get($resource, 'destination.server_id'),
         ];
         $values = SharedEnvironmentVariable::query()
             ->where('team_id', $teamId)

@@ -12,11 +12,13 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use PDOException;
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -32,7 +34,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -45,6 +47,9 @@ use OpenApi\Attributes as OA;
 class EnvironmentVariable extends BaseModel
 {
     use Auditable;
+
+    /** The key is in the metadata of the row, and the flags of a new variable have little audit value. */
+    protected bool $auditCreatedChanges = false;
 
     /**
      * Flags that a "# coolify:" line of the developer view can set, with their defaults.
@@ -115,6 +120,7 @@ class EnvironmentVariable extends BaseModel
         'is_multiline' => 'boolean',
         'is_literal' => 'boolean',
         'is_preview' => 'boolean',
+        'is_production_value_copy' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'is_file_secret' => 'boolean',
@@ -138,8 +144,17 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping',
     ];
 
+    /**
+     * Not stored: false leaves the preview copy of a new production variable of an application empty.
+     * It cannot copy the value when the "New preview variables" setting of the application is "Leave empty".
+     */
+    public ?bool $copyValueToPreview = null;
+
     protected static function booted()
     {
+        static::creating(function (ModelsEnvironmentVariable $environment_variable) {
+            $environment_variable->version = config('constants.coolify.version');
+        });
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
             if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
@@ -152,9 +167,15 @@ class EnvironmentVariable extends BaseModel
                     $application = Application::find($environment_variable->resourceable_id);
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
-                        ModelsEnvironmentVariable::create([
+                        // The preview copy is part of the same change, so it gets no audit rows of its own.
+                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false
+                            && $environment_variable->copyValueToPreview !== false;
+                        // forceFill: is_production_value_copy is not fillable.
+                        $preview = (new ModelsEnvironmentVariable)->forceFill([
                             'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
+                            // Without production values, the copy only shows which keys the previews need.
+                            'value' => $usesProductionValue ? $environment_variable->value : '',
+                            'is_production_value_copy' => $usesProductionValue && filled($environment_variable->value),
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
@@ -166,19 +187,25 @@ class EnvironmentVariable extends BaseModel
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
                         ]);
+                        $preview->withoutAuditLogging(fn () => $preview->save());
                     }
                 }
             }
-            $environment_variable->update([
-                'version' => config('constants.coolify.version'),
-            ]);
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+            if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
+                $environmentVariable->is_shown_once = true;
+            }
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
             }
             $environmentVariable->authorizeAddedSharedVariableReferences();
+            // A changed preview value is the user's own value, not the copy of production.
+            if ($environmentVariable->exists && $environmentVariable->is_preview && $environmentVariable->isDirty('value')) {
+                $environmentVariable->is_production_value_copy = false;
+            }
             $environmentVariable->updateIsShared();
         });
     }
@@ -197,6 +224,62 @@ class EnvironmentVariable extends BaseModel
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * The variables of one resource and preview flag that have the given key.
+     */
+    public function scopeForResourceKey(Builder $query, string $resourceableType, int $resourceableId, bool $isPreview, string $key): Builder
+    {
+        return $query->where('resourceable_type', $resourceableType)
+            ->where('resourceable_id', $resourceableId)
+            ->where('is_preview', $isPreview)
+            ->where('key', $key);
+    }
+
+    /**
+     * The other variables of this resource and preview flag that have the given key (by default its own key).
+     */
+    public function sameKeyVariables(?string $key = null): Builder
+    {
+        return static::query()
+            ->forResourceKey($this->resourceable_type, $this->resourceable_id, (bool) $this->is_preview, $key ?? $this->key)
+            ->whereKeyNot($this->getKey());
+    }
+
+    /**
+     * The table has no unique index on resource and key, so two requests that create the same key at the
+     * same time (parallel Compose parses or saves) could both insert it. Inserts of one key wait for each
+     * other, and a second row is refused like a unique index refuses it, so firstOrCreate() returns the
+     * existing row.
+     */
+    protected function performInsert(Builder $query)
+    {
+        if ($this->resourceable_type === null || $this->resourceable_id === null) {
+            return parent::performInsert($query);
+        }
+
+        $connection = $this->getConnection();
+
+        return $connection->transaction(function () use ($connection, $query) {
+            if ($connection->getDriverName() === 'pgsql') {
+                // Held until the transaction commits, so the next insert of this key sees this row.
+                $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                    "environment_variables:{$this->resourceable_type}:{$this->resourceable_id}:".(int) (bool) $this->is_preview.":{$this->key}",
+                ]);
+            }
+
+            if ($this->sameKeyVariables()->exists()) {
+                throw new UniqueConstraintViolationException(
+                    $connection->getName(),
+                    'insert into "environment_variables"',
+                    [],
+                    new PDOException("Environment variable {$this->key} already exists."),
+                );
+            }
+
+            return parent::performInsert($query);
+        });
     }
 
     public function scopeWithoutBuildpackControlVariables(Builder $query): Builder
@@ -696,11 +779,27 @@ class EnvironmentVariable extends BaseModel
 
             $scope = self::sharedVariableScope($resource, $reference['type']);
             if ($scope === null || Gate::forUser($user)->denies('viewSensitive', $scope)) {
+                $name = "{$reference['type']}.{$reference['key']}";
+
                 throw ValidationException::withMessages([
-                    $field => "You cannot reference the shared variable {$reference['type']}.{$reference['key']}, because you cannot read its value.",
+                    $field => self::isBlockedOnlyByTokenScope($user, $scope)
+                        ? "This API token is limited to selected projects, environments, or resources, so it cannot reference the {$reference['type']} shared variable {$name}. Use a token for the whole team."
+                        : "You cannot reference the shared variable {$name}, because you cannot read its value.",
                 ]);
             }
         }
+    }
+
+    /**
+     * True when the user is an admin who can read team and server variables, but the API token of the request
+     * is limited to selected projects, environments, or resources.
+     */
+    private static function isBlockedOnlyByTokenScope(User $user, ?SharedEnvironmentVariable $scope): bool
+    {
+        return $scope !== null
+            && in_array($scope->type, ['team', 'server'], true)
+            && data_get($user->currentAccessToken(), 'scopes') !== null
+            && $user->isAdminOfTeam((int) $scope->team_id);
     }
 
     /**
@@ -751,7 +850,7 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
         }
-        $environment_variable = trim($environment_variable);
+        $environment_variable = self::withoutEdgeWhitespace($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
@@ -804,7 +903,19 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return trim(decrypt($environment_variable));
+        return self::withoutEdgeWhitespace(decrypt($environment_variable));
+    }
+
+    /**
+     * Single-line values lose their edge whitespace. Multiline content (a private key, a
+     * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
+     * without its trailing newline.
+     */
+    private static function withoutEdgeWhitespace(string $value): string
+    {
+        $trimmed = trim($value);
+
+        return str_contains($trimmed, "\n") ? $value : $trimmed;
     }
 
     private function set_environment_variables(?string $environment_variable = null): ?string
@@ -812,13 +923,8 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable)) {
             return null;
         }
-        $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt($environment_variable);
-        }
 
-        return encrypt($environment_variable);
+        return encrypt(self::withoutEdgeWhitespace($environment_variable));
     }
 
     protected function key(): Attribute

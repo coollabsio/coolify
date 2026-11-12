@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Services\Access\Grant;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Form;
 
@@ -55,7 +56,7 @@ class ApiTokenForm extends Form
             'description' => $token->name,
             'permissions' => $permissions,
             'scopeMode' => $token->scopes === null ? 'team' : 'selected',
-            'selectedScopes' => collect($token->scopes ?? [])->map(fn (array $scope) => "{$scope['scope']}:{$scope['uuid']}")->values()->all(),
+            'selectedScopes' => array_map(fn (Grant $scope) => "{$scope->scope->value}:{$scope->uuid}", Grant::listFrom($token->scopes)),
             'expiresInDays' => self::KEEP_EXPIRY,
             'keepLabel' => 'Keep current ('.($token->expires_at?->isPast() ? 'expired '.$currentExpiry : $currentExpiry).')',
         ];

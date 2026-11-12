@@ -56,7 +56,7 @@
             $faviconUrl = $isSuggested || $serviceApplication?->hasProxyBasicAuth() ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
-            if ($row['has_port_override'] ?? false) {
+            if (filled($row['internal_port'] ?? null)) {
                 $editingParts['port'] = (string) $row['internal_port'];
             }
         @endphp

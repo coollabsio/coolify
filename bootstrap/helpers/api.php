@@ -120,7 +120,7 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
 /**
  * Remove the saved proxy configuration and validation logs from every
  * serialized server in an API payload, including nested ones such as
- * `destination.server`, unless the token can read sensitive data.
+ * `destination.server`, unless the token can read sensitive server data.
  * The saved proxy configuration often contains DNS provider API tokens.
  *
  * @template T
@@ -130,11 +130,20 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
  */
 function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
 {
-    if (request()->attributes->get('can_read_sensitive', false) === true) {
+    if (canReadServerSecretsFromApi()) {
         return $payload;
     }
 
     return removeServerProxySecrets($payload);
+}
+
+/**
+ * True when the API token can read server secrets (Sentinel token, log drain keys, proxy configuration).
+ * A token limited to some projects, environments, or resources cannot, because servers are team-level.
+ */
+function canReadServerSecretsFromApi(): bool
+{
+    return request()->attributes->get('can_read_server_sensitive', false) === true;
 }
 
 /**
@@ -237,13 +246,17 @@ function sharedDataApplications(?Application $application = null): array
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
         'disable_build_cache' => 'boolean',
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
+        'include_network_hosts_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'include_coolify_default_variables' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
+        'use_production_values_in_previews' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
@@ -261,6 +274,7 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'is_consistent_container_name_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
@@ -430,6 +444,7 @@ function migrateResourceToDestination(Request $request, $resource, string $resou
     if (! $destination || ! $destination->server?->canHostResources()) {
         return response()->json(['message' => 'Destination not found.'], 404);
     }
+    Gate::authorize('placeResource', $destination->server);
 
     $sourceDestination = $resource->destination;
     $migrateVolumes = $request->boolean('migrate_volumes', true);
@@ -505,6 +520,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('domains');
     $request->offsetUnset('instant_deploy');
     $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('gitea_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('use_build_secrets');
@@ -519,15 +535,19 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_container_label_escape_enabled');
     $request->offsetUnset('is_preserve_repository_enabled');
     $request->offsetUnset('include_source_commit_in_build');
+    $request->offsetUnset('include_network_hosts_in_build');
     $request->offsetUnset('is_git_submodules_enabled');
     $request->offsetUnset('is_git_lfs_enabled');
     $request->offsetUnset('is_git_shallow_clone_enabled');
+    $request->offsetUnset('is_auto_cancel_queued_deployments_enabled');
+    $request->offsetUnset('is_auto_cancel_building_deployments_enabled');
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
     $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
+    $request->offsetUnset('use_production_values_in_previews');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
@@ -544,6 +564,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('gpu_device_ids');
     $request->offsetUnset('gpu_options');
     $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('is_image_scan_enabled');
     $request->offsetUnset('custom_internal_name');
     $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');

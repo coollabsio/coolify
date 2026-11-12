@@ -141,7 +141,7 @@ class Danger extends Component
                 $this->delete_connected_networks,
                 $this->delete_configurations,
                 $this->docker_cleanup,
-            )->afterResponse();
+            );
 
             return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,

@@ -224,9 +224,7 @@ it('accepts a bucket that denies anonymous listing', function () {
         fn (CommandInterface $command) => new S3Exception('denied', $command, ['code' => 'AccessDenied']),
     ]));
 
-    $downloads->ensureBucketIsPrivate($this->storage);
-
-    expect(true)->toBeTrue();
+    expect(fn () => $downloads->ensureBucketIsPrivate($this->storage))->not->toThrow(Throwable::class);
 });
 
 it('refuses the bundled MinIO because servers and browsers cannot reach it', function () {

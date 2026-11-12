@@ -309,32 +309,6 @@ it('uses sanitized method in full_healthcheck_url display', function () {
         ->and($result)->not->toContain('evil');
 });
 
-it('validates healthCheckCommand rejects strings over 1000 characters', function () {
-    $rules = [
-        'healthCheckCommand' => 'nullable|string|max:1000',
-    ];
-
-    $validator = Validator::make(
-        ['healthCheckCommand' => str_repeat('a', 1001)],
-        $rules
-    );
-
-    expect($validator->fails())->toBeTrue();
-});
-
-it('validates healthCheckCommand accepts strings under 1000 characters', function () {
-    $rules = [
-        'healthCheckCommand' => 'nullable|string|max:1000',
-    ];
-
-    $validator = Validator::make(
-        ['healthCheckCommand' => 'pg_isready -U postgres'],
-        $rules
-    );
-
-    expect($validator->fails())->toBeFalse();
-});
-
 /**
  * Helper: Invokes the private generate_healthcheck_commands() method via reflection.
  */

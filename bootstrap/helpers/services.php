@@ -36,6 +36,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
@@ -394,9 +395,9 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
 
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');
-        $currentImage = data_get_str($dockerCompose, "services.{$name}.image");
+        $currentImage = data_get_str($dockerCompose, ['services', $name, 'image']);
         if ($currentImage !== $updatedImage) {
-            data_set($dockerCompose, "services.{$name}.image", $updatedImage->value());
+            data_set($dockerCompose, ['services', $name, 'image'], $updatedImage->value());
             $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
             $resource->service->docker_compose_raw = $dockerComposeRaw;
             $resource->service->save();
@@ -408,7 +409,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // to ensure we use the exact names defined in the template (which may be abbreviated)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
-        $serviceConfig = data_get($dockerCompose, "services.{$name}");
+        $serviceConfig = data_get($dockerCompose, ['services', $name]);
         $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
@@ -789,6 +790,9 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             $pendingVolumeClones,
         ));
     }
+
+    $dnsRecords = app(ResourceDnsRecords::class);
+    $dnsRecords->queueAutomaticRecords($newService, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newService;
 }

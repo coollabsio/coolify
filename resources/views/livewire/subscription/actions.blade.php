@@ -112,8 +112,7 @@
                                     <x-reicon name="x" class="size-3.5" />
                                 </button>
                             </div>
-                            <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4"
-                                style="-webkit-overflow-scrolling: touch;">
+                            <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4">
                                 {{-- Server count input --}}
                                 <div>
                                     <label class="mb-1.5 block">Paid servers</label>

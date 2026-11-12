@@ -99,7 +99,6 @@ function unreadyRunnerApp(): array
 function fakeRunnerGroupApi(GithubApp $githubApp, int $createStatus = 201): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runner-groups' => fn ($request) => $request->method() === 'POST'
             ? Http::response($createStatus === 201 ? ['id' => 55, 'default' => false] : ['message' => 'Upgrade to create runner groups'], $createStatus)
@@ -137,7 +136,6 @@ describe('runner settings page', function () {
     it('keeps the restrictions an organization admin set on an existing runner group', function () {
         $this->githubApp->update(['runner_group_id' => 77]);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runner-groups/77' => Http::response(['id' => 77, 'default' => false, 'visibility' => 'selected', 'allows_public_repositories' => false]),
         ]);
@@ -625,11 +623,11 @@ describe('build server role', function () {
 describe('GitHub App runner permissions', function () {
     it('stores runner permissions and webhook events from GitHub', function () {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app' => Http::response([
                 'permissions' => ['contents' => 'read', 'metadata' => 'read', 'organization_self_hosted_runners' => 'write', 'actions' => 'read'],
                 'events' => ['push', 'workflow_job'],
             ]),
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}" => Http::response(['permissions' => []]),
         ]);
 
         GithubAppPermissionJob::dispatchSync($this->githubApp);

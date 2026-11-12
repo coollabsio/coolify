@@ -37,6 +37,8 @@ class Input extends Component
         public bool $autoDisable = true,
         public bool $loading = false,
         public string $loadingText = 'Loading...',
+        // Alpine expression that makes the field required while it is true, for rules that depend on other unsaved fields.
+        public ?string $requiredWhen = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {

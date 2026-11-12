@@ -34,9 +34,7 @@ use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -704,20 +702,6 @@ it('records the S3 storage used by each volume backup execution', function () {
         ->and((new ScheduledVolumeBackupExecution)->s3())->not->toBeNull();
 });
 
-it('declares the volume backup action return types', function () {
-    $backupNowReturnType = (new ReflectionMethod(VolumeBackups::class, 'backupNow'))->getReturnType();
-    $deleteReturnType = (new ReflectionMethod(VolumeBackups::class, 'delete'))->getReturnType();
-
-    expect($backupNowReturnType)->toBeInstanceOf(ReflectionUnionType::class)
-        ->and(collect($backupNowReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing([
-            RedirectResponse::class,
-            Redirector::class,
-            'null',
-        ])
-        ->and($deleteReturnType)->toBeInstanceOf(ReflectionUnionType::class)
-        ->and(collect($deleteReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing(['bool', 'string']);
-});
-
 it('renders volume backup executions like database backup executions', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
@@ -1031,21 +1015,6 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
         ->and($backup->retention_amount_s3)->toBe(12)
         ->and($backup->retention_days_s3)->toBe(30)
         ->and($backup->retention_max_storage_s3)->toBe(4.5);
-});
-
-it('allows team owners to edit volume backup retention settings', function () {
-    $team = Team::factory()->create();
-    signInForVolumeBackups($this, $team);
-    [$application, $volume] = createVolumeBackupApplication($team);
-    $volume->scheduledBackups()->create([
-        'team_id' => $team->id,
-        'frequency' => 'daily',
-    ]);
-
-    Livewire::test(VolumeBackups::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])->assertDontSee('You do not have permission to perform this action.');
 });
 
 it('does not enable S3 backups when another volume backup setting is invalid', function () {

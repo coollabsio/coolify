@@ -5,18 +5,17 @@ namespace App\Livewire\Project\Database;
 use App\Actions\Database\StartDatabaseImport;
 use App\Models\S3Storage;
 use App\Models\Server;
-use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
-use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -134,8 +133,6 @@ class ImportForm extends Component
     #[Locked]
     public string $resourceDbType = '';
 
-    public array $parameters = [];
-
     public array $containers = [];
 
     public bool $scpInProgress = false;
@@ -245,10 +242,9 @@ class ImportForm extends Component
         $this->activityId = null;
     }
 
-    public function mount()
+    public function mount(Model $resource): void
     {
-        $this->parameters = get_route_parameters();
-        $this->getContainers();
+        $this->loadResource($resource);
         $this->loadAvailableS3Storages();
         $this->initializeRestoreOptions();
     }
@@ -315,42 +311,9 @@ class ImportForm extends Component
         }
     }
 
-    public function getContainers()
+    private function loadResource(Model $resource): void
     {
         $this->containers = [];
-        $teamId = data_get(auth()->user()->currentTeam(), 'id');
-
-        // Try to find resource by route parameter
-        $databaseUuid = data_get($this->parameters, 'database_uuid');
-        $stackServiceUuid = data_get($this->parameters, 'stack_service_uuid');
-
-        $resource = null;
-        if ($databaseUuid) {
-            // Standalone database route
-            $resource = getResourceByUuid($databaseUuid, $teamId);
-            if (is_null($resource)) {
-                abort(404);
-            }
-        } elseif ($stackServiceUuid) {
-            // ServiceDatabase route - look up the service database
-            $serviceUuid = data_get($this->parameters, 'service_uuid');
-            $project = currentTeam()
-                ->projects()
-                ->select('id', 'uuid', 'team_id')
-                ->where('uuid', data_get($this->parameters, 'project_uuid'))
-                ->firstOrFail();
-            $environment = $project->environments()
-                ->select('id', 'uuid', 'name', 'project_id')
-                ->where('uuid', data_get($this->parameters, 'environment_uuid'))
-                ->firstOrFail();
-            $service = $environment->services()->whereUuid($serviceUuid)->firstOrFail();
-            $resource = $service->databases()->whereUuid($stackServiceUuid)->first();
-            if (is_null($resource)) {
-                abort(404);
-            }
-        } else {
-            abort(404);
-        }
 
         $this->authorize('view', $resource);
 
@@ -612,13 +575,13 @@ class ImportForm extends Component
         $this->authorize('update', $this->resource);
 
         if (! $this->s3StorageId) {
-            $this->dispatch('error', 'Please select an S3 storage.');
+            $this->dispatch('error', 'Please select a storage.');
 
             return;
         }
 
         if (blank($this->s3Path)) {
-            $this->dispatch('error', 'Please provide an S3 path.');
+            $this->dispatch('error', 'Please provide a file path.');
 
             return;
         }
@@ -628,7 +591,7 @@ class ImportForm extends Component
 
         // Validate the S3 path early to prevent command injection in subsequent operations
         if (! $this->validateS3Path($cleanPath)) {
-            $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+            $this->dispatch('error', 'Invalid file path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
 
             return;
         }
@@ -643,30 +606,19 @@ class ImportForm extends Component
             $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
             // Validate bucket name early
-            if (! $this->validateBucketName($s3Storage->bucket)) {
+            if ($s3Storage->isS3() && ! $this->validateBucketName($s3Storage->bucket)) {
                 $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return;
             }
 
-            // Test connection
+            // Before testConnection(), which saves the host key of an SFTP storage in memory only.
+            $disk = $s3Storage->filesystem();
             $s3Storage->testConnection();
-
-            // Build S3 disk configuration
-            $disk = Storage::build([
-                'driver' => 's3',
-                'region' => $s3Storage->region,
-                'key' => $s3Storage->key,
-                'secret' => $s3Storage->secret,
-                'bucket' => $s3Storage->bucket,
-                'endpoint' => $s3Storage->endpoint,
-                'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
-                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
-            ]);
 
             // Check if file exists
             if (! $disk->exists($cleanPath)) {
-                $this->dispatch('error', 'File not found in S3. Please check the path.');
+                $this->dispatch('error', 'File not found in the storage. Please check the path.');
 
                 return;
             }
@@ -675,7 +627,7 @@ class ImportForm extends Component
             $this->s3FileSize = $disk->size($cleanPath);
             $this->selectSqliteDatabaseFor($cleanPath);
 
-            $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
+            $this->dispatch('success', 'File found in the storage. Size: '.formatBytes($this->s3FileSize));
         } catch (\Throwable $e) {
             $this->s3FileSize = null;
 
@@ -698,7 +650,7 @@ class ImportForm extends Component
         }
 
         if (! $this->s3StorageId || blank($this->s3Path)) {
-            $this->dispatch('error', 'Please select S3 storage and provide a path first.');
+            $this->dispatch('error', 'Please select a storage and provide a path first.');
 
             return true;
         }
@@ -731,7 +683,7 @@ class ImportForm extends Component
                 'replace_existing' => $this->replaceExisting,
                 'storage_id' => $this->s3StorageId,
             ]);
-            $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
+            $this->dispatch('info', 'Restoring database from the storage. Progress will be shown in the activity monitor...');
         } catch (DatabaseImportException $e) {
             $this->importRunning = false;
             $this->dispatch('error', $e->getMessage());

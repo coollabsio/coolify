@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        {{ $name ?: 'Gitea App' }} | Sources | Coolify
+        {{ $name ?: 'Gitea / Forgejo App' }} | Sources | Coolify
     </x-slot>
 
     @if ($isConnected)
@@ -8,12 +8,12 @@
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                     <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
-                        {{ $name ?: 'Gitea App' }}
+                        {{ $name ?: 'Gitea / Forgejo App' }}
                     </h1>
                     <x-status-badge label="Connected" type="success" />
                 </div>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                    {{ filled($organization) ? 'Gitea App for '.$organization : 'Private Gitea source' }}
+                    {{ filled($organization) ? 'Gitea / Forgejo App for '.$organization : 'Private Gitea / Forgejo source' }}
                 </p>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">
@@ -23,11 +23,11 @@
                     </x-forms.button>
                 @endcan
                 @can('delete', $gitea_app)
-                    <x-modal-confirmation title="Confirm Gitea App Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['The selected Gitea App will be permanently deleted.']"
+                    <x-modal-confirmation title="Confirm Gitea / Forgejo App Deletion?" isErrorButton buttonTitle="Delete"
+                        submitAction="delete" :actions="['The selected Gitea / Forgejo App will be permanently deleted.']"
                         confirmationText="{{ data_get($gitea_app, 'name') }}"
-                        confirmationLabel="Please confirm by entering the Gitea App Name below"
-                        shortConfirmationLabel="Gitea App Name" :confirmWithPassword="false"
+                        confirmationLabel="Please confirm by entering the Gitea / Forgejo App Name below"
+                        shortConfirmationLabel="Gitea / Forgejo App Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />
                 @endcan
             </div>
@@ -44,20 +44,20 @@
                     @if (! isCloud())
                         <div class="lg:col-span-2 max-w-xs">
                             <x-forms.checkbox canGate="update" :canResource="$gitea_app" label="System wide"
-                                helper="If checked, this Gitea App will be available for everyone in this Coolify instance."
+                                helper="If checked, this Gitea / Forgejo App will be available for everyone in this Coolify instance."
                                 instantSave id="isSystemWide" />
                         </div>
                         @if ($isSystemWide)
                             <div class="lg:col-span-2">
                                 <x-callout type="warning" title="Shared with every team">
-                                    System-wide Gitea Apps are shared across all teams on this Coolify instance. Prefer team-specific apps when you need repository isolation.
+                                    System-wide Gitea / Forgejo Apps are shared across all teams on this Coolify instance. Prefer team-specific apps when you need repository isolation.
                                 </x-callout>
                             </div>
                         @endif
                     @endif
                 </div>
                 <x-application.settings-subsection title="Webhook"
-                    helper="Configure this webhook URL in Gitea (user, organization, or repository settings → Webhooks → Add webhook → Gitea).">
+                    helper="Configure this webhook URL in Gitea or Forgejo (user, organization, or repository settings → Webhooks → Add webhook → Gitea or Forgejo).">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <div class="lg:col-span-2">
                             <x-forms.input readonly label="Webhook URL"
@@ -65,7 +65,7 @@
                         </div>
                         <x-forms.input canGate="update" :canResource="$gitea_app" id="webhookSecret"
                             label="Webhook secret" type="password"
-                            helper="Set this as the Secret in a Gitea webhook (user, organization, or repository settings → Webhooks → Add webhook → Gitea), content type application/json, trigger on Push and Pull Request events. Stored encrypted." />
+                            helper="Set this as the Secret in a Gitea webhook (user, organization, or repository settings → Webhooks → Add webhook → Gitea or Forgejo), content type application/json, trigger on Push and Pull Request events. Stored encrypted." />
                     </div>
                 </x-application.settings-subsection>
             </x-application.settings-section>
@@ -73,7 +73,7 @@
             <x-application.settings-section id="connection-section" title="Connection"
                 helper="OAuth credentials and the endpoints Coolify uses to reach this source.">
                 <x-application.settings-subsection first title="OAuth credentials"
-                    helper="Client credentials from your Gitea OAuth2 application.">
+                    helper="Client credentials from your Gitea or Forgejo OAuth2 application.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.input canGate="update" :canResource="$gitea_app" id="clientId"
                             label="Client ID" />
@@ -85,10 +85,10 @@
                     </div>
                 </x-application.settings-subsection>
                 <x-application.settings-subsection title="Self-hosted / advanced"
-                    helper="Override endpoints and SSH settings for self-hosted Gitea.">
+                    helper="Override endpoints and SSH settings for self-hosted Gitea or Forgejo.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.input canGate="update" :canResource="$gitea_app" id="htmlUrl"
-                            label="Gitea URL" />
+                            label="Instance URL" />
                         <x-forms.input canGate="update" :canResource="$gitea_app" id="apiUrl" label="API URL" />
                         <x-forms.input canGate="update" :canResource="$gitea_app" id="customUser"
                             label="SSH user" />
@@ -110,10 +110,10 @@
 
         <div x-data="{ search: '' }" class="application-settings-form mt-6">
             <x-application.settings-section title="Resources"
-                description="Applications currently using this Gitea App." flush>
+                description="Applications currently using this Gitea / Forgejo App." flush>
                 @if ($applications->isEmpty())
                     <x-empty title="No resources use this source"
-                        description="Applications will appear here after this Gitea App is selected as their source."
+                        description="Applications will appear here after this Gitea / Forgejo App is selected as their source."
                         icon-name="sources" size="sm" />
                 @else
                     <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
@@ -164,19 +164,19 @@
         <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
-                    {{ $name ?: 'Gitea App' }}
+                    {{ $name ?: 'Gitea / Forgejo App' }}
                 </h1>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                    Finish connecting this Gitea App before using it as a source
+                    Finish connecting this Gitea / Forgejo App before using it as a source
                 </p>
             </div>
             @can('delete', $gitea_app)
                 <div class="shrink-0 sm:ml-auto">
-                    <x-modal-confirmation title="Confirm Gitea App Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['The selected Gitea App will be permanently deleted.']"
+                    <x-modal-confirmation title="Confirm Gitea / Forgejo App Deletion?" isErrorButton buttonTitle="Delete"
+                        submitAction="delete" :actions="['The selected Gitea / Forgejo App will be permanently deleted.']"
                         confirmationText="{{ data_get($gitea_app, 'name') }}"
-                        confirmationLabel="Please confirm by entering the Gitea App Name below"
-                        shortConfirmationLabel="Gitea App Name" :confirmWithPassword="false"
+                        confirmationLabel="Please confirm by entering the Gitea / Forgejo App Name below"
+                        shortConfirmationLabel="Gitea / Forgejo App Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />
                 </div>
             @endcan
@@ -194,7 +194,7 @@
                 }
             }">
             <x-application.settings-section title="Step 1 · Create an OAuth application"
-                description="In Gitea, open Manage OAuth2 Applications and create a new application with the redirect URI below.">
+                description="In Gitea or Forgejo, open Settings → Applications → Manage OAuth2 Applications and create a new application with the redirect URI below.">
                 <div class="flex flex-col gap-3 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim">
                     <a href="{{ rtrim($htmlUrl, '/') }}/user/settings/applications" target="_blank"
                         class="inline-flex w-fit items-center gap-1 font-medium text-black underline-offset-2 hover:underline dark:text-fg">
@@ -216,7 +216,7 @@
 
             <form wire:submit="submit" class="contents">
                 <x-application.settings-section title="Step 2 · Enter credentials"
-                    description="Paste the Client ID and Client secret from Gitea, then save.">
+                    description="Paste the Client ID and Client secret from Gitea or Forgejo, then save.">
                     <x-slot:actions>
                         <x-forms.button type="submit">Save</x-forms.button>
                     </x-slot:actions>
@@ -224,10 +224,10 @@
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.input id="name" label="Name" />
                         <x-forms.input id="clientId" label="Client ID" required
-                            helper="The Client ID from your Gitea OAuth2 application." />
+                            helper="The Client ID from your Gitea or Forgejo OAuth2 application." />
                         <x-forms.input id="clientSecretInput" label="Client secret" type="password"
                             :required="blank($clientSecretInput) && blank(data_get($gitea_app, 'client_secret'))"
-                            helper="The Client secret from your Gitea OAuth2 application. Saved encrypted." />
+                            helper="The Client secret from your Gitea or Forgejo OAuth2 application. Saved encrypted." />
                         <x-forms.input id="organization" label="Organization"
                             helper="Optional. Comma-separated organization or user names to filter repositories." />
                     </div>
@@ -235,7 +235,7 @@
                     @if (! isCloud() || isDev())
                         <div class="mt-4 grid gap-4 lg:grid-cols-2">
                             <div class="lg:col-span-2 text-[12px] text-neutral-500 dark:text-fg-dim">
-                                Gitea will redirect back to this Coolify URL. It must match the Redirect URI on your Gitea OAuth2 application exactly.
+                                Gitea or Forgejo will redirect back to this Coolify URL. It must match the Redirect URI on your Gitea or Forgejo OAuth2 application exactly.
                             </div>
                             <div class="lg:col-span-2 max-w-md">
                                 <x-forms.listbox id="use_custom_webhook_endpoint" label="Webhook endpoint"
@@ -249,7 +249,7 @@
                             <div class="lg:col-span-2" x-show="!useCustomWebhookEndpoint">
                                 <x-forms.listbox id="webhook_endpoint" x-model="webhookEndpoint"
                                     label="Selected endpoint"
-                                    helper="Gitea will use this endpoint unless custom mode is enabled."
+                                    helper="Gitea or Forgejo will use this endpoint unless custom mode is enabled."
                                     :options="collect([$fqdn, $ipv4, $ipv6, config('app.url')])
                                         ->filter()->unique()->map(fn ($endpoint) => [
                                             'value' => $endpoint,
@@ -260,7 +260,7 @@
                                 <x-forms.input x-model="customWebhookEndpoint" id="custom_webhook_endpoint"
                                     type="url" label="Custom endpoint"
                                     placeholder="https://coolify.example.com"
-                                    helper="Gitea will use this custom public URL. Do not include /webhooks." />
+                                    helper="Gitea or Forgejo will use this custom public URL. Do not include /webhooks." />
                             </div>
                         </div>
                     @endif
@@ -276,16 +276,16 @@
                         </button>
                         <div x-cloak x-show="open" x-collapse.duration.200ms
                             class="mt-3 grid gap-4 rounded-lg border border-neutral-200 p-3 lg:grid-cols-2 dark:border-white/[0.08]">
-                            <x-forms.input id="htmlUrl" label="Gitea URL"
-                                helper="Only change this for self-hosted Gitea (e.g. https://gitea.example.com)." />
+                            <x-forms.input id="htmlUrl" label="Instance URL"
+                                helper="Only change this for self-hosted Gitea or Forgejo (e.g. https://git.example.com)." />
                             <x-forms.input id="apiUrl" label="API URL"
-                                helper="Usually your Gitea URL with /api/v1 appended." />
+                                helper="Usually your instance URL with /api/v1 appended." />
                             <x-forms.input id="customUser" label="SSH user" />
                             <x-forms.input type="number" id="customPort" label="SSH port" />
                             @if (! isCloud())
                                 <div class="max-w-xs lg:col-span-2">
                                     <x-forms.checkbox label="System wide" id="isSystemWide"
-                                        helper="If checked, this Gitea App will be available for everyone in this Coolify instance." />
+                                        helper="If checked, this Gitea / Forgejo App will be available for everyone in this Coolify instance." />
                                 </div>
                             @endif
                         </div>
@@ -294,11 +294,11 @@
             </form>
 
             @if ($clientId)
-                <x-application.settings-section title="Step 3 · Authorize with Gitea"
-                    description="Authorize Coolify with your Gitea instance. The redirect URI must match the one configured in Gitea.">
+                <x-application.settings-section title="Step 3 · Authorize with Gitea or Forgejo"
+                    description="Authorize Coolify with your Gitea or Forgejo instance. The redirect URI must match the one configured there.">
                     <a href="{{ $this->getOAuthUrl() }}" wire:key="oauth-url-{{ md5((string) $redirectUri) }}"
                         class="button button-highlighted">
-                        Connect to Gitea
+                        Connect to Gitea / Forgejo
                         <x-external-link />
                     </a>
                 </x-application.settings-section>

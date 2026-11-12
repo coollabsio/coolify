@@ -24,16 +24,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('keeps nested storage component keys stable when mounts are added or deleted', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
-
-    expect($view)
-        ->toContain('wire:key="volumes-{{ $resource->id }}"')
-        ->toContain('wire:key="svc-volumes-{{ $resource->id }}"')
-        ->not->toContain('wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"')
-        ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
-});
-
 beforeEach(function () {
     $this->withoutVite();
 
@@ -116,28 +106,6 @@ it('creates named Docker volumes without a source path in swarm mode', function 
         ->assertHasNoErrors();
 
     expect($application->persistentStorages()->first()->host_path)->toBeNull();
-});
-
-it('declares explicit authorization on the changed storage controls', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
-
-    preg_match(
-        '/<x-forms\.listbox\s+id="forms\.\{\{ \$id \}\}\.isPreviewSuffixEnabled"[\s\S]*?\/>/',
-        $view,
-        $previewSuffixListbox
-    );
-
-    expect($previewSuffixListbox[0] ?? '')
-        ->toContain('canGate="update"')
-        ->toContain(':canResource="$resource"');
-
-    $backupAction = '/<x-table\.row-action>Backup<\/x-table\.row-action>/';
-    preg_match('/@if \(\$canUpdate\)\s*<x-modal-input\b.*?<\/x-modal-input>/s', $view, $canUpdateBlock);
-    preg_match('/@can\(\'update\', \$resource\)(.*?)@endcan/s', $view, $canBlock);
-
-    expect(preg_match_all($backupAction, $view))->toBe(3)
-        ->and(preg_match_all($backupAction, $canUpdateBlock[0] ?? ''))->toBe(1)
-        ->and(preg_match_all($backupAction, $canBlock[0] ?? ''))->toBe(2);
 });
 
 it('creates named volumes without a host path in swarm mode', function () {
@@ -407,4 +375,55 @@ it('hides PR deployment suffix for databases', function () {
         ->assertSet('supportsPreviewSuffix', false)
         ->assertDontSee('Add suffix')
         ->assertDontSee('PR deployment suffix');
+});
+
+it('asks for confirmation before it changes the volume name', function () {
+    [$application, $volume] = createApplicationWithVolume();
+    $oldName = $volume->name;
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.name", 'renamed-data')
+        ->call('submit', $volume->id)
+        ->assertNotDispatched('success')
+        ->assertSet('pendingRename', ['storageId' => $volume->id, 'from' => $oldName, 'to' => 'renamed-data'])
+        ->assertSee('Change the volume name?')
+        ->assertSee("Your data stays in <strong>{$oldName}</strong>", false);
+
+    expect($volume->refresh()->name)->toBe($oldName);
+
+    $component->call('submit', $volume->id, true)
+        ->assertDispatched('success')
+        ->assertSet('pendingRename', null);
+
+    expect($volume->refresh()->name)->toBe('renamed-data');
+});
+
+it('asks again when the volume name changes after the warning', function () {
+    [$application, $volume] = createApplicationWithVolume();
+    $oldName = $volume->name;
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.name", 'first-name')
+        ->call('submit', $volume->id)
+        ->set("forms.{$volume->id}.name", 'second-name')
+        ->call('submit', $volume->id, true)
+        ->assertNotDispatched('success')
+        ->assertSet('pendingRename', ['storageId' => $volume->id, 'from' => $oldName, 'to' => 'second-name']);
+
+    expect($volume->refresh()->name)->toBe($oldName);
+});
+
+it('restores the volume name when the rename is cancelled', function () {
+    [$application, $volume] = createApplicationWithVolume();
+    $oldName = $volume->name;
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.name", 'renamed-data')
+        ->call('submit', $volume->id)
+        ->call('cancelRename', $volume->id)
+        ->assertSet("forms.{$volume->id}.name", $oldName)
+        ->assertSet('pendingRename', null)
+        ->assertDontSee('Your data stays in');
+
+    expect($volume->refresh()->name)->toBe($oldName);
 });

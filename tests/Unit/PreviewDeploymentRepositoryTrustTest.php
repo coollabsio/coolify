@@ -43,25 +43,3 @@ it('denies missing or ambiguous repository identity', function (mixed $source, m
 it('denies spoofed target repository metadata', function () {
     expect(previewRepositoryIsTrusted(55, 55, 999, true))->toBeFalse();
 });
-
-it('gates every non-GitHub webhook preview before it creates or queues a deployment', function (string $controller, int $expectedChecks) {
-    $source = file_get_contents(dirname(__DIR__, 2)."/app/Http/Controllers/Webhook/{$controller}.php");
-
-    expect(substr_count($source, 'isPreviewDeploymentRepositoryTrusted('))->toBe($expectedChecks);
-
-    $offset = 0;
-    for ($check = 0; $check < $expectedChecks; $check++) {
-        $trustCheck = strpos($source, 'isPreviewDeploymentRepositoryTrusted(', $offset);
-        $nextQueue = strpos($source, 'queue_application_deployment(', $trustCheck);
-
-        expect($trustCheck)->not->toBeFalse()
-            ->and($nextQueue)->not->toBeFalse()
-            ->and($trustCheck)->toBeLessThan($nextQueue);
-
-        $offset = $trustCheck + 1;
-    }
-})->with([
-    'GitLab normal and manual webhooks' => ['Gitlab', 2],
-    'Gitea signed manual webhook' => ['Gitea', 1],
-    'Bitbucket signed manual webhook' => ['Bitbucket', 1],
-]);

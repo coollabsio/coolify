@@ -177,7 +177,10 @@
                                                                 $form['replacedExternalVolume']
                                                                     ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
                                                                     : null,
-                                                            ]))" confirmationText="{{ $form['name'] }}"
+                                                            ]))"
+                                                            :warningMessage="$form['usedByContainers'] !== []
+                                                                ? e('This volume is still in use by: '.implode(', ', $form['usedByContainers']).'. After you delete this entry, the next deployment starts the resource without the data in this volume. Back up the data first if you need it.')
+                                                                : null" confirmationText="{{ $form['name'] }}"
                                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                                             shortConfirmationLabel="Storage Name">
                                                             <x-slot:trigger>
@@ -349,6 +352,55 @@
                     </form>
                 @endif
             @endforeach
+        </div>
+    @endif
+
+    @if ($pendingRename)
+        <div x-data="{ modalOpen: true }" wire:key="rename-volume-modal-{{ md5(json_encode($pendingRename)) }}"
+            @keydown.escape.window="if (modalOpen) { modalOpen = false; $wire.cancelRename({{ $pendingRename['storageId'] }}) }"
+            :class="{ 'z-40': modalOpen }" class="relative h-auto w-auto">
+            <template x-teleport="body">
+                <div x-show="modalOpen"
+                    class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4" x-cloak>
+                    <div x-show="modalOpen" class="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" role="dialog" aria-modal="true"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        class="application-settings-form application-settings-section relative w-full lg:min-w-[36rem] lg:max-w-2xl"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header>
+                            <h3>Change the volume name?</h3>
+                            <button type="button" aria-label="Close"
+                                @click="modalOpen = false; $wire.cancelRename({{ $pendingRename['storageId'] }})"
+                                class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body">
+                            <x-callout type="warning" title="The data does not move to the new volume" class="mb-4">
+                                <ul class="mt-2 ml-4 list-disc">
+                                    <li>Changing the name does not rename or move the Docker volume.</li>
+                                    <li>After the next restart or deployment, the resource uses the Docker volume <strong>{{ $pendingRename['to'] }}</strong>. If that volume does not exist, Docker creates it empty.</li>
+                                    <li>Your data stays in <strong>{{ $pendingRename['from'] }}</strong>. Coolify does not copy it, and does not delete it when you delete this resource.</li>
+                                    <li>To keep your data, stop the resource and copy the data into the new volume before you start it again.</li>
+                                </ul>
+                            </x-callout>
+
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button
+                                    @click="modalOpen = false; $wire.cancelRename({{ $pendingRename['storageId'] }})">
+                                    Cancel
+                                </x-forms.button>
+                                <x-forms.button wire:click="submit({{ $pendingRename['storageId'] }}, true)"
+                                    @click="modalOpen = false" isError>
+                                    Change Volume Name
+                                </x-forms.button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     @endif
 

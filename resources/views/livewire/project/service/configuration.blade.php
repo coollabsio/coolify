@@ -81,6 +81,7 @@
                         :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
+                @elseif ($currentRoute === 'project.service.maintenance')
                     <livewire:project.shared.maintenance :resource="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
@@ -106,6 +107,12 @@
                     <livewire:project.shared.webhooks :resource="$service" />
                 @elseif ($currentRoute === 'project.service.resource-operations')
                     <livewire:project.shared.resource-operations :resource="$service" />
+                @elseif ($currentRoute === 'project.service.vulnerabilities')
+                    <div class="flex flex-col gap-6">
+                        <livewire:image-scan.vulnerabilities resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.packages resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.scan-settings scope-type="service" :scope-uuid="$service->uuid" />
+                    </div>
                 @elseif ($currentRoute === 'project.service.tags')
                     <livewire:project.shared.tags :resource="$service" />
                 @elseif ($currentRoute === 'project.service.danger')

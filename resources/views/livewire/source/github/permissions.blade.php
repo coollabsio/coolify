@@ -3,10 +3,12 @@
                     description="GitHub permissions currently granted to this App.">
                     <x-slot:actions>
                         @can('view', $github_app)
-                            <x-forms.button type="button" wire:click.prevent="checkPermissions">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Refetch
-                            </x-forms.button>
+                            @can('update', $github_app)
+                                <x-forms.button type="button" wire:click.prevent="checkPermissions">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Refetch
+                                </x-forms.button>
+                            @endcan
                             <a href="{{ getPermissionsPath($github_app) }}" class="button">
                                 Update on GitHub
                                 <x-external-link />
@@ -23,6 +25,35 @@
                             helper="Write access is needed for preview deployment status updates."
                             label="Pull requests" readonly placeholder="N/A" />
                     </div>
+                </x-application.settings-section>
+
+                @php($missingDeploymentRequirements = $github_app->missingDeploymentRequirements())
+                <x-application.settings-section title="GitHub deployments"
+                    description="Coolify creates a GitHub deployment for each deployment and updates its status, so branches and pull requests show what is deployed.">
+                    <div class="grid gap-4 lg:grid-cols-3">
+                        <x-forms.input canGate="view" :canResource="$github_app"
+                            label="Deployments" readonly placeholder="N/A" :value="$github_app->deployments"
+                            helper="Repository permission. Write access is needed to create deployments and their statuses." />
+                    </div>
+                    @if ($missingDeploymentRequirements !== [])
+                        <x-callout type="info" title="Not ready for GitHub deployments" class="mt-4">
+                            Update the App on GitHub, then click Refetch. Missing:
+                            <ul class="mt-1 list-disc pl-4">
+                                @foreach ($missingDeploymentRequirements as $requirement)
+                                    <li>{{ $requirement }}</li>
+                                @endforeach
+                            </ul>
+                            @can('view', $github_app)
+                                <div class="mt-2">
+                                    <a href="{{ getPermissionsPath($github_app) }}" class="button" target="_blank"
+                                        rel="noopener noreferrer">
+                                        Update on GitHub
+                                        <x-external-link />
+                                    </a>
+                                </div>
+                            @endcan
+                        </x-callout>
+                    @endif
                 </x-application.settings-section>
 
                 @php($missingRunnerRequirements = $github_app->missingRunnerRequirements())

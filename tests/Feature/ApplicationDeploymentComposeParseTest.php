@@ -89,6 +89,8 @@ it('stops the deployment when the Compose file gives no services, instead of wri
             ->implode(''),
     'invalid YAML' => "services:\n  web:\n    image: [nginx\n",
     'an empty services section' => "services: {}\n",
+    'a services key with no value' => "services:\n",
+    'a services key that is not a map' => "services: web\n",
 ]);
 
 it('deploys a Compose file that reuses YAML anchors more than 128 times', function () {

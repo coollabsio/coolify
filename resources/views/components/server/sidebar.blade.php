@@ -52,6 +52,20 @@
             'disabled' => ! $server->isFunctional(),
         ],
         [
+            'label' => 'Security',
+            'route' => 'server.security',
+            'active' => $activeMenu === 'security',
+            'icon' => 'shield-alert',
+            'group' => 'Security',
+            'visible' => auth()->user()?->can('update', $server),
+            'warning' => filled($server->settings->ssh_host_key_pending),
+            'children' => [
+                ['label' => 'General', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
+                ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'refresh', 'visible' => $server->isFunctional()],
+                ['label' => 'Vulnerabilities', 'route' => 'server.security.vulnerabilities', 'active' => $activeSubMenu === 'vulnerabilities', 'icon' => 'shield-alert', 'visible' => $server->isFunctional()],
+            ],
+        ],
+        [
             'label' => 'Cloudflare Tunnel',
             'route' => 'server.cloudflare-tunnel',
             'active' => $activeMenu === 'cloudflare-tunnel',
@@ -186,19 +200,6 @@
             'disabled' => ! $server->isFunctional(),
         ],
         [
-            'label' => 'Security',
-            'route' => 'server.security.patches',
-            'active' => $activeMenu === 'security',
-            'icon' => 'shield-alert',
-            'group' => 'Security',
-            'visible' => auth()->user()?->can('update', $server),
-            'disabled' => ! $server->isFunctional(),
-            'children' => [
-                ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'bandage', 'beta' => true],
-                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => $activeSubMenu === 'terminal-access', 'icon' => 'browser-terminal', 'navigate' => false],
-            ],
-        ],
-        [
             'label' => 'Transfer',
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
@@ -224,6 +225,17 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
+
+    // Pages that the user can star (components/starred-menu). A disabled page cannot be opened, so it is not starrable.
+    $starrableMenuItems = $serverMenuItems->reject(fn (array $item): bool => $item['disabled'] ?? false)
+        ->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $item['icon'],
+            'href' => route($item['route'], $serverRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->values()->all();
 @endphp
 
 @php
@@ -289,6 +301,7 @@
 @endif
     <nav aria-label="Server configuration sections"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="server" :items="$starrableMenuItems" />
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -302,46 +315,49 @@
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     </span>
-                    @continue
-                @endif
-                <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
-                    @class([
-                        'menu-item',
-                        'menu-item-active' => $menuItem['active'],
-                    ])
-                    @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                    href="{{ route($menuItem['route'], $serverRouteParameters) }}">
-                    <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                    @if ($menuItem['tracks_proxy_configuration'] ?? false)
-                        <x-reicon name="alert-triangle" x-cloak
-                            x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['tracks_sentinel_status'] ?? false)
-                        <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['warning'] ?? false)
-                        <x-reicon name="alert-triangle"
-                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                    @elseif ($menuItem['beta'] ?? false)
-                        <x-beta-badge class="ml-auto shrink-0" />
-                    @endif
-                </a>
-                @if ($menuItem['active'] && isset($menuItem['children']))
-                    <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
-                        @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
-                            <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
-                                @class(['menu-item', 'menu-item-active' => $child['active']])
-                                @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
-                                href="{{ route($child['route'], $serverRouteParameters) }}">
-                                <x-reicon :name="$child['icon']" class="menu-item-icon" />
-                                <span class="menu-item-label">{{ $child['label'] }}</span>
-                                @if ($child['beta'] ?? false)
-                                    <x-beta-badge class="ml-auto shrink-0" />
-                                @endif
-                            </a>
-                        @endforeach
+                @else
+                    <div class="starred-menu-row">
+                    <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
+                        @class([
+                            'menu-item',
+                            'menu-item-active' => $menuItem['active'],
+                        ])
+                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                        href="{{ route($menuItem['route'], $serverRouteParameters) }}">
+                        <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                        <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                        @if ($menuItem['tracks_proxy_configuration'] ?? false)
+                            <x-reicon name="alert-triangle" x-cloak
+                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['tracks_sentinel_status'] ?? false)
+                            <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['warning'] ?? false)
+                            <x-reicon name="alert-triangle"
+                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                        @elseif ($menuItem['beta'] ?? false)
+                            <x-beta-badge class="ml-auto shrink-0" />
+                        @endif
+                    </a>
+                    <x-starred-menu.toggle menu="server" :page="$menuItem['route']" :label="$menuItem['label']" />
                     </div>
+                    @if ($menuItem['active'] && isset($menuItem['children']))
+                        <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
+                            @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
+                                <a wire:key="{{ $placement }}-server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
+                                    @class(['menu-item', 'menu-item-active' => $child['active']])
+                                    @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                    href="{{ route($child['route'], $serverRouteParameters) }}">
+                                    <x-reicon :name="$child['icon']" class="menu-item-icon" />
+                                    <span class="menu-item-label">{{ $child['label'] }}</span>
+                                    @if ($child['beta'] ?? false)
+                                        <x-beta-badge class="ml-auto shrink-0" />
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
                 @endif
             @endforeach
         @endforeach

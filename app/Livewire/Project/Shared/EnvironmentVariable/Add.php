@@ -39,6 +39,16 @@ class Add extends Component
 
     public bool $is_preview = false;
 
+    /** The resource has preview deployments, so a new variable also gets a preview copy. */
+    #[Locked]
+    public bool $showPreview = false;
+
+    public bool $copy_value_to_preview = true;
+
+    /** The application copies production values to new preview variables, so one variable can opt out. */
+    #[Locked]
+    public bool $canLeavePreviewValueEmpty = false;
+
     public string $key;
 
     public ?string $value = null;
@@ -67,6 +77,7 @@ class Add extends Component
             'is_runtime' => 'required|boolean',
             'is_buildtime' => 'required|boolean',
             'comment' => 'nullable|string|max:256',
+            'copy_value_to_preview' => 'required|boolean',
         ];
     }
 
@@ -89,6 +100,9 @@ class Add extends Component
     {
         $this->parameters = get_route_parameters();
         $this->problematicVariables = self::getProblematicVariablesForFrontend();
+        $this->canLeavePreviewValueEmpty = $this->showPreview
+            && $this->resource instanceof Application
+            && $this->resource->settings?->use_production_values_in_previews !== false;
     }
 
     #[Computed]
@@ -231,6 +245,7 @@ class Add extends Component
             'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
             'comment' => $this->comment,
+            'copy_value_to_preview' => $this->canLeavePreviewValueEmpty ? $this->copy_value_to_preview : null,
         ]);
         $this->clear();
     }
@@ -244,5 +259,6 @@ class Add extends Component
         $this->is_runtime = true;
         $this->is_buildtime = true;
         $this->comment = null;
+        $this->copy_value_to_preview = true;
     }
 }

@@ -2,7 +2,7 @@ name: Main
 
 on:
   schedule:
-    - cron: "50 9,21 * * *"
+    - cron: "50 7,15 * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -73,7 +73,7 @@ jobs:
           path: ${{ runner.temp }}/images
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@v4.7.0
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

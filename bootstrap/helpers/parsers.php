@@ -63,6 +63,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                 $e
             );
         }
+        validateComposeServiceName((string) $serviceName);
 
         // Validate volumes in this service (both string and array formats)
         if (isset($serviceConfig['volumes']) && is_array($serviceConfig['volumes'])) {
@@ -208,6 +209,24 @@ function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase
  *
  * @throws Exception If the source is missing or contains shell metacharacters
  */
+/**
+ * Coolify names each container "<service name>-<suffix>". Docker allows only container names
+ * that match [a-zA-Z0-9][a-zA-Z0-9_.-]+, and Docker Compose allows only service names that
+ * match [a-zA-Z0-9._-]+. Compose accepts a service name that starts with ".", "-", or "_",
+ * but Docker then refuses to create its container.
+ *
+ * @throws Exception If Docker cannot use the service name at the start of a container name
+ */
+function validateComposeServiceName(string $serviceName): void
+{
+    if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $serviceName) !== 1) {
+        throw new Exception(
+            "Service name \"{$serviceName}\" must start with a letter or a digit and contain only letters, digits, \".\", \"-\", and \"_\". ".
+            'Docker uses the same rule for container names, and Coolify uses the service name at the start of the container name.'
+        );
+    }
+}
+
 /**
  * Coolify sets container_name on every Compose service, and Docker Compose does not start more
  * than one container of a service that has a fixed container_name.
@@ -1161,7 +1180,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1205,6 +1227,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
         validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
@@ -1784,8 +1807,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
+            // A preview renames its services to "<name>-pr-<id>". The alias keeps the original name as a hostname
+            // on the preview network, so that services can still reach each other by their Compose names.
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [(string) $serviceName]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
@@ -2002,10 +2027,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $branch = $originalResource->git_branch;
-        if ($pullRequestId !== 0) {
-            $branch = "pull/{$pullRequestId}/head";
-        }
+        $branch = $originalResource->coolifyBranch($pullRequestId);
         if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
             $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
         }
@@ -2280,6 +2302,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
+        // A security update of this service, while the compose file still names the image it replaced.
+        if (($imageOverride = $resource->composeImageOverride((string) $serviceName, $image->isEmpty() ? null : $image->value())) !== null) {
+            $payload['image'] = $imageOverride;
+        }
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
@@ -2389,6 +2415,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     return $topLevel;
 }
 
+/**
+ * Marks the applications and databases of a service whose names are no longer in its compose file.
+ * They keep their settings, so a part that comes back under the same name is used again.
+ * The service status ignores marked parts, and the user can delete them.
+ *
+ * @param  array<string|int, mixed>|Collection<string|int, mixed>  $services
+ */
+function markServicePartsRemovedFromCompose(Service $resource, array|Collection $services): void
+{
+    $serviceNames = collect($services)->keys()->map(fn ($name): string => (string) $name)->all();
+    if ($serviceNames === []) {
+        return;
+    }
+
+    foreach ([$resource->applications(), $resource->databases()] as $parts) {
+        (clone $parts)->whereIn('name', $serviceNames)->where('is_removed_from_compose', true)
+            ->update(['is_removed_from_compose' => false]);
+        (clone $parts)->whereNotIn('name', $serviceNames)->where('is_removed_from_compose', false)
+            ->update(['is_removed_from_compose' => true]);
+    }
+}
+
 function serviceParser(Service $resource): Collection
 {
     $resource->resetComposeVolumeWarnings();
@@ -2410,7 +2458,10 @@ function serviceParser(Service $resource): Collection
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
 
     // Clean up corrupted environment variables from previous parser bugs
     // (keys starting with $ or ending with } should not exist as env var names)
@@ -2464,6 +2515,7 @@ function serviceParser(Service $resource): Collection
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
         validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
@@ -2513,6 +2565,7 @@ function serviceParser(Service $resource): Collection
             $savedService->save();
         }
     }
+    markServicePartsRemovedFromCompose($resource, $services);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);

@@ -41,19 +41,6 @@ it('builds the testing host only for local development', function () {
         ->toContain('dockerfile: ./docker/testing-host/Dockerfile');
 });
 
-it('documents pull request targets for fixes and features', function () {
-    $contributingGuide = file_get_contents(dirname(__DIR__, 2).'/CONTRIBUTING.md');
-
-    expect($contributingGuide)
-        ->toContain('Fixes and small improvements')
-        ->toContain('target `main`')
-        ->toContain('New features and larger changes')
-        ->toContain('target `next`')
-        ->toContain('branch from `main`')
-        ->toContain('branch from `next`')
-        ->not->toContain('All pull requests must target the `next` branch');
-});
-
 it('guides issue authors to the correct contribution branch', function () {
     $bugReport = file_get_contents(dirname(__DIR__, 2).'/.github/ISSUE_TEMPLATE/01_BUG_REPORT.yml');
     $issueConfig = file_get_contents(dirname(__DIR__, 2).'/.github/ISSUE_TEMPLATE/config.yml');

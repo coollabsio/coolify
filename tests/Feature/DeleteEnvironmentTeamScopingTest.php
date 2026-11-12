@@ -46,15 +46,9 @@ test('mount can load DeleteEnvironment with own team environment', function () {
 });
 
 test('environment_id is locked and cannot be reassigned from the client', function () {
-    $component = Livewire::test(DeleteEnvironment::class, ['environment_id' => $this->environmentA->id]);
-
-    try {
-        $component->set('environment_id', $this->environmentB->id);
-        $this->fail('Setting a #[Locked] property should have thrown.');
-    } catch (CannotUpdateLockedPropertyException) {
-        expect(true)->toBeTrue();
-    }
-});
+    Livewire::test(DeleteEnvironment::class, ['environment_id' => $this->environmentA->id])
+        ->set('environment_id', $this->environmentB->id);
+})->throws(CannotUpdateLockedPropertyException::class);
 
 test('delete still removes an empty environment owned by the current team', function () {
     $component = Livewire::test(DeleteEnvironment::class, ['environment_id' => $this->environmentA->id])

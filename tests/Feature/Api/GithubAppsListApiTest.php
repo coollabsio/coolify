@@ -469,9 +469,6 @@ describe('GitHub app API url normalization', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.octocorp.ghe.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.octocorp.ghe.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'installation-token',
             ]),

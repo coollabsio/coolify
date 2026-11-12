@@ -1,5 +1,10 @@
 @php
-    $deploymentStatusMeta = function (string $status): array {
+    $deploymentStatusMeta = function (\App\Models\ApplicationDeploymentQueue $deployment): array {
+        $status = (string) $deployment->status;
+        if ($deployment->isImageScanBlocked()) {
+            return ['Blocked', 'error'];
+        }
+
         $label = match ($status) {
             'finished' => 'Success',
             'in_progress' => 'In progress',
@@ -54,7 +59,7 @@
 
                         @foreach ($this->activeDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -91,9 +96,14 @@
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}
-                                        <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                        {{ $deployment->server_name ?: '-' }}
                                     </p>
+                                    @if ($deployment->created_at)
+                                        <time datetime="{{ $deployment->created_at->toIso8601String() }}"
+                                            title="{{ $deployment->created_at->toDayDateTimeString() }}"
+                                            class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $deployment->created_at->diffForHumans() }}
+                                        </time>
+                                    @endif
                                 </div>
                             </a>
                         @endforeach
@@ -109,12 +119,12 @@
                             <span>Environment</span>
                             <span>Server</span>
                             <span>Status</span>
-                            <span>Started</span>
+                            <span>Finished</span>
                         </div>
 
                         @foreach ($this->recentDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -143,17 +153,23 @@
                                 <span class="hidden @2xl:block">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                 </span>
-                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim">
-                                    {{ $deployment->created_at?->diffForHumans() ?? '-' }}
+                                <p class="hidden truncate text-[12px] text-neutral-500 @2xl:block dark:text-fg-dim"
+                                    title="{{ $deployment->finished_at?->toDayDateTimeString() }}">
+                                    {{ $deployment->finished_at?->diffForHumans() ?? '-' }}
                                 </p>
 
                                 <div class="mt-3 flex min-w-0 items-center gap-3 @2xl:hidden">
                                     <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                                     <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $environmentPath ?: '-' }}
-                                        <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                        {{ $deployment->server_name ?: '-' }}
                                     </p>
+                                    @if ($deployment->finished_at)
+                                        <time datetime="{{ $deployment->finished_at->toIso8601String() }}"
+                                            title="{{ $deployment->finished_at->toDayDateTimeString() }}"
+                                            class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $deployment->finished_at->diffForHumans() }}
+                                        </time>
+                                    @endif
                                 </div>
                             </a>
                         @endforeach

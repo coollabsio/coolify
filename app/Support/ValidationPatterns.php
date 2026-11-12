@@ -37,9 +37,11 @@ class ValidationPatterns
 
     /**
      * Pattern for SSH usernames.
-     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     * Allows alphanumeric characters, dots, hyphens, and underscores. The first character must not be
+     * a hyphen, so ssh and scp cannot read the user as an option.
+     * The terminal server uses the same rule (docker/coolify-terminal/terminal-utils.js).
      */
-    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9_.][a-zA-Z0-9._-]*$/';
 
     /**
      * Pattern for removing characters not allowed in SSH usernames.
@@ -488,14 +490,16 @@ class ValidationPatterns
 
     /**
      * Get validation rules for name fields
+     *
+     * Set $nullable to false for optional fields that may be left out but not set to null.
      */
-    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
+    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255, bool $nullable = true): array
     {
         $rules = [];
 
         if ($required) {
             $rules[] = 'required';
-        } else {
+        } elseif ($nullable) {
             $rules[] = 'nullable';
         }
 

@@ -36,6 +36,13 @@
     --color-warning-900: oklch(42.1% 0.0897 57.71);
     --color-success: oklch(72.27% 0.192 149.58);
     --color-error: oklch(57.71% 0.2152 27.33);
+    /* Vulnerability severity. Critical uses --color-error; low and unknown are
+       neutral. These two never follow the accent or --color-warning (the custom
+       theme recolors both): high is orange, medium is sky blue, so neither reads
+       as the yellow warning or the purple accent. Light values here, dark
+       values in .dark. */
+    --color-severity-high: oklch(56% 0.135 50);
+    --color-severity-medium: oklch(55% 0.1 235);
     --color-coollabs-50: oklch(96.33% 0.0206 301.15);
     --color-coollabs: oklch(49.65% 0.2709 289.33);
     --color-coollabs-100: oklch(52.34% 0.287 289.16);
@@ -482,6 +489,18 @@ select,
 /*
 * Base styles
 */
+/* UI scale from the Appearance page. It scales rem sizes only, because CSS zoom breaks the
+   mouse positions in xterm and the canvas. Phones keep 100% so inputs stay at 16px. */
+@media (min-width: 768px) {
+    html[data-ui-scale="90"] {
+        font-size: 90%;
+    }
+
+    html[data-ui-scale="80"] {
+        font-size: 80%;
+    }
+}
+
 html,
 body {
     @apply w-full min-h-full bg-neutral-50 dark:bg-app dark:text-fg-dim;
@@ -1408,6 +1427,8 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
        (4.10/3.75/3.53). Brightened for dark mode so text-error clears AA on the
        card ladder while staying unmistakably red. */
     --color-error: oklch(66% 0.2 27.33);
+    --color-severity-high: oklch(74% 0.15 55);
+    --color-severity-medium: oklch(76% 0.11 230);
 }
 
 /* Light-mode semantic text.
@@ -1440,21 +1461,24 @@ html[data-theme="custom"] {
     --theme-base-color: oklch(49.65% 0.2709 289.33);
     --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, oklch(100% 0 0));
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
-    /* Accent text/icons sit directly on dark surfaces. Force the lightness into a
-       readable band (and tame chroma) so any picked hue keeps enough contrast. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.72, l, 0.86) min(c, 0.13) h);
+    /* Accent text and icons on the page. applyCustomTheme() computes a color with
+       4.5:1 contrast on the page surfaces. */
+    --theme-fg-on-surface: var(--theme-accent-text, var(--theme-bright-color));
+    /* The opposite of the text on accent fills. Shades of a fill that carry that
+       text move toward it, so the text never has less contrast than on the fill. */
+    --theme-accent-away: oklch(from var(--theme-accent-foreground) calc(1 - l) 0 0);
     --color-accent: var(--theme-bright-color);
     --color-coollabs: var(--theme-bright-color);
-    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(0% 0 0));
+    --color-coollabs-100: var(--theme-bright-color);
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, var(--theme-accent-away));
     --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
     /* Brand fills, tints, and accent text follow the picked color. Text on a
        brand fill uses the computed foreground, so light colors stay readable. */
     --color-brand: var(--theme-bright-color);
-    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
-    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, oklch(0% 0 0));
+    --color-brand-hover: color-mix(in oklab, var(--theme-bright-color) 92%, var(--theme-accent-away));
+    --color-brand-press: color-mix(in oklab, var(--theme-bright-color) 85%, var(--theme-accent-away));
     --color-brand-depth: color-mix(in oklab, var(--theme-bright-color) 65%, oklch(0% 0 0));
     --color-brand-ring: color-mix(in oklab, var(--theme-bright-color) 75%, oklch(100% 0 0));
     --color-brand-foreground: var(--theme-accent-foreground);
@@ -1465,11 +1489,13 @@ html[data-theme="custom"] {
 
 html[data-theme="custom"]:not(.dark) {
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-base-color) 45%, oklch(60% 0 0));
-    /* Accent text/icons on light surfaces: force lightness into a dark band. */
-    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.30, l, 0.48) min(c, 0.16) h);
 }
 
+/* The sidebar has its own accent text color. --color-brand-light is resolved on
+   <html>, so set it again here. */
 html[data-theme="custom"] :is(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) {
+    --theme-fg-on-surface: var(--theme-sidebar-accent-text, var(--theme-bright-color));
+    --color-brand-light: var(--theme-fg-on-surface);
     --t-bg: var(--theme-sidebar);
     --t-text: var(--theme-sidebar-text);
     --t-light: var(--theme-sidebar-light);
@@ -1629,6 +1655,11 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
 html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
 html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
     border-color: var(--coollabs-line) !important;
+}
+
+/* Menu entries (the account menu) follow the sidebar text, not the page scheme. */
+html[data-sidebar-scheme] :where(.app-sidebar, .mobile-sidebar-sheet [role="dialog"]) .listbox-option {
+    color: var(--color-fg);
 }
 
 /* Row and section separators (one-sided borders and divide-y) use the softer
@@ -1955,8 +1986,10 @@ html[data-theme="custom"] textarea:disabled {
     --card-fg-faint: var(--color-fg-faint);
 }
 
+/* The light well uses the theme surface, like the bg-white remap, instead of white. */
 html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .application-settings-section-body, .empty-state) {
     --card-underlay: var(--coollabs-canvas);
+    --well-bg: var(--coollabs-elevated);
 }
 
 /* Top-level cards and wells sit on the page: paint the translucent tint over
@@ -2073,6 +2106,30 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     color: inherit;
 }
 
+/* Collapsible layer card: the title is the toggle; closed, only the title row shows. */
+.application-settings-section > header.is-collapsed {
+    padding-bottom: 0.25rem;
+}
+
+.application-settings-section .settings-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    color: inherit;
+    font: inherit;
+    transition: color 150ms ease;
+}
+
+.application-settings-section .settings-section-toggle:hover {
+    color: var(--card-fg);
+}
+
+.application-settings-section .settings-section-toggle:focus-visible {
+    outline: 2px solid var(--color-coollabs);
+    outline-offset: 2px;
+}
+
 .application-settings-section > .application-settings-section-header p {
     margin-top: 0.125rem;
     font-size: 11px;
@@ -2098,6 +2155,26 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     background: var(--well-bg);
     box-shadow: var(--well-shadow);
     padding: 1rem;
+}
+
+/* Sections inside a modal well: the modal is already the card, so show each
+   section flat (title row and fields) with a divider between sections. */
+.modal-flat-sections .application-settings-section,
+.modal-flat-sections .application-settings-section-body {
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.modal-flat-sections .application-settings-section > :is(header, .application-settings-section-header) {
+    padding-inline: 0;
+}
+
+.modal-flat-sections .application-settings-section ~ .application-settings-section {
+    border-top: 1px solid var(--well-border);
+    padding-top: 1.5rem;
 }
 
 /* The dark well is darker than the canvas, so controls inside it use a darker,
@@ -2758,6 +2835,11 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
     box-shadow: var(--shadow-dropdown);
 }
 
+/* Geist centers lowercase letters 1px below the line box center. Move the icons to match. */
+.top-user-menu-panel .listbox-option svg {
+    translate: 0 1px;
+}
+
 @media (max-width: 767px) {
     /* The mobile top bar's backdrop filter makes it the containing block for
        fixed descendants. Keep this menu anchored below its trigger instead
@@ -3036,7 +3118,6 @@ input[type="search"]::-webkit-search-results-decoration {
     max-width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .data-table-header {
@@ -3155,11 +3236,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .table-filter-value.table-filter-badge:hover {
     text-decoration-color: transparent;
-    border-color: var(--color-neutral-400);
-}
-
-.dark .table-filter-value.table-filter-badge:hover {
-    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .env-table-grid {
@@ -3207,7 +3283,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .environment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .environment-table-scroll .env-table-grid {
@@ -3517,8 +3592,9 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 50rem;
 }
 
+/* Shared by the Schedules and Executions tables of a service, so their columns line up. */
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 4.5rem;
+    grid-template-columns: minmax(10rem, 1.5fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(11rem, 1.2fr) minmax(6rem, 0.8fr) 4.5rem;
     width: 100%;
 }
 
@@ -3528,16 +3604,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Rows are reordered with CSS order, so dividers must not depend on DOM position. */
 .data-table-row.service-backup-table-grid {
-    background: var(--coollabs-base);
     border-top: 1px solid var(--coollabs-fill);
-}
-
-.data-table-row.service-backup-table-grid:hover {
-    background: color-mix(in srgb, var(--coollabs-base) 98%, black);
-}
-
-.dark .data-table-row.service-backup-table-grid:hover {
-    background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
 /* Persistent storage volumes: Name | [Source] | Destination | [PR suffix] | Backup | [Actions] */
@@ -3688,7 +3755,6 @@ input[type="search"]::-webkit-search-results-decoration {
 .deployment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
 }
 
 .deployment-table-grid {
@@ -3793,6 +3859,105 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 10.5rem;
 }
 
+.image-scan-ignores-table-grid {
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(12rem, 2fr) 6.5rem 9rem 5rem;
+}
+
+.image-scan-packages-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
+}
+
+.image-scan-packages-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 6rem 2.5rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+}
+
+.image-scan-findings-grid.has-image {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    min-width: 52rem;
+}
+
+.image-scan-findings-grid.is-nested {
+    grid-template-columns: minmax(11rem, 1.2fr) minmax(8rem, 1fr) minmax(9rem, 1fr) 5.5rem;
+    padding-left: 2.75rem;
+}
+
+.image-scan-sbom-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr);
+}
+
+.image-scan-sbom-grid.has-image {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) 6rem minmax(8rem, 1fr) minmax(8rem, 1fr);
+    min-width: 46rem;
+}
+
+.image-scan-fleet-grid {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 0.9fr) minmax(12rem, 1.8fr) minmax(7rem, 0.8fr) 6.5rem;
+}
+
+@media (max-width: 1279px) {
+    .image-scan-fleet-grid {
+        grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 0.9fr) minmax(10rem, 1.6fr) minmax(7rem, 0.8fr);
+    }
+
+    .image-scan-fleet-grid > .image-scan-fleet-tertiary {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .image-scan-packages-grid,
+    .image-scan-packages-grid.has-image,
+    .image-scan-findings-grid,
+    .image-scan-findings-grid.has-image,
+    .image-scan-findings-grid.is-nested {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 0.375rem;
+        min-width: 0;
+    }
+
+    .image-scan-severity-cell {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header > .image-scan-severity-cell {
+        display: none;
+    }
+
+    .image-scan-findings-grid.is-nested {
+        padding-left: 1rem;
+    }
+
+    .image-scan-sbom-grid,
+    .image-scan-sbom-grid.has-image {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+        min-width: 0;
+    }
+
+    .image-scan-fleet-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        row-gap: 0.375rem;
+    }
+
+    .image-scan-fleet-action {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .data-table-header > .image-scan-fleet-action {
+        display: none;
+    }
+
+    .image-scan-secondary {
+        display: none;
+    }
+}
+
 .fleet-servers-table-grid {
     grid-template-columns: minmax(9rem, 1.4fr) 8rem 8rem 8rem 5rem 8rem 5.5rem;
 }
@@ -3828,7 +3993,15 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .package-updates-table-grid {
-    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 6rem;
+    grid-template-columns: 1.25rem minmax(12rem, 1.4fr) minmax(10rem, 1fr);
+}
+
+.held-updates-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 7rem;
+}
+
+.host-vulnerabilities-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 6rem 6rem;
 }
 
 .scheduled-backups-table-grid {
@@ -3836,9 +4009,9 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 10rem 5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem 4.5rem minmax(6rem, 0.8fr) 4rem;
     gap: 0.75rem;
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
 .backup-executions-table-scroll {
@@ -3847,10 +4020,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Match the grid width so the log output spans the full scrolled row. */
 .backup-execution-row {
-    min-width: 67.5rem;
+    min-width: 52rem;
 }
 
-.backup-execution-row:last-child > .data-table-row {
+.backup-execution-row:last-child {
     border-bottom: 0;
 }
 
@@ -3893,6 +4066,15 @@ input[type="search"]::-webkit-search-results-decoration {
         display: none;
     }
 
+    .image-scan-ignores-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6.5rem 5rem;
+    }
+
+    .image-scan-ignores-table-grid > :nth-child(2),
+    .image-scan-ignores-table-grid > :nth-child(4) {
+        display: none;
+    }
+
     .server-resources-managed-table-grid {
         grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) 8rem 9.5rem;
     }
@@ -3902,7 +4084,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 10rem minmax(8rem, 1fr) 5rem;
+        grid-template-columns: 6.5rem minmax(6rem, 0.7fr) minmax(10rem, 1.6fr) 9.5rem minmax(6rem, 0.8fr) 4rem;
     }
 
     .backup-executions-table-grid > :nth-child(5) {
@@ -3969,10 +4151,27 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .package-updates-table-grid {
-        grid-template-columns: minmax(0, 1fr) 5rem;
+        grid-template-columns: 1.25rem minmax(0, 1fr);
     }
 
-    .package-updates-table-grid > :nth-child(2) {
+    .package-updates-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .held-updates-table-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .held-updates-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .host-vulnerabilities-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem 5rem;
+    }
+
+    .host-vulnerabilities-table-grid > :nth-child(2),
+    .host-vulnerabilities-table-grid > :nth-child(3) {
         display: none;
     }
 
@@ -4256,7 +4455,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-section-status-badge {
     height: 1.5rem !important;
-    padding-inline: 0.5rem !important;
     font-size: 0.6875rem !important;
 }
 
@@ -4272,7 +4470,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {
@@ -6637,8 +6834,9 @@ html[data-theme="custom"] .mobile-sidebar-sheet nav.sidebar-nav {
     background-color: transparent !important;
 }
 
-/* The current page in the sidebar uses the Selected color. */
-html[data-theme="custom"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+/* In the Flat style, the current page in the sidebar uses the Selected color. The 3D style has
+   no row fill, so its label keeps the sidebar text color. */
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
     background-color: var(--theme-selected);
     color: var(--theme-selected-text);
 }
@@ -6972,6 +7170,84 @@ html.dark .project-card-stats-dot {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
+}
+
+/* Starred resource menu pages (components/starred-menu). The star button sits on the right of its row:
+   it shows on hover and on focus, and always for a starred page. */
+.starred-menu-row {
+    position: relative;
+}
+
+.starred-menu-row > .menu-item {
+    padding-right: 2rem;
+}
+
+.starred-menu-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    color: var(--color-neutral-400);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 0.1s, color 0.1s;
+}
+
+.starred-menu-toggle:hover {
+    color: var(--color-warning-600);
+}
+
+.starred-menu-row:hover > .starred-menu-toggle,
+.starred-menu-toggle:focus-visible,
+.starred-menu-toggle[aria-pressed="true"] {
+    opacity: 1;
+}
+
+.starred-menu-toggle[aria-pressed="true"] {
+    color: var(--color-warning-600);
+}
+
+html.dark .starred-menu-toggle[aria-pressed="true"],
+html.dark .starred-menu-toggle:hover {
+    color: var(--color-warning);
+}
+
+/* Touch screens have no hover: show every star, dimmed. */
+@media (hover: none) {
+    .starred-menu-toggle {
+        opacity: 0.6;
+    }
+}
+
+.starred-menu-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.625rem 0.25rem;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-faint);
+}
+
+.starred-menu-item {
+    cursor: grab;
+}
+
+.starred-menu-item.is-dragging > .menu-item {
+    outline: 1px dashed var(--color-coollabs);
+    outline-offset: -1px;
+}
+
+/* Collapsed desktop sidebar: the starred icons show first, above a divider. */
+.app-sidebar .sidebar-collapsed .nav-context-menu :is(.starred-menu-toggle, .starred-menu-title) {
+    display: none !important;
 }
 
 /* A page menu's own "Back to ..." item: the main sidebar copy has the back row instead (components/main-nav-menu). */

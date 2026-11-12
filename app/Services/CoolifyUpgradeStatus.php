@@ -2,11 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\Server;
 use DateTimeInterface;
 
 class CoolifyUpgradeStatus
 {
     public const FILE = '/data/coolify/source/.upgrade-status';
+
+    /**
+     * scripts/upgrade.sh holds this lock while it writes a status, so an error write cannot interleave with it.
+     */
+    public const LOCK_FILE = '/data/coolify/source/.upgrade-status.lock';
 
     public const STALE_AFTER_MINUTES = 10;
 
@@ -83,6 +89,39 @@ class CoolifyUpgradeStatus
             'message' => $message,
             ...$base,
         ];
+    }
+
+    /**
+     * Writes an error that stopped an upgrade before the upgrade script started, so the upgrade modal shows it.
+     * Does nothing while an upgrade script runs, because the error then belongs to this attempt only.
+     * The write happens only if the status file did not change after the read, so a status that an
+     * upgrade script wrote in the meantime is kept.
+     */
+    public static function writeError(Server $server, string $message): void
+    {
+        $current = (string) instant_remote_process(['cat '.self::FILE.' 2>/dev/null || true'], $server, false);
+        if (self::isRunning($current)) {
+            return;
+        }
+
+        $line = 'error|'.trim((string) preg_replace('/[|\r\n]+/', ' ', $message)).'|'.now()->toIso8601String();
+        instant_remote_process([self::compareAndWriteCommand($current, $line)], $server, false);
+    }
+
+    /**
+     * Shell command that writes $line to the status file only if the file still contains $expected.
+     * It holds the lock that scripts/upgrade.sh takes for its status writes, if flock is available.
+     */
+    public static function compareAndWriteCommand(string $expected, string $line): string
+    {
+        $script = 'if command -v flock >/dev/null 2>&1; then exec 9>"$2"; flock -w 10 9 || exit 1; fi; '
+            .'if [ "$(cat "$1" 2>/dev/null)" = "$(printf %s "$3" | base64 -d)" ]; then printf %s "$4" | base64 -d > "$1"; echo >> "$1"; fi';
+
+        return 'sh -c '.escapeshellarg($script).' _ '
+            .escapeshellarg(self::FILE).' '
+            .escapeshellarg(self::LOCK_FILE).' '
+            .escapeshellarg(base64_encode(trim($expected))).' '
+            .escapeshellarg(base64_encode($line));
     }
 
     public static function isRunning(string $content, ?DateTimeInterface $now = null): bool

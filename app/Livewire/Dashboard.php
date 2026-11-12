@@ -7,8 +7,12 @@ use App\Livewire\Dashboard\ClusterMap;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Star;
 use App\Models\TeamInvitation;
 use App\Services\Access\AccessResolver;
+use App\Services\ImageScan\TeamVulnerabilities;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -42,6 +46,14 @@ class Dashboard extends Component
     #[Locked]
     public bool $showsTeamSections = true;
 
+    /**
+     * UUIDs of the resources the user can see that need a security update now (update_now).
+     *
+     * @var list<string>
+     */
+    #[Locked]
+    public array $securityUpdateNow = [];
+
     public function mount()
     {
         $this->showsTeamSections = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
@@ -52,6 +64,7 @@ class Dashboard extends Component
             return;
         }
 
+        $this->securityUpdateNow = TeamVulnerabilities::updateNowResources(currentTeam()->id);
         $this->privateKeys = $this->showsTeamSections ? PrivateKey::ownedByCurrentTeamCached() : collect();
         $this->servers = $this->showsTeamSections ? Server::ownedByCurrentTeamCached() : collect();
         $this->projects = Project::ownedByCurrentTeam()
@@ -80,6 +93,7 @@ class Dashboard extends Component
         return view('livewire.dashboard', [
             'clusterMapAvailable' => ClusterMap::isAvailableForCurrentTeam(),
             'pendingInvitations' => $this->pendingInvitations(),
+            'starredResources' => $this->starredResources(),
             'dashboardProjects' => $dashboardProjects,
             'dashboardServers' => $dashboardServers,
             'projectResourceCounts' => $dashboardProjects->mapWithKeys(fn (Project $project) => [$project->id => $this->projectResourceCount($project)]),
@@ -99,6 +113,70 @@ class Dashboard extends Component
         if ($this->isValidSort($sort, self::SERVER_SORT_COLUMNS)) {
             $this->serverSort = $sort;
         }
+    }
+
+    public function unstar(int $starId): void
+    {
+        auth()->user()->stars()->whereKey($starId)->delete();
+    }
+
+    /**
+     * Saves the order of the starred cards after a drag and drop. Stars of other teams keep their positions.
+     *
+     * @param  list<int>  $starIds
+     */
+    public function reorderStars(array $starIds): void
+    {
+        $stars = auth()->user()->stars()->whereKey($starIds)->get()->keyBy('id');
+
+        foreach (array_values($starIds) as $position => $starId) {
+            $stars->get((int) $starId)?->update(['position' => $position]);
+        }
+    }
+
+    /**
+     * Resources the user starred, in the current team, that the user can still see, in the order the user chose.
+     *
+     * @return Collection<int, array{star_id: int, resource: Model, name: string, context: string, href: string}>
+     */
+    private function starredResources(): Collection
+    {
+        $user = auth()->user();
+        $teamId = currentTeam()->id;
+
+        return $user->stars()
+            ->whereIn('starrable_type', Star::STARRABLE_TYPES)
+            ->with(['starrable' => fn (MorphTo $morphTo) => $morphTo->morphWith(
+                collect(Star::STARRABLE_TYPES)->reject(Server::class)->mapWithKeys(fn (string $type) => [$type => ['environment.project']])->all()
+            )])
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get()
+            ->filter(function (Star $star) use ($user, $teamId): bool {
+                $resource = $star->starrable;
+
+                if (! $resource) {
+                    return false;
+                }
+
+                if ($resource instanceof Server) {
+                    return $this->showsTeamSections && $resource->team_id === $teamId && $user->can('view', $resource);
+                }
+
+                return $resource->environment?->project?->team_id === $teamId && $user->can('view', $resource);
+            })
+            ->map(fn (Star $star) => [
+                'star_id' => $star->id,
+                'resource' => $star->starrable,
+                'name' => $star->starrable->name,
+                'context' => $star->starrable instanceof Server
+                    ? 'Server'
+                    : $star->starrable->environment->project->name.' / '.$star->starrable->environment->name,
+                'href' => $star->starrable instanceof Server
+                    ? route('server.show', ['server_uuid' => $star->starrable->uuid])
+                    : $star->starrable->link(),
+            ])
+            ->values();
     }
 
     private function projectResourceCount(Project $project): int
@@ -123,7 +201,7 @@ class Dashboard extends Component
             ! $server->settings->is_reachable => ['Unreachable', 'error'],
             ! $server->settings->is_usable => ['Not ready', 'warning'],
             $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-            default => ['Ready', 'success'],
+            default => ['Operational', 'success'],
         };
     }
 
@@ -174,6 +252,16 @@ class Dashboard extends Component
         [$column, $direction] = array_pad(explode('-', $sort, 2), 2, null);
 
         return in_array($column, $columns, true) && in_array($direction, ['asc', 'desc'], true);
+    }
+
+    /**
+     * "1 resource needs a security update now." / "3 resources need a security update now."
+     */
+    public static function securityCalloutTitle(int $count): string
+    {
+        return $count === 1
+            ? '1 resource needs a security update now.'
+            : "{$count} resources need a security update now.";
     }
 
     /**

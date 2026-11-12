@@ -74,7 +74,7 @@ describe('GET /api/v1/databases/{uuid}/envs', function () {
         ])->getJson("/api/v1/databases/{$database->uuid}/envs");
 
         $response->assertStatus(200);
-        $response->assertJson([]);
+        $response->assertExactJson([]);
     });
 
     test('returns 404 for non-existent database', function () {
@@ -84,6 +84,7 @@ describe('GET /api/v1/databases/{uuid}/envs', function () {
         ])->getJson('/api/v1/databases/non-existent-uuid/envs');
 
         $response->assertStatus(404);
+        $response->assertExactJson(['message' => 'Database not found.']);
     });
 });
 
@@ -150,6 +151,14 @@ describe('POST /api/v1/databases/{uuid}/envs', function () {
         ]);
 
         $response->assertStatus(409);
+        $response->assertExactJson(['message' => 'Environment variable already exists. Use PATCH request to update it.']);
+
+        $envs = EnvironmentVariable::where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->where('key', 'EXISTING_VAR')
+            ->get();
+        expect($envs)->toHaveCount(1)
+            ->and($envs->first()->value)->toBe('existing_value');
     });
 
     test('returns 422 when key is missing', function () {
@@ -163,6 +172,12 @@ describe('POST /api/v1/databases/{uuid}/envs', function () {
         ]);
 
         $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Validation failed.');
+        $response->assertJsonValidationErrors(['key']);
+
+        expect(EnvironmentVariable::where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->count())->toBe(0);
     });
 });
 
@@ -229,6 +244,11 @@ describe('PATCH /api/v1/databases/{uuid}/envs', function () {
         ]);
 
         $response->assertStatus(404);
+        $response->assertExactJson(['message' => 'Environment variable not found.']);
+
+        expect(EnvironmentVariable::where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->count())->toBe(0);
     });
 });
 
@@ -320,6 +340,12 @@ describe('PATCH /api/v1/databases/{uuid}/envs/bulk', function () {
         ]);
 
         $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Validation failed.');
+        $response->assertJsonValidationErrors(['comment']);
+
+        expect(EnvironmentVariable::where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->count())->toBe(0);
     });
 
     test('returns 400 when data is missing', function () {
@@ -331,6 +357,7 @@ describe('PATCH /api/v1/databases/{uuid}/envs/bulk', function () {
         ])->patchJson("/api/v1/databases/{$database->uuid}/envs/bulk", []);
 
         $response->assertStatus(400);
+        $response->assertExactJson(['message' => 'Bulk data is required.']);
     });
 });
 
@@ -359,12 +386,22 @@ describe('DELETE /api/v1/databases/{uuid}/envs/{env_uuid}', function () {
     test('returns 404 for non-existent environment variable', function () {
         $database = createDatabase($this);
 
+        $env = EnvironmentVariable::create([
+            'key' => 'KEEP_ME',
+            'value' => 'kept',
+            'resourceable_type' => StandalonePostgresql::class,
+            'resourceable_id' => $database->id,
+        ]);
+
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
         ])->deleteJson("/api/v1/databases/{$database->uuid}/envs/non-existent-uuid");
 
         $response->assertStatus(404);
+        $response->assertExactJson(['message' => 'Environment variable not found.']);
+
+        expect(EnvironmentVariable::where('uuid', $env->uuid)->exists())->toBeTrue();
     });
 });
 
@@ -406,5 +443,68 @@ describe('environment variable key validation for database APIs', function () {
                 ]],
             ])
             ->assertStatus(422);
+
+        expect(EnvironmentVariable::query()
+            ->where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->pluck('value', 'key')
+            ->all())->toBe(['SAFE_KEY' => 'old-value']);
+    });
+});
+
+describe('cross-team access to database environment variables', function () {
+    test('a token of another team gets 404 and changes nothing', function () {
+        $database = createDatabase($this);
+
+        $env = EnvironmentVariable::create([
+            'key' => 'TEAM_SECRET',
+            'value' => 'original',
+            'resourceable_type' => StandalonePostgresql::class,
+            'resourceable_id' => $database->id,
+        ]);
+
+        $otherTeam = Team::factory()->create();
+        $otherUser = User::factory()->create();
+        $otherTeam->members()->attach($otherUser->id, ['role' => 'owner']);
+        session(['currentTeam' => $otherTeam]);
+        $otherToken = $otherUser->createToken('other-token', ['*'])->plainTextToken;
+
+        $headers = [
+            'Authorization' => 'Bearer '.$otherToken,
+            'Content-Type' => 'application/json',
+        ];
+        $notFound = ['message' => 'Database not found.'];
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/databases/{$database->uuid}/envs")
+            ->assertStatus(404)
+            ->assertExactJson($notFound);
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/databases/{$database->uuid}/envs", ['key' => 'INJECTED', 'value' => 'x'])
+            ->assertStatus(404)
+            ->assertExactJson($notFound);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/databases/{$database->uuid}/envs", ['key' => 'TEAM_SECRET', 'value' => 'changed'])
+            ->assertStatus(404)
+            ->assertExactJson($notFound);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/databases/{$database->uuid}/envs/bulk", ['data' => [['key' => 'TEAM_SECRET', 'value' => 'changed']]])
+            ->assertStatus(404)
+            ->assertExactJson($notFound);
+
+        $this->withHeaders($headers)
+            ->deleteJson("/api/v1/databases/{$database->uuid}/envs/{$env->uuid}")
+            ->assertStatus(404)
+            ->assertExactJson($notFound);
+
+        $envs = EnvironmentVariable::where('resourceable_type', StandalonePostgresql::class)
+            ->where('resourceable_id', $database->id)
+            ->get();
+        expect($envs)->toHaveCount(1)
+            ->and($envs->first()->uuid)->toBe($env->uuid)
+            ->and($envs->first()->value)->toBe('original');
     });
 });

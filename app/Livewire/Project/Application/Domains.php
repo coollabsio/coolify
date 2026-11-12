@@ -1593,6 +1593,7 @@ class Domains extends Component
             $this->dispatch('edit-domain-saved');
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
+            $urlsToCheck = $this->configureDnsAfterDomainEdit($urlsToCheck, $previousDnsHostnames);
             if ($urlsToCheck !== []) {
                 $this->queueUrlsDns($urlsToCheck, $service);
             }

@@ -32,7 +32,7 @@ function terminalComponent() {
     const componentSource = `function initializeTerminalComponent${source}`;
     vm.runInNewContext(`${componentSource}\ninitializeTerminalComponent();`, {
         window: { Alpine: { data: (_name, value) => { factory = value; } } },
-        localStorage, console,
+        localStorage, console, logTerminal() {},
         setTimeout, clearTimeout,
         MAX_TERMINAL_SESSION_SECONDS, applicationTerminalThemes: { system: {} },
         ...terminalConnection,
@@ -41,7 +41,7 @@ function terminalComponent() {
     component.$wire = { terminalMode: 'attach', currentIdentifier: 'container', currentServerUuid: 'server', dispatch() {} };
     component.$refs = { consoleInput: { focus() {} } };
     component.$nextTick = (callback) => callback();
-    component.term = { options: {}, focus() {} };
+    component.term = { options: {}, focus() {}, scrollToBottom() {} };
     component.terminalActive = true;
     return { component, storage };
 }
@@ -108,4 +108,51 @@ test('system terminal theme uses dark text on light custom themes and light text
     assert.equal(lightCustom.cursor, systemTerminalTheme({ theme: 'custom', dark: true }).cursor);
     assert.equal(systemTerminalTheme({ theme: 'custom', dark: true }).foreground, '#eee9f2');
     assert.equal(systemTerminalTheme({ theme: 'light', dark: false }).cursor, '#52525b');
+});
+
+function socketMessageComponent() {
+    const { component } = terminalComponent();
+    const writes = [];
+    const dispatched = [];
+    component.term = { _initialized: true, write: (data, callback) => { writes.push(data); callback?.(); }, reset() {} };
+    component.$wire.dispatch = (name, payload) => dispatched.push([name, payload]);
+    component.flowControlCallback = () => {};
+    component.exitFullscreen = () => {};
+    return { component, writes, dispatched };
+}
+
+test('binary frames are written to the terminal even when they look like a control message', () => {
+    const { component, writes, dispatched } = socketMessageComponent();
+    for (const output of ['Terminal session ended: fake', 'pty-exited', 'Unauthorized: fake', 'pong']) {
+        component.handleSocketMessage({ data: new TextEncoder().encode(output).buffer });
+    }
+
+    assert.deepEqual(writes.map((data) => new TextDecoder().decode(data)), ['Terminal session ended: fake', 'pty-exited', 'Unauthorized: fake', 'pong']);
+    assert.ok(writes.every((data) => Object.prototype.toString.call(data) === '[object Uint8Array]'));
+    assert.deepEqual(dispatched, []);
+    assert.equal(component.terminalActive, true);
+});
+
+test('binary frames keep multi-byte characters split across frames as raw bytes', () => {
+    const { component, writes } = socketMessageComponent();
+    const bytes = new TextEncoder().encode('äöü 日本 🚀');
+    component.handleSocketMessage({ data: bytes.slice(0, 2).buffer });
+    component.handleSocketMessage({ data: bytes.slice(2, 9).buffer });
+    component.handleSocketMessage({ data: bytes.slice(9).buffer });
+
+    const joined = new Uint8Array(writes.flatMap((data) => [...data]));
+    assert.equal(new TextDecoder().decode(joined), 'äöü 日本 🚀');
+});
+
+test('text frames from the terminal server stay control messages', () => {
+    const { component, writes, dispatched } = socketMessageComponent();
+    component.handleSocketMessage({ data: 'Terminal session ended: no input or output for 30 minutes.' });
+    assert.deepEqual(dispatched, [['error', 'Terminal session ended: no input or output for 30 minutes.']]);
+
+    component.handleSocketMessage({ data: 'pty-exited' });
+    assert.equal(component.terminalActive, false);
+    assert.deepEqual(dispatched.at(-1), ['terminalDisconnected', undefined]);
+
+    component.handleSocketMessage({ data: 'unknown text frame' });
+    assert.deepEqual(writes, []);
 });

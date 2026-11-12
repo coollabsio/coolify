@@ -79,20 +79,15 @@
         @php
             $selectedSchedule = $selectedDatabaseBackup ?: $selectedVolumeBackup;
         @endphp
-        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
+        <x-modal-input :title="'Edit backup schedule'"
+            :subtitle="($selectedDatabaseBackup
+                ? ($selectedDatabaseBackup->database->human_name ?: $selectedDatabaseBackup->database->name)
+                : $selectedVolumeBackup->targetName()).' · '.$selectedSchedule->frequency.' schedule'"
+            wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
             canGate="update" :canResource="$service">
             <x-slot:content><span></span></x-slot:content>
 
-            <div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
-                <div>
-                    <h2 class="text-base font-semibold text-neutral-950 dark:text-fg">
-                        {{ $selectedDatabaseBackup
-                            ? ($selectedDatabaseBackup->database->human_name ?: $selectedDatabaseBackup->database->name)
-                            : $selectedVolumeBackup->targetName() }}
-                    </h2>
-                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">{{ $selectedSchedule->frequency }} schedule</p>
-                </div>
-
+            <div x-data="{ activeSection: 'general' }" class="modal-flat-sections flex min-w-0 flex-col gap-6">
                 <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
 
                 @foreach (['general', 'danger'] as $modalSection)
@@ -123,6 +118,10 @@
             helper="Manage database, persistent volume, and directory backup schedules for this service.">
             @can('update', $service)
                 <x-slot:actions>
+                    <x-modal-input title="Import backup" buttonTitle="Import backup">
+                        <livewire:project.service.import-backup :service="$service"
+                            wire:key="service-import-backup-{{ $service->id }}" />
+                    </x-modal-input>
                     <div x-data="{ dropdownOpen: false }">
                         <div class="relative" @click.outside="dropdownOpen = false">
                             <x-forms.button class="button-highlighted" @click="dropdownOpen = !dropdownOpen"
@@ -265,7 +264,7 @@
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
                             $databaseS3s = ($databaseBackup->s3Storages->isNotEmpty() ? $databaseBackup->s3Storages : collect([$databaseBackup->s3])->filter())->where('team_id', $serviceTeamId);
-                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
+                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3s->isNotEmpty() ? 'S3 storage: '.$databaseS3s->map(fn ($s3) => $s3->name.' ('.($s3->isS3() ? 'bucket: '.$s3->bucket : $s3->type->label()).')')->join(', ') : 'S3 storage: Unavailable');
                         @endphp
                         <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
                             x-show="isVisible(@js($databaseBackupId))"
@@ -284,10 +283,8 @@
                             </span>
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>
-                                <x-status-badge :status="$databaseBackup->save_s3 ? match ($databaseS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $databaseS3s->count().' storages' } : 'Not set'"
-                                    :type="$databaseBackup->save_s3 ? ($databaseS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
-                                    :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
+                            <span class="min-w-0">
+                                <x-backup-s3-storage :enabled="$databaseBackup->save_s3" :names="$databaseS3s->pluck('name')" :tooltip="$databaseS3Tooltip" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
                             <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
@@ -309,7 +306,7 @@
                         @php
                             $latestExecution = $backup->latestExecution;
                             $volumeS3s = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->where('team_id', $serviceTeamId);
-                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' (bucket: '.$s3->bucket.')')->join(', ') : 'S3 storage: Unavailable');
+                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3s->isNotEmpty() ? 'S3 storage: '.$volumeS3s->map(fn ($s3) => $s3->name.' ('.($s3->isS3() ? 'bucket: '.$s3->bucket : $s3->type->label()).')')->join(', ') : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {
                                 'running' => 'In progress',
@@ -342,10 +339,8 @@
                             </span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>
-                                <x-status-badge :status="$backup->save_s3 ? match ($volumeS3s->count()) { 0 => 'Unavailable', 1 => 'Configured', default => $volumeS3s->count().' storages' } : 'Not set'"
-                                    :type="$backup->save_s3 ? ($volumeS3s->isNotEmpty() ? 'success' : 'error') : 'neutral'"
-                                    :data-tooltip="$volumeS3Tooltip" :aria-label="$volumeS3Tooltip" tabindex="0" />
+                            <span class="min-w-0">
+                                <x-backup-s3-storage :enabled="$backup->save_s3" :names="$volumeS3s->pluck('name')" :tooltip="$volumeS3Tooltip" />
                             </span>
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}

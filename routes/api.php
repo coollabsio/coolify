@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\DnsController;
 use App\Http\Controllers\Api\FluxConnectionEventController;
+use App\Http\Controllers\Api\GiteaController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServerCloudflareTunnelController;
 use App\Http\Controllers\Api\ServerDockerCleanupController;
 use App\Http\Controllers\Api\ServerDockerRegistriesController;
+use App\Http\Controllers\Api\ServerImageScanningController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
@@ -41,6 +43,7 @@ use App\Http\Controllers\Api\SharedEnvironmentVariablesController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
+use App\Http\Controllers\Api\VulnerabilitiesController;
 use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
 use Illuminate\Support\Facades\Route;
@@ -184,6 +187,9 @@ Route::group([
     Route::get('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
+    Route::get('/servers/{uuid}/image-scanning', [ServerImageScanningController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/servers/{uuid}/image-scanning', [ServerImageScanningController::class, 'update'])->middleware(['api.ability:write']);
+
     Route::get('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/cloudflare-tunnel', [ServerCloudflareTunnelController::class, 'update'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/cloudflare-tunnel/enable', [ServerCloudflareTunnelController::class, 'enable'])->middleware(['api.ability:write']);
@@ -199,6 +205,7 @@ Route::group([
 
     Route::get('/servers/{uuid}/validate', [OtherController::class, 'post_required'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/host-key/reset', [ServersController::class, 'reset_host_key'])->middleware(['api.ability:write']);
 
     Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
     Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write', 'api.ability:deploy']);
@@ -247,6 +254,7 @@ Route::group([
     Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
+    Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
     Route::post('/tags', [TagsController::class, 'create'])->middleware(['api.ability:write']);
@@ -256,11 +264,13 @@ Route::group([
     Route::get('/applications', [ApplicationsController::class, 'applications'])->middleware(['api.ability:read']);
     Route::post('/applications/public', [ApplicationsController::class, 'create_public_application'])->middleware(['api.ability:write']);
     Route::post('/applications/private-github-app', [ApplicationsController::class, 'create_private_gh_app_application'])->middleware(['api.ability:write']);
+    Route::post('/applications/private-gitea-app', [ApplicationsController::class, 'create_private_gitea_app_application'])->middleware(['api.ability:write']);
     Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'application'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
 
@@ -336,6 +346,8 @@ Route::group([
     Route::patch('/gitlab-apps/{gitlab_app_id}', [GitlabController::class, 'update_gitlab_app'])->middleware(['api.ability:write']);
     Route::delete('/gitlab-apps/{gitlab_app_id}', [GitlabController::class, 'delete_gitlab_app'])->middleware(['api.ability:delete']);
 
+    Route::get('/gitea-apps', [GiteaController::class, 'list_gitea_apps'])->middleware(['api.ability:read']);
+
     Route::get('/databases', [DatabasesController::class, 'databases'])->middleware(['api.ability:read']);
     Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware(['api.ability:write']);
     Route::post('/databases/mysql', [DatabasesController::class, 'create_database_mysql'])->middleware(['api.ability:write']);
@@ -348,6 +360,7 @@ Route::group([
     Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'database'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:write'])->name('api.databases.imports.upload');
     Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:write'])->name('api.databases.imports.store');
     Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->whereNumber('activity_id')->name('api.databases.imports.show');
@@ -399,6 +412,7 @@ Route::group([
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/services/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'service'])->middleware(['api.ability:read']);
     Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
 

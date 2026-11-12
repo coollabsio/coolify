@@ -60,7 +60,7 @@ test('the migration keeps the most recently changed NIXPACKS_NODE_VERSION of eac
     $other = Application::factory()->create($attributes);
 
     // The rows an earlier clone_application() added next to the defaults of the created hooks.
-    $copies = collect([false, true])->map(fn (bool $isPreview) => EnvironmentVariable::query()->create([
+    $copies = collect([false, true])->map(fn (bool $isPreview) => insertDuplicateEnvironmentVariable([
         'key' => 'NIXPACKS_NODE_VERSION',
         'value' => '20',
         'is_preview' => $isPreview,
