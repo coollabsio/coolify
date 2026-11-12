@@ -1,0 +1,51 @@
+# documentation: https://github.com/monicahq/docker
+# slogan: Monica is an open-source personal relationship manager that helps you organize your social life.
+# category: productivity
+# tags: crm, contacts, personal, relationship-manager, php, laravel
+# logo: svgs/monica.svg
+# port: 80
+
+services:
+  monica:
+    image: monica:4.1.2-apache
+    environment:
+      - SERVICE_URL_MONICA_80
+      - APP_KEY=$SERVICE_BASE64_APPKEY
+      - APP_ENV=production
+      - APP_URL=$SERVICE_URL_MONICA_80
+      - DB_CONNECTION=mysql
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=${MARIADB_DATABASE:-monica}
+      - DB_USERNAME=$SERVICE_USER_MARIADB
+      - DB_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - DB_USE_UTF8MB4=true
+    volumes:
+      - monica-storage:/var/www/html/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      - MARIADB_USER=$SERVICE_USER_MARIADB
+      - MARIADB_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-monica}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  monica-storage:
+  mariadb-data:
