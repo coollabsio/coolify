@@ -1982,3 +1982,41 @@ test('an application with a system-wide GitHub App that the target lacks is list
         ->and(data_get($server->server_metadata, 'transfer.git_source_applications'))->toBe([$this->application->uuid])
         ->and(collect(data_get($server->server_metadata, 'transfer.finish.items'))->pluck('key'))->toContain("git_source:{$this->application->uuid}");
 });
+
+test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {
+    $this->application->settings->forceFill(['is_pr_deployments_public_approval_required' => false])->save();
+
+    $preview = new ApplicationPreview;
+    $preview->forceFill([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 9,
+        'pull_request_html_url' => 'https://github.com/example/app/pull/9',
+        'fqdn' => 'https://pr-9.app.example.com',
+        'is_fork_pull_request' => true,
+        'pending_approval_commit' => 'b2c3d4e5f6',
+        'approved_commit' => 'a1b2c3d4e5',
+        'approved_at' => '2031-02-03 04:05:06',
+    ]);
+    $preview->uuid = 'preview-pr-9';
+    $preview->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+
+    ApplicationPreview::withoutEvents(fn () => ApplicationPreview::withTrashed()->get()->each->forceDelete());
+    DB::table('scheduled_volume_backups')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: false, adoptMode: false);
+
+    $application = Application::where('name', 'my-app')->sole();
+    $importedPreview = $application->previews()->sole();
+    expect($application->settings->is_pr_deployments_public_approval_required)->toBeFalse()
+        ->and($importedPreview->is_fork_pull_request)->toBeTrue()
+        ->and($importedPreview->pending_approval_commit)->toBe('b2c3d4e5f6')
+        ->and($importedPreview->approved_commit)->toBe('a1b2c3d4e5')
+        ->and($importedPreview->approved_at->toDateTimeString())->toBe('2031-02-03 04:05:06');
+});

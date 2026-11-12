@@ -2332,6 +2332,10 @@ class ServerTransferImporter
                 'docker_registry_image_tag' => data_get($previewPayload, 'docker_registry_image_tag'),
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
+                'is_fork_pull_request' => (bool) data_get($previewPayload, 'is_fork_pull_request', false),
+                'pending_approval_commit' => data_get($previewPayload, 'pending_approval_commit'),
+                'approved_commit' => data_get($previewPayload, 'approved_commit'),
+                'approved_at' => data_get($previewPayload, 'approved_at'),
             ];
 
             if ($preview) {

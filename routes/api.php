@@ -300,6 +300,7 @@ Route::group([
     Route::get('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'index'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/previews', [ApplicationPreviewsController::class, 'store'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/previews/{pull_request_id}', [ApplicationPreviewsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::post('/applications/{uuid}/previews/{pull_request_id}/approve', [ApplicationPreviewsController::class, 'approve'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::patch('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'update_preview_by_pull_request_id'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:delete']);
 

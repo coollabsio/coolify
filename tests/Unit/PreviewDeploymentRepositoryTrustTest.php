@@ -62,6 +62,6 @@ it('gates every non-GitHub webhook preview before it creates or queues a deploym
     }
 })->with([
     'GitLab normal and manual webhooks' => ['Gitlab', 2],
-    'Gitea signed manual webhook' => ['Gitea', 1],
+    'Gitea normal and manual webhooks' => ['Gitea', 2],
     'Bitbucket signed manual webhook' => ['Bitbucket', 1],
 ]);

@@ -44,6 +44,8 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'is_fork_pull_request' => 'boolean',
+        'approved_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -174,6 +176,60 @@ class ApplicationPreview extends BaseModel
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
+    }
+
+    /**
+     * Store if the pull request comes from a fork. Each webhook event of the pull request sets it.
+     */
+    public function markForkPullRequest(bool $isFork): void
+    {
+        if ($this->is_fork_pull_request !== $isFork) {
+            $this->forceFill(['is_fork_pull_request' => $isFork])->save();
+        }
+    }
+
+    /**
+     * A fork pull request runs code that the repository owner did not review. Each of its commits
+     * waits for an admin, unless the admin turned on public previews without approval.
+     */
+    public function forkCommitNeedsApproval(string $commit): bool
+    {
+        if (! $this->is_fork_pull_request) {
+            return false;
+        }
+
+        $settings = $this->application?->settings;
+        if ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required) {
+            return false;
+        }
+
+        return blank($this->approved_commit) || ! hash_equals($this->approved_commit, $commit);
+    }
+
+    public function markWaitingForApproval(string $commit): void
+    {
+        $this->forceFill(['pending_approval_commit' => $commit])->save();
+    }
+
+    public function approveCommit(string $commit): void
+    {
+        $this->forceFill([
+            'approved_commit' => $commit,
+            'approved_at' => now(),
+            'pending_approval_commit' => null,
+        ])->save();
+    }
+
+    /**
+     * @return 'waiting_for_approval'|'approved'|null
+     */
+    public function approvalStatus(): ?string
+    {
+        if (filled($this->pending_approval_commit)) {
+            return 'waiting_for_approval';
+        }
+
+        return filled($this->approved_commit) ? 'approved' : null;
     }
 
     public function isRunning()

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\ApproveForkPreviewCommit;
 use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ApplicationPreviewsController extends Controller
 {
@@ -154,6 +156,11 @@ class ApplicationPreviewsController extends Controller
             new OA\Property(property: 'domain_port_overrides', type: 'object', nullable: true),
             new OA\Property(property: 'docker_registry_image_tag', type: 'string', nullable: true),
             new OA\Property(property: 'last_online_at', type: 'string', nullable: true),
+            new OA\Property(property: 'is_fork_pull_request', type: 'boolean', description: 'The pull request comes from a fork.'),
+            new OA\Property(property: 'approval_status', type: 'string', nullable: true, enum: ['waiting_for_approval', 'approved'], description: 'Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.'),
+            new OA\Property(property: 'pending_approval_commit', type: 'string', nullable: true, description: 'Commit that waits for approval before it deploys.'),
+            new OA\Property(property: 'approved_commit', type: 'string', nullable: true, description: 'Last approved commit.'),
+            new OA\Property(property: 'approved_at', type: 'string', format: 'date-time', nullable: true),
             new OA\Property(property: 'created_at', type: 'string'),
             new OA\Property(property: 'updated_at', type: 'string'),
         ],
@@ -299,6 +306,86 @@ class ApplicationPreviewsController extends Controller
         ], $status);
     }
 
+    #[OA\Post(
+        summary: 'Approve Preview Commit',
+        description: 'Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/approve',
+        operationId: 'approve-preview-commit-by-pull-request-id',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the application.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'pull_request_id', in: 'path', description: 'Pull request ID of the preview.', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            required: ['commit'],
+            properties: [
+                new OA\Property(property: 'commit', type: 'string', pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$', description: 'Full SHA of the reviewed commit. It must match pending_approval_commit of the preview.'),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'Commit approved.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'deployment_uuid', type: 'string', nullable: true),
+                ],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Missing permissions.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'The preview does not wait for approval of this commit, for example because the pull request has a newer commit.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, description: 'Deployment queue is full.'),
+        ],
+    )]
+    public function approve(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
+            return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+        }
+
+        $preview = $application->previews()->where('pull_request_id', (int) $pullRequestIdRaw)->first();
+        if (! $preview) {
+            return response()->json(['message' => 'Preview not found.'], 404);
+        }
+
+        $this->authorize('approve', $preview);
+
+        $validator = Validator::make($request->all(), [
+            'commit' => ['required', 'string', 'regex:/^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $result = ApproveForkPreviewCommit::run($preview, $request->string('commit')->value(), 'api');
+        } catch (ConflictHttpException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
+        }
+
+        return response()->json([
+            'message' => $result['status'] === 'queued' ? 'Commit approved. Preview deployment queued.' : $result['message'],
+            'deployment_uuid' => $result['deployment_uuid'] ?? null,
+        ]);
+    }
+
     private function sourceGitType(Application $application): ?string
     {
         return match ($application->source?->getMorphClass()) {
@@ -332,6 +419,11 @@ class ApplicationPreviewsController extends Controller
             'domain_port_overrides' => $preview->domain_port_overrides,
             'docker_registry_image_tag' => $preview->docker_registry_image_tag,
             'last_online_at' => $preview->last_online_at,
+            'is_fork_pull_request' => (bool) $preview->is_fork_pull_request,
+            'approval_status' => $preview->approvalStatus(),
+            'pending_approval_commit' => $preview->pending_approval_commit,
+            'approved_commit' => $preview->approved_commit,
+            'approved_at' => $preview->approved_at,
             'created_at' => $preview->created_at,
             'updated_at' => $preview->updated_at,
         ];

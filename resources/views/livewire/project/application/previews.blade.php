@@ -92,6 +92,17 @@
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
                     ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
             </div>
+            @if ($isPrDeploymentsPublicEnabled)
+                <div class="w-full">
+                    <x-forms.listbox id="isPrDeploymentsPublicApprovalRequired"
+                        label="Require approval for fork pull requests" onChange="savePreviewSettings"
+                        helper="When on, each new commit of a fork pull request waits until an admin approves it.<br><br><span class='font-bold'>Warning:</span> when off, Coolify deploys every fork commit automatically, and the code of a fork can take control of the server."
+                        :options="[
+                            ['value' => true, 'label' => 'Required for each commit'],
+                            ['value' => false, 'label' => 'Not required (deploy automatically)'],
+                        ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+                </div>
+            @endif
         </x-application.settings-section>
     @endif
 
@@ -287,6 +298,46 @@
                         @endcan
                     </div>
                 </div>
+
+                @if (filled($preview->pending_approval_commit))
+                    @php
+                        $pendingCommit = $preview->pending_approval_commit;
+                        $pendingCommitShort = substr($pendingCommit, 0, 7);
+                    @endphp
+                    <div class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]"
+                        wire:key="preview-approval-{{ $preview->id }}-{{ $pendingCommit }}">
+                        <div class="flex min-w-0 flex-col gap-1.5">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-status-badge type="warning" label="Waiting for approval" />
+                                @if (filled($preview->pull_request_html_url))
+                                    <a target="_blank" title="Open pull request in a new tab"
+                                        class="font-mono text-xs text-neutral-600 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
+                                        href="{{ $preview->pull_request_html_url }}">{{ $pendingCommitShort }}</a>
+                                @else
+                                    <span class="font-mono text-xs text-neutral-600 dark:text-fg-dim">{{ $pendingCommitShort }}</span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                This pull request comes from a fork. An admin must review and approve this commit before Coolify deploys it.
+                            </p>
+                        </div>
+                        @can('approve', $preview)
+                            <x-modal-confirmation title="Approve and deploy this commit?" buttonTitle="Approve and deploy"
+                                isHighlightedButton
+                                submitAction="approveForkCommit({{ $preview->id }}, '{{ $pendingCommit }}')"
+                                :actions="[
+                                    'Commit ' . $pendingCommitShort . ' of this fork pull request will be deployed.',
+                                    'The code of the fork runs on your server and can read the environment variables of this preview.',
+                                ]"
+                                :confirmWithText="false" :confirmWithPassword="false"
+                                step2ButtonText="Approve and deploy" />
+                        @endcan
+                    </div>
+                @elseif (filled($preview->approved_commit))
+                    <p class="mt-3 text-xs text-neutral-500 dark:text-fg-dim">
+                        Approved commit <span class="font-mono">{{ substr($preview->approved_commit, 0, 7) }}</span>
+                    </p>
+                @endif
 
                 <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                     <livewire:project.application.preview-domains

@@ -96,7 +96,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |
 | ➕ | Advanced | custom labels, custom docker run options, pre/post deployment command + container, manual webhook secrets |
 | ✅ | Maintenance | maintenance mode on + custom maintenance page |
-| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, Traefik certificate resolver |
+| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, fork PR approval not required, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, Traefik certificate resolver |
 | ✅ | Environment variables | normal, multiline, literal, shown once, build time only, runtime only, required, with comment, preview-only, and references to `{{team.*}}`, `{{project.*}}`, `{{environment.*}}`, `{{server.*}}` |
 | ✅ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on |
 | ✅ | File mount + directory mount | content, chown, chmod |
@@ -104,6 +104,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout |
 | ✅ | Tag | |
 | ✅ | Preview deployment | PR preview with domain port overrides + max restart count (needs the GitHub App, or create it in the database) |
+| ✅ | Fork PR preview approval | a fork PR preview with an approved commit and a newer commit that waits for approval (`is_fork_pull_request`, `approved_commit`, `approved_at`, `pending_approval_commit`); after the transfer the approved commit still deploys and the pending one still waits |
 | ✅ | Secret manager link | the app loads variables from the secret manager token |
 | ✅ | Managed DNS record | owned record in the Cloudflare zone for the app domain. Expected: the target takes ownership (provider comment changes) |
 

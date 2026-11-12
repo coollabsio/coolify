@@ -1644,6 +1644,10 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'is_fork_pull_request' => (bool) $preview->is_fork_pull_request,
+                'pending_approval_commit' => $preview->pending_approval_commit,
+                'approved_commit' => $preview->approved_commit,
+                'approved_at' => $preview->approved_at?->toIso8601String(),
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

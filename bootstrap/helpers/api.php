@@ -208,6 +208,7 @@ function sharedDataApplications(?Application $application = null): array
         'redact_all_env_values_in_logs' => 'boolean',
         'include_coolify_default_variables' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
+        'is_pr_deployments_public_approval_required' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
@@ -492,6 +493,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
+    $request->offsetUnset('is_pr_deployments_public_approval_required');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
