@@ -15,6 +15,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\Node;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\S3Storage;
@@ -1020,12 +1021,22 @@ function isDev(): bool
 }
 
 /**
- * The single gate for the Node product (Podman Nodes, clusters, host Sentinel, Flux). Flux ships only in the
- * development stack today, so Nodes also need a development instance.
+ * The gate for the Node product (Podman Nodes, clusters, host Sentinel, Flux) in the UI and for new work. Instance
+ * admins set it in Settings > Advanced. Flux ships only in the development stack today, so Nodes also need a
+ * development instance.
  */
 function nodesEnabled(): bool
 {
-    return isDev() && (bool) config('constants.sentinel.host_enabled', false);
+    return isDev() && (bool) instanceSettings()->is_nodes_enabled;
+}
+
+/**
+ * The gate for the background work that keeps existing Nodes connected (Flux trust and certificates, Sentinel
+ * assignment, Flux events). It stays open when an instance admin turns Nodes off, so cluster workloads keep running.
+ */
+function nodesInUse(): bool
+{
+    return nodesEnabled() || (isDev() && Node::query()->exists());
 }
 
 /**

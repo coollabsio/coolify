@@ -127,7 +127,7 @@
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [
-                        ['label' => nodesEnabled() ? 'Servers & Clusters' : 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*'), 'visible' => $teamWide],
+                        ['label' => nodesEnabled() ? 'Servers & Clusters' : 'Servers', 'beta' => nodesEnabled(), 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*'), 'visible' => $teamWide],
                         ['label' => 'Integrations', 'icon' => 'link', 'visible' => $teamWide, 'children' => [
                             ['label' => 'Sources', 'icon' => 'sources', 'href' => route('source.all'), 'active' => request()->is('sources', 'source/*')],
                             ['label' => 'Destinations', 'icon' => 'destinations', 'href' => route('destination.index'), 'active' => request()->is('destinations', 'destination/*')],
@@ -318,6 +318,9 @@
                                 :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <x-reicon :name="$item['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label flex-1" :class="collapsed && 'lg:hidden'">{{ $item['label'] }}</span>
+                                @if ($item['beta'] ?? false)
+                                    <x-beta-badge class="shrink-0" ::class="collapsed && 'lg:hidden'" />
+                                @endif
                             </a>
                         @endisset
                     </li>

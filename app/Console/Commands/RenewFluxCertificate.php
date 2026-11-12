@@ -14,7 +14,7 @@ class RenewFluxCertificate extends Command
 
     public function handle(): int
     {
-        if (! nodesEnabled()) {
+        if (! nodesInUse()) {
             return self::SUCCESS;
         }
 

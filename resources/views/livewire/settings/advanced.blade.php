@@ -147,6 +147,30 @@
                 </x-application.settings-subsection>
             </x-application.settings-section>
 
+            @if (isDev())
+                <x-application.settings-section id="nodes-section" title="Nodes and clusters">
+                    <x-slot:badges>
+                        <x-beta-badge />
+                    </x-slot:badges>
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="is_nodes_enabled" label="Nodes"
+                            helper="Show cluster servers and clusters to all teams. Only instance admins can change this setting. If you disable Nodes, existing Nodes stay connected and their applications continue to run, but users cannot open or change them."
+                            onChange="saveNodesEnabled" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                        <div x-show="! $wire.is_nodes_enabled" @if ($is_nodes_enabled) x-cloak @endif class="lg:col-span-2">
+                            <x-callout type="warning" title="Cluster applications continue to run">
+                                Coolify hides the cluster pages and blocks new clusters, cluster servers, and cluster
+                                applications. Existing Nodes stay connected and their applications continue to run.
+                                Webhooks and the API can still deploy existing cluster applications.
+                                To stop a cluster application, enable Nodes and stop the application first.
+                            </x-callout>
+                        </div>
+                    </div>
+                </x-application.settings-section>
+            @endif
+
             <x-application.settings-section id="interface-section" title="Interface and telemetry">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.listbox id="is_wire_navigate_enabled" label="Navigation"

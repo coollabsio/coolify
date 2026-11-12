@@ -28,7 +28,7 @@ class SentinelController extends Controller
 
     public function assignment(Request $request, IssueFluxCredential $issueFluxCredential, ResolveFluxPublicUrl $resolveFluxPublicUrl, EnsureFluxCertificateAuthority $ensureFluxCertificateAuthority, ResolveFluxTrustBundle $resolveFluxTrustBundle): JsonResponse
     {
-        if (! nodesEnabled()) {
+        if (! nodesInUse()) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 

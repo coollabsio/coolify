@@ -51,6 +51,8 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_mcp_server_enabled;
 
+    public bool $is_nodes_enabled = false;
+
     public ?string $webhook_allowed_internal_hosts = null;
 
     #[Validate('boolean')]
@@ -115,6 +117,7 @@ class Advanced extends Component
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
+        $this->is_nodes_enabled = (bool) $this->settings->is_nodes_enabled;
         $this->webhook_allowed_internal_hosts = collect($this->settings->webhook_allowed_internal_hosts ?? [])->implode(',');
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
         // Do not prefill the secret into the form; only update when the admin pastes a new value.
@@ -326,6 +329,23 @@ class Advanced extends Component
         }
 
         $this->settings->file_download_s3_storage_id = $storage->id;
+    }
+
+    /**
+     * Turning Nodes off hides the cluster pages and blocks new cluster work. Existing Nodes stay connected
+     * (see nodesInUse()), so their workloads keep running. The page reloads so the navigation follows the setting.
+     */
+    public function saveNodesEnabled(): void
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->validateOnly('is_nodes_enabled', ['is_nodes_enabled' => 'boolean']);
+            $this->settings->is_nodes_enabled = $this->is_nodes_enabled;
+            $this->saveAndAudit();
+            $this->redirectRoute('settings.advanced', navigate: false);
+        } catch (\Exception $e) {
+            handleError($e, $this);
+        }
     }
 
     public function clearDomainConnectPrivateKey(): void

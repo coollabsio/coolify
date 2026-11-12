@@ -709,6 +709,7 @@
                             <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $cluster->name }}</span>
                             <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->nodes_count }} available {{ Str::plural('server', $cluster->nodes_count) }}</span>
                         </span>
+                        <x-beta-badge class="shrink-0" />
                         <x-status-badge status="running" text="Cluster" />
                     </button>
                     @foreach($cluster->nodes as $node)

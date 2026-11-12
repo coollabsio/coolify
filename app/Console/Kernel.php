@@ -66,12 +66,12 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->when(fn () => config('constants.ssh.mux_enabled'));
         $this->scheduleInstance->command('flux:renew-certificate')->daily()->onOneServer()->withoutOverlapping(30)
-            ->when(fn () => nodesEnabled());
+            ->when(fn () => nodesInUse());
         // Retries trust bundle delivery to connected Nodes that missed a CA rotation step.
         $this->scheduleInstance->job(new DistributeFluxTrustBundleJob)
             ->everyFiveMinutes()
             ->onOneServer()
-            ->when(fn () => nodesEnabled());
+            ->when(fn () => nodesInUse());
         $this->scheduleInstance->call(fn () => CleanupOperations::run())
             ->name('cleanup:node-operations')
             ->daily()
@@ -89,7 +89,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new DeleteExpiredNodeVolumeCopiesJob)
             ->hourly()
             ->onOneServer()
-            ->when(fn () => nodesEnabled());
+            ->when(fn () => nodesInUse());
         $this->scheduleInstance->job(new InspectNodeClusterNetworksJob)
             ->everyMinute()
             ->onOneServer()

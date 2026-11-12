@@ -35,7 +35,7 @@ class DistributeFluxTrustBundleJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        if (! nodesEnabled()) {
+        if (! nodesInUse()) {
             return;
         }
 

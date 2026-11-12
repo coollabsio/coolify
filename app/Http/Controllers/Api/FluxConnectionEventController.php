@@ -21,7 +21,7 @@ class FluxConnectionEventController extends Controller
 {
     public function __invoke(Request $request, ResolveFluxPublicUrl $resolveFluxPublicUrl): Response
     {
-        abort_unless(nodesEnabled(), 404);
+        abort_unless(nodesInUse(), 404);
 
         $expectedToken = config('constants.flux.internal_token');
         $providedToken = $request->bearerToken();

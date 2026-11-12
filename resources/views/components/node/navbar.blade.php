@@ -13,6 +13,7 @@
         <span class="min-w-0 truncate px-2 font-semibold text-black dark:text-fg">
             {{ $node->name }}
         </span>
+        <x-beta-badge class="shrink-0" />
         <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'"
             :type="$node->is_usable ? 'success' : 'warning'" />
     </div>

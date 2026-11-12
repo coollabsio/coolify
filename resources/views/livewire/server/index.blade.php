@@ -5,7 +5,12 @@
 
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
-            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $clusterServersEnabled ? 'Servers & Clusters' : 'Servers' }}</h1>
+            <h1 class="flex min-w-0 items-center gap-1.5 text-[24px]! leading-7! font-semibold! tracking-tight!">
+                {{ $clusterServersEnabled ? 'Servers & Clusters' : 'Servers' }}
+                @if ($clusterServersEnabled)
+                    <x-beta-badge />
+                @endif
+            </h1>
             @if ($clusterServersEnabled)
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Cluster servers grouped by cluster, and Docker servers.</p>
             @endif
