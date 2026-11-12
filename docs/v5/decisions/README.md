@@ -32,7 +32,7 @@ current v5 architecture.
 | [0018: Add typed exec and terminal commands](0018-node-exec-and-terminal.md) | Accepted | `workload.exec.v1` for scheduled tasks and `workload.terminal.v1` over Flux; no host shell. |
 | [0019: Manage DNS records of cluster domains](0019-node-dns-records.md) | Accepted | Reuse v4 managed DNS records for the ingress Node addresses. |
 | [0020: Build and place by CPU architecture](0020-node-cpu-architecture.md) | Accepted | Build on a Node of the target architecture without emulation; place by architecture. |
-| [0021: Run Flux on the Coolify host, managed by Coolify](0021-production-flux.md) | Proposed | Coolify starts a pinned Flux container on server 0 when Nodes are on, stores generated Flux secrets in the database, issues the certificate for a Flux URL setting, and restarts Flux after a renewal. |
+| [0021: Run Flux as a service in the Coolify container](0021-production-flux.md) | Accepted | Flux is an s6 service in the Coolify container with a pinned binary, Coolify-generated secrets in the database, a Flux URL setting, an internal API on 127.0.0.1, and a restart after each certificate renewal. |
 
 ## Adding a decision
 
