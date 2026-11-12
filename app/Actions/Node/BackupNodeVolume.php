@@ -2,7 +2,6 @@
 
 namespace App\Actions\Node;
 
-use App\Actions\Sentinel\FetchContainerLogs;
 use App\Models\Node;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
@@ -70,7 +69,7 @@ class BackupNodeVolume
             'server_id' => $node->uuid,
             'backup_id' => $execution->uuid,
             'volume_name' => $volume->podmanName(),
-            'stop_container' => $backup->stop_during_backup ? FetchContainerLogs::containerName($workload) : '',
+            'stop_container' => $backup->stop_during_backup ? $workload->containerNameOn($node) : '',
             'stop_timeout_seconds' => $backup->stop_during_backup ? 120 : 0,
         ];
 
@@ -253,7 +252,7 @@ class BackupNodeVolume
                     'server_id' => $node->uuid,
                     'backup_id' => $execution->uuid,
                     'volume_name' => $volume->podmanName(),
-                    'stop_container' => $backup->stop_during_backup ? FetchContainerLogs::containerName($workload) : '',
+                    'stop_container' => $backup->stop_during_backup ? $workload->containerNameOn($node) : '',
                     'stop_timeout_seconds' => $backup->stop_during_backup ? 120 : 0,
                     'abort' => true,
                 ]);

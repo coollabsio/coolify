@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Enums\NodeContainerSlot;
 use App\Enums\NodeDatabaseType;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
@@ -487,12 +488,35 @@ class NodeWorkload extends BaseModel
 
     public function nodes(): BelongsToMany
     {
-        return $this->belongsToMany(Node::class, 'node_workload_nodes')->withPivot('container_ip')->withTimestamps();
+        return $this->belongsToMany(Node::class, 'node_workload_nodes')->withPivot('container_ip', 'next_container_ip')->withTimestamps();
     }
 
     public function containers(): HasMany
     {
         return $this->hasMany(NodeContainer::class);
+    }
+
+    /**
+     * The slot of the container of this workload on the Node, from the inventory: the running
+     * container, else the newest. A rolling deploy alternates the slots (decision 0022).
+     */
+    public function containerSlotOn(Node $node): NodeContainerSlot
+    {
+        $slots = collect(NodeContainerSlot::cases())->keyBy(fn (NodeContainerSlot $slot): string => $slot->containerName($this));
+        $name = $this->containers()
+            ->where('node_id', $node->id)
+            ->whereIn('name', $slots->keys())
+            ->orderByRaw("CASE WHEN state = 'running' THEN 0 ELSE 1 END")
+            ->orderByRaw('runtime_created_at DESC NULLS LAST')
+            ->orderByDesc('id')
+            ->value('name');
+
+        return $name === null ? NodeContainerSlot::MAIN : $slots->get($name);
+    }
+
+    public function containerNameOn(Node $node): string
+    {
+        return $this->containerSlotOn($node)->containerName($this);
     }
 
     public function operations(): HasMany

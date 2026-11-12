@@ -2,6 +2,8 @@
 
 namespace App\Actions\Node;
 
+use App\Enums\NodeContainerSlot;
+use App\Enums\NodeWorkloadAction;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,9 @@ use RuntimeException;
 class DispatchWorkloadDeployment
 {
     use AsAction;
+
+    /** Sentinel drains a removed container whenever another one serves (decision 0022). */
+    public const ROLLING_CAPABILITY = 'workload.rolling_deploy.v1';
 
     /** @return array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
     public function handle(NodeOperation $operation): array
@@ -55,20 +60,30 @@ class DispatchWorkloadDeployment
             // An older Sentinel ignores unknown fields and would start the container without the check.
             $operation->node->ensureReportedCapability('workload.healthcheck.v1');
         }
+        $plan = self::containerPlan($operation, $mounts);
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
-            $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->container_ip);
+            $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->{$plan['slot']->addressColumn()});
             $hadDnsName = filled($operation->workload->internal_dns_name);
-            $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
+            $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload, $plan['slot']);
             EnsureNodeWorkloadDnsNames::run($operation->node);
             $operation->workload->refresh();
             if ((! $hadAddress || ! $hadDnsName) && $operation->node->cluster !== null) {
                 // A new placement needs its name in the name table (creation assigns the name before any network
                 // revision) and, when routed, the firewall allow for this container. A new name needs the name table.
-                QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
+                if ($plan['replaces'] !== null) {
+                    // The new container gets traffic as soon as it is healthy, so its firewall allow must be in place.
+                    ApplyNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
+                } else {
+                    QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
+                }
             }
         }
-        $name = 'coolify-'.$operation->workload->uuid.'-main';
+        $name = $plan['slot']->containerName($operation->workload);
+        if ($plan['replaces'] !== null && $operation->node->containers()->where('node_workload_id', $operation->workload->id)->where('name', $name)->exists()) {
+            // A leftover of an earlier deploy can still get traffic. Podman would stop it without the drain.
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-clear", $name, NodeWorkloadAction::REMOVE);
+        }
         $response = Http::withToken($token)
             ->acceptJson()
             ->connectTimeout(10)
@@ -118,6 +133,44 @@ class DispatchWorkloadDeployment
 
         /** @var array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
         return $validator->validated();
+    }
+
+    /**
+     * The slot that the deploy starts its container in, and the slot of the container that it
+     * replaces after the new one is healthy (decision 0022). Without a replaced slot, Podman
+     * replaces the container in its slot: the old one stops before the new one starts. A writable
+     * volume must never have two writers. The first dispatch stores the plan, so a replay of the
+     * same command sends the same container name.
+     *
+     * @param  list<array{volume_name: string, container_path: string, read_only: bool}>  $mounts
+     * @return array{slot: NodeContainerSlot, replaces: ?NodeContainerSlot}
+     */
+    public static function containerPlan(NodeOperation $operation, array $mounts = []): array
+    {
+        $stored = data_get($operation->request, 'container');
+        if (is_array($stored)) {
+            return [
+                'slot' => NodeContainerSlot::from($stored['slot']),
+                'replaces' => NodeContainerSlot::tryFrom((string) ($stored['replaces'] ?? '')),
+            ];
+        }
+
+        $current = $operation->workload->containerSlotOn($operation->node);
+        $rolling = $operation->node->node_cluster_id !== null
+            && $operation->node->supportsCapability(self::ROLLING_CAPABILITY) === true
+            && ! collect($mounts)->contains(fn (array $mount): bool => ! $mount['read_only'])
+            && $operation->node->containers()
+                ->where('node_workload_id', $operation->workload->id)
+                ->where('name', $current->containerName($operation->workload))
+                ->where('state', 'running')
+                ->exists();
+        $plan = ['slot' => $rolling ? $current->other() : $current, 'replaces' => $rolling ? $current : null];
+        $operation->update(['request' => [
+            ...($operation->request ?? []),
+            'container' => ['slot' => $plan['slot']->value, 'replaces' => $plan['replaces']?->value],
+        ]]);
+
+        return $plan;
     }
 
     /**

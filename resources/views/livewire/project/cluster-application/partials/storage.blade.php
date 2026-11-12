@@ -6,7 +6,7 @@
 
 <div class="flex flex-col gap-6">
     <x-application.settings-section id="cluster-application-volumes" title="Persistent storage" :flush="$hasVolumes"
-        helper="A volume keeps its data when the container is replaced. It lives on one server, and the application can run only there. Moving the application copies the data to the new server.">
+        helper="A volume keeps its data when the container is replaced. It lives on one server, and the application can run only there. Moving the application copies the data to the new server.<br><br><span class='font-bold dark:text-warning'>With a writable volume, a redeploy stops the old container before the new one starts, so the application is unavailable for a short time.</span> Without one, the new container starts next to the old one and gets the traffic when it is healthy.">
         <x-slot:actions>
             @can('update', $workload)
                 @if (! $multipleServers)

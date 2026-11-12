@@ -146,10 +146,12 @@ class NodeEndToEndCommand extends Command
                 'uuid' => $workload->uuid,
                 'name' => $workload->name,
                 'dns_name' => $workload->internal_dns_name,
-                'container_name' => 'coolify-'.$workload->uuid.'-main',
+                'container_name' => ($first = $workload->nodes()->first()) === null ? null : $workload->containerNameOn($first),
                 'desired_state' => $workload->desired_state?->value,
                 'node_uuids' => $workload->nodes()->pluck('nodes.uuid')->all(),
-                'container_ips' => $workload->nodes()->get()->pluck('pivot.container_ip')->filter()->values()->all(),
+                'container_ips' => $workload->nodes()->get()
+                    ->map(fn ($node) => $node->pivot->{$workload->containerSlotOn($node)->addressColumn()})
+                    ->filter()->values()->all(),
                 'domains' => $workload->domains ?? [],
                 'domain_routes' => $workload->domain_routes ?? [],
                 'active_operations' => NodeOperation::query()

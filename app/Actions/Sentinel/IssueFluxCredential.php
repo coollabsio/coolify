@@ -57,6 +57,7 @@ class IssueFluxCredential
             'workload.stop_timeout.v1',
             'workload.healthcheck.v1',
             'workload.secrets.v1',
+            'workload.rolling_deploy.v1',
             'image.build.v1',
             'image.build.private_git.v1',
             'image.load.v1',

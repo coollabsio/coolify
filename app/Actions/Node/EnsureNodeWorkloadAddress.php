@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Enums\NodeContainerSlot;
 use App\Models\Node;
 use App\Models\NodeWorkload;
 use DomainException;
@@ -12,23 +13,26 @@ class EnsureNodeWorkloadAddress
 {
     use AsAction;
 
-    public function handle(Node $node, NodeWorkload $workload): string
+    public function handle(Node $node, NodeWorkload $workload, NodeContainerSlot $slot = NodeContainerSlot::MAIN): string
     {
         $node->refresh();
         if ($node->team_id !== $workload->team_id || $node->node_cluster_id === null || blank($node->workload_cidr)) {
             throw new DomainException('The workload and server must belong to the same configured mesh.');
         }
 
-        return DB::transaction(function () use ($node, $workload): string {
+        $column = $slot->addressColumn();
+
+        return DB::transaction(function () use ($node, $workload, $column): string {
             $node = Node::query()->lockForUpdate()->findOrFail($node->id);
             $assignment = $node->workloads()->whereKey($workload->id)->first();
-            if (filled($assignment?->pivot->container_ip)) {
-                return $assignment->pivot->container_ip;
+            if (filled($assignment?->pivot->{$column})) {
+                return $assignment->pivot->{$column};
             }
 
             [$network] = explode('/', $node->workload_cidr);
             $base = (int) sprintf('%u', ip2long($network));
-            $used = DB::table('node_workload_nodes')->where('node_id', $node->id)->pluck('container_ip')->filter()->all();
+            $used = DB::table('node_workload_nodes')->where('node_id', $node->id)->get(['container_ip', 'next_container_ip'])
+                ->flatMap(fn (object $row): array => [$row->container_ip, $row->next_container_ip])->filter()->all();
             $address = null;
             for ($offset = 2; $offset <= 254; $offset++) {
                 $candidate = long2ip($base + $offset);
@@ -41,7 +45,7 @@ class EnsureNodeWorkloadAddress
                 throw new DomainException('No workload address is available on this server.');
             }
 
-            $node->workloads()->syncWithoutDetaching([$workload->id => ['container_ip' => $address]]);
+            $node->workloads()->syncWithoutDetaching([$workload->id => [$column => $address]]);
 
             return $address;
         });

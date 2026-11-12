@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Enums\NodeContainerSlot;
 use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\ManageNodeWorkloadJob;
@@ -61,8 +62,8 @@ class FenceRecoveredNodeWorkloads
             return;
         }
 
-        $name = 'coolify-'.$workload->uuid.'-main';
-        if (! $node->containers()->where('name', $name)->exists()) {
+        $names = array_map(fn (NodeContainerSlot $slot): string => $slot->containerName($workload), NodeContainerSlot::cases());
+        if (! $node->containers()->whereIn('name', $names)->exists()) {
             NodeVolumeCopy::query()
                 ->where('node_id', $node->id)
                 ->whereNull('podman_name')
@@ -85,7 +86,7 @@ class FenceRecoveredNodeWorkloads
             "fence:{$node->uuid}:{$workload->uuid}:".Str::uuid(),
             $workload,
             $move->revision,
-            ['revision_uuid' => $move->revision->uuid, 'action' => NodeWorkloadAction::REMOVE->value],
+            ['revision_uuid' => $move->revision->uuid, 'action' => NodeWorkloadAction::REMOVE->value, 'container_name' => $workload->containerNameOn($node)],
         );
         $this->record($move, ['fence' => 'removing', 'fence_removal_operation_uuid' => $removal->uuid]);
         ManageNodeWorkloadJob::dispatch($removal->id);

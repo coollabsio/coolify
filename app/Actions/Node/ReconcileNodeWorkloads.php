@@ -108,6 +108,7 @@ class ReconcileNodeWorkloads
                 $node,
                 $latestRevision,
                 $currentContainer,
+                $containers->contains('state', 'running'),
             ),
             NodeWorkloadDesiredState::STOPPED => $container !== null
                 && ! in_array($container->state, self::NOT_RUNNING_STATES, true)
@@ -123,12 +124,22 @@ class ReconcileNodeWorkloads
         Node $node,
         NodeWorkloadRevision $latestRevision,
         ?NodeContainer $currentContainer,
+        bool $olderRevisionRuns,
     ): int {
         if ($currentContainer?->state === 'running') {
             return 0;
         }
         if ($currentContainer !== null) {
             return $this->dispatchLifecycle($node, $currentContainer, $latestRevision, NodeWorkloadAction::START);
+        }
+        // A failed rolling deploy removes its new container and keeps the old one serving. Like v4, it is not retried.
+        if ($olderRevisionRuns && NodeOperation::query()
+            ->where('node_id', $node->id)
+            ->where('node_workload_revision_id', $latestRevision->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->where('status', NodeOperationStatus::FAILED)
+            ->exists()) {
+            return 0;
         }
 
         // Without a backoff, an image that cannot run creates a failing deployment every minute.

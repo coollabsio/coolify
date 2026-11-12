@@ -24,8 +24,10 @@ class VerifyWorkloadLifecycleConvergence
             ->where('node_workload_id', $operation->node_workload_id)
             ->where('is_managed', true)
             ->get();
-        $container = $containers->firstWhere('node_workload_revision_id', $operation->node_workload_revision_id)
-            ?? $containers->first();
+        $name = data_get($operation->request, 'container_name');
+        $container = is_string($name)
+            ? $containers->firstWhere('name', $name)
+            : $containers->firstWhere('node_workload_revision_id', $operation->node_workload_revision_id) ?? $containers->first();
         $converged = match ($action) {
             NodeWorkloadAction::START, NodeWorkloadAction::RESTART => $container !== null
                 && $container->node_workload_revision_id === $operation->node_workload_revision_id

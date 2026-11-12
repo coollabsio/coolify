@@ -4,10 +4,13 @@ namespace App\Jobs;
 
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
+use App\Actions\Node\DispatchWorkloadLifecycle;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\TransitionOperation;
 use App\Actions\Node\VerifyDeploymentConvergence;
+use App\Enums\NodeContainerSlot;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadAction;
 use App\Models\NodeOperation;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -53,7 +56,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
                         ClaimOperation::run(
                             $operation,
                             NodeOperationStatus::SUCCEEDED,
-                            result: [...($operation->result ?? []), 'verification' => $verification],
+                            result: [...($operation->result ?? []), 'verification' => $verification, ...$this->retireReplaced($operation)],
                         );
 
                         return;
@@ -72,12 +75,12 @@ class DeployNodeWorkloadJob implements ShouldQueue
             $verification = $this->verifyUntilHealthy($operation);
             $result['verification'] = $verification;
             if (! $verification['converged']) {
-                TransitionOperation::run($operation, NodeOperationStatus::FAILED, result: $result, error: $this->failureReason($operation, $verification));
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, result: $result, error: $this->failureReason($operation, $verification).$this->discardNew($operation));
 
                 return;
             }
 
-            TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);
+            TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: [...$result, ...$this->retireReplaced($operation)]);
         } catch (ConnectionException) {
             if ($operation->refresh()->status !== NodeOperationStatus::UNCERTAIN) {
                 TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The deployment result is unknown.');
@@ -85,9 +88,69 @@ class DeployNodeWorkloadJob implements ShouldQueue
         } catch (RequestException $exception) {
             $reason = trim(mb_substr($exception->response->body(), 0, 2000));
             $message = 'Flux rejected the deployment with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}");
-            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: $message);
+            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: $message.$this->discardNew($operation));
         } catch (Throwable $exception) {
-            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000).$this->discardNew($operation));
+        }
+    }
+
+    /** @return array{slot: NodeContainerSlot, replaces: NodeContainerSlot}|null */
+    private function rollingPlan(NodeOperation $operation): ?array
+    {
+        $plan = data_get($operation->refresh()->request, 'container');
+        $replaces = NodeContainerSlot::tryFrom((string) data_get($plan, 'replaces'));
+
+        return $replaces === null ? null : ['slot' => NodeContainerSlot::from($plan['slot']), 'replaces' => $replaces];
+    }
+
+    /**
+     * Removes the container that a rolling deploy replaced, after the new one is healthy. Sentinel
+     * drains its endpoint first. A failure leaves it running: the next rolling deploy replaces it.
+     *
+     * @return array<string, mixed>
+     */
+    private function retireReplaced(NodeOperation $operation): array
+    {
+        $plan = $this->rollingPlan($operation);
+        if ($plan === null) {
+            return [];
+        }
+        $name = $plan['replaces']->containerName($operation->workload);
+        try {
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-retire", $name, NodeWorkloadAction::REMOVE);
+            $retired = ['replaced_container' => $name];
+        } catch (Throwable $exception) {
+            report($exception);
+            $retired = ['replaced_container' => $name, 'replaced_container_error' => mb_substr($exception->getMessage(), 0, 2000)];
+        }
+        $this->refreshInventory($operation);
+
+        return $retired;
+    }
+
+    /** Removes the new container of a failed rolling deploy, so the old one keeps serving alone. */
+    private function discardNew(NodeOperation $operation): string
+    {
+        $plan = $this->rollingPlan($operation);
+        if ($plan === null) {
+            return '';
+        }
+        try {
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-discard", $plan['slot']->containerName($operation->workload), NodeWorkloadAction::REMOVE);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+        $this->refreshInventory($operation);
+
+        return ' The previous version keeps running.';
+    }
+
+    private function refreshInventory(NodeOperation $operation): void
+    {
+        try {
+            FetchContainers::run($operation->node);
+        } catch (Throwable) {
+            // The scheduled inventory refresh catches up.
         }
     }
 

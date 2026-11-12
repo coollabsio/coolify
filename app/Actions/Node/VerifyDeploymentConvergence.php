@@ -30,7 +30,9 @@ class VerifyDeploymentConvergence
             ->where('node_workload_revision_id', $operation->node_workload_revision_id)
             ->where('is_managed', true)
             ->get();
-        $container = $containers->first(fn ($container): bool => $container->image === $operation->revision->image && $container->state === 'running')
+        // During a rolling deploy the old container can run the same revision.
+        $container = $containers->firstWhere('runtime_id', data_get($operation->result, 'runtime_id'))
+            ?? $containers->first(fn ($container): bool => $container->image === $operation->revision->image && $container->state === 'running')
             ?? $containers->first();
 
         $running = $container !== null

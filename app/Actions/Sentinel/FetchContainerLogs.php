@@ -48,7 +48,7 @@ class FetchContainerLogs
             throw new RuntimeException('Flux is not configured, so logs cannot be read.');
         }
 
-        $name = self::containerName($workload);
+        $name = $workload->containerNameOn($node);
         $payload = [
             'server_id' => $node->uuid,
             'command_id' => (string) Str::uuid(),
@@ -105,10 +105,5 @@ class FetchContainerLogs
             'truncated' => (bool) $data['truncated'],
             'observed_at_unix_ms' => (int) $data['observed_at_unix_ms'],
         ];
-    }
-
-    public static function containerName(NodeWorkload $workload): string
-    {
-        return 'coolify-'.$workload->uuid.'-main';
     }
 }

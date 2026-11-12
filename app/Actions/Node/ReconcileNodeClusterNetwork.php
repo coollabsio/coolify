@@ -513,8 +513,8 @@ class ReconcileNodeClusterNetwork
             ->flatMap(function (NodeFirewallRule $rule) use ($cluster) {
                 $sources = $rule->sourceNode !== null
                     ? collect([$rule->sourceNode->wireguard_ip])->filter()
-                    : $rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
-                $destinations = $rule->destinationWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
+                    : self::containerAddresses($rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id));
+                $destinations = self::containerAddresses($rule->destinationWorkload->nodes->where('node_cluster_id', $cluster->id));
 
                 return $sources->crossJoin($destinations)->map(fn (array $addresses): array => [
                     'source_ip' => $addresses[0],
@@ -536,9 +536,7 @@ class ReconcileNodeClusterNetwork
     private function ingressRules(NodeCluster $cluster): array
     {
         return BuildNodeClusterIngressRoutes::routedWorkloads($cluster)
-            ->flatMap(fn (NodeWorkload $workload) => $workload->nodes
-                ->pluck('pivot.container_ip')
-                ->filter()
+            ->flatMap(fn (NodeWorkload $workload) => self::containerAddresses($workload->nodes)
                 ->crossJoin($workload->domainPorts())
                 ->map(fn (array $destination): array => [
                     'destination_ip' => $destination[0],
@@ -548,6 +546,17 @@ class ReconcileNodeClusterNetwork
             ->unique(fn (array $rule): string => "{$rule['destination_ip']}|{$rule['protocol']}|{$rule['port']}")
             ->values()
             ->all();
+    }
+
+    /**
+     * Both container slots of each placement, so a rolling deploy needs no network change.
+     *
+     * @param  Collection<int, Node>  $nodes  Nodes of a workload, with the placement pivot.
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private static function containerAddresses(Collection $nodes): \Illuminate\Support\Collection
+    {
+        return $nodes->flatMap(fn (Node $node): array => [$node->pivot->container_ip, $node->pivot->next_container_ip])->filter()->values();
     }
 
     /** @return Collection<int, Node> */

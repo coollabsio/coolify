@@ -93,6 +93,7 @@ class CreateLifecycleOperation
                 [
                     'revision_uuid' => $revision->uuid,
                     'action' => $action->value,
+                    'container_name' => $workload->containerNameOn($node),
                     ...($stopTimeoutSeconds === null ? [] : ['stop_timeout_seconds' => $stopTimeoutSeconds]),
                 ],
                 $requestedBy,
