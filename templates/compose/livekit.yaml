@@ -1,0 +1,51 @@
+# documentation: https://docs.livekit.io/transport/self-hosting/
+# slogan: Self-hosted real-time audio and video infrastructure
+# category: communication
+# tags: livekit,webrtc,audio,video,realtime
+# logo: svgs/livekit.svg
+# port: 7880
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13.7
+    restart: unless-stopped
+    environment:
+      SERVICE_URL_LIVEKIT_7880: ""
+      LIVEKIT_KEYS: "${SERVICE_USER_LIVEKIT}: ${SERVICE_PASSWORD_64_LIVEKIT}"
+      REDIS_HOST: redis:6379
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
+      NODE_IP: ${LIVEKIT_NODE_IP:-}
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882-7889
+          use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP:-true}
+    ports:
+      - "7881:7881/tcp"
+      - "7882-7889:7882-7889/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8.10.1-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
+    command: ["redis-server", "--requirepass", "${SERVICE_PASSWORD_64_REDIS}", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:
