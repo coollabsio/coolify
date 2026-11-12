@@ -106,11 +106,11 @@ class CreateScheduledBackup extends Component
                     'backup_uuid' => $databaseBackup->uuid,
                 ], navigate: true);
             } else {
-                $this->redirectRoute('project.database.backup.execution', [
+                $this->redirectRoute('project.database.backup.index', [
                     'project_uuid' => $database->project()->uuid,
                     'environment_uuid' => $database->environment->uuid,
                     'database_uuid' => $database->uuid,
-                    'backup_uuid' => $databaseBackup->uuid,
+                    'schedule' => $databaseBackup->uuid,
                 ], navigate: true);
             }
         } catch (\Throwable $e) {

@@ -27,7 +27,7 @@ it('saves a removed database from the databases to back up', function () {
 
     $base = databaseConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->postgres);
 
-    visit("{$base}/backups/{$this->backup->uuid}")
+    visit("{$base}/backups?schedule={$this->backup->uuid}")
         ->assertSee('Databases to back up')
         ->click('[aria-label="Remove postgres"]')
         ->click('Save changes')
@@ -42,7 +42,7 @@ it('saves an added database to the databases to back up', function () {
 
     $base = databaseConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->postgres);
 
-    visit("{$base}/backups/{$this->backup->uuid}")
+    visit("{$base}/backups?schedule={$this->backup->uuid}")
         ->assertSee('Databases to back up')
         ->fill('[placeholder="Type a database and press Enter"]', 'analytics')
         ->keys('[placeholder="Type a database and press Enter"]', 'Enter')

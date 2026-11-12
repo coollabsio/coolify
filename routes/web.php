@@ -58,7 +58,6 @@ use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
-use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
@@ -482,12 +481,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
-        Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
-        // S3 and retention settings moved into the general page; keep old links working.
-        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
-        Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
+        // A schedule opens in a modal on the backups page; keep old links to its pages working.
+        Route::get('/backups/{backup_uuid}/{section?}', fn (Request $request) => redirect()->route('project.database.backup.index', [
+            ...collect($request->route()->parameters())->only(['project_uuid', 'environment_uuid', 'database_uuid'])->all(),
+            'schedule' => $request->route('backup_uuid'),
+        ]))->whereIn('section', ['executions', 'danger', 's3', 'retention']);
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');

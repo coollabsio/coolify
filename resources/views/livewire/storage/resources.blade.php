@@ -66,9 +66,9 @@
                     @foreach ($backups as $backup)
                         @php
                             $backupLink = $backupParams
-                                ? route('project.database.backup.execution', [
+                                ? route('project.database.backup.index', [
                                     ...$backupParams,
-                                    'backup_uuid' => $backup->uuid,
+                                    'schedule' => $backup->uuid,
                                 ])
                                 : null;
                             $storageOptions = $allStorages->map(fn ($s3) => [

@@ -4,8 +4,7 @@
     <x-application.settings-section title="Backup schedule"
         description="Choose what to back up, when it runs, and how long it may run.">
         <x-slot:actions>
-            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
-            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader])>
+            <div class="flex items-center gap-2">
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>

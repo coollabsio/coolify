@@ -26,25 +26,27 @@
                     <div>
                         <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Schedules</p>
                         <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                            {{ $database->scheduledBackups->count() }}
+                            {{ $scheduleCount }}
                         </p>
                     </div>
                     <div>
                         <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Enabled</p>
                         <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                            {{ $database->scheduledBackups->where('enabled', true)->count() }}
+                            {{ $enabledScheduleCount }}
                         </p>
                     </div>
                     <div>
                         <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Total executions</p>
                         <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                            {{ $database->scheduledBackups->sum('executions_count') }}
+                            {{ $executionCount }}
                         </p>
                     </div>
                 </div>
             </x-application.settings-section>
 
             <livewire:project.database.scheduled-backups :database="$database" />
+            <livewire:project.database.backup.execution-history :database="$database"
+                wire:key="database-backup-execution-history-{{ $database->uuid }}" />
         </div>
     </div>
 </div>

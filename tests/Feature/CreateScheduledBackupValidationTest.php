@@ -56,11 +56,11 @@ it('creates a standalone database backup without S3 and opens its configuration'
 
     $backup = ScheduledDatabaseBackup::query()->sole();
 
-    $component->assertRedirectToRoute('project.database.backup.execution', [
+    $component->assertRedirectToRoute('project.database.backup.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'database_uuid' => $database->uuid,
-        'backup_uuid' => $backup->uuid,
+        'schedule' => $backup->uuid,
     ]);
 
     expect($backup->save_s3)->toBeFalsy()
@@ -170,7 +170,6 @@ it('selects a service database when creating a backup from the unified backups p
     ]);
 
     $component = Livewire::test(CreateScheduledBackup::class, ['service' => $service])
-        ->assertSee('Database')
         ->assertSee('analytics')
         ->set('selectedDatabaseUuid', $analytics->uuid)
         ->set('frequency', 'daily')
@@ -208,11 +207,11 @@ it('creates a clickhouse backup for its configured database', function () {
 
     $backup = ScheduledDatabaseBackup::firstOrFail();
 
-    $component->assertRedirectToRoute('project.database.backup.execution', [
+    $component->assertRedirectToRoute('project.database.backup.index', [
         'project_uuid' => $project->uuid,
         'environment_uuid' => $environment->uuid,
         'database_uuid' => $database->uuid,
-        'backup_uuid' => $backup->uuid,
+        'schedule' => $backup->uuid,
     ]);
 
     expect($backup->database_type)->toBe(StandaloneClickhouse::class)

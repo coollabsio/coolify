@@ -1,4 +1,4 @@
-<div class="flex min-w-0 flex-col gap-3" x-data="{
+<div class="flex min-w-0 flex-col gap-6" x-data="{
     search: '',
     backups: @js($database->scheduledBackups->map(fn ($backup) => [
         'name' => strtolower($database->name),
@@ -14,16 +14,27 @@
             || backup.s3_storage.includes(query)
         );
     },
-    matchCount() {
-        const query = this.search.toLowerCase();
-
-        return this.backups.filter((backup) =>
-            backup.name.includes(query)
-            || backup.frequency.includes(query)
-            || backup.s3_storage.includes(query)
-        ).length;
-    },
 }">
+    @if ($selectedBackup)
+        <x-modal-input :title="'Edit backup schedule'"
+            :subtitle="$database->name.' · '.$selectedBackup->frequency.' schedule'"
+            wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight>
+            <x-slot:content><span></span></x-slot:content>
+
+            <div x-data="{ activeSection: 'general' }" class="modal-flat-sections flex min-w-0 flex-col gap-6">
+                <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
+
+                @foreach (['general', 'danger'] as $modalSection)
+                    <div x-show="activeSection === '{{ $modalSection }}'" x-cloak>
+                        <livewire:project.database.backup-edit :backup="$selectedBackup"
+                            :status="data_get($database, 'status')" :section="$modalSection"
+                            wire:key="database-backup-modal-{{ $selectedBackup->uuid }}-{{ $modalSection }}" />
+                    </div>
+                @endforeach
+            </div>
+        </x-modal-input>
+    @endif
+
     @if ($database->is_migrated && blank($database->custom_type))
         <form wire:submit="setCustomType" class="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
@@ -51,85 +62,82 @@
             </div>
         @endif
 
-        @if ($database->scheduledBackups->isEmpty())
-            <x-empty size="sm" title="No scheduled backups"
-                description="Create a schedule to start protecting this database."
-                icon-name="storages" />
-        @else
-            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
-                <div class="data-table-header scheduled-backups-table-grid">
-                    <span>Schedule</span>
-                    <span>Latest run</span>
-                    <span>S3 storage</span>
-                    <span>Executions</span>
-                    <span class="text-right">Actions</span>
+        <x-application.settings-section title="Schedules"
+            helper="Backup schedules of this database." :flush="$database->scheduledBackups->isNotEmpty()">
+            @if ($database->scheduledBackups->isEmpty())
+                <x-empty size="sm" title="No scheduled backups"
+                    description="Create a schedule to start protecting this database."
+                    icon-name="storages" />
+            @else
+                <div x-cloak x-show="search !== '' && !hasMatches()">
+                    <x-empty size="sm" title="No matching backup schedules"
+                        description="Try another database name, frequency, or storage name." />
                 </div>
-                @foreach ($database->scheduledBackups as $backup)
-                    @php
-                        $latestStatus = data_get($backup->latest_log, 'status');
-                        $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name')->join(', ');
-                        [$statusLabel, $statusType] = match ($latestStatus) {
-                            'success' => ['Success', 'success'],
-                            'running' => ['In progress', 'warning'],
-                            'failed' => ['Failed', 'error'],
-                            default => ['Never run', 'neutral'],
-                        };
-                        $backupRoute = $type === 'database'
-                            ? route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid])
-                            : route('project.service.database.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
-                        $backupExecutionsRoute = $type === 'database'
-                            ? route('project.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid])
-                            : route('project.service.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid]);
-                    @endphp
-                    <div x-show="search === ''
-                        || @js(strtolower($database->name)).includes(search.toLowerCase())
-                        || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
-                        || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
-                        class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
-                        <div class="flex min-w-0 items-center gap-2">
-                            <a {{ wireNavigate() }} href="{{ $backupRoute }}"
-                                class="block truncate text-[12px] font-semibold text-black hover:underline dark:text-fg">
-                                {{ $backup->frequency }}
-                            </a>
-                            @unless ($backup->enabled)
-                                <x-status-badge status="Disabled" />
-                            @endunless
+                <div class="data-table w-full overflow-x-auto" x-show="search === '' || hasMatches()">
+                    <div class="flex min-w-[48rem] flex-col">
+                        <div class="data-table-header database-backup-table-grid">
+                            <span>Schedule</span>
+                            <span>Status</span>
+                            <span>S3</span>
+                            <span>Last run</span>
+                            <span>Executions</span>
+                            <span class="text-right">Actions</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <x-status-badge :status="$statusLabel" :type="$statusType" />
-                            @if ($latestStatus === 'running')
-                                <x-loading />
-                            @endif
-                        </div>
-                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim" title="{{ $backup->save_s3 ? $s3StorageNames : '' }}">
-                            {{ $backup->save_s3 ? ($s3StorageNames ?: 'Unavailable') : 'Local only' }}
-                        </div>
-                        <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            <a {{ wireNavigate() }} href="{{ $backupExecutionsRoute }}"
-                                class="font-medium hover:underline hover:text-black dark:hover:text-fg">
-                                {{ $backup->executions_count ?? $backup->executions()->count() }}
-                            </a>
-                        </div>
-                        <div class="flex justify-end">
-                            <a class="icon-button" {{ wireNavigate() }} href="{{ $backupRoute }}"
-                                title="Manage backup schedule" aria-label="Manage backup schedule">
-                                <x-reicon name="settings" class="size-3.5" />
-                            </a>
-                        </div>
+                        @foreach ($database->scheduledBackups as $backup)
+                            @php
+                                $latestExecution = $backup->latest_log;
+                                $latestStatus = $latestExecution?->status;
+                                $s3Storages = $backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter();
+                                $s3StorageNames = $s3Storages->pluck('name')->join(', ');
+                                $s3Tooltip = $backup->save_s3 && $s3Storages->isNotEmpty()
+                                    ? 'S3 storage: '.$s3Storages->map(fn ($s3) => $s3->name.' ('.($s3->isS3() ? 'bucket: '.$s3->bucket : $s3->type->label()).')')->join(', ')
+                                    : null;
+                                [$statusLabel, $statusType] = match ($latestStatus) {
+                                    'running' => ['In progress', 'warning'],
+                                    'success' => ['Success', 'success'],
+                                    'failed' => ['Failed', 'error'],
+                                    default => [$backup->enabled ? 'Waiting' : 'Disabled', 'neutral'],
+                                };
+                            @endphp
+                            <div wire:key="database-backup-schedule-{{ $backup->uuid }}"
+                                x-show="search === ''
+                                || @js(strtolower($database->name)).includes(search.toLowerCase())
+                                || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
+                                || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
+                                wire:click="openSchedule('{{ $backup->uuid }}')"
+                                wire:keydown.enter="openSchedule('{{ $backup->uuid }}')" role="button" tabindex="0"
+                                class="data-table-row database-backup-table-grid cursor-pointer text-left text-[13px] text-neutral-700 dark:text-fg-dim">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span class="truncate font-medium text-neutral-950 dark:text-fg">{{ $backup->frequency }}</span>
+                                    @if (! $backup->enabled && $latestStatus)
+                                        <x-status-badge status="Disabled" />
+                                    @endif
+                                </span>
+                                <span class="flex items-center gap-2">
+                                    <x-status-badge :status="$statusLabel" :type="$statusType" />
+                                </span>
+                                <span class="min-w-0">
+                                    <x-backup-s3-storage :enabled="$backup->save_s3" :names="$s3Storages->pluck('name')" :tooltip="$s3Tooltip" />
+                                </span>
+                                <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($latestStatus === 'running' ? 'Running now' : 'Never') }}</span>
+                                <span>{{ $backup->executions_count ?? $backup->executions()->count() }}</span>
+                                <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
+                                    <x-table.row-actions label="Backup schedule actions">
+                                        @can('manageBackups', $database)
+                                            <x-table.row-action
+                                                :disabled="! str($database->status)->startsWith('running')"
+                                                :title="! str($database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
+                                                wire:click="backupNow('{{ $backup->uuid }}')">Back up now</x-table.row-action>
+                                        @endcan
+                                        <x-table.row-action
+                                            wire:click="openSchedule('{{ $backup->uuid }}')">Edit</x-table.row-action>
+                                    </x-table.row-actions>
+                                </span>
+                            </div>
+                        @endforeach
                     </div>
-                @endforeach
-                <div
-                    class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                    <span
-                        x-text="`${search === '' ? backups.length : matchCount()} ${(search === '' ? backups.length : matchCount()) === 1 ? 'schedule' : 'schedules'}`"></span>
                 </div>
-            </div>
-        @endif
-
-        <div x-cloak x-show="search !== '' && backups.length > 0 && !hasMatches()"
-            class="border-t border-neutral-200 dark:border-white/[0.06]">
-            <x-empty size="sm" title="No matching backup schedules"
-                description="Try another database name, frequency, or storage name." />
-        </div>
+            @endif
+        </x-application.settings-section>
     @endif
 </div>

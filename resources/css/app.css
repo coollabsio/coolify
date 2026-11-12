@@ -3986,8 +3986,19 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 6rem 6rem;
 }
 
-.scheduled-backups-table-grid {
-    grid-template-columns: minmax(10rem, 1.25fr) 8rem minmax(9rem, 1fr) 6rem 5rem;
+/* Shared by the Schedules and Executions tables of a standalone database, so their columns line up. */
+.database-backup-table-grid {
+    grid-template-columns: minmax(8rem, 1fr) 7.5rem minmax(8rem, 1fr) minmax(11rem, 1.2fr) minmax(6rem, 0.7fr) 4.5rem;
+    width: 100%;
+}
+
+.data-table-header.database-backup-table-grid {
+    border-bottom: 0;
+}
+
+/* Search hides rows, so dividers must not depend on DOM position. */
+.data-table-row.database-backup-table-grid {
+    border-top: 1px solid var(--coollabs-fill);
 }
 
 .backup-executions-table-grid {
@@ -4154,15 +4165,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .host-vulnerabilities-table-grid > :nth-child(2),
     .host-vulnerabilities-table-grid > :nth-child(3) {
-        display: none;
-    }
-
-    .scheduled-backups-table-grid {
-        grid-template-columns: minmax(0, 1fr) 8rem 5rem;
-    }
-
-    .scheduled-backups-table-grid > :nth-child(3),
-    .scheduled-backups-table-grid > :nth-child(4) {
         display: none;
     }
 

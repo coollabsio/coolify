@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Database;
 
 use App\Enums\AccessLevel;
 use App\Livewire\Concerns\ManagesDatabaseBackup;
-use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
@@ -29,9 +28,6 @@ class BackupEdit extends Component
     public ScheduledDatabaseBackup $backup;
 
     public string $section = 'general';
-
-    /** The page shows the backup actions in the top header bar instead. */
-    public bool $actionsInHeader = false;
 
     #[Locked]
     public $availableS3Storages;
@@ -105,7 +101,6 @@ class BackupEdit extends Component
         // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
         $listeners = [
             'databaseUpdated' => 'refreshStatus',
-            'backupEnabledChanged' => 'syncBackupEnabled',
         ];
 
         $user = Auth::user();
@@ -323,15 +318,9 @@ class BackupEdit extends Component
     {
         try {
             $this->backupEnabled = $this->toggleDatabaseBackup($this->backup);
-            $this->dispatch('backupEnabledChanged')->to(Execution::class);
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
-    }
-
-    public function syncBackupEnabled(): void
-    {
-        $this->backupEnabled = $this->backup->refresh()->enabled;
     }
 
     public function updatedS3StorageIds(): void
