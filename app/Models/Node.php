@@ -218,12 +218,10 @@ class Node extends BaseModel
      */
     public function statusBadge(): array
     {
-        $sentinelConnected = data_get(Cache::get($this->cacheKey()), 'status') === 'connected';
-
         return match (true) {
             ! $this->is_reachable => ['status' => 'Unreachable', 'type' => 'error'],
             ! $this->is_usable => ['status' => 'Not ready', 'type' => 'warning'],
-            ! $sentinelConnected => ['status' => 'Sentinel disconnected', 'type' => 'warning'],
+            ! $this->hasRecentFluxHeartbeat() => ['status' => 'Sentinel disconnected', 'type' => 'warning'],
             default => ['status' => 'Ready', 'type' => 'success'],
         };
     }

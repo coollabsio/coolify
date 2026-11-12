@@ -1,5 +1,10 @@
 @props(['node'])
 
+@php
+    // Ready only when Sentinel is connected to Flux, like the server lists and the cluster map.
+    $nodeStatus = $node->statusBadge();
+@endphp
+
 @teleport('#server-topbar-context')
     <div data-testid="node-topbar-context" class="flex min-w-0 items-center gap-1 text-[13px]">
         @if ($node->cluster)
@@ -14,8 +19,7 @@
             {{ $node->name }}
         </span>
         <x-beta-badge class="shrink-0" />
-        <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'"
-            :type="$node->is_usable ? 'success' : 'warning'" />
+        <x-status-badge :status="$nodeStatus['status']" :type="$nodeStatus['type']" />
     </div>
 @endteleport
 
@@ -30,7 +34,6 @@
         <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
             {{ $node->name }}
         </h1>
-        <x-status-badge class="self-start" :status="$node->is_usable ? 'Ready' : 'Not ready'"
-            :type="$node->is_usable ? 'success' : 'warning'" />
+        <x-status-badge class="self-start" :status="$nodeStatus['status']" :type="$nodeStatus['type']" />
     </div>
 </div>
