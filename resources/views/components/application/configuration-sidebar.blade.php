@@ -7,17 +7,16 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $openRecommendations = \App\Enums\ApplicationRecommendation::openFor($application);
+        $hasRecommendationsSection = $openRecommendations->isNotEmpty()
+            || \App\Enums\ApplicationRecommendation::dismissedFor($application)->isNotEmpty();
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
                 'route' => 'project.application.configuration',
                 'active' => $currentRoute === 'project.application.configuration',
-            ],
-            [
-                'label' => 'Recommended settings',
-                'route' => 'project.application.recommendations',
-                'active' => $currentRoute === 'project.application.recommendations',
-                'count' => \App\Enums\ApplicationRecommendation::openFor($application)->count(),
+                'recommendations' => $openRecommendations,
             ],
             [
                 'label' => 'Domains',
@@ -164,7 +163,6 @@
         // Icons follow the main sidebar's reicon set
         $menuIcons = [
             'General' => 'settings',
-            'Recommended settings' => 'shield-star',
             'Domains' => 'globe',
             'Advanced' => 'grid',
             'Swarm' => 'destinations',
@@ -194,7 +192,7 @@
 
         // Discord-style groups for the settings sidebar
         $menuGroups = [
-            'Settings' => ['General', 'Recommended settings', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
@@ -212,6 +210,7 @@
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
             'project.application.configuration' => array_values(array_filter([
+                $hasRecommendationsSection ? ['id' => 'recommendations-section', 'label' => 'Recommendations'] : null,
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
                 ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
@@ -295,9 +294,8 @@
                                     @if ($menuItem['label'] === 'Files')
                                         <x-beta-badge class="ml-auto shrink-0" />
                                     @endif
-                                    @if (($menuItem['count'] ?? 0) > 0)
-                                        <span class="ml-auto shrink-0 rounded-full border border-coollabs/30 bg-coollabs/10 px-1.5 text-[11px] leading-4 font-semibold text-coollabs dark:border-warning/30 dark:bg-warning/15 dark:text-warning"
-                                            aria-label="{{ $menuItem['count'] }} open">{{ $menuItem['count'] }}</span>
+                                    @if (filled($menuItem['recommendations'] ?? null))
+                                        <x-attention-mark :label="$menuItem['recommendations']->count().' '.str('recommendation')->plural($menuItem['recommendations']->count())" />
                                     @endif
                                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)

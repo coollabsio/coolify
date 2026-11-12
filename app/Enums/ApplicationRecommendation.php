@@ -6,7 +6,7 @@ use App\Models\Application;
 use Illuminate\Support\Collection;
 
 /**
- * Settings that Coolify recommends for an application, shown on its Recommended settings page.
+ * Settings that Coolify recommends for an application, shown in the Recommendations section of its General page.
  * The values are stored in application_settings.dismissed_recommendations, so do not rename them.
  */
 enum ApplicationRecommendation: string

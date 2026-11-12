@@ -6,7 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('applies and dismisses recommended settings and updates the menu count', function () {
+it('shows recommendations on the General page and updates the General menu dot', function () {
     config()->set('app.maintenance.store', 'array');
     $stack = seedBrowserResourceStack();
     $application = createBrowserApplication($stack, ['docker_registry_image_name' => 'ghcr.io/acme/app']);
@@ -24,7 +24,7 @@ it('applies and dismisses recommended settings and updates the menu count', func
         ->fill('password', 'password')
         ->click('Login')
         ->assertSee('Dashboard')
-        ->navigate(route('project.application.recommendations', [
+        ->navigate(route('project.application.configuration', [
             'project_uuid' => $stack['project']->uuid,
             'environment_uuid' => $stack['environment']->uuid,
             'application_uuid' => $application->uuid,
@@ -34,25 +34,25 @@ it('applies and dismisses recommended settings and updates the menu count', func
         ->assertSee('ghcr.io/acme/app');
 
     $menuCount = <<<'JS'
-        () => document.querySelector('[aria-label$=" open"]')?.textContent.trim() ?? null
+        () => document.querySelector('.application-settings-navigation [aria-label$="recommendation"], .application-settings-navigation [aria-label$="recommendations"]')?.getAttribute('aria-label') ?? null
     JS;
     $clickButton = fn (string $text) => $page->script(<<<JS
-        () => [...document.querySelectorAll('#recommended-settings-section button')]
+        () => [...document.querySelectorAll('#recommendations-section button')]
             .find(button => button.textContent.trim() === '{$text}')
             .click()
     JS);
 
-    expect($page->script($menuCount))->toBe('2');
+    expect($page->script($menuCount))->toBe('2 recommendations');
     $page->screenshot(filename: 'recommendations-open');
 
     $clickButton('Turn on build secrets');
     $page->wait(1.5);
     expect($application->fresh()->settings->use_build_secrets)->toBeTrue()
-        ->and($page->script($menuCount))->toBe('1');
+        ->and($page->script($menuCount))->toBe('1 recommendation');
 
     $clickButton('Dismiss');
     $page->wait(1.5);
-    $page->assertSee('No recommendations')->assertSee('Restore');
+    $page->assertSee('You dismissed every recommendation')->assertSee('Show dismissed (1)');
     expect($page->script($menuCount))->toBeNull();
 
     $page->assertNoJavaScriptErrors();

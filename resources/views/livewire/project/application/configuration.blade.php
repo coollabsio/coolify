@@ -11,6 +11,7 @@
 
             <div class="min-w-0">
             @if ($currentRoute === 'project.application.configuration')
+                <livewire:project.application.recommendations :application="$application" />
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.domains')
                 <livewire:project.application.domains :application="$application" />
@@ -18,8 +19,6 @@
                 <livewire:project.shared.maintenance :resource="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
-            @elseif ($currentRoute === 'project.application.recommendations')
-                <livewire:project.application.recommendations :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />
             @elseif ($currentRoute === 'project.application.environment-variables')

@@ -26,7 +26,7 @@ class Recommendations extends Component
             $this->saveApplicationSettingsWithAudit($this->application);
 
             $this->dispatch('success', 'Settings saved. Redeploy the application to apply them.');
-            $this->refreshConfiguration();
+            $this->reloadGeneralPage();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -67,10 +67,23 @@ class Recommendations extends Component
     }
 
     /**
-     * Only the parent page refreshes, so the sidebar count and the build pack dependent menu items update.
+     * Only the parent page refreshes, so the recommendation dot on the General menu item updates.
      */
     private function refreshConfiguration(): void
     {
         $this->dispatch('refresh')->to(Configuration::class);
+    }
+
+    /**
+     * A fix can change a value that the General form holds, such as the build pack. A reload loads the form again,
+     * so a later save of the form does not write the old value back.
+     */
+    private function reloadGeneralPage(): void
+    {
+        $this->redirectRoute('project.application.configuration', [
+            'project_uuid' => $this->application->environment->project->uuid,
+            'environment_uuid' => $this->application->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ], navigate: true);
     }
 }

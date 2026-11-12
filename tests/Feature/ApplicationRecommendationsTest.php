@@ -103,8 +103,11 @@ test('an admin turns on build secrets with one click', function () {
     Livewire::test(Recommendations::class, ['application' => $application])
         ->call('applyFix', 'use-build-secrets')
         ->assertDispatched('success')
-        ->assertDispatched('refresh')
-        ->assertViewHas('openRecommendations', fn ($open) => $open->isEmpty());
+        ->assertRedirect(route('project.application.configuration', [
+            'project_uuid' => $application->environment->project->uuid,
+            'environment_uuid' => $application->environment->uuid,
+            'application_uuid' => $application->uuid,
+        ]));
 
     expect($application->fresh()->settings->use_build_secrets)->toBeTrue();
 });
