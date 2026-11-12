@@ -100,12 +100,35 @@
                                 <x-forms.listbox id="moveTarget" htmlId="cluster-application-move-target"
                                     label="Target server" placeholder="Select a server" :options="$moveTargetOptions"
                                     portal required />
-                                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                                    The application keeps running on its current server until it is ready on the target server.
-                                </p>
+                                @if ($moveRecovery)
+                                    <div class="flex flex-col gap-2 text-[12px] text-neutral-500 dark:text-fg-dim">
+                                        <p class="font-medium text-error">Server {{ $moveRecovery['source'] }} is offline.</p>
+                                        @if ($moveRecovery['error'])
+                                            <p class="text-error">{{ $moveRecovery['error'] }}</p>
+                                        @elseif ($moveRecovery['backups'] === [])
+                                            <p>The application starts on the target server. Its old container on {{ $moveRecovery['source'] }} is removed when that server comes back.</p>
+                                        @else
+                                            <p>Coolify cannot copy the volumes from the offline server. It restores each volume from its latest backup on the target server:</p>
+                                            <ul class="list-disc pl-4">
+                                                @foreach ($moveRecovery['backups'] as $backup)
+                                                    <li><span class="font-mono">{{ $backup['volume'] }}</span>: backup of {{ $backup['finished_at'] ?? 'an unknown time' }}@if ($backup['size']) ({{ $backup['size'] }})@endif</li>
+                                                @endforeach
+                                            </ul>
+                                            <p class="text-warning">Data written after these backups is not on the target server. It stays on {{ $moveRecovery['source'] }} as a retained copy for 7 days after the server comes back, and the old container there is removed.</p>
+                                            <x-forms.checkbox id="moveRecoveryConfirmed" label="Restore the volumes from these backups" />
+                                            @error('moveRecoveryConfirmed')
+                                                <p class="text-error">{{ $message }}</p>
+                                            @enderror
+                                        @endif
+                                    </div>
+                                @else
+                                    <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                        The application keeps running on its current server until it is ready on the target server.
+                                    </p>
+                                @endif
                                 <div class="flex justify-end">
-                                    <x-forms.button type="submit" isHighlighted wire:target="moveWorkload">
-                                        Move application
+                                    <x-forms.button type="submit" isHighlighted wire:target="moveWorkload" :disabled="(bool) ($moveRecovery['error'] ?? false)">
+                                        {{ $moveRecovery ? 'Recover on target server' : 'Move application' }}
                                     </x-forms.button>
                                 </div>
                             </form>

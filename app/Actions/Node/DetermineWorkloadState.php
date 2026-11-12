@@ -42,6 +42,9 @@ class DetermineWorkloadState
      */
     public function fromInventory(Node $node, callable $currentRevision, callable $managedContainers): NodeWorkloadState
     {
+        if (NotifyNodeReachability::isOffline($node)) {
+            return NodeWorkloadState::SERVER_OFFLINE;
+        }
         $observedAt = data_get($node->metadata, 'container_inventory_observed_at');
         if (! is_string($observedAt)) {
             return NodeWorkloadState::UNKNOWN;

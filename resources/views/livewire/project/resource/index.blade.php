@@ -547,7 +547,7 @@
                 if (['starting', 'restarting', 'degraded'].includes(state)) {
                     return 'warning';
                 }
-                if (['exited', 'stopped', 'failed'].includes(state)) {
+                if (['exited', 'stopped', 'failed', 'server offline'].includes(state)) {
                     return 'error';
                 }
 

@@ -117,14 +117,22 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
                 return;
             }
-            $volumes = CreateMoveOperation::volumesToTransfer($operation->workload, $operation->node, $target);
-            if ($volumes->isNotEmpty() && $this->timeout < self::STATEFUL_TIMEOUT) {
+            $recovery = self::recoveryBackups($operation);
+            $volumes = $recovery === null
+                ? CreateMoveOperation::volumesToTransfer($operation->workload, $operation->node, $target)
+                : $operation->workload->volumes()->whereNotNull('node_id')->orderBy('id')->get();
+            if (($volumes->isNotEmpty() && $this->timeout < self::STATEFUL_TIMEOUT)
+                || ($recovery !== null && $volumes->pluck('uuid')->diff(array_keys($recovery))->isNotEmpty())) {
                 throw new RuntimeException('The application got a volume after the move was queued. Start the move again.');
             }
             if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
                 return;
             }
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
+            if ($recovery !== null) {
+                // Recorded before the target runs, so the old container on the source is removed when it comes back.
+                self::checkpoint($operation, ['fence' => 'pending']);
+            }
             if ($volumes->isNotEmpty()) {
                 self::checkpoint($operation, ['stateful' => true, 'volume_uuids' => $volumes->pluck('uuid')->all()]);
             }
@@ -169,7 +177,8 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 Sleep::for(self::INGRESS_SETTLE_SECONDS)->seconds();
             }
 
-            $removalOperation = CreateLifecycleOperation::run(
+            // An offline source gets no command: FenceRecoveredNodeWorkloads removes its container when it comes back.
+            $removalOperation = $recovery !== null ? null : CreateLifecycleOperation::run(
                 $operation->node,
                 $operation->revision,
                 NodeWorkloadAction::REMOVE,
@@ -177,9 +186,11 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 updateDesiredState: false,
                 partOfMove: true,
             );
-            (new ManageNodeWorkloadJob($removalOperation->id))->handle();
-            $removalOperation->refresh();
-            if ($removalOperation->status !== NodeOperationStatus::SUCCEEDED) {
+            if ($removalOperation !== null) {
+                (new ManageNodeWorkloadJob($removalOperation->id))->handle();
+                $removalOperation->refresh();
+            }
+            if ($removalOperation !== null && $removalOperation->status !== NodeOperationStatus::SUCCEEDED) {
                 if ($volumes->isEmpty()) {
                     throw new RuntimeException('The source workload could not be removed after the target became ready.');
                 }
@@ -200,7 +211,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 ...($operation->refresh()->result ?? []),
                 'target_node_uuid' => $target->uuid,
                 'deployment_operation_uuid' => $deploymentOperation->uuid,
-                'removal_operation_uuid' => $removalOperation->uuid,
+                'removal_operation_uuid' => $removalOperation?->uuid,
             ];
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
             TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);
@@ -238,8 +249,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
     private function copyVolumes(NodeOperation $operation, Node $target, Collection $volumes, Carbon $deadline): void
     {
         $source = $operation->node;
+        $recovery = self::recoveryBackups($operation);
         $restored = $volumes->firstWhere('uuid', data_get($operation->request, 'restore.volume_uuid'));
-        $names = $volumes->reject(fn (NodeVolume $volume): bool => $volume->is($restored))
+        $names = $recovery !== null ? [] : $volumes->reject(fn (NodeVolume $volume): bool => $volume->is($restored))
             ->map(fn (NodeVolume $volume): string => $volume->podmanName())->values()->all();
         $secret = self::transferSecret($operation);
 
@@ -271,13 +283,22 @@ class MoveNodeWorkloadJob implements ShouldQueue
         if ($service !== null) {
             $this->runPass($operation, $target, 'warm', $service, $secret, $names, $deadline);
         }
-        if ($restored !== null) {
+        if ($recovery !== null) {
+            foreach ($volumes as $volume) {
+                $execution = RestoreNodeVolume::executions($volume)->where('uuid', $recovery[$volume->uuid])->firstOrFail();
+                // One restore ID for each volume: Sentinel keys its download state by it.
+                RestoreNodeVolume::download($target, $operation, $volume->podmanName(), $execution, $deadline, substr(hash('sha256', $operation->uuid.':'.$volume->uuid), 0, 32));
+            }
+        } elseif ($restored !== null) {
             RestoreNodeVolume::download($target, $operation, $restored->podmanName(), RestoreNodeVolume::target($operation)['execution'], $deadline);
         }
 
         // Downtime starts. A fresh inventory decides whether a container runs; a stale one could miss writes.
-        FetchContainers::run($source);
-        $sourceRunning = $source->containers()
+        // The offline source of a recovery gets no command; fencing removes its container later.
+        if ($recovery === null) {
+            FetchContainers::run($source);
+        }
+        $sourceRunning = $recovery === null && $source->containers()
             ->where('node_workload_id', $operation->workload->id)
             ->where('is_managed', true)
             ->whereNotIn('state', ['exited', 'stopped', 'created', 'configured', 'dead'])
@@ -496,6 +517,19 @@ class MoveNodeWorkloadJob implements ShouldQueue
         self::checkpoint($operation, ['rollback' => $notes]);
         self::releaseTarget($operation);
         self::checkpoint($operation, ['cleaned_up' => true]);
+    }
+
+    /**
+     * The backup execution UUID of each volume, keyed by volume UUID, when the move is a recovery
+     * from an offline server (decision 0014); null for a move that copies from the source.
+     *
+     * @return array<string, string>|null
+     */
+    public static function recoveryBackups(NodeOperation $operation): ?array
+    {
+        $recovery = data_get($operation->request, 'recovery');
+
+        return is_array($recovery) ? $recovery : null;
     }
 
     /** The text that a failed stateful move adds to its error after cleanUp(). */

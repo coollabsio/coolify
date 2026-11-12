@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Actions\Node\NotifyNodeReachability;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
@@ -132,7 +133,7 @@ class Index extends Component
 
         $this->nodeWorkloads = $this->environment->nodeWorkloads()
             ->with([
-                'nodes:id,uuid,name,node_cluster_id',
+                'nodes:id,uuid,name,node_cluster_id,unreachable_notified_at',
                 'nodes.cluster:id,uuid,name',
                 'containers:id,node_workload_id,node_id,state,is_managed',
                 'operations' => fn ($query) => $query->latest('id')->limit(1),
@@ -261,11 +262,11 @@ class Index extends Component
                 ->where('is_managed', true)
                 ->first();
             $operationStatus = $workload->operations->first()?->status?->value;
-            $status = $container?->state ?? match ($operationStatus) {
+            $status = ($node !== null && NotifyNodeReachability::isOffline($node)) ? 'server offline' : ($container?->state ?? match ($operationStatus) {
                 'queued', 'dispatched', 'running', 'verifying' => 'starting',
                 'failed' => 'failed',
                 default => 'unknown',
-            };
+            });
 
             return [
                 'uuid' => $workload->uuid,

@@ -14,6 +14,7 @@ use App\Actions\Node\CreateNodeVolume;
 use App\Actions\Node\DeleteNodeVolumeCopy;
 use App\Actions\Node\DeleteNodeVolumeData;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\NotifyNodeReachability;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
@@ -62,7 +63,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -168,6 +169,9 @@ class Show extends Component
 
     /** Uuid of the server to move the application to. */
     public string $moveTarget = '';
+
+    /** The user accepts that a recovery move from an offline server restores the volumes from their backups. */
+    public bool $moveRecoveryConfirmed = false;
 
     /** The full image reference of a database, like the v4 database Image field. */
     public string $databaseImage = '';
@@ -669,13 +673,23 @@ class Show extends Component
                 ->whereDoesntHave('workloads', fn ($query) => $query->whereKey($this->workload->id))
                 ->firstOrFail();
             $revision = $this->workload->revisions()->latest('id')->firstOrFail();
-            $operation = CreateMoveOperation::run($source, $target, $revision, auth()->user());
+            $recovery = NotifyNodeReachability::isOffline($source);
+            $hasVolumes = NodeVolume::query()->where('node_workload_id', $this->workload->id)->whereNotNull('node_id')->exists();
+            if ($recovery && $hasVolumes && ! $this->moveRecoveryConfirmed) {
+                $this->addError('moveRecoveryConfirmed', 'Confirm that the volumes are restored from their latest backups.');
+
+                return;
+            }
+            $operation = CreateMoveOperation::run($source, $target, $revision, auth()->user(), recovery: $recovery);
             MoveNodeWorkloadJob::dispatch($operation->id);
             $this->moveTarget = '';
+            $this->moveRecoveryConfirmed = false;
             $this->dispatch('close-modal');
-            $this->dispatch('success', data_get($operation->result, 'stateful') || NodeVolume::query()->where('node_workload_id', $this->workload->id)->whereNotNull('node_id')->exists()
+            $this->dispatch('success', $recovery
+                ? 'Recovery move queued. The application starts on '.$target->name.($hasVolumes ? ' with the volumes from their latest backups' : '').'. Its old container on '.$source->name.' is removed when that server comes back.'
+                : (data_get($operation->result, 'stateful') || $hasVolumes
                 ? 'Move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
-                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.');
+                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.'));
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -705,6 +719,38 @@ class Show extends Component
         return [
             'moveSourceOptions' => $sources->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->all(),
             'moveTargetOptions' => $targets->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->values()->all(),
+            'moveRecovery' => $this->moveRecovery($sources->firstWhere('uuid', $this->moveSource), $targets->firstWhere('uuid', $this->moveTarget) ?? $targets->first()),
+        ];
+    }
+
+    /**
+     * What a move from an offline server restores (decision 0014): the backup of each volume, or
+     * the reason why the move is blocked. Null while the source is online.
+     *
+     * @return array{source: string, backups: list<array{volume: string, finished_at: ?string, size: ?string}>, error: ?string}|null
+     */
+    private function moveRecovery(?Node $source, ?Node $target): ?array
+    {
+        if ($source === null || $target === null || ! NotifyNodeReachability::isOffline($source)) {
+            return null;
+        }
+        try {
+            $backups = collect(CreateMoveOperation::recoveryBackups($this->workload, $source, $target));
+            $volumes = $this->workload->volumes()->whereIn('uuid', $backups->keys())->pluck('name', 'uuid');
+            $error = null;
+        } catch (\RuntimeException $exception) {
+            $backups = collect();
+            $error = $exception->getMessage();
+        }
+
+        return [
+            'source' => $source->name,
+            'backups' => $backups->map(fn ($execution, string $uuid): array => [
+                'volume' => (string) ($volumes[$uuid] ?? $uuid),
+                'finished_at' => ($execution->finished_at ?? $execution->created_at)?->copy()->setTimezone(instanceSettings()->instance_timezone ?: config('app.timezone'))->format('Y-m-d H:i T'),
+                'size' => $execution->size ? formatBytes((int) $execution->size) : null,
+            ])->values()->all(),
+            'error' => $error,
         ];
     }
 

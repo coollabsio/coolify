@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\FenceRecoveredNodeWorkloads;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\ReconcileNodeWorkloads;
 use App\Models\Node;
@@ -35,6 +36,7 @@ class RefreshNodeContainersJob implements ShouldBeUnique, ShouldQueue
         }
 
         FetchContainers::run($node);
+        FenceRecoveredNodeWorkloads::run($node);
         ReconcileNodeWorkloads::run($node);
     }
 }

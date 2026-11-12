@@ -11,9 +11,15 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class Unreachable extends CustomEmailNotification
 {
+    /** @var list<array{name: string, uuid: string}> The applications on the server when it went offline (decision 0014). */
+    public array $applications;
+
     public function __construct(public Node $node)
     {
         $this->onQueue('high');
+        $this->applications = $node->workloads()->orderBy('name')->get(['node_workloads.name', 'node_workloads.uuid'])
+            ->map(fn ($workload): array => ['name' => $workload->name, 'uuid' => $workload->uuid])
+            ->all();
     }
 
     public function via(object $notifiable): array
@@ -84,12 +90,21 @@ class Unreachable extends CustomEmailNotification
             'server_uuid' => $this->node->uuid,
             'server_type' => 'cluster',
             'url' => $this->url(),
+            'affected_applications' => $this->applications,
         ];
     }
 
     private function description(): string
     {
-        return "Cluster server '{$this->node->name}' has not reported to Coolify for more than 3 minutes. Check that the machine and the Sentinel service are running.";
+        $description = "Cluster server '{$this->node->name}' has not reported to Coolify for more than 3 minutes. Check that the machine and the Sentinel service are running.";
+        if ($this->applications === []) {
+            return $description;
+        }
+        $names = array_column(array_slice($this->applications, 0, 10), 'name');
+        $more = count($this->applications) - count($names);
+
+        return $description.' Affected applications: '.implode(', ', $names).($more > 0 ? " and {$more} more" : '')
+            .'. Coolify does not move them automatically. To recover one now, use Move to another server on its page.';
     }
 
     private function url(): string

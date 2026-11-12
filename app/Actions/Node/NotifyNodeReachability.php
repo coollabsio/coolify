@@ -20,6 +20,15 @@ class NotifyNodeReachability
 
     public const GRACE_PERIOD_SECONDS = 180;
 
+    /**
+     * Offline for applications and recovery moves (decision 0014): the team got the unreachable
+     * notification after the grace period, and Sentinel still sends no heartbeat.
+     */
+    public static function isOffline(Node $node): bool
+    {
+        return $node->unreachable_notified_at !== null && ! $node->hasRecentFluxHeartbeat();
+    }
+
     public function handle(Node $node): void
     {
         if ($node->hasRecentFluxHeartbeat()) {

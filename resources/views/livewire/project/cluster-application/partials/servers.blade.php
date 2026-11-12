@@ -28,6 +28,9 @@
                     </div>
                     <div class="min-w-0">
                         <h4 class="truncate text-sm font-semibold text-black dark:text-fg">{{ $server->name }}</h4>
+                        @if (\App\Actions\Node\NotifyNodeReachability::isOffline($server))
+                            <p class="mt-1 text-xs text-error">Offline. Move the application to another server to recover it.</p>
+                        @endif
                         @if ($server->ip)
                             <p class="mt-1 font-mono text-xs text-neutral-500 dark:text-fg-dim">{{ $server->ip }}</p>
                         @endif

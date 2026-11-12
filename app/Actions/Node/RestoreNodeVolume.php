@@ -13,6 +13,7 @@ use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -68,10 +69,11 @@ class RestoreNodeVolume
             throw new RuntimeException('Deploy the application first.');
         }
 
+        // With the source offline, the move restores the other volumes from their latest backups too (decision 0014).
         $operation = CreateMoveOperation::run($source, $target, $revision, $requestedBy, [
             'volume_uuid' => $volume->uuid,
             'execution_uuid' => $execution->uuid,
-        ]);
+        ], recovery: $source->id !== $target->id && NotifyNodeReachability::isOffline($source));
         MoveNodeWorkloadJob::dispatch($operation->id);
 
         return $operation;
@@ -88,15 +90,30 @@ class RestoreNodeVolume
             ->where('node_workload_id', $operation->node_workload_id)
             ->where('uuid', data_get($operation->request, 'restore.volume_uuid'))
             ->firstOrFail();
-        $execution = ScheduledVolumeBackupExecution::query()
+
+        return ['volume' => $volume, 'execution' => self::executions($volume)->where('uuid', data_get($operation->request, 'restore.execution_uuid'))->firstOrFail()];
+    }
+
+    /** The newest successful backup of the volume that is still in S3, for a recovery move (decision 0014). */
+    public static function latestExecution(NodeVolume $volume): ?ScheduledVolumeBackupExecution
+    {
+        return self::executions($volume)
+            ->where('status', 'success')
+            ->whereNotNull('filename')
+            ->whereNotNull('sha256')
+            ->where('s3_storage_deleted', false)
+            ->latest('id')
+            ->first();
+    }
+
+    /** @return Builder<ScheduledVolumeBackupExecution> */
+    public static function executions(NodeVolume $volume): Builder
+    {
+        return ScheduledVolumeBackupExecution::query()
             ->with('scheduledVolumeBackup')
-            ->where('uuid', data_get($operation->request, 'restore.execution_uuid'))
             ->whereHas('scheduledVolumeBackup', fn ($backups) => $backups
                 ->where('backupable_type', $volume->getMorphClass())
-                ->where('backupable_id', $volume->id))
-            ->firstOrFail();
-
-        return ['volume' => $volume, 'execution' => $execution];
+                ->where('backupable_id', $volume->id));
     }
 
     /** Restores on the server of the volume. Each step writes a checkpoint first, for cleanUp(). */
@@ -204,7 +221,7 @@ class RestoreNodeVolume
      * poll signs a new URL and touches the operation, so stale operation recovery does not take
      * over a long download.
      */
-    public static function download(Node $node, NodeOperation $operation, string $volumeName, ScheduledVolumeBackupExecution $execution, Carbon $deadline): void
+    public static function download(Node $node, NodeOperation $operation, string $volumeName, ScheduledVolumeBackupExecution $execution, Carbon $deadline, ?string $restoreId = null): void
     {
         $backup = $execution->scheduledVolumeBackup;
         $s3 = BackupNodeVolume::storage($backup, $operation->workload);
@@ -216,7 +233,7 @@ class RestoreNodeVolume
             }
             try {
                 $state = self::send($node, [
-                    'restore_id' => $operation->uuid,
+                    'restore_id' => $restoreId ?? $operation->uuid,
                     'step' => 'download',
                     'volume_name' => $volumeName,
                     'url' => BackupNodeVolume::downloadUrl($s3, (string) $execution->filename),
