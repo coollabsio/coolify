@@ -11,6 +11,7 @@
 
             <div class="min-w-0">
             @if ($currentRoute === 'project.application.configuration')
+                <livewire:project.application.recommendations :application="$application" />
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.domains')
                 <livewire:project.application.domains :application="$application" />

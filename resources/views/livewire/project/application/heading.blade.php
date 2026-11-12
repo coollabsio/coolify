@@ -4,7 +4,7 @@
         <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
     @endteleport
     <div>
-        @if ($application->build_pack === 'nixpacks')
+        @if ($application->build_pack === 'nixpacks' && $activeRouteName !== 'project.application.configuration')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
                 {{ config('deprecations.nixpacks') }}
                 <a class="underline" href="{{ route('project.application.configuration', $parameters) }}" {{ wireNavigate() }}>

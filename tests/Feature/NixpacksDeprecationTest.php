@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApplicationRecommendation;
 use App\Livewire\Project\Application\General;
 use App\Livewire\Project\Application\Heading;
 use App\Models\Application;
@@ -64,6 +65,42 @@ test('the general page does not repeat the nixpacks deprecation notice from the 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
         ->assertDontSee(config('deprecations.nixpacks'));
+});
+
+test('the Railpack recommendation shows the nixpacks deprecation notice only for nixpacks', function (string $buildPack, bool $showsNotice) {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => $buildPack,
+    ]);
+
+    $open = ApplicationRecommendation::openFor($application);
+
+    expect($open->contains(ApplicationRecommendation::UseRailpack))->toBe($showsNotice)
+        ->and(ApplicationRecommendation::UseRailpack->why($application))->toContain(config('deprecations.nixpacks'));
+})->with([
+    'nixpacks' => ['nixpacks', true],
+    'railpack' => ['railpack', false],
+]);
+
+test('switching the build pack to railpack on the General page closes the Railpack recommendation', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'nixpacks',
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'ports_exposes' => '3000',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('buildPack', 'railpack');
+
+    expect(ApplicationRecommendation::openFor($application->fresh())->contains(ApplicationRecommendation::UseRailpack))->toBeFalse();
 });
 
 test('switching the build pack to railpack hides the nixpacks deprecation notice in the heading', function () {

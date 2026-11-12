@@ -59,6 +59,7 @@
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'warning' => filled($server->settings->ssh_host_key_pending),
+            'warning_label' => 'SSH host key change pending',
             'children' => [
                 ['label' => 'General', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
                 ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'refresh', 'visible' => $server->isFunctional()],
@@ -327,15 +328,12 @@
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                         @if ($menuItem['tracks_proxy_configuration'] ?? false)
-                            <x-reicon name="alert-triangle" x-cloak
-                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                            <x-attention-mark label="Proxy needs attention" x-cloak
+                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning" />
                         @elseif ($menuItem['tracks_sentinel_status'] ?? false)
-                            <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                            <x-attention-mark label="Sentinel is out of sync" x-cloak x-show="sentinelOutOfSync" />
                         @elseif ($menuItem['warning'] ?? false)
-                            <x-reicon name="alert-triangle"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                            <x-attention-mark :label="$menuItem['warning_label'] ?? 'Needs attention'" />
                         @elseif ($menuItem['beta'] ?? false)
                             <x-beta-badge class="ml-auto shrink-0" />
                         @endif
