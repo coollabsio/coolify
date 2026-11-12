@@ -12,25 +12,25 @@ stable need.
 | # | Work | Decision | Notes |
 | --- | --- | --- | --- |
 | B1 | Pin `sentinel-host` to a release that has the volume, secret, health check, and build commands | 0006, 0007, 0008 | `upstream.json` pins `sentinel-host` 1.1.3. The volume commands are first in Sentinel v1.1.5. A Node that installs or upgrades Sentinel gets 1.1.3, so volumes, moves with volumes, and secret files fail on it. |
-| B2 | ~~Private registry pulls~~ | 0006 "Before release" | Done (uncommitted, verified on dev): team registry credentials (Keys & Tokens), `--authfile` on tmpfs for `workload.deploy`. |
-| B3 | ~~Push built images to an external registry~~ | 0006 "Before release" | Done (uncommitted, verified on dev): image name + tag on Git apps, second push after the cluster push. |
-| B4 | ~~Static build source~~ | 0006 | Done (uncommitted): built by the Railpack job with the base directory. Railpack serves files only when the folder has `index.html`, `Staticfile`, or `public/`. |
+| B2 | ~~Private registry pulls~~ | 0006 "Before release" | Done (verified on dev): team registry credentials (Keys & Tokens), `--authfile` on tmpfs for `workload.deploy`. |
+| B3 | ~~Push built images to an external registry~~ | 0006 "Before release" | Done (verified on dev): image name + tag on Git apps, second push after the cluster push. |
+| B4 | ~~Static build source~~ | 0006 | Done: built by the Railpack job with the base directory. Railpack serves files only when the folder has `index.html`, `Staticfile`, or `public/`. |
 | B5 | Bring the status documents up to date | — | `architecture/current-state.md` still lists HTTPS ingress, volumes, secrets, and health gates as not implemented. Decision 0005 still says "HTTP only". Check that HTTPS follows the 0005 plan first. |
 | B6 | ~~Merge `next` into `v5-progress`~~ | — | Done on 2026-11-12 (merge `37aefab058`). |
-| B7 | ~~Volume backups and restore~~ | [0009](decisions/0009-node-volume-backups.md) | Done (uncommitted, verified on dev with one Node). Restore to another Node is untested; restore from a dead Node is not built. |
-| B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (uncommitted, verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews come after beta. |
+| B7 | ~~Volume backups and restore~~ | [0009](decisions/0009-node-volume-backups.md) | Done (verified on dev with one Node). Restore to another Node is untested; restore from a dead Node is not built. |
+| B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews come after beta. |
 | B9 | Build-time secrets | [0012](decisions/0012-node-build-secrets.md) | |
 | B10 | Installer scope: control plane plus SSH workers | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Mostly done. Check the install flow end to end. |
 | B11 | Host Sentinel cluster upgrades | [0013](decisions/0013-host-sentinel-upgrades.md) | |
 | B12 | Instance setting for Nodes, labeled Beta | [0015](decisions/0015-node-release-criteria.md) | Replaces `SENTINEL_HOST_ENABLED`. |
-| B13 | Release Sentinel, Flux, and `coolify-builder` with private Git and the Podman 6 health fix | 0011, 0013 | Built and tested only as local images on the dev Node. B1 pins the release. |
+| B13 | Release Sentinel, Flux, and `coolify-builder` with private Git and the Podman 6 health fix | 0011, 0013 | Published as `main-ea82bdb` images and tested on the dev Node; no versioned Sentinel release yet. B1 pins the release. |
 | B14 | Dockerfile without Git (v4 "Dockerfile" type) | 0006 | Needs an inline Dockerfile field in `image.build`. |
 
 ## Build for stable
 
 | # | Work | Decision |
 | --- | --- | --- |
-| S1 | Databases on Nodes | [0010](decisions/0010-node-databases.md). Create and deploy done (uncommitted, Postgres verified). Left: deploy test of the other 7 engines, `database.dump.v1` backups and restore. |
+| S1 | Databases on Nodes | [0010](decisions/0010-node-databases.md). Create and deploy done (Postgres verified). Left: deploy test of the other 7 engines, `database.dump.v1` backups and restore. |
 | S2 | Offline Node notifications and recovery | [0014](decisions/0014-node-placement-and-failure.md) |
 | S3 | Revision rollback | [0017](decisions/0017-node-revision-rollback.md) |
 | S4 | Exec and terminal | [0018](decisions/0018-node-exec-and-terminal.md) |
