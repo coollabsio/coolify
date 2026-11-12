@@ -62,10 +62,9 @@ class DispatchWorkloadDeployment
             $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
             EnsureNodeWorkloadDnsNames::run($operation->node);
             $operation->workload->refresh();
-            $newRoutedPlacement = ! $hadAddress && $operation->workload->hasIngressRoutes();
-            if (($newRoutedPlacement || ! $hadDnsName) && $operation->node->cluster !== null) {
-                // A new routed placement needs the firewall allow for this container; a new name needs the name table.
-                // Names map to the workload UUID, so other placements change nothing in the network intent.
+            if ((! $hadAddress || ! $hadDnsName) && $operation->node->cluster !== null) {
+                // A new placement needs its name in the name table (creation assigns the name before any network
+                // revision) and, when routed, the firewall allow for this container. A new name needs the name table.
                 QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
             }
         }
