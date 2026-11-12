@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\BackupNodeVolume;
 use App\Events\BackupCreated;
 use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
@@ -61,6 +62,12 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
+        if ($this->backup->isNodeVolume()) {
+            $this->handleNodeVolume();
+
             return;
         }
 
@@ -282,7 +289,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             ->latest('id')
             ->first();
 
-        if ($execution) {
+        if ($execution && $this->backup->isNodeVolume()) {
+            if ($execution->status === 'running') {
+                BackupNodeVolume::abandon($this->backup, $execution);
+            }
+        } elseif ($execution) {
             $recoveryError = $this->recoverIncompleteBackup($execution);
             $server = $this->backup->server();
             $filename = $execution->filename;
@@ -548,9 +559,72 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         ]);
     }
 
-    private function removeExpiredBackups(Server $server): void
+    /**
+     * A cluster volume (decision 0009): Sentinel streams the archive to the S3 storage of the
+     * schedule. There is no local archive, so only the S3 retention applies.
+     */
+    private function handleNodeVolume(): void
     {
-        if ($this->hasRetentionLimits(
+        $this->backup->loadMissing(['backupable.workload', 'team']);
+        $volume = $this->backup->backupable;
+        $workload = $volume?->workload;
+        $team = $this->backup->team;
+        if (! $volume || ! $workload || ! $team) {
+            throw new \RuntimeException('The storage backup volume or team no longer exists.');
+        }
+
+        $this->execution = $this->backup->executions()->create([
+            's3_storage_id' => $this->backup->s3_storage_id,
+            'local_storage_deleted' => true,
+            'filename' => 'volume-backups/'.$workload->team_id.'/'.$workload->uuid.'/'.$volume->uuid.'/'
+                .str($volume->name)->slug().'-'.now()->format('Ymd-His').'.tar.zst',
+        ]);
+        $this->execution->s3Replicas()->create(['s3_storage_id' => $this->backup->s3_storage_id]);
+        BackupCreated::dispatch($team->id);
+
+        $failed = false;
+        try {
+            $archive = BackupNodeVolume::run($this->backup, $this->execution, now()->addSeconds(max(60, $this->timeout - 60)));
+            $this->execution->s3Replicas()->update(['s3_uploaded' => true]);
+            $this->execution->refreshS3Summary();
+            $this->execution->update([
+                'status' => 'success',
+                'size' => $archive['size'],
+                'sha256' => $archive['sha256'],
+            ]);
+
+            try {
+                $this->removeExpiredBackups(null);
+            } catch (Throwable $exception) {
+                Log::channel('scheduled-errors')->warning('Volume backup retention cleanup failed', [
+                    'backup_id' => $this->backup->id,
+                    'execution_id' => $this->execution->id,
+                    'error' => $this->redact($exception->getMessage()),
+                ]);
+            }
+        } catch (Throwable $exception) {
+            $failed = true;
+            $this->execution->s3Replicas()->whereNull('s3_uploaded')->update(['s3_uploaded' => false]);
+            $this->execution->refreshS3Summary();
+            $message = $this->redact(BackupNodeVolume::redactUrls($exception->getMessage()));
+            $this->execution->update(['status' => 'failed', 'message' => $message]);
+
+            throw new \RuntimeException($message, (int) $exception->getCode());
+        } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
+            $this->execution->update(['finished_at' => now()]);
+            BackupCreated::dispatch($team->id);
+        }
+
+        $team->notify(new BackupSuccess($this->backup, null));
+    }
+
+    private function removeExpiredBackups(?Server $server): void
+    {
+        if ($server !== null && $this->hasRetentionLimits(
             $this->backup->retention_amount_locally,
             $this->backup->retention_days_locally,
             $this->backup->retention_max_storage_locally,

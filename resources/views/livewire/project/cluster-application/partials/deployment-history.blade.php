@@ -1,4 +1,4 @@
-<x-application.settings-section id="cluster-application-deployments" title="Deployments"
+<x-application.settings-section id="cluster-application-deployments" title="Deployment history"
     helper="A deploy of a Git application builds the image first, then deploys it to each server. Open a deploy to see its build and deploy logs." flush>
     {{-- Same toolbar as the v4 deployment history: search, Filter (status and server), Sort. --}}
     <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">

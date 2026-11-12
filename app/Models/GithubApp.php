@@ -90,7 +90,7 @@ class GithubApp extends BaseModel
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
-            $applications_count = $github_app->applications()->count();
+            $applications_count = $github_app->applications()->count() + $github_app->nodeWorkloads()->count();
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
             }
@@ -137,6 +137,11 @@ class GithubApp extends BaseModel
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');
+    }
+
+    public function nodeWorkloads()
+    {
+        return $this->hasMany(NodeWorkload::class);
     }
 
     public function privateKey()

@@ -129,6 +129,9 @@ class NodeOperation extends BaseModel
                 default => 'Update container',
             };
         }
+        if ($this->command_type === 'workload.move.v1' && data_get($this->request, 'restore') !== null) {
+            return $moveTargetName === null ? 'Restore volume backup' : "Restore volume backup on {$moveTargetName}";
+        }
         if ($this->command_type === 'workload.move.v1') {
             return $moveTargetName === null ? 'Move' : "Move to {$moveTargetName}";
         }

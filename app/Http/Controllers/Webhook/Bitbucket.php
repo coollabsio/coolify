@@ -8,18 +8,21 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\StartsClusterWebhookBuilds;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class Bitbucket extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use StartsClusterWebhookBuilds;
     use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
@@ -90,8 +93,13 @@ class Bitbucket extends Controller
                 $applications->where('git_branch', $branch);
             }
             $applications = $this->manualWebhookApplications($applications, $full_name);
+            if ($x_bitbucket_event === 'repo:push') {
+                $return_payloads = $this->startManualWebhookClusterBuilds('bitbucket', $full_name, $branch, $commit, $skip_deploy_commits,
+                    fn (string $secret): bool => str_starts_with($x_bitbucket_token, 'sha256=')
+                        && hash_equals(Str::after($x_bitbucket_token, 'sha256='), hash_hmac('sha256', $request->getContent(), $secret)));
+            }
             if ($applications->isEmpty()) {
-                return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');

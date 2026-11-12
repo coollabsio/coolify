@@ -5,7 +5,7 @@
 @endphp
 
 <div class="flex flex-col gap-6">
-    <x-application.settings-section id="cluster-application-volumes" title="Volumes" :flush="$hasVolumes"
+    <x-application.settings-section id="cluster-application-volumes" title="Persistent storage" :flush="$hasVolumes"
         helper="A volume keeps its data when the container is replaced. It lives on one server, and the application can run only there. Moving the application copies the data to the new server.">
         <x-slot:actions>
             @can('update', $workload)
@@ -104,8 +104,8 @@
                 @endforeach
             </div>
         @else
-            <x-empty size="sm" title="No volumes"
-                description="Add a volume for data that must survive a redeploy, for example a database directory." icon-name="storages" />
+            <x-empty size="sm" title="No persistent storage"
+                description="Add a volume to preserve data between deployments." icon-name="storages" />
         @endif
     </x-application.settings-section>
 

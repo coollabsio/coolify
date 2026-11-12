@@ -26,6 +26,9 @@ class DeleteNodeVolumeData
             if ($workload->hasActiveMove()) {
                 throw new RuntimeException('Wait until the move of this application finishes.');
             }
+            if ($volume->scheduledBackups()->exists()) {
+                throw new RuntimeException('Delete the backup schedule of this volume and its archives first.');
+            }
             if ($workload->latestRevisionMounts($volume)) {
                 throw new RuntimeException('Redeploy first. The current configuration of the application still mounts this volume.');
             }

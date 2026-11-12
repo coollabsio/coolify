@@ -2,11 +2,13 @@
 
 namespace App\Actions\Node\Build;
 
+use App\Actions\Node\IssueNodeRegistryCredential;
 use App\Enums\NodeBuildStatus;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeBuildLogLine;
 use App\Models\NodeRegistry;
+use App\Services\Security\SensitiveDataRedactor;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
@@ -19,7 +21,8 @@ use Throwable;
  * Runs the build container on the builder Node and follows it until it ends.
  * Sentinel only starts the container (`image.build.v1`). The state comes from
  * `container.list` and the output from `container.logs`. The last line of a
- * successful build carries the image digest.
+ * successful build carries the image digest. In a cluster without a registry
+ * the build stays on the builder Node: Sentinel loads it into its Podman store.
  */
 class RunImageBuild
 {
@@ -31,15 +34,25 @@ class RunImageBuild
 
     /**
      * @param  array{source_type: string, dockerfile_path?: string}  $source
+     * @param  array{git_https_token?: string, git_ssh_private_key?: string}  $credential  Sent with this request only, never stored.
      * @return string The image digest, `sha256:...`.
      */
-    public function handle(NodeBuild $build, Node $node, array $source): string
+    public function handle(NodeBuild $build, Node $node, array $source, array $credential = []): string
     {
+        if ($credential !== []) {
+            $node->ensureReportedCapability(NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY);
+        }
+        $push = self::pushTarget($build);
+        if ($push !== []) {
+            $node->ensureReportedCapability(IssueNodeRegistryCredential::PUSH_CAPABILITY);
+        }
+        $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null]));
+        $local = $node->cluster?->needsRegistryServer() === false;
         $build->update([
             'node_id' => $node->id,
             'status' => NodeBuildStatus::RUNNING,
             'started_at' => now(),
-            'image' => NodeRegistry::imageReference($build->workload, $build->uuid),
+            'image' => NodeRegistry::imageReference($build->workload, $build->uuid, $local),
         ]);
         self::flux('image.build', [
             'server_id' => $node->uuid,
@@ -52,13 +65,15 @@ class RunImageBuild
             'image' => $build->image,
             'dockerfile_path' => '',
             ...$source,
-        ], 660);
+            ...$credential,
+            ...$push,
+        ], 660, $secrets);
 
         $deadline = now()->addMinutes((int) config('constants.node.build_timeout_minutes'));
         try {
             while (true) {
                 $state = $this->containerState($node, $build);
-                $this->appendLogs($node, $build);
+                $this->appendLogs($node, $build, $secrets);
                 if ($state !== null && ! in_array($state, ['created', 'running', 'configured', 'initialized', 'stopping'], true)) {
                     break;
                 }
@@ -72,7 +87,7 @@ class RunImageBuild
                 Sleep::sleep(self::POLL_SECONDS);
             }
             // The container exited; read what it wrote after the last poll.
-            $this->appendLogs($node, $build);
+            $this->appendLogs($node, $build, $secrets);
         } finally {
             $this->removeContainer($node, $build);
         }
@@ -83,7 +98,17 @@ class RunImageBuild
             : null;
         $digest = is_array($result) ? ($result['digest'] ?? null) : null;
         if (! is_string($digest) || preg_match('/^sha256:[0-9a-f]{64}$/', $digest) !== 1) {
-            throw new RuntimeException('The build failed. See the build log for the reason.');
+            $pushError = $push === [] ? null : $build->logLines()->where('line', 'like', 'error: the push to %')->latest('id')->value('line');
+            throw new RuntimeException(is_string($pushError) ? ucfirst(substr($pushError, strlen('error: '))) : 'The build failed. See the build log for the reason.');
+        }
+        if ($local) {
+            self::flux('image.load', [
+                'server_id' => $node->uuid,
+                'command_id' => (string) Str::uuid(),
+                'build_id' => $build->uuid,
+                'image' => $build->image,
+                'keep_tags' => $node->cluster->registry?->keep_tags ?? 5,
+            ], 660);
         }
 
         return $digest;
@@ -98,8 +123,33 @@ class RunImageBuild
         return $container === null ? 'missing' : strtolower((string) data_get($container, 'state'));
     }
 
-    /** Appends the lines that are newer than the stored cursor. */
-    private function appendLogs(Node $node, NodeBuild $build): void
+    /**
+     * The external image that the build also pushes (v4 "Docker registry image name"), with the
+     * registry login of the workload. Empty without an image name.
+     *
+     * @return array{push_image?: string, push_username?: string, push_password?: string}
+     */
+    public static function pushTarget(NodeBuild $build): array
+    {
+        $workload = $build->workload;
+        if (blank($workload->docker_registry_image_name)) {
+            return [];
+        }
+        $image = $workload->docker_registry_image_name.':'.(filled($workload->docker_registry_image_tag) ? $workload->docker_registry_image_tag : 'latest');
+        $login = IssueNodeRegistryCredential::run($workload, $image);
+
+        return [
+            'push_image' => $image,
+            ...($login === null ? [] : ['push_username' => $login['username'], 'push_password' => $login['password']]),
+        ];
+    }
+
+    /**
+     * Appends the lines that are newer than the stored cursor. A credential that the builder prints is hidden.
+     *
+     * @param  list<string>  $secrets
+     */
+    private function appendLogs(Node $node, NodeBuild $build, array $secrets): void
     {
         $payload = [
             'server_id' => $node->uuid,
@@ -123,7 +173,7 @@ class RunImageBuild
             $rows[] = [
                 'node_build_id' => $build->id,
                 'logged_at' => CarbonImmutable::createFromTimestampUTC(substr($key, 0, 10).'.'.substr($key, 11, 6)),
-                'line' => mb_substr($line, 0, 10_000),
+                'line' => mb_substr($secrets === [] ? $line : str_replace($secrets, REDACTED, $line), 0, 10_000),
             ];
             $cursor = $key;
         }
@@ -177,9 +227,10 @@ class RunImageBuild
      * Sends one direct command through the Flux internal API and returns its JSON result.
      *
      * @param  array<string, mixed>  $payload
+     * @param  list<string>  $secrets  Values of the payload that an error text must not show.
      * @return array<string, mixed>
      */
-    public static function flux(string $verb, array $payload, int $timeout = 30): array
+    public static function flux(string $verb, array $payload, int $timeout = 30, array $secrets = []): array
     {
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
@@ -189,7 +240,8 @@ class RunImageBuild
         $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout($timeout)
             ->post(rtrim($url, '/').'/v1/commands/'.$verb, $payload);
         if ($response->failed()) {
-            $reason = trim(mb_substr($response->body(), 0, 1000));
+            // An error can echo the request, which may carry a Git credential.
+            $reason = trim(mb_substr(app(SensitiveDataRedactor::class)->redactText($response->body(), lockedSecrets: $secrets), 0, 1000));
             throw new RuntimeException($response->status() === 409
                 ? "The server does not support {$verb}. Upgrade Sentinel and try again."
                 : ($reason === '' ? "Flux rejected {$verb} with HTTP {$response->status()}." : $reason));

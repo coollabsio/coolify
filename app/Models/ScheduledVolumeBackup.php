@@ -158,12 +158,31 @@ class ScheduledVolumeBackup extends BaseModel
         return $this->backupable?->resource;
     }
 
+    /** A cluster volume (decision 0009): Sentinel uploads it to S3, there is no server and no local archive. */
+    public function isNodeVolume(): bool
+    {
+        return $this->backupable_type === (new NodeVolume)->getMorphClass();
+    }
+
     /**
      * Link to the resource in the Coolify UI. Built from base_url(), because queued notifications have no request and route() would use APP_URL.
      */
     public function resourceUrl(): ?string
     {
         $resource = $this->targetResource();
+        if ($resource instanceof NodeWorkload) {
+            $project = $resource->project()->first();
+            $environment = $resource->environment()->first();
+            if ($project === null || $environment === null) {
+                return null;
+            }
+
+            return rtrim(base_url(), '/').parse_url(route('project.cluster-application.backups', [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $environment->uuid,
+                'workload_uuid' => $resource->uuid,
+            ]), PHP_URL_PATH);
+        }
         $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
         if (! $linkable || ! method_exists($linkable, 'link') || ! $link = $linkable->link()) {
             return null;
@@ -181,7 +200,7 @@ class ScheduledVolumeBackup extends BaseModel
     {
         return match (true) {
             $this->backupable instanceof LocalFileVolume => $this->backupable->fs_path,
-            $this->backupable instanceof LocalPersistentVolume => $this->backupable->name,
+            $this->backupable instanceof LocalPersistentVolume, $this->backupable instanceof NodeVolume => $this->backupable->name,
             default => 'Unknown storage',
         };
     }

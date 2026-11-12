@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\StartsClusterWebhookBuilds;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitea\Change as GiteaSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitea extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use StartsClusterWebhookBuilds;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -419,8 +421,10 @@ class Gitea extends Controller
             $applications = Application::query();
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
+                $return_payloads = $this->startManualWebhookClusterBuilds('gitea', $full_name, $branch, $commit, $skip_deploy_commits,
+                    fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)));
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                    return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }
             }
             if ($x_gitea_event === 'pull_request') {

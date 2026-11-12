@@ -314,6 +314,11 @@ class PrivateKey extends BaseModel
         return $this->hasMany(Application::class);
     }
 
+    public function nodeWorkloads()
+    {
+        return $this->hasMany(NodeWorkload::class);
+    }
+
     public function githubApps()
     {
         return $this->hasMany(GithubApp::class);
@@ -333,6 +338,7 @@ class PrivateKey extends BaseModel
     {
         return $this->servers()->exists()
             || $this->applications()->exists()
+            || $this->nodeWorkloads()->exists()
             || $this->githubApps()->exists()
             || $this->gitlabApps()->exists()
             || $this->giteaApps()->exists();

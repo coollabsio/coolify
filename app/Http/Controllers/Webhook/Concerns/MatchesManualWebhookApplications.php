@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Models\Application;
+use App\Models\NodeWorkload;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -31,7 +32,7 @@ trait MatchesManualWebhookApplications
     }
 
     /**
-     * @return Collection<int, Application>
+     * @return Collection<int, Application|NodeWorkload>
      */
     protected function manualWebhookApplications(Builder $query, string $fullName): Collection
     {
@@ -42,7 +43,7 @@ trait MatchesManualWebhookApplications
 
         return $query->whereRaw("LOWER(git_repository) LIKE ? ESCAPE '\\'", [$pattern])
             ->get()
-            ->filter(fn (Application $application): bool => $this->manualWebhookRepositoryMatches($application->git_repository, $fullName))
+            ->filter(fn (Application|NodeWorkload $application): bool => $this->manualWebhookRepositoryMatches($application->git_repository, $fullName))
             ->values();
     }
 

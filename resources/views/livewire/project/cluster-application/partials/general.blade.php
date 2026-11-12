@@ -58,7 +58,7 @@
     </x-application.settings-subsection>
 
     <x-application.settings-subsection title="Internal access">
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @if ($internalHostname)
                 <x-forms.copy-input label="Internal hostname" :text="$internalHostname" />
             @else
@@ -73,28 +73,57 @@
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,baseDirectory,dockerfileLocation" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,dockerfileLocation,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
         helper="How Coolify deploys the application. Changes create a new revision. A running application applies it automatically within about a minute, or redeploy to apply it now.">
         @if ($workload->buildsFromSource())
-            <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                Coolify builds this public Git repository with {{ $workload->source_type->label() }} on a builder server of the cluster. Deploy builds the latest commit of the branch.
-            </p>
-            <x-application.settings-subsection title="Source">
+            <div class="mb-5 w-full border-b border-neutral-200 pb-5 dark:border-white/[0.07]">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-forms.listbox id="buildPack" label="Build strategy" required canGate="update" :canResource="$workload"
+                        :options="\App\Enums\NodeWorkloadSourceType::gitBuildPackOptions()" />
+                </div>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
+                    canGate="update" :canResource="$workload"
+                    helper="Repository directory used as the build root. Static serves this directory on port 80, so it needs an index.html." />
+                <div x-cloak x-show="$wire.buildPack === 'dockerfile'">
+                    <x-forms.input id="dockerfileLocation" label="Dockerfile location" placeholder="Dockerfile"
+                        canGate="update" :canResource="$workload" helper="Relative to the base directory." />
+                </div>
+            </div>
+            <x-application.settings-subsection title="Source"
+                helper="Deploy builds the latest commit of the branch with {{ $workload->source_type->label() }} on a builder server of the cluster.">
                 <div class="grid gap-4">
-                    <x-forms.copy-input label="Repository" :text="$workload->git_repository" />
-                    <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input id="gitBranch" label="Branch" required canGate="update" :canResource="$workload" />
-                        <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
-                            canGate="update" :canResource="$workload"
-                            helper="The directory to build, relative to the repository root." />
-                    </div>
-                    @if ($workload->source_type === \App\Enums\NodeWorkloadSourceType::DOCKERFILE)
-                        <x-forms.input id="dockerfileLocation" label="Dockerfile location" placeholder="Dockerfile"
-                            canGate="update" :canResource="$workload" helper="Relative to the base directory." />
+                    @if ($workload->github_app_id !== null || $workload->private_key_id !== null)
+                        <div
+                            class="flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:ring-white/[0.07]">
+                            <span class="text-[12px] text-neutral-500 dark:text-fg-dim">{{ $workload->github_app_id !== null ? 'Connected source' : 'Attached private key' }}</span>
+                            <span class="text-[12px] font-medium text-neutral-900 dark:text-fg">
+                                {{ $workload->github_app_id !== null ? data_get($workload->githubApp, 'name', 'GitHub App not found') : data_get($workload->privateKey, 'name', 'Deploy key not found') }}
+                            </span>
+                        </div>
                     @endif
+                    <x-forms.copy-input label="Repository" :text="$workload->git_repository" />
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <x-forms.input id="gitBranch" label="Branch" required canGate="update" :canResource="$workload" />
+                    </div>
+                </div>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection title="Image registry"
+                helper="Each build is stored in the cluster registry. Set an image to also push each build there.">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input id="dockerRegistryImageName" label="Image" placeholder="ghcr.io/your-org/your-app"
+                        canGate="update" :canResource="$workload"
+                        helper="Empty means it won't push the image to a docker registry. Pre-tag the image with your registry url if you want to push it to a private registry (default: Dockerhub). <br><br>Example: ghcr.io/myimage" />
+                    <x-forms.input id="dockerRegistryImageTag" label="Tag" placeholder="latest"
+                        canGate="update" :canResource="$workload"
+                        helper="The tag of the pushed image. Empty means latest." />
+                    <x-forms.listbox id="registryCredentialUuid" label="Registry credential" canGate="update"
+                        :canResource="$workload" :options="$registryCredentialOptions"
+                        helper="The login for the registry of the image. Add one in Keys & Tokens, Registry Credentials." />
                 </div>
             </x-application.settings-subsection>
         @else
@@ -106,6 +135,9 @@
                     <x-forms.input id="imageTag" label="Tag" placeholder="latest"
                         canGate="update" :canResource="$workload"
                         helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')" />
+                    <x-forms.listbox id="registryCredentialUuid" label="Registry credential" canGate="update"
+                        :canResource="$workload" :options="$registryCredentialOptions"
+                        helper="The login for a private image. Add one in Keys & Tokens, Registry Credentials." />
                 </div>
             </x-application.settings-subsection>
         @endif

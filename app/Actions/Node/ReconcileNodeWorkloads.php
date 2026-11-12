@@ -10,6 +10,7 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -61,6 +62,13 @@ class ReconcileNodeWorkloads
                     NodeOperationStatus::UNCERTAIN,
                 ])
                 ->distinct()
+                ->pluck('node_workload_id'))
+            // Sentinel stops the container for a backup with `stop_during_backup` and starts it after.
+            ->merge(NodeVolume::query()
+                ->whereIn('node_workload_id', $workloads->modelKeys())
+                ->whereHas('scheduledBackups', fn ($backups) => $backups
+                    ->where('stop_during_backup', true)
+                    ->whereHas('executions', fn ($executions) => $executions->where('status', 'running')))
                 ->pluck('node_workload_id'));
         $operationCount = 0;
 

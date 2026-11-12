@@ -45,6 +45,12 @@ class DispatchWorkloadDeployment
             // An older Sentinel ignores unknown fields and would start the container without its secret files.
             $operation->node->ensureReportedCapability('workload.secrets.v1');
         }
+        // A Git application deploys its build from the cluster registry; its credential is for the push.
+        $login = $operation->workload->buildsFromSource() ? null : IssueNodeRegistryCredential::run($operation->workload, $operation->revision->image);
+        if ($login !== null) {
+            // An older Sentinel ignores unknown fields and would pull without the login.
+            $operation->node->ensureReportedCapability(IssueNodeRegistryCredential::DEPLOY_CAPABILITY);
+        }
         if ($healthCheck !== null) {
             // An older Sentinel ignores unknown fields and would start the container without the check.
             $operation->node->ensureReportedCapability('workload.healthcheck.v1');
@@ -89,6 +95,7 @@ class DispatchWorkloadDeployment
                 'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
                 ...($mounts === [] ? [] : ['mounts' => $mounts]),
                 ...($secrets === [] ? [] : ['secrets' => $secrets]),
+                ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
                 ...($healthCheck === null ? [] : ['health_check' => [
                     'command' => $healthCheck['command'],
                     'interval_seconds' => $healthCheck['interval_seconds'],

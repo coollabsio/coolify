@@ -11,7 +11,8 @@ use RuntimeException;
 
 /**
  * Picks the builder Node of a build: a Node of the workload's cluster with the
- * builder role and a running BuildKit, with the fewest active builds.
+ * builder role and a running BuildKit, with the fewest active builds. A
+ * private repository also needs a Sentinel that accepts Git credentials.
  */
 class SelectBuilderNode
 {
@@ -32,13 +33,16 @@ class SelectBuilderNode
             ->filter(fn (Node $node): bool => $node->canBuild()
                 && $node->canReceiveNetworkCommands()
                 && $node->supportsCapability(NodeRegistry::BUILD_CAPABILITY) === true
+                && (! $workload->usesPrivateGitSource() || $node->supportsCapability(NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY) === true)
                 && data_get($node->metadata, 'builder_running') === true);
 
         // One build at a time on each builder Node; the job waits for a free one.
         $node = $candidates->first(fn (Node $node): bool => $node->active_builds_count === 0);
         if ($node === null) {
             throw new RuntimeException($candidates->isEmpty()
-                ? 'No server in this cluster can build images. Turn on the builder role on a server, and upgrade Sentinel if needed.'
+                ? ($workload->usesPrivateGitSource()
+                    ? 'No server in this cluster can build private repositories. Turn on the builder role on a server, and upgrade Sentinel to a version that supports '.NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY.'.'
+                    : 'No server in this cluster can build images. Turn on the builder role on a server, and upgrade Sentinel if needed.')
                 : NodeBuild::BUILDERS_BUSY);
         }
 

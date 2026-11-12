@@ -12,6 +12,7 @@ use App\Actions\Node\FetchContainers;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReceiveNodeVolumes;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
+use App\Actions\Node\RestoreNodeVolume;
 use App\Actions\Node\ServeNodeVolumes;
 use App\Actions\Node\TransitionOperation;
 use App\Enums\NodeOperationStatus;
@@ -111,6 +112,11 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 ->where('team_id', $operation->node->team_id)
                 ->where('node_cluster_id', $operation->node->node_cluster_id)
                 ->firstOrFail();
+            if (data_get($operation->request, 'restore') !== null && $target->id === $operation->node->id) {
+                $this->restoreInPlace($operation, $target);
+
+                return;
+            }
             $volumes = CreateMoveOperation::volumesToTransfer($operation->workload, $operation->node, $target);
             if ($volumes->isNotEmpty() && $this->timeout < self::STATEFUL_TIMEOUT) {
                 throw new RuntimeException('The application got a volume after the move was queued. Start the move again.');
@@ -207,9 +213,24 @@ class MoveNodeWorkloadJob implements ShouldQueue
         }
     }
 
+    /** A restore of a volume backup on the server of the volume (decision 0009). */
+    private function restoreInPlace(NodeOperation $operation, Node $target): void
+    {
+        if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+            return;
+        }
+        $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
+        self::checkpoint($operation, ['stateful' => true]);
+        RestoreNodeVolume::run($operation, now()->addSeconds($this->timeout - self::STATEFUL_RESERVE_SECONDS));
+        $result = [...($operation->refresh()->result ?? []), 'target_node_uuid' => $target->uuid];
+        $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
+        TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);
+    }
+
     /**
      * Copies the volumes to the target and switches them there: serve on the source, warm pass,
-     * stop the source, final pass, switch. Each step writes a checkpoint first, so cleanUp()
+     * stop the source, final pass, switch. A restore (decision 0009) downloads the restored
+     * volume from S3 on the target instead and copies only the other volumes. Each step writes a checkpoint first, so cleanUp()
      * knows what to undo after any failure.
      *
      * @param  Collection<int, NodeVolume>  $volumes
@@ -217,18 +238,23 @@ class MoveNodeWorkloadJob implements ShouldQueue
     private function copyVolumes(NodeOperation $operation, Node $target, Collection $volumes, Carbon $deadline): void
     {
         $source = $operation->node;
-        $names = $volumes->map(fn (NodeVolume $volume): string => $volume->podmanName())->values()->all();
+        $restored = $volumes->firstWhere('uuid', data_get($operation->request, 'restore.volume_uuid'));
+        $names = $volumes->reject(fn (NodeVolume $volume): bool => $volume->is($restored))
+            ->map(fn (NodeVolume $volume): string => $volume->podmanName())->values()->all();
         $secret = self::transferSecret($operation);
 
-        self::checkpoint($operation, ['transfer_served' => true]);
-        $service = ServeNodeVolumes::run($source, $operation->uuid, $names, (string) $target->wireguard_ip, $secret, now()->addSeconds($this->timeout));
+        $service = null;
+        if ($names !== []) {
+            self::checkpoint($operation, ['transfer_served' => true]);
+            $service = ServeNodeVolumes::run($source, $operation->uuid, $names, (string) $target->wireguard_ip, $secret, now()->addSeconds($this->timeout));
 
-        $required = array_sum(array_column($service['volumes'], 'used_bytes'));
-        $available = data_get($target->fresh()?->metadata, 'disk_available_bytes');
-        // 10% headroom: the reported free disk is from the last inventory, and the copy adds metadata.
-        if (is_numeric($available) && (int) $available < (int) ceil($required * 1.1)) {
-            throw new RuntimeException("Server {$target->name} has ".formatBytes((int) $available).' of free disk, but the volumes use '
-                .formatBytes($required).'. The source remains active.');
+            $required = array_sum(array_column($service['volumes'], 'used_bytes'));
+            $available = data_get($target->fresh()?->metadata, 'disk_available_bytes');
+            // 10% headroom: the reported free disk is from the last inventory, and the copy adds metadata.
+            if (is_numeric($available) && (int) $available < (int) ceil($required * 1.1)) {
+                throw new RuntimeException("Server {$target->name} has ".formatBytes((int) $available).' of free disk, but the volumes use '
+                    .formatBytes($required).'. The source remains active.');
+            }
         }
 
         // Recorded before the first pass writes to the target, so cleanup deletes the partial data.
@@ -236,13 +262,18 @@ class MoveNodeWorkloadJob implements ShouldQueue
             NodeVolume::query()->whereKey($volumes->modelKeys())->lockForUpdate()->get();
             foreach ($volumes as $volume) {
                 NodeVolumeCopy::query()->updateOrCreate(
-                    ['node_volume_id' => $volume->id, 'node_id' => $target->id],
+                    ['node_volume_id' => $volume->id, 'node_id' => $target->id, 'podman_name' => null],
                     ['state' => NodeVolumeCopyState::RECEIVING, 'delete_after' => null],
                 );
             }
             self::checkpoint($operation, ['receive_started' => true]);
         });
-        $this->runPass($operation, $target, 'warm', $service, $secret, $names, $deadline);
+        if ($service !== null) {
+            $this->runPass($operation, $target, 'warm', $service, $secret, $names, $deadline);
+        }
+        if ($restored !== null) {
+            RestoreNodeVolume::download($target, $operation, $restored->podmanName(), RestoreNodeVolume::target($operation)['execution'], $deadline);
+        }
 
         // Downtime starts. A fresh inventory decides whether a container runs; a stale one could miss writes.
         FetchContainers::run($source);
@@ -260,9 +291,11 @@ class MoveNodeWorkloadJob implements ShouldQueue
             }
         }
 
-        $this->runPass($operation, $target, 'final', $service, $secret, $names, $deadline);
-        // Compares every file by checksum while the source is still stopped, so the switch happens only to an exact copy.
-        $this->runPass($operation, $target, 'verify', $service, $secret, $names, $deadline);
+        if ($service !== null) {
+            $this->runPass($operation, $target, 'final', $service, $secret, $names, $deadline);
+            // Compares every file by checksum while the source is still stopped, so the switch happens only to an exact copy.
+            $this->runPass($operation, $target, 'verify', $service, $secret, $names, $deadline);
+        }
 
         DB::transaction(function () use ($operation, $volumes, $source, $target): void {
             $locked = NodeVolume::query()->whereKey($volumes->modelKeys())->lockForUpdate()->get();
@@ -271,10 +304,10 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 throw new RuntimeException('A volume changed during the move. The source starts again.');
             }
             NodeVolume::query()->whereKey($locked->modelKeys())->update(['node_id' => $target->id]);
-            NodeVolumeCopy::query()->whereIn('node_volume_id', $locked->modelKeys())->where('node_id', $target->id)->delete();
+            NodeVolumeCopy::query()->whereIn('node_volume_id', $locked->modelKeys())->whereNull('podman_name')->where('node_id', $target->id)->delete();
             foreach ($locked as $volume) {
                 NodeVolumeCopy::query()->updateOrCreate(
-                    ['node_volume_id' => $volume->id, 'node_id' => $source->id],
+                    ['node_volume_id' => $volume->id, 'node_id' => $source->id, 'podman_name' => null],
                     ['state' => NodeVolumeCopyState::RETAINED, 'delete_after' => now()->addDays(self::RETAIN_SOURCE_DAYS)],
                 );
             }
@@ -366,6 +399,11 @@ class MoveNodeWorkloadJob implements ShouldQueue
         if (data_get($operation->result, 'cleaned_up')) {
             return;
         }
+        if (data_get($operation->result, 'restore_in_place')) {
+            RestoreNodeVolume::cleanUp($operation);
+
+            return;
+        }
 
         self::stopTransferService($operation);
         if (data_get($operation->refresh()->result, 'target_ready')) {
@@ -416,10 +454,10 @@ class MoveNodeWorkloadJob implements ShouldQueue
             DB::transaction(function () use ($operation, $volumeIds, $source, $target): void {
                 NodeVolume::query()->whereKey($volumeIds)->lockForUpdate()->get();
                 NodeVolume::query()->whereKey($volumeIds)->where('node_id', $target->id)->update(['node_id' => $source->id]);
-                NodeVolumeCopy::query()->whereIn('node_volume_id', $volumeIds)->where('node_id', $source->id)->delete();
+                NodeVolumeCopy::query()->whereIn('node_volume_id', $volumeIds)->whereNull('podman_name')->where('node_id', $source->id)->delete();
                 foreach ($volumeIds as $volumeId) {
                     NodeVolumeCopy::query()->updateOrCreate(
-                        ['node_volume_id' => $volumeId, 'node_id' => $target->id],
+                        ['node_volume_id' => $volumeId, 'node_id' => $target->id, 'podman_name' => null],
                         ['state' => NodeVolumeCopyState::RECEIVING, 'delete_after' => null],
                     );
                 }
@@ -430,7 +468,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
         // 3. Delete the partial target data. When that is not possible now, the copies become
         // retained copies that expire at once, so the hourly cleanup deletes them later.
         if ($target !== null && data_get($result, 'receive_started')) {
-            $copies = NodeVolumeCopy::query()->whereIn('node_volume_id', $volumeIds)->where('node_id', $target->id)->where('state', NodeVolumeCopyState::RECEIVING);
+            $copies = NodeVolumeCopy::query()->whereIn('node_volume_id', $volumeIds)->whereNull('podman_name')->where('node_id', $target->id)->where('state', NodeVolumeCopyState::RECEIVING);
             try {
                 if (! $targetClean) {
                     throw new RuntimeException('the target container was not removed');
@@ -466,6 +504,11 @@ class MoveNodeWorkloadJob implements ShouldQueue
         $result = $operation->refresh()->result ?? [];
         if (! data_get($result, 'stateful') || data_get($result, 'target_ready')) {
             return '';
+        }
+        if (data_get($result, 'restore_in_place')) {
+            return str_starts_with((string) data_get($result, 'rollback.switch_back', 'done'), 'failed')
+                ? ' The volume data could not be switched back. The application stays stopped; both copies are kept.'
+                : ' The volume keeps its data from before the restore.';
         }
 
         return match (true) {

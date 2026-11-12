@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\StartsClusterWebhookBuilds;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitlab extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use StartsClusterWebhookBuilds;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -444,8 +446,10 @@ class Gitlab extends Controller
             $applications = Application::query();
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
+                $return_payloads = $return_payloads->merge($this->startManualWebhookClusterBuilds('gitlab', $full_name, $branch, $commit, $skip_deploy_commits,
+                    fn (string $secret): bool => hash_equals($secret, $x_gitlab_token)));
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                    return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }
             }
             if ($x_gitlab_event === 'merge_request') {

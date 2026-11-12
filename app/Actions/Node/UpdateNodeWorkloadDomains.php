@@ -35,6 +35,10 @@ class UpdateNodeWorkloadDomains
     public function handle(NodeWorkload $workload, array $routes, User $user, array $redirects = []): NodeWorkload
     {
         Gate::forUser($user)->authorize('update', $workload);
+        // A database has no public HTTP domain (decision 0010); public access uses port publishing.
+        if ($workload->isDatabase() && $routes !== []) {
+            throw ValidationException::withMessages(['routes' => 'A database cannot have a domain.']);
+        }
         $routes = array_map(self::normalizeRoute(...), array_values($routes));
 
         $validator = Validator::make(['routes' => $routes, ...$redirects], [

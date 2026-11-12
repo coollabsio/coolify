@@ -297,7 +297,7 @@
                                 ? \App\Actions\Node\DetermineWorkloadState::run($workloadNode, $currentWorkload)
                                 : \App\Enums\NodeWorkloadState::UNKNOWN;
                         @endphp
-                        <x-status-summary :status="$workloadState->value" />
+                        <x-status-summary :status="$workloadState === \App\Enums\NodeWorkloadState::RUNNING && ($workloadHealth = $currentWorkload->observedHealth()) ? $workloadState->value.':'.$workloadHealth : $workloadState->value" />
                     @else
                         <livewire:project.service.status :service="$currentService"
                             :wire:key="'service-status-'.$currentService->uuid" />

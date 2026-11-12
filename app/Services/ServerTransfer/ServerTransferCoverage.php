@@ -50,6 +50,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ProjectSetting;
 use App\Models\PushoverNotificationSettings;
+use App\Models\RegistryCredential;
 use App\Models\ResourceLink;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -383,5 +384,6 @@ final class ServerTransferCoverage
         NodeRegistry::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeVolume::class => 'v5 cluster data. Server transfer moves Docker servers only.',
         NodeVolumeCopy::class => 'v5 cluster data. Server transfer moves Docker servers only.',
+        RegistryCredential::class => 'Team registry logins of v5 cluster applications. Server transfer moves Docker servers only.',
     ];
 }

@@ -26,8 +26,9 @@ class PublishBuiltRevision
         $workload = DB::transaction(function () use ($build, $digest): NodeWorkload {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($build->node_workload_id);
             $current = $workload->revisions()->latest('id')->first();
+            // A local build has no registry digest; its tag is unique to the build.
             $workload->createRevision(
-                NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
+                NodeRegistry::isLocalImage($build->image) ? $build->image : NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
                 $current?->configuration ?? ['restart_policy' => 'unless-stopped'],
                 $current?->environment ?? [],
                 $current?->secrets ?? [],

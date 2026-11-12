@@ -29,6 +29,7 @@ class ScheduledVolumeBackupExecution extends BaseModel
         'recovery_last_attempt_at',
         'recovery_error',
         'recovery_needs_attention',
+        'sha256',
     ];
 
     protected function casts(): array

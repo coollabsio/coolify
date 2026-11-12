@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\StartsClusterWebhookBuilds;
 use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
@@ -35,6 +36,7 @@ class Github extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use StartsClusterWebhookBuilds;
 
     public function manual(Request $request)
     {
@@ -103,8 +105,12 @@ class Github extends Controller
                 $applications->where('git_branch', $matched_branch);
             }
             $applications = $this->manualWebhookApplications($applications, $full_name);
+            if ($x_github_event === 'push') {
+                $return_payloads = $this->startManualWebhookClusterBuilds('github', $full_name, $branch, $commit, $skip_deploy_commits,
+                    fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)));
+            }
             if ($applications->isEmpty()) {
-                return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
                 return $app->destination->server_id;
@@ -484,9 +490,12 @@ class Github extends Controller
                 ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
+                $return_payloads = $this->startGithubAppClusterBuilds($github_app, data_get($payload, 'repository.full_name'), $branch, $commit, $skip_deploy_commits);
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with branch '$branch'.");
+                    return $return_payloads->isEmpty()
+                        ? response("Nothing to do. No applications found with branch '$branch'.")
+                        : response($return_payloads);
                 }
                 if ($applications->contains(fn (Application $application): bool => filled($application->watch_paths))) {
                     $changed_files = $this->githubPushComparedFiles($github_app, $payload) ?? $changed_files;

@@ -203,9 +203,9 @@ class ReconcileNodeClusterNetwork
             $firewallRules = $this->firewallRules($cluster);
             $ingressRules = $this->ingressRules($cluster);
             // The registry exists once the cluster has a Git workload. Its certificate is renewed here.
+            // The sync also starts zot when a second Node joins, and stops it when one Node remains.
             $registry = $cluster->registry()->exists() ? EnsureNodeRegistry::run($cluster) : null;
-            if ($registry !== null && $registry->node_id === null) {
-                $cluster->syncRegistryNode();
+            if ($registry !== null && $cluster->syncRegistryNode()) {
                 $registry->refresh();
             }
             $registryIp = $registry?->node?->wireguard_ip;

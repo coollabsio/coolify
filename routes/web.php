@@ -85,6 +85,7 @@ use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
+use App\Livewire\Security\RegistryCredentials;
 use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
 use App\Livewire\Server\Analytics\Show as ServerAnalytics;
@@ -432,6 +433,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/builds/{build_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.build.show');
             Route::get('/logs', ClusterApplicationShow::class)->name('project.cluster-application.logs');
             Route::get('/servers', ClusterApplicationShow::class)->name('project.cluster-application.servers');
+            Route::get('/webhooks', ClusterApplicationShow::class)->name('project.cluster-application.webhooks');
+            Route::get('/backups', ClusterApplicationShow::class)->name('project.cluster-application.backups');
+            Route::get('/backups/{backup_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.backup.show');
             Route::get('/danger', ClusterApplicationShow::class)->name('project.cluster-application.danger');
         });
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
@@ -625,6 +629,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
         Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
+        Route::get('/security/registry-credentials', RegistryCredentials::class)->name('security.registry-credentials');
         Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
         Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
         Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');

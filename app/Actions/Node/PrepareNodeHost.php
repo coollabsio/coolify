@@ -39,15 +39,15 @@ case "$(uname -m)" in
     aarch64) podman_arch=arm64 podman_sha256="$podman_arm64_sha256" ;;
     *) echo "Podman is not available for the $(uname -m) architecture." >&2; exit 1 ;;
 esac
-if ! command -v wg >/dev/null || ! command -v nft >/dev/null || ! command -v iptables >/dev/null || ! command -v curl >/dev/null || ! command -v rsync >/dev/null; then
+if ! command -v wg >/dev/null || ! command -v nft >/dev/null || ! command -v iptables >/dev/null || ! command -v curl >/dev/null || ! command -v rsync >/dev/null || ! command -v zstd >/dev/null; then
     if command -v apt-get >/dev/null; then
         export DEBIAN_FRONTEND=noninteractive
         apt-get update
-        apt-get install -y wireguard-tools nftables iptables curl rsync ca-certificates
+        apt-get install -y wireguard-tools nftables iptables curl rsync zstd ca-certificates
     elif command -v dnf >/dev/null; then
-        dnf install -y wireguard-tools nftables iptables curl rsync ca-certificates container-selinux
+        dnf install -y wireguard-tools nftables iptables curl rsync zstd ca-certificates container-selinux
     elif command -v yum >/dev/null; then
-        yum install -y wireguard-tools nftables iptables curl rsync ca-certificates container-selinux
+        yum install -y wireguard-tools nftables iptables curl rsync zstd ca-certificates container-selinux
     else
         echo 'No supported package manager was found.' >&2
         exit 1

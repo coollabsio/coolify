@@ -29,6 +29,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
+use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\ValidServerIp;
@@ -429,9 +430,15 @@ class Show extends Component
             ->whereIn('uuid', $uuids)
             ->where(fn ($query) => $query
                 ->where('node_id', $this->node->id)
-                ->orWhereHas('copies', fn ($copies) => $copies->where('node_id', $this->node->id)))
+                ->orWhereHas('copies', fn ($copies) => $copies->where('node_id', $this->node->id)->whereNull('podman_name')))
             ->pluck('uuid')
             ->map(fn (string $uuid): string => NodeVolume::PODMAN_PREFIX.$uuid)
+            // The old data of a restore on this server keeps its own name (decision 0009).
+            ->merge(NodeVolumeCopy::query()
+                ->where('node_id', $this->node->id)
+                ->whereIn('podman_name', $names->all())
+                ->whereHas('volume', fn ($volumes) => $volumes->where('team_id', $this->node->team_id))
+                ->pluck('podman_name'))
             ->all();
 
         return $names->diff($known)->sort()->values()->all();

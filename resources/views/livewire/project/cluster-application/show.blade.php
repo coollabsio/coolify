@@ -12,6 +12,8 @@
             'build' => 'Deployment',
             'logs' => 'Logs',
             'servers' => 'Servers',
+            'webhooks' => 'Webhooks',
+            'backups' => 'Backups',
             'danger' => 'Danger Zone',
         ];
         // The status can carry the health, like "Running (healthy)".
@@ -145,10 +147,14 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <x-cluster-applications.sidebar :section="$section" :route-parameters="$routeParameters" />
+            <x-cluster-applications.sidebar :section="$section" :route-parameters="$routeParameters" :workload="$workload" />
 
             <div class="application-settings-form flex min-w-0 flex-col gap-6">
-                @include('livewire.project.cluster-application.partials.'.($section === 'build' ? 'deployment' : $section))
+                @include('livewire.project.cluster-application.partials.'.match (true) {
+                    $section === 'build' => 'deployment',
+                    $section === 'general' && $workload->isDatabase() => 'database-general',
+                    default => $section,
+                })
             </div>
         </div>
     </section>

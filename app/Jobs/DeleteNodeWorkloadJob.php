@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DeleteNodeVolumes;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Models\NodeCluster;
@@ -12,6 +13,7 @@ use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Internal\GeneralNotification;
@@ -83,7 +85,32 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
             }
         }
 
+        $this->deleteBackupSchedules($workload);
         $this->deleteRecords($workload, $requestedBy);
+    }
+
+    /**
+     * Deletes the volume backup schedules, which the volume rows do not cascade to. Like v4, the
+     * S3 archives go with the volumes; with the volumes kept, only the schedules go.
+     */
+    private function deleteBackupSchedules(NodeWorkload $workload): void
+    {
+        $schedules = ScheduledVolumeBackup::query()
+            ->where('backupable_type', (new NodeVolume)->getMorphClass())
+            ->whereIn('backupable_id', $workload->volumes()->pluck('id'))
+            ->get();
+        foreach ($schedules as $schedule) {
+            try {
+                if ($this->deleteVolumes && ! $this->deleteFromCoolifyOnly) {
+                    DeleteScheduledVolumeBackup::run($schedule, deleteLocalArchives: false);
+
+                    continue;
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Cluster volume backup archives could not be deleted.', ['workload_uuid' => $workload->uuid, 'backup_uuid' => $schedule->uuid, 'error' => $exception->getMessage()]);
+            }
+            $schedule->delete();
+        }
     }
 
     /**
@@ -130,7 +157,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
             }
             foreach ($volume->copies as $copy) {
                 $names[$copy->node->id] ??= ['node' => $copy->node, 'names' => []];
-                $names[$copy->node->id]['names'][] = $volume->podmanName();
+                $names[$copy->node->id]['names'][] = $copy->setRelation('volume', $volume)->podmanName();
             }
         });
 

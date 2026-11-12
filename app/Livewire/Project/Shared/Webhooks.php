@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
 use App\Models\GitlabApp;
+use App\Models\NodeWorkload;
 use App\Rules\ManualWebhookSecret;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
@@ -19,6 +20,14 @@ class Webhooks extends Component
     public $resource;
 
     public ?string $deploywebhook;
+
+    /** Whether the page shows the Git webhooks of an application, or only the deploy webhook. */
+    public bool $isApplication = false;
+
+    public bool $isGitBased = false;
+
+    /** The webhook settings of the repository at its Git host. */
+    public ?string $repositoryWebhookSettingsUrl = null;
 
     public ?string $githubManualWebhook;
 
@@ -65,6 +74,17 @@ class Webhooks extends Component
     public function mount()
     {
         $this->deploywebhook = generateDeployWebhook($this->resource);
+        if ($this->resource instanceof NodeWorkload) {
+            // A cluster application has no type of its own; one that builds from Git shows the v4 application page.
+            $this->isApplication = $this->isGitBased = $this->resource->buildsFromSource();
+            $this->repositoryWebhookSettingsUrl = str_starts_with((string) $this->resource->git_repository, 'https://')
+                ? preg_replace('/\.git\z/', '', $this->resource->git_repository).'/settings/hooks'
+                : null;
+        } else {
+            $this->isApplication = $this->resource->type() === 'application';
+            $this->isGitBased = $this->isApplication && $this->resource->git_based();
+            $this->repositoryWebhookSettingsUrl = $this->isApplication ? $this->resource->gitWebhook : null;
+        }
 
         if ($this->canViewSecrets()) {
             $this->githubManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_github');

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\Build\CancelNodeBuild;
 use App\Actions\Node\Build\StartNodeBuild;
+use App\Actions\Node\CreateClusterDatabaseWorkload;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
@@ -21,6 +22,7 @@ use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadSourceType;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
@@ -33,17 +35,22 @@ use App\Models\NodeBuildLogLine;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\Project;
+use App\Models\RegistryCredential;
+use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Services\DockerImageParser;
+use App\Services\DockerRegistryLogins;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -54,7 +61,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -119,6 +126,15 @@ class Show extends Component
 
     public string $dockerfileLocation = '';
 
+    public string $buildPack = '';
+
+    /** The UUID of the registry credential, or empty for none. */
+    public string $registryCredentialUuid = '';
+
+    public string $dockerRegistryImageName = '';
+
+    public string $dockerRegistryImageTag = '';
+
     /** @var array{scheme: string, host: string, port: string, path: string} */
     public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
@@ -149,6 +165,16 @@ class Show extends Component
     /** Uuid of the server to move the application to. */
     public string $moveTarget = '';
 
+    /** The full image reference of a database, like the v4 database Image field. */
+    public string $databaseImage = '';
+
+    /** @var array<string, string> The credential variables of a database, keyed by variable name. Empty for users who cannot update it. */
+    public array $databaseCredentials = [];
+
+    /** @var list<string> Credential variables that are locked (shown once), so the page cannot show or change them. */
+    #[Locked]
+    public array $lockedDatabaseCredentials = [];
+
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null, ?string $build_uuid = null): void
     {
         abort_unless(nodesEnabled(), 404);
@@ -171,6 +197,9 @@ class Show extends Component
         $this->loadConfiguration();
         $this->loadDomains();
         $this->resetNewDomain();
+        // A database has no public domain (decision 0010).
+        abort_if($this->section === 'domains' && $this->workload->isDatabase(), 404);
+        $this->loadDatabase();
     }
 
     /**
@@ -295,7 +324,12 @@ class Show extends Component
         $image = CreateClusterDockerImageWorkload::qualifiedImage(
             trim($this->imageName).(preg_match('/^[a-f0-9]{64}$/i', $tag) === 1 ? '@sha256:' : ':').$tag,
         );
+        $credential = $this->selectedRegistryCredential($image, 'registryCredentialUuid');
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
 
+        $this->workload->update(['registry_credential_id' => $credential?->id]);
         UpdateNodeWorkloadConfiguration::run($this->workload, $command, null, $image);
         $this->loadData();
         $this->loadConfiguration();
@@ -557,6 +591,47 @@ class Show extends Component
         $this->dispatch('success', 'Application updated.');
     }
 
+    /**
+     * Saves the General page of a database, like the v4 database General page. Credentials are
+     * environment variables, so the container gets new values at the next deployment.
+     */
+    public function saveDatabase(): void
+    {
+        $this->authorize('update', $this->workload);
+        $type = $this->workload->database_type;
+        abort_if($type === null, 404);
+        $credentialRules = collect($type->credentials())
+            ->reject(fn (array $credential): bool => in_array($credential['key'], $this->lockedDatabaseCredentials, true))
+            ->mapWithKeys(fn (array $credential): array => ['databaseCredentials.'.$credential['key'] => ['required', 'string', 'max:255', 'not_regex:/\x00/']])
+            ->all();
+        $validated = $this->validate([
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'databaseImage' => ['required', 'string', 'max:255', new DockerImageFormat],
+            ...$credentialRules,
+        ], ValidationPatterns::combinedMessages());
+
+        $this->workload->update([
+            'name' => trim($validated['name']),
+            'description' => filled($validated['description']) ? trim($validated['description']) : null,
+        ]);
+        foreach ($type->credentials() as $credential) {
+            if (array_key_exists('databaseCredentials.'.$credential['key'], $credentialRules)) {
+                CreateClusterDatabaseWorkload::storeCredential($this->workload, $credential, $this->databaseCredentials[$credential['key']]);
+            }
+        }
+        $revision = $this->workload->revisions()->latest('id')->first();
+        $image = CreateClusterDockerImageWorkload::qualifiedImage(trim($validated['databaseImage']));
+        if ($revision !== null && $image !== $revision->image) {
+            UpdateNodeWorkloadConfiguration::run($this->workload, $revision->configuration['command'] ?? [], null, $image);
+        }
+        $this->loadData();
+        $this->loadDetails();
+        $this->loadDatabase();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Database updated. Redeploy the database to apply the changes.');
+    }
+
     public function restart(): void
     {
         $this->queueLifecycle(NodeWorkloadAction::RESTART);
@@ -793,10 +868,12 @@ class Show extends Component
             'internalHostname' => $this->workload->internal_dns_name
                 ? $this->workload->internal_dns_name.'.default.coolify.internal'
                 : null,
+            'databaseUrl' => $this->section === 'general' ? $this->databaseInternalUrl($this->workload->internal_dns_name ? $this->workload->internal_dns_name.'.default.coolify.internal' : null) : null,
             ...($this->section === 'domains' ? $this->ingressData() : []),
             ...($this->section === 'storage' ? $this->storageData() : []),
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
+            'registryCredentialOptions' => $this->section === 'general' ? $this->registryCredentialOptions() : [],
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentHistory() : null,
             'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentFilterOptions() : null,
             'selectedDeployment' => in_array($this->section, ['deployment', 'build'], true) ? $this->selectedDeployment() : null,
@@ -991,7 +1068,8 @@ class Show extends Component
         if ($operation->command_type === 'workload.move.v1') {
             $targetName = Node::query()->where('team_id', $this->workload->team_id)
                 ->where('uuid', data_get($operation->request, 'target_node_uuid'))->value('name');
-            $add($operation->created_at, 'Move to '.($targetName ?? 'another server').' queued'.($requestedBy ? " by {$requestedBy}." : '.'));
+            $add($operation->created_at, (data_get($operation->request, 'restore') !== null ? 'Restore of a volume backup on ' : 'Move to ')
+                .($targetName ?? 'another server').' queued'.($requestedBy ? " by {$requestedBy}." : '.'));
         } else {
             $add($operation->created_at, 'Deployment queued'.($requestedBy ? " by {$requestedBy}." : '.'));
         }
@@ -1222,6 +1300,9 @@ class Show extends Component
         if ($routeName === 'project.cluster-application.deployment.show') {
             return 'deployment';
         }
+        if ($routeName === 'project.cluster-application.backup.show') {
+            return 'backups';
+        }
         if ($routeName === 'project.cluster-application.build.show') {
             return 'build';
         }
@@ -1249,14 +1330,8 @@ class Show extends Component
         $this->status = str($state->value)->title()->toString();
         $this->statusType = $state->badgeType();
         if ($state === NodeWorkloadState::RUNNING) {
-            // Like v4: "Running (healthy)". The worst health of the running containers wins.
-            $observed = NodeContainer::query()
-                ->where('node_workload_id', $this->workload->id)
-                ->whereIn('node_id', $this->workload->nodes->modelKeys())
-                ->where('is_managed', true)
-                ->where('state', 'running')
-                ->pluck('health_status');
-            $health = collect(['unhealthy', 'starting', 'healthy'])->first(fn (string $health): bool => $observed->contains($health));
+            // Like v4: "Running (healthy)".
+            $health = $this->workload->observedHealth();
             if ($health !== null) {
                 $this->status .= " ({$health})";
                 $this->statusType = $health === 'healthy' ? 'success' : 'warning';
@@ -1274,6 +1349,37 @@ class Show extends Component
         }
     }
 
+    private function loadDatabase(): void
+    {
+        $type = $this->workload->database_type;
+        if ($type === null) {
+            return;
+        }
+        $this->databaseImage = (string) $this->workload->revisions()->latest('id')->value('image');
+        $variables = $this->workload->environment_variables()->whereIn('key', array_column($type->credentials(), 'key'))->get()->keyBy('key');
+        $this->lockedDatabaseCredentials = $variables->filter(fn ($variable): bool => (bool) $variable->is_shown_once)->keys()->values()->all();
+        // Livewire sends public properties to the browser, so only users who can update the database get the values.
+        $this->databaseCredentials = auth()->user()?->can('update', $this->workload)
+            ? collect($type->credentials())
+                ->mapWithKeys(fn (array $credential): array => [$credential['key'] => in_array($credential['key'], $this->lockedDatabaseCredentials, true) ? '' : (string) $variables->get($credential['key'])?->value])
+                ->all()
+            : [];
+    }
+
+    /** The internal connection URL of a database, or null when the user cannot see the credentials or one is locked. */
+    private function databaseInternalUrl(?string $internalHostname): ?string
+    {
+        $type = $this->workload->database_type;
+        if ($type === null || $internalHostname === null || $this->databaseCredentials === [] || $this->lockedDatabaseCredentials !== []) {
+            return null;
+        }
+        $values = $this->workload->environment_variables()->whereIn('key', array_column($type->credentials(), 'key'))->get()
+            ->mapWithKeys(fn ($variable): array => [$variable->key => (string) $variable->value])
+            ->all();
+
+        return $type->connectionUrl($values, $internalHostname);
+    }
+
     private function loadDetails(): void
     {
         $this->name = $this->workload->name;
@@ -1289,16 +1395,33 @@ class Show extends Component
         $this->gitBranch = trim($this->gitBranch);
         $this->validate([
             'gitBranch' => ['required', 'string', 'max:255', new ValidGitBranch],
+            'buildPack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
             'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'startCommand' => ['nullable', 'string', 'max:16384'],
+            'dockerRegistryImageName' => [...ValidationPatterns::dockerImageNameRules(), 'not_regex:/@/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//'],
+            'dockerRegistryImageTag' => ['nullable', 'string', 'max:128', 'regex:'.ValidationPatterns::DOCKER_IMAGE_LITERAL_TAG_PATTERN],
+        ], [
+            'dockerRegistryImageName.regex' => 'Enter an image repository without a tag, for example ghcr.io/acme/api.',
+            'dockerRegistryImageName.not_regex' => 'Enter an image repository outside the cluster registry, without a digest.',
         ]);
         $command = $this->parseStartCommand();
+        $imageName = trim($this->dockerRegistryImageName);
+        $credential = null;
+        if ($imageName === '' && $this->registryCredentialUuid !== '') {
+            $this->addError('registryCredentialUuid', 'Set the Docker image name to push with a registry credential.');
+        } elseif ($imageName !== '') {
+            $credential = $this->selectedRegistryCredential($imageName, 'registryCredentialUuid');
+        }
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
         $this->workload->update([
+            'registry_credential_id' => $credential?->id,
+            'docker_registry_image_name' => $imageName === '' ? null : $imageName,
+            'docker_registry_image_tag' => filled($this->dockerRegistryImageTag) ? trim($this->dockerRegistryImageTag) : null,
             'git_branch' => $this->gitBranch,
+            'source_type' => NodeWorkloadSourceType::from($this->buildPack),
             'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
             'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
         ]);
@@ -1316,11 +1439,59 @@ class Show extends Component
         $this->dispatch('success', 'Configuration saved. Deploy to build the new source.');
     }
 
+    /**
+     * The selected registry credential, which must belong to the team of the workload and be for
+     * the registry of the image. Adds a validation error otherwise.
+     */
+    private function selectedRegistryCredential(string $image, string $errorField): ?RegistryCredential
+    {
+        if ($this->registryCredentialUuid === '') {
+            return null;
+        }
+        $credential = RegistryCredential::query()
+            ->where('team_id', $this->workload->team_id)
+            ->where('uuid', $this->registryCredentialUuid)
+            ->first();
+        if ($credential === null) {
+            $this->addError($errorField, 'Select a registry credential of this team.');
+
+            return null;
+        }
+        if (! $credential->matchesImage($image)) {
+            $this->addError($errorField, "This credential is for {$credential->registry}, but the image is in ".DockerRegistryLogins::registryFromImage($image).'.');
+
+            return null;
+        }
+
+        return $credential;
+    }
+
+    /** @return list<array{value: string, label: string, description: string}> */
+    private function registryCredentialOptions(): array
+    {
+        return RegistryCredential::query()
+            ->where('team_id', $this->workload->team_id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (RegistryCredential $credential): array => [
+                'value' => $credential->uuid,
+                'label' => $credential->name,
+                'description' => $credential->registry.' · '.$credential->username,
+            ])
+            ->prepend(['value' => '', 'label' => 'None', 'description' => 'Public image, or a registry without a login'])
+            ->values()
+            ->all();
+    }
+
     private function loadConfiguration(): void
     {
+        $this->registryCredentialUuid = (string) $this->workload->registryCredential?->uuid;
+        $this->dockerRegistryImageName = (string) $this->workload->docker_registry_image_name;
+        $this->dockerRegistryImageTag = (string) $this->workload->docker_registry_image_tag;
         $this->gitBranch = (string) $this->workload->git_branch;
         $this->baseDirectory = (string) $this->workload->base_directory;
         $this->dockerfileLocation = (string) $this->workload->dockerfile_location;
+        $this->buildPack = (string) $this->workload->source_type?->value;
         $revision = $this->workload->revisions->first();
         $configuration = $revision?->configuration ?? [];
         $image = (new DockerImageParser)->parse($revision?->image ?? '');

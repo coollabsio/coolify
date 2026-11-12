@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Database\StartDatabase;
+use App\Actions\Node\Build\StartNodeBuild;
+use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Http\Controllers\Controller;
+use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\NodeWorkload;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
@@ -18,6 +23,7 @@ use App\Support\ResourceStartActivity;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class DeployController extends Controller
 {
@@ -280,7 +286,7 @@ class DeployController extends Controller
             try {
                 $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
                 CleanupCancelledDeployment::run($deployment, (int) $teamId);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 \Log::warning("Failed to clean up cancelled deployment {$deployment->id}: {$e->getMessage()}");
             }
 
@@ -297,7 +303,7 @@ class DeployController extends Controller
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'status' => $deployment->status,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'message' => 'Failed to cancel deployment: '.$e->getMessage(),
             ], 500);
@@ -305,7 +311,7 @@ class DeployController extends Controller
             if ($cancelled) {
                 try {
                     next_after_cancel($deploymentServer, $application);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
                 }
             }
@@ -417,7 +423,14 @@ class DeployController extends Controller
         $deployments = collect();
         $payload = collect();
         foreach ($uuids as $uuid) {
-            $resource = getResourceByUuid($uuid, $teamId);
+            $resource = getResourceByUuid($uuid, $teamId)
+                ?? NodeWorkload::query()->where('uuid', $uuid)->where('team_id', $teamId)->first();
+            if ($resource instanceof NodeWorkload) {
+                $result = $this->deployClusterWorkload($resource, $pr, $dockerTag);
+                $deployments->push(array_filter(['message' => $result['message'], 'resource_uuid' => $uuid, 'deployment_uuid' => $result['deployment_uuid']]));
+
+                continue;
+            }
             if ($resource) {
                 $dockerTagForResource = $dockerTag;
                 $preview = null;
@@ -597,6 +610,62 @@ class DeployController extends Controller
         }
 
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
+    }
+
+    /**
+     * Deploys a cluster application like its Deploy button: a Git application starts a build,
+     * which deploys the built image; other workloads deploy their latest configuration.
+     *
+     * @return array{message: string, deployment_uuid: ?string}
+     */
+    private function deployClusterWorkload(NodeWorkload $workload, int $pr, ?string $dockerTag): array
+    {
+        try {
+            $this->authorize('update', $workload);
+        } catch (AuthorizationException) {
+            return ['message' => 'Unauthorized to deploy this application.', 'deployment_uuid' => null];
+        }
+        if ($pr !== 0 || $dockerTag !== null) {
+            return ['message' => 'Cluster applications have no preview deployments yet.', 'deployment_uuid' => null];
+        }
+        $nodes = $workload->nodes()->orderBy('nodes.id')->get();
+        if ($nodes->isEmpty()) {
+            return ['message' => 'This application is not placed on any server.', 'deployment_uuid' => null];
+        }
+
+        try {
+            if ($workload->buildsFromSource()) {
+                $build = StartNodeBuild::run($workload, auth()->user());
+                if (! $build->wasRecentlyCreated) {
+                    return ['message' => 'A build of this application is already running.', 'deployment_uuid' => $build->uuid];
+                }
+                $operationUuid = $build->uuid;
+            } else {
+                $revision = PrepareNodeWorkloadRevision::run($workload);
+                $operationUuid = null;
+                foreach ($nodes as $node) {
+                    $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer');
+                    if ($deployment['created']) {
+                        DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                        $operationUuid ??= $deployment['operation']->uuid;
+                    }
+                }
+                if ($operationUuid === null) {
+                    return ['message' => 'This application already has an active operation.', 'deployment_uuid' => null];
+                }
+            }
+        } catch (Throwable $exception) {
+            return ['message' => $exception->getMessage(), 'deployment_uuid' => null];
+        }
+
+        auditLog('api.deployment.triggered', [
+            'resource_type' => 'cluster-application',
+            'workload_uuid' => $workload->uuid,
+            'workload_name' => $workload->name,
+            'deployment_uuid' => $operationUuid,
+        ]);
+
+        return ['message' => "Application {$workload->name} deployment queued.", 'deployment_uuid' => $operationUuid];
     }
 
     private function upsertDockerImagePreview(Application $application, int $pullRequestId, ?string $dockerTag): ?ApplicationPreview

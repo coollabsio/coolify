@@ -24,6 +24,12 @@
             'active' => request()->routeIs('security.integration-tokens'),
             'icon' => 'network',
         ] : null,
+        nodesEnabled() && auth()->user()?->can('viewAny', App\Models\RegistryCredential::class) ? [
+            'label' => 'Registry Credentials',
+            'route' => 'security.registry-credentials',
+            'active' => request()->routeIs('security.registry-credentials'),
+            'icon' => 'keys',
+        ] : null,
         auth()->user()?->can('viewAny', App\Models\CloudInitScript::class) ? [
             'label' => 'Cloud-Init Scripts',
             'route' => 'security.cloud-init-scripts',

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * A named Podman volume of a cluster application. It lives on exactly one Node: `node_id`
@@ -56,6 +57,12 @@ class NodeVolume extends BaseModel
         return $this->belongsTo(NodeWorkload::class, 'node_workload_id');
     }
 
+    /** The owner of the volume under the name that v4 backup code uses for every backup target. */
+    public function resource(): BelongsTo
+    {
+        return $this->belongsTo(NodeWorkload::class, 'node_workload_id');
+    }
+
     public function node(): BelongsTo
     {
         return $this->belongsTo(Node::class);
@@ -69,5 +76,11 @@ class NodeVolume extends BaseModel
     public function copies(): HasMany
     {
         return $this->hasMany(NodeVolumeCopy::class);
+    }
+
+    /** The v4 backup schedule of the volume (decision 0009). */
+    public function scheduledBackups(): MorphMany
+    {
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 }

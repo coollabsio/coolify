@@ -1,5 +1,5 @@
 <div>
-    @if ($resource->type() === 'application')
+    @if ($isApplication)
         @php
             $manualWebhookProviders = [
                 [
@@ -48,15 +48,15 @@
                 <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
 
-            @if ($resource->git_based() && $githubManualWebhook && $gitlabManualWebhook)
+            @if ($isGitBased && $githubManualWebhook && $gitlabManualWebhook)
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col">
                     <x-unsaved-bar action="submit"
                         dirty="Object.entries($wire.savedSecrets).some(([property, saved]) => ($wire[property] ?? '') !== (saved ?? ''))" />
                     <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                         helper="Configure these endpoints when the repository is not connected through an official Git App." flush>
                         <x-slot:actions>
-                            @if (filled($resource?->gitWebhook))
-                                <a class="button" href="{{ $resource->gitWebhook }}" target="_blank"
+                            @if (filled($repositoryWebhookSettingsUrl))
+                                <a class="button" href="{{ $repositoryWebhookSettingsUrl }}" target="_blank"
                                     rel="noopener noreferrer">
                                     Repository settings
                                     <x-external-link />
@@ -110,8 +110,8 @@
                                 Source settings
                             </a>
                         @endcan
-                        @if (filled($resource?->gitWebhook))
-                            <a class="button" href="{{ $resource->gitWebhook }}" target="_blank"
+                        @if (filled($repositoryWebhookSettingsUrl))
+                            <a class="button" href="{{ $repositoryWebhookSettingsUrl }}" target="_blank"
                                 rel="noopener noreferrer">
                                 Repository settings
                                 <x-external-link />

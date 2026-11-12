@@ -6,6 +6,7 @@ use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Models\Node;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
@@ -28,6 +29,10 @@ class CreateDeploymentOperation
         $node->ensureCapability('workload.deploy.v1');
         if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
             throw new InvalidArgumentException('The image pull policy is invalid.');
+        }
+        // A local build exists only in the Podman store of this Node; there is nothing to pull.
+        if (NodeRegistry::isLocalImage($revision->image)) {
+            $pullPolicy = 'missing';
         }
 
         return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove): array {

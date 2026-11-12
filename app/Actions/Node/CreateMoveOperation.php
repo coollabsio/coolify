@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -19,15 +20,19 @@ class CreateMoveOperation
 {
     use AsAction;
 
-    public function handle(Node $source, Node $target, NodeWorkloadRevision $revision, ?User $requestedBy = null): NodeOperation
+    /**
+     * @param  array{volume_uuid: string, execution_uuid: string}|null  $restore  A restore of a volume backup
+     *                                                                            (decision 0009): the volume comes from S3, also to the same server.
+     */
+    public function handle(Node $source, Node $target, NodeWorkloadRevision $revision, ?User $requestedBy = null, ?array $restore = null): NodeOperation
     {
         $source->refresh();
         $target->refresh();
         $source->ensureCapability('workload.lifecycle.v1');
         $target->ensureCapability('workload.deploy.v1');
 
-        return DB::transaction(function () use ($source, $target, $revision, $requestedBy): NodeOperation {
-            if ($source->id === $target->id
+        return DB::transaction(function () use ($source, $target, $revision, $requestedBy, $restore): NodeOperation {
+            if (($source->id === $target->id && $restore === null)
                 || $source->team_id !== $target->team_id
                 || $source->node_cluster_id === null
                 || $source->node_cluster_id !== $target->node_cluster_id
@@ -45,6 +50,9 @@ class CreateMoveOperation
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
                 ->firstOrFail();
+            if (NodeRegistry::isLocalImage($revision->image)) {
+                throw new RuntimeException('The image of this application is only on '.$source->name.'. Deploy the application again, so that it is stored in the cluster registry, then move it.');
+            }
             $hasActiveMove = NodeOperation::query()
                 ->where('node_workload_id', $workload->id)
                 ->where('command_type', 'workload.move.v1')
@@ -59,15 +67,17 @@ class CreateMoveOperation
             if ($hasActiveMove) {
                 throw new RuntimeException('This workload already has an active move.');
             }
-            self::volumesToTransfer($workload, $source, $target);
+            if ($source->id !== $target->id) {
+                self::volumesToTransfer($workload, $source, $target);
+            }
 
             return CreateOperation::run(
                 $source,
                 'workload.move.v1',
-                "move:{$source->uuid}:{$target->uuid}:{$workload->uuid}:".Str::uuid(),
+                ($restore === null ? 'move' : 'restore').":{$source->uuid}:{$target->uuid}:{$workload->uuid}:".Str::uuid(),
                 $workload,
                 $revision,
-                ['revision_uuid' => $revision->uuid, 'target_node_uuid' => $target->uuid],
+                ['revision_uuid' => $revision->uuid, 'target_node_uuid' => $target->uuid, ...($restore === null ? [] : ['restore' => $restore])],
                 $requestedBy,
             );
         });

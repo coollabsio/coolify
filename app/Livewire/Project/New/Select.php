@@ -2,16 +2,21 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Enums\NodeDatabaseType;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Select extends Component
 {
+    /** The Git resource types that can target a cluster: a public repository, and the v4 GitHub App and deploy key sources. */
+    private const CLUSTER_GIT_TYPES = ['public', 'private-gh-app', 'private-deploy-key'];
+
     public $current_step = 'type';
 
     public ?Server $server = null;
@@ -56,6 +61,10 @@ class Select extends Component
 
     public string $postgresql_type = 'postgres:16-alpine';
 
+    /** The cluster query parameters of a PostgreSQL database while the user picks its image. */
+    #[Locked]
+    public array $clusterTarget = [];
+
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
@@ -82,7 +91,12 @@ class Select extends Component
             $queryServerId = request()->query('server_id');
             $queryDestination = request()->query('destination');
 
-            if ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
+            $clusterQuery = array_filter(['cluster' => request()->query('cluster'), 'server' => request()->query('server')], 'is_string');
+            if ($queryType === 'postgresql' && nodesEnabled() && $clusterQuery !== []) {
+                $this->type = $queryType;
+                $this->clusterTarget = array_slice($clusterQuery, 0, 1);
+                $this->current_step = 'select-postgresql-type';
+            } elseif ($queryType === 'postgresql' && $queryServerId !== null && $queryDestination) {
                 $server = Server::isUsable()->whereKey($queryServerId)->first();
                 if ($server && $this->findDestination($server, $queryDestination)) {
                     $this->type = $queryType;
@@ -437,8 +451,8 @@ class Select extends Component
 
             return;
         }
-        // Clusters run Docker images and build public Git repositories; Docker servers keep their flow.
-        if (in_array($type, ['docker-image', 'public'], true) && $this->clusters?->isNotEmpty()) {
+        // Clusters run Docker images, build Git repositories, and run databases; Docker servers keep their flow.
+        if ((in_array($type, ['docker-image', ...self::CLUSTER_GIT_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null) && $this->clusters?->isNotEmpty()) {
             $this->current_step = 'targets';
 
             return;
@@ -502,12 +516,7 @@ class Select extends Component
                 ->onDeployableClusterNetwork())
             ->firstOrFail();
 
-        return redirect()->route('project.resource.create', [
-            'project_uuid' => $this->parameters['project_uuid'],
-            'environment_uuid' => $this->parameters['environment_uuid'],
-            'type' => $this->clusterResourceType(),
-            'cluster' => $cluster->uuid,
-        ]);
+        return $this->createOnCluster(['cluster' => $cluster->uuid]);
     }
 
     public function setNode(string $nodeUuid)
@@ -522,18 +531,39 @@ class Select extends Component
             ->onDeployableClusterNetwork()
             ->firstOrFail();
 
+        return $this->createOnCluster(['server' => $node->uuid]);
+    }
+
+    /**
+     * Opens the create page for the cluster target. A PostgreSQL database first picks its image, like on a Docker server.
+     *
+     * @param  array{cluster?: string, server?: string}  $target
+     */
+    private function createOnCluster(array $target)
+    {
+        if ($this->type === NodeDatabaseType::POSTGRESQL->value) {
+            $this->clusterTarget = $target;
+            $this->current_step = 'select-postgresql-type';
+
+            return null;
+        }
+
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => $this->clusterResourceType(),
-            'server' => $node->uuid,
+            ...$target,
         ]);
     }
 
-    /** The resource type that a cluster target creates: a Git build or a Docker image. */
+    /** The resource type that a cluster target creates: a Git build, a database, or a Docker image. */
     private function clusterResourceType(): string
     {
-        return ($this->type ?? null) === 'public' ? 'public' : 'docker-image';
+        if (in_array($this->type ?? null, self::CLUSTER_GIT_TYPES, true) || NodeDatabaseType::tryFrom((string) $this->type) !== null) {
+            return $this->type;
+        }
+
+        return 'docker-image';
     }
 
     private function findDestination(Server $server, string $destinationUuid): ?object
@@ -544,6 +574,15 @@ class Select extends Component
     public function setPostgresqlType(string $type)
     {
         $this->postgresql_type = $type;
+        if ($this->clusterTarget !== []) {
+            return redirect()->route('project.resource.create', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'environment_uuid' => $this->parameters['environment_uuid'],
+                'type' => $this->type,
+                ...$this->clusterTarget,
+                'database_image' => $this->postgresql_type,
+            ]);
+        }
 
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],

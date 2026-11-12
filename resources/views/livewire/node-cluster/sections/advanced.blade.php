@@ -47,7 +47,7 @@
 
 @if ($cluster->registry)
     <x-application.settings-section id="node-cluster-registry-section" title="Image registry"
-        helper="Git applications push their images to the registry of the cluster. By default it runs on the first available server and moves when that server is offline. A selected server is kept, also while it is offline.">
+        helper="Git applications push their images to the registry of the cluster. By default it runs on the first available server and moves when that server is offline. A selected server is kept, also while it is offline. A cluster with one server runs no registry: builds stay on that server.">
         @php
             $registryOptions = collect([['value' => '', 'label' => 'Automatic (first available server)']])
                 ->concat($cluster->nodes->sortBy('id')->map(fn ($node) => ['value' => $node->uuid, 'label' => $node->name]))
@@ -57,7 +57,7 @@
         <div class="flex flex-col gap-3" wire:init="loadRegistryReport">
             <div class="flex flex-wrap items-center gap-3">
                 <p class="text-sm text-neutral-600 dark:text-fg-dim">
-                    Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? 'No available server' }}</span>
+                    Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? ($cluster->needsRegistryServer() ? 'No available server' : 'Not needed (one server, builds stay on it)') }}</span>
                 </p>
                 @if ($registryReport === null)
                     <x-status-badge label="Checking" type="neutral" spinning />

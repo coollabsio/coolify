@@ -20,6 +20,10 @@
         <livewire:project.new.docker-image :type="$type" />
     @elseif ($type === 'cluster-git-repository')
         <livewire:project.new.cluster-git-repository />
+    @elseif ($type === 'cluster-private-gh-app')
+        <livewire:project.new.cluster-github-private-repository />
+    @elseif ($type === 'cluster-private-deploy-key')
+        <livewire:project.new.cluster-github-private-repository-deploy-key />
     @else
         <livewire:project.new.select />
     @endif

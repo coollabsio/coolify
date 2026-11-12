@@ -24,12 +24,13 @@ class DeleteNodeVolumeCopy
             if ($volume === null || $copy === null) {
                 return;
             }
+            $copy->setRelation('volume', $volume);
             // The live data of the volume is never a copy.
-            if ($copy->node_id !== $volume->node_id) {
+            if (! $copy->isLiveData()) {
                 if ($volume->workload?->hasActiveMove()) {
                     throw new RuntimeException('Wait until the move of this application finishes.');
                 }
-                DeleteNodeVolumes::run($copy->node, [$volume->podmanName()]);
+                DeleteNodeVolumes::run($copy->node, [$copy->podmanName()]);
             }
             $copy->delete();
         });

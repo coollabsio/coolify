@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\PublishBuiltRevision;
 use App\Actions\Node\Build\ResolveGitCommit;
 use App\Actions\Node\Build\RunImageBuild;
@@ -13,8 +14,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * The steps that every Git build job shares: resolve the commit, wait for a
- * free builder Node, build, then publish and deploy the revision. A job only
+ * The steps that every Git build job shares: issue the Git credential of a
+ * private repository, resolve the commit, wait for a free builder Node,
+ * build, then publish and deploy the revision. A job only
  * says what the builder must do with the source.
  */
 trait BuildsNodeWorkloadImage
@@ -48,8 +50,11 @@ trait BuildsNodeWorkloadImage
         }
 
         try {
+            // A private repository gets a new credential for each attempt; it is never stored.
+            $credential = null;
             if ($build->commit_sha === null) {
-                $build->update(['commit_sha' => ResolveGitCommit::run($build->git_repository, $build->git_branch)]);
+                $credential = IssueNodeGitCredential::run($build->workload);
+                $build->update(['commit_sha' => ResolveGitCommit::run($build->git_repository, $build->git_branch, $credential)]);
             }
             try {
                 $node = SelectBuilderNode::run($build->workload);
@@ -61,7 +66,7 @@ trait BuildsNodeWorkloadImage
                 }
                 throw $exception;
             }
-            $digest = RunImageBuild::run($build, $node, $this->source($build));
+            $digest = RunImageBuild::run($build, $node, $this->source($build), $credential ?? IssueNodeGitCredential::run($build->workload));
             // A cancel that arrives while the image is pushed wins: the image is not deployed.
             if ($build->refresh()->status === NodeBuildStatus::CANCELLED) {
                 return;

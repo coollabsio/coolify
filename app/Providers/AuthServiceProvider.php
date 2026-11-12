@@ -25,6 +25,7 @@ use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
+use App\Models\RegistryCredential;
 use App\Models\S3Storage;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -70,6 +71,7 @@ use App\Policies\NodeWorkloadPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
+use App\Policies\RegistryCredentialPolicy;
 use App\Policies\ResourceCreatePolicy;
 use App\Policies\S3StoragePolicy;
 use App\Policies\ScheduledTaskPolicy;
@@ -155,6 +157,7 @@ class AuthServiceProvider extends ServiceProvider
         // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
         IntegrationToken::class => IntegrationTokenPolicy::class,
+        RegistryCredential::class => RegistryCredentialPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
         Tag::class => TagPolicy::class,
 

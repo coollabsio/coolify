@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Enums\NodeDatabaseType;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class NodeWorkload extends BaseModel
@@ -24,6 +26,16 @@ class NodeWorkload extends BaseModel
     use HasFactory, ScopedByAccessGrants;
 
     protected $guarded = [];
+
+    /** The v4 manual webhook secrets (decision 0011). */
+    public const MANUAL_WEBHOOK_SECRETS = [
+        'manual_webhook_secret_github',
+        'manual_webhook_secret_gitlab',
+        'manual_webhook_secret_bitbucket',
+        'manual_webhook_secret_gitea',
+    ];
+
+    protected $hidden = self::MANUAL_WEBHOOK_SECRETS;
 
     protected $attributes = [
         'www_redirect' => 'both',
@@ -39,6 +51,10 @@ class NodeWorkload extends BaseModel
         return [
             'desired_state' => NodeWorkloadDesiredState::class,
             'source_type' => NodeWorkloadSourceType::class,
+            'database_type' => NodeDatabaseType::class,
+            'github_app_id' => 'integer',
+            'private_key_id' => 'integer',
+            'registry_credential_id' => 'integer',
             'domains' => 'array',
             'domain_routes' => 'array',
             'force_https' => 'boolean',
@@ -53,11 +69,20 @@ class NodeWorkload extends BaseModel
             'health_check_retries' => 'integer',
             'health_check_start_period' => 'integer',
             'custom_healthcheck_found' => 'boolean',
+            'manual_webhook_secret_github' => 'encrypted',
+            'manual_webhook_secret_gitlab' => 'encrypted',
+            'manual_webhook_secret_bitbucket' => 'encrypted',
+            'manual_webhook_secret_gitea' => 'encrypted',
         ];
     }
 
     protected static function booted(): void
     {
+        static::creating(function (NodeWorkload $workload): void {
+            foreach (self::MANUAL_WEBHOOK_SECRETS as $secret) {
+                $workload->{$secret} ??= Str::random(40);
+            }
+        });
         static::deleting(function (NodeWorkload $workload): void {
             $workload->ingressClusterIdsBeforeDelete = $workload->hasIngressRoutes() || filled($workload->internal_dns_name) ? $workload->clusterIds() : [];
         });
@@ -165,10 +190,53 @@ class NodeWorkload extends BaseModel
         return $this->hasMany(NodeBuild::class);
     }
 
+    /** The worst health of the running managed containers on the Nodes of this workload, or null without a health check. */
+    public function observedHealth(): ?string
+    {
+        $observed = NodeContainer::query()
+            ->where('node_workload_id', $this->id)
+            ->whereIn('node_id', $this->nodes()->pluck('nodes.id'))
+            ->where('is_managed', true)
+            ->where('state', 'running')
+            ->pluck('health_status');
+
+        return collect(['unhealthy', 'starting', 'healthy'])->first(fn (string $health): bool => $observed->contains($health));
+    }
+
+    /** Whether this workload is a database (decision 0010). */
+    public function isDatabase(): bool
+    {
+        return filled($this->database_type);
+    }
+
     /** Whether Coolify builds the image of this workload from a Git repository. */
     public function buildsFromSource(): bool
     {
         return ($this->source_type ?? NodeWorkloadSourceType::IMAGE)->builds();
+    }
+
+    /** The GitHub App that reads a private repository (v4 `source_id`). */
+    public function githubApp(): BelongsTo
+    {
+        return $this->belongsTo(GithubApp::class);
+    }
+
+    /** The deploy key that reads a private repository over SSH (v4 `private_key_id`). */
+    public function privateKey(): BelongsTo
+    {
+        return $this->belongsTo(PrivateKey::class);
+    }
+
+    /** The registry login: the pull login of an image application, or the push login of a Git application. */
+    public function registryCredential(): BelongsTo
+    {
+        return $this->belongsTo(RegistryCredential::class);
+    }
+
+    /** Whether a build needs a Git credential: the workload has a GitHub App or a deploy key. */
+    public function usesPrivateGitSource(): bool
+    {
+        return $this->github_app_id !== null || $this->private_key_id !== null;
     }
 
     /**
@@ -218,7 +286,10 @@ class NodeWorkload extends BaseModel
             return REDACTED;
         }
 
-        return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'], $secrets['locked']);
+        // Errors of a pull or a push must not show the registry password either.
+        $registryPassword = $this->registry_credential_id === null ? null : RegistryCredential::query()->whereKey($this->registry_credential_id)->value('password');
+
+        return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'], [...$secrets['locked'], ...(filled($registryPassword) ? [$registryPassword] : [])]);
     }
 
     /** Whether logs hide every environment value, or only locked values. */
@@ -249,6 +320,18 @@ class NodeWorkload extends BaseModel
                 'COOLIFY_ENVIRONMENT_NAME' => $this->environment?->name,
             ])->whereNotNull()->map(fn ($value): string => (string) $value)->except($variables->pluck('key')->all());
             $environment = [...$environment, ...$defaults->all()];
+        }
+        // A database image reads a credential that is a secret file through <key>_FILE. It follows the
+        // delivery of the credential, so a change of the delivery never sets both forms.
+        if ($this->isDatabase()) {
+            $credentialKeys = array_column($this->database_type->credentials(), 'key');
+            $variables->where('is_file_secret', true)->whereIn('key', $credentialKeys)
+                ->each(function (EnvironmentVariable $variable) use (&$environment, $variables): void {
+                    $fileKey = $variable->key.'_FILE';
+                    if (! $variables->contains('key', $fileKey)) {
+                        $environment[$fileKey] = '/run/secrets/'.$variable->key;
+                    }
+                });
         }
         ksort($environment);
 

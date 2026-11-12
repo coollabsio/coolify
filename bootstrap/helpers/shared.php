@@ -15,6 +15,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -1877,6 +1878,12 @@ function generateDeployWebhook($resource)
 }
 function generateGitManualWebhook($resource, $type)
 {
+    // A cluster application with a GitHub App gets its pushes from the App, like a v4 application.
+    if ($resource instanceof NodeWorkload) {
+        return $resource->buildsFromSource() && $resource->github_app_id === null
+            ? Url::fromString(base_url())."/webhooks/source/$type/events/manual"
+            : null;
+    }
     if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
         return null;
     }

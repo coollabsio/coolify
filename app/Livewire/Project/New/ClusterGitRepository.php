@@ -11,6 +11,7 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use RuntimeException;
 
@@ -50,15 +51,6 @@ class ClusterGitRepository extends Component
             : (is_string($cluster) && $cluster !== '' ? 'cluster:'.$cluster : '');
     }
 
-    /** @return array<int, array{value: string, label: string}> */
-    public function buildPackOptions(): array
-    {
-        return [
-            ['value' => NodeWorkloadSourceType::RAILPACK->value, 'label' => 'Railpack: detects the language and framework, static sites too'],
-            ['value' => NodeWorkloadSourceType::DOCKERFILE->value, 'label' => 'Dockerfile in the repository'],
-        ];
-    }
-
     public function submit()
     {
         $this->repository = trim($this->repository);
@@ -67,7 +59,7 @@ class ClusterGitRepository extends Component
             'deploymentTarget' => ['required', 'string', 'regex:/^(cluster|node):.+$/'],
             'repository' => ['required', 'string', 'max:2048', 'starts_with:https://', new ValidGitRepositoryUrl(allowSSH: false)],
             'branch' => ['required', 'string', 'max:255', new ValidGitBranch],
-            'buildPack' => ['required', 'in:railpack,dockerfile'],
+            'buildPack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
             'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'name' => ValidationPatterns::nameRules(required: false),

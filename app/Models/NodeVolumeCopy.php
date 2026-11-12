@@ -18,6 +18,18 @@ class NodeVolumeCopy extends BaseModel
         ];
     }
 
+    /** A restore on the Node of the volume keeps the old data in a volume with its own name. */
+    public function podmanName(): string
+    {
+        return $this->podman_name ?? NodeVolume::PODMAN_PREFIX.$this->volume->uuid;
+    }
+
+    /** Whether this copy is the live data of its volume, which is never deleted as a copy. */
+    public function isLiveData(): bool
+    {
+        return $this->node_id === $this->volume->node_id && $this->podmanName() === $this->volume->podmanName();
+    }
+
     public function volume(): BelongsTo
     {
         return $this->belongsTo(NodeVolume::class, 'node_volume_id');

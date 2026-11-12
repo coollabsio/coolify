@@ -66,6 +66,18 @@ class NodeCluster extends BaseModel
     public const REGISTRY_MOVE_AFTER_MINUTES = 10;
 
     /**
+     * A cluster with one Node runs no registry: its builds stay in the Podman store of that Node,
+     * and no other Node can need them. A second Node turns the registry on, and the next build
+     * of each application pushes again. An older Sentinel cannot keep a build local.
+     */
+    public function needsRegistryServer(): bool
+    {
+        $nodes = $this->nodes()->limit(2)->get();
+
+        return $nodes->count() !== 1 || $nodes->first()->supportsCapability(NodeRegistry::LOAD_CAPABILITY) !== true;
+    }
+
+    /**
      * The Node that should run the registry. A selected Node is kept, also while it is offline.
      * Otherwise the registry stays on its current Node; it moves to the first available Node by
      * ID only after the current Node was unreachable for REGISTRY_MOVE_AFTER_MINUTES, because a
@@ -74,7 +86,7 @@ class NodeCluster extends BaseModel
     public function desiredRegistryNode(): ?Node
     {
         $registry = $this->registry;
-        if ($registry === null) {
+        if ($registry === null || ! $this->needsRegistryServer()) {
             return null;
         }
         if ($registry->selected_node_id !== null) {

@@ -2,9 +2,15 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Actions\Node\CreateClusterDatabaseWorkload;
+use App\Enums\NodeDatabaseType;
+use App\Livewire\Project\New\DockerImage;
 use App\Models\EnvironmentVariable;
+use App\Models\NodeWorkload;
 use App\Models\Service;
+use App\Rules\DockerImageFormat;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
 class Create extends Component
@@ -36,10 +42,32 @@ class Create extends Component
 
             return;
         }
-        if ($type->value() === 'public' && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
-            $this->type = 'cluster-git-repository';
+        $clusterGitPages = ['public' => 'cluster-git-repository', 'private-gh-app' => 'cluster-private-gh-app', 'private-deploy-key' => 'cluster-private-deploy-key'];
+        if (isset($clusterGitPages[$type->value()]) && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
+            $this->type = $clusterGitPages[$type->value()];
 
             return;
+        }
+        $databaseType = NodeDatabaseType::tryFrom($type->value());
+        if ($databaseType !== null && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
+            // PostgreSQL picks its image first, like on a Docker server.
+            if ($databaseType === NodeDatabaseType::POSTGRESQL && ! $database_image) {
+                $this->type = $type->value();
+
+                return;
+            }
+            $this->authorize('create', NodeWorkload::class);
+            Validator::make(['image' => $database_image], ['image' => ['nullable', 'string', 'max:255', new DockerImageFormat]])->validate();
+            [$cluster, $targetNode] = request()->filled('server')
+                ? DockerImage::resolveClusterTarget($project, 'node', (string) request()->query('server'))
+                : DockerImage::resolveClusterTarget($project, 'cluster', (string) request()->query('cluster'));
+            $workload = CreateClusterDatabaseWorkload::run($project, $environment, $cluster, $databaseType, auth()->user(), $targetNode, $database_image);
+
+            return redirect()->route('project.cluster-application.show', [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $environment->uuid,
+                'workload_uuid' => $workload->uuid,
+            ]);
         }
         if (isset($type) && isset($destination_uuid)) {
             $destination = find_resource_destination_for_current_team($destination_uuid);

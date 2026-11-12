@@ -6,7 +6,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * The image registry of one cluster (decision 0006). zot runs on one Node and
- * serves `registry.cluster.coolify.internal:5443` over the mesh. Its CA is
+ * serves `registry.cluster.coolify.internal:5443` over the mesh. A cluster with
+ * one Node runs no zot (NodeCluster::needsRegistryServer()). Its CA is
  * separate from the Flux CA, and only this registry trusts it.
  */
 class NodeRegistry extends BaseModel
@@ -31,6 +32,15 @@ class NodeRegistry extends BaseModel
 
     /** Starts one build container. */
     public const BUILD_CAPABILITY = 'image.build.v1';
+
+    /** Loads a `localhost/` build into the Podman store of its Node, so a single-Node cluster runs no registry. */
+    public const LOAD_CAPABILITY = 'image.load.v1';
+
+    /** The prefix of an image that stays in the Podman store of the Node that built it. */
+    public const LOCAL_PREFIX = 'localhost/';
+
+    /** Clones a private repository with the `git_https_token` or `git_ssh_private_key` of `image.build`. */
+    public const PRIVATE_GIT_BUILD_CAPABILITY = 'image.build.private_git.v1';
 
     protected $guarded = [];
 
@@ -66,8 +76,13 @@ class NodeRegistry extends BaseModel
     }
 
     /** The image reference of a build, before the digest is known. */
-    public static function imageReference(NodeWorkload $workload, string $tag): string
+    public static function imageReference(NodeWorkload $workload, string $tag, bool $local = false): string
     {
-        return self::HOST.'/'.$workload->uuid.':'.$tag;
+        return ($local ? self::LOCAL_PREFIX : self::HOST.'/').$workload->uuid.':'.$tag;
+    }
+
+    public static function isLocalImage(?string $image): bool
+    {
+        return is_string($image) && str_starts_with($image, self::LOCAL_PREFIX);
     }
 }

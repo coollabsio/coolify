@@ -19,12 +19,12 @@
     <x-application.settings-section id="cluster-application-memory-limits" title="Memory"
         helper="Optional runtime limit and scheduling reservation. Empty values mean unlimited. A running application applies changes automatically within about a minute, or redeploy to apply them now.">
         <div class="grid gap-4 sm:grid-cols-2">
-            <x-forms.input id="memoryLimitMb" type="number" min="4" max="1048576"
-                label="Memory limit (MiB)" canGate="update" :canResource="$workload"
-                helper="Maximum memory available to the container." />
             <x-forms.input id="memoryReservationMb" type="number" min="4" max="1048576"
                 label="Memory reservation (MiB)" canGate="update" :canResource="$workload"
                 helper="Capacity reserved for placement and soft runtime memory pressure." />
+            <x-forms.input id="memoryLimitMb" type="number" min="4" max="1048576"
+                label="Memory limit (MiB)" canGate="update" :canResource="$workload"
+                helper="Maximum memory available to the container." />
         </div>
     </x-application.settings-section>
 </form>

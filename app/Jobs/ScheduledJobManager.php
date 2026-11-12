@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\BackupNodeVolume;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Models\NodeVolume;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
@@ -530,6 +532,12 @@ class ScheduledJobManager implements ShouldQueue
 
     private function processScheduledVolumeBackup(ScheduledVolumeBackup $backup): void
     {
+        if ($backup->isNodeVolume()) {
+            $this->processScheduledNodeVolumeBackup($backup);
+
+            return;
+        }
+
         try {
             $server = $backup->server();
 
@@ -616,6 +624,67 @@ class ScheduledJobManager implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * A backup of a cluster volume (decision 0009) runs in the instance timezone, and only on a Node
+     * that is online and reports the backup capabilities. VolumeBackupJob runs it through Sentinel.
+     */
+    private function processScheduledNodeVolumeBackup(ScheduledVolumeBackup $backup): void
+    {
+        try {
+            $volume = $backup->backupable;
+            if (! $volume instanceof NodeVolume) {
+                $backup->delete();
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'resource_deleted', ['backup_id' => $backup->id, 'team_id' => $backup->team_id]);
+
+                return;
+            }
+
+            $timezone = $this->instanceTimezone();
+            $scheduleKey = "scheduled-volume-backup:{$backup->id}";
+            $delivery = app(ScheduledJobDeliveryService::class);
+            $node = $volume->node;
+            $skipReason = match (true) {
+                $node === null => 'volume_not_created',
+                ! $node->hasRecentFluxHeartbeat() => 'node_offline',
+                collect(BackupNodeVolume::CAPABILITIES)->contains(fn (string $capability): bool => $node->supportsCapability($capability) !== true) => 'node_capability_missing',
+                isCloud() && $backup->team_id !== 0 && ! data_get($backup, 'team.subscription.stripe_invoice_paid', false) => 'subscription_unpaid',
+                default => null,
+            };
+            if ($skipReason !== null) {
+                if ($delivery->recordSkipped($scheduleKey, $backup->frequency, $timezone, $this->executionTime)) {
+                    $this->skippedCount++;
+                    $this->logSkip('volume_backup', $skipReason, ['backup_id' => $backup->id, 'team_id' => $backup->team_id, 'node_id' => $node?->id]);
+                }
+
+                return;
+            }
+
+            if ($delivery->recordAndPublish($scheduleKey, $backup->frequency, $timezone, 'volume-backup', $backup->id, [], $this->executionTime)) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Volume backup dispatched', [
+                    'backup_id' => $backup->id,
+                    'backupable_type' => $backup->backupable_type,
+                    'backupable_id' => $backup->backupable_id,
+                    'team_id' => $backup->team_id,
+                    'node_id' => $node->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing volume backup', [
+                'backup_id' => $backup->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function instanceTimezone(): string
+    {
+        $timezone = instanceSettings()->instance_timezone ?: config('app.timezone');
+
+        return validate_timezone($timezone) ? $timezone : config('app.timezone');
     }
 
     private function getBackupSkipReason(ScheduledDatabaseBackup $backup, ?Server $server): ?string
