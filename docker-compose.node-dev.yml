@@ -5,82 +5,18 @@ services:
       FLUX_PORT: "${FLUX_PORT:-7443}"
       # Nodes resolve coolify-flux to the libvirt gateway and reach the published host port.
       FLUX_PUBLIC_URL: "https://coolify-flux:${FLUX_PORT:-7443}"
+      # Fixed development secrets. Production generates them and stores them in the database.
       FLUX_ISSUER: "coolify-dev"
       FLUX_SIGNING_KEY_ID: "dev-key"
       FLUX_SIGNING_PRIVATE_KEY: "Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0Mi/Cl3kvC2/8C/z9t+2wwKoU4CWjZewONC6G44Kct0tg=="
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
-      FLUX_INTERNAL_URL: "http://coolify-flux:7080"
       FLUX_RUNTIME_UID: "1000"
-      FLUX_TLS_VERIFY_HOST: "coolify-flux"
       # Host port of this instance's UI; QEMU worker Nodes reach Coolify through the libvirt gateway.
       DEVELOPMENT_QEMU_COOLIFY_PORT: "${APP_PORT:-8000}"
-    volumes:
-      - dev_flux_data:/data/coolify/flux
-
-  flux-pki-init:
-    image: coolify:dev
-    pull_policy: never
-    restart: "no"
-    depends_on:
-      coolify:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      # Same key as the coolify service; env_file alone would use the checkout .env key under scripts/dev.
-      APP_KEY: "${APP_KEY:-}"
-      BASE_CONFIG_PATH: /data/coolify
-      SENTINEL_HOST_ENABLED: "true"
-      DB_HOST: postgres
-      FLUX_RUNTIME_UID: "1000"
-    command:
-      - sh
-      - -lc
-      # The coolify healthcheck passes before its first composer install and migrate finish.
-      - >-
-        chown -R 1000:1000 /data/coolify/flux &&
-        attempt=0 &&
-        until /command/s6-setuidgid www-data php artisan migrate:status --pending=1 >/dev/null 2>&1; do
-        attempt=$$((attempt + 1));
-        [ "$$attempt" -lt 150 ] || { echo 'Coolify migrations did not finish within 5 minutes.' >&2; exit 1; };
-        sleep 2;
-        done &&
-        exec /command/s6-setuidgid www-data php artisan flux:initialize-tls --identities=flux,coolify-flux,localhost,127.0.0.1,::1
-    volumes:
-      - .:/var/www/html/:cached
-      - dev_flux_data:/data/coolify/flux
-    networks:
-      - coolify
-
-  flux:
-    image: ghcr.io/coollabsio/flux:main
-    # Per Compose project, so stopped dev instances (scripts/dev) do not block each other.
-    container_name: "${COMPOSE_PROJECT_NAME:-coolify}-flux"
-    user: "1000:1000"
-    restart: unless-stopped
-    environment:
-      FLUX_LISTEN_ADDR: "0.0.0.0:7443"
-      FLUX_ISSUER: "coolify-dev"
-      FLUX_SIGNING_KEY_ID: "dev-key"
-      FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
-      FLUX_INTERNAL_EVENTS_URL: "http://coolify:8080/api/v1/internal/sentinel/control/events"
-      FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
-      FLUX_TLS_CERT_PATH: "/tls/pki/server.pem"
-      FLUX_TLS_KEY_PATH: "/tls/pki/server-key.pem"
-    depends_on:
-      flux-pki-init:
-        condition: service_completed_successfully
-    volumes:
-      - dev_flux_data:/tls:ro
     ports:
+      # Flux runs in the coolify container (s6 service flux).
       - "${FLUX_PORT:-7443}:7443"
-    networks:
-      coolify:
-        aliases:
-          - coolify-flux
 
   testing-host:
     image: coolify-testing-host-systemd:dev
@@ -95,12 +31,8 @@ services:
       - /run/lock
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - dev_flux_data:/data/coolify/flux
     healthcheck:
       test: ["CMD-SHELL", "systemctl is-active --quiet ssh.service"]
       interval: 5s
       retries: 10
       timeout: 2s
-
-volumes:
-  dev_flux_data:

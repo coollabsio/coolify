@@ -6,7 +6,8 @@
 #
 #   --list    list the scenarios and exit
 #   --only    run only these scenarios, in the given order
-#   --build   build Sentinel (host binary) and Flux from $SENTINEL_DIR and install them first
+#   --build   build Sentinel (host binary) and Flux from $SENTINEL_DIR and install them first. Flux
+#             runs as the s6 service flux in the Coolify container; the build mounts the binary there.
 #
 # Runs every scenario except offline-removal, which is destructive and runs only when named
 # with --only. Each scenario prints PASS or FAIL with the reason and restores what it changed
@@ -24,7 +25,6 @@ set -euo pipefail
 set -o errtrace
 
 cd "$(dirname "$0")/.."
-ROOT="$(pwd -P)"
 
 SCENARIOS=(preflight coolify-down-dns ingress reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline offline-removal)
 DEFAULT_SCENARIOS=(preflight coolify-down-dns ingress reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline)
@@ -48,10 +48,9 @@ ENV_DIR="$(dirname "$GIT_COMMON_DIR")/.dev-instances"
 PROJECT="$(./scripts/dev container)"
 INSTANCE="${PROJECT#coolify-dev-}"
 APP="$PROJECT"
-FLUX="$PROJECT-flux"
 ENV_FILE="$ENV_DIR/$INSTANCE.env"
 FLUX_OVERRIDE="$ENV_DIR/$INSTANCE-flux-override.yml"
-RESTART_DIR="$ROOT/storage/app/node-e2e"
+FLUX_BUILD_DIR="$ENV_DIR/$INSTANCE-flux"
 KEY="$WORK/ssh-key"
 SSH_OPTS=(-i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes)
 declare -A NODE_IP=() NODE_WG=()
@@ -274,7 +273,6 @@ load_environment() {
 cleanup_work() {
   rm -f "$KEY" "$WORK"/sentinel "$WORK"/*.log
   rmdir "$WORK" 2>/dev/null || true
-  rm -rf "$RESTART_DIR"
 }
 
 # ---------------------------------------------------------------------------
@@ -297,9 +295,9 @@ build_and_install() {
   local version="${NODE_E2E_SENTINEL_VERSION:-0.0.0-dev-e2e-$(date +%Y%m%d%H%M)}" id node
   mkdir -p "$WORK"
   log "building Sentinel $version from $SENTINEL_DIR"
-  docker build -q -f "$SENTINEL_DIR/Dockerfile.host" --build-arg VERSION="$version" -t "sentinel-host:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
+  docker build -q --target host --build-arg VERSION="$version" -t "sentinel-host:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
   log 'building Flux'
-  docker build -q -f "$SENTINEL_DIR/Dockerfile.flux" -t "flux:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
+  docker build -q --target flux -t "flux:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
   id="$(docker create "sentinel-host:$INSTANCE-dev" /sentinel)"
   docker cp "$id:/sentinel" "$WORK/sentinel" >/dev/null
   docker rm "$id" >/dev/null
@@ -309,30 +307,34 @@ build_and_install() {
     node_ssh "$node" 'chmod 755 /usr/local/bin/sentinel.new && mv /usr/local/bin/sentinel.new /usr/local/bin/sentinel && systemctl restart sentinel && systemctl try-restart coolify-discovery-dns'
   done
   rm -f "$WORK/sentinel"
-  printf 'services:\n  flux:\n    image: flux:%s-dev\n' "$INSTANCE" >"$FLUX_OVERRIDE"
-  log 'recreating Flux with the local image'
-  local -a env_files=()
-  [[ -f .env ]] && env_files+=(--env-file .env)
-  docker compose -p "$PROJECT" -f docker-compose.dev-multi.yml -f docker-compose.node-dev.yml -f "$FLUX_OVERRIDE" \
-    "${env_files[@]}" --env-file "$ENV_FILE" up -d --no-deps flux >/dev/null 2>&1
+  install_flux_build
   try_until 180 nodes_reachable || { echo 'Nodes did not reconnect after the install.' >&2; exit 1; }
   for node in a b; do
     log "worker $node runs $(node_ssh "$node" 'sentinel --version')"
   done
 }
 
-# Answers the restart request of `dev:node-e2e ca-continue` during the CA switch.
-serve_flux_restart() {
-  local pid="$1"
-  while kill -0 "$pid" 2>/dev/null; do
-    if [[ -f "$RESTART_DIR/flux-restart.request" ]]; then
-      log "restarting Flux for certificate $(cut -c1-23 "$RESTART_DIR/flux-restart.request")..."
-      rm -f "$RESTART_DIR/flux-restart.request"
-      docker restart "$FLUX" >/dev/null
-      touch "$RESTART_DIR/flux-restart.done"
-    fi
-    sleep 1
-  done
+# Mounts the Flux binary of the local build into the Coolify container (FLUX_BINARY), restarts the s6
+# service flux with it, and keeps it on every ./scripts/dev start. Recreates Coolify only for a new mount.
+install_flux_build() {
+  local id
+  mkdir -p "$FLUX_BUILD_DIR"
+  id="$(docker create "flux:$INSTANCE-dev")"
+  docker cp "$id:/usr/local/bin/flux" "$FLUX_BUILD_DIR/flux.new" >/dev/null
+  docker rm "$id" >/dev/null
+  mv "$FLUX_BUILD_DIR/flux.new" "$FLUX_BUILD_DIR/flux"
+  if [[ ! -f "$FLUX_OVERRIDE" ]] || ! grep -qF "$FLUX_BUILD_DIR" "$FLUX_OVERRIDE"; then
+    printf 'services:\n  coolify:\n    environment:\n      FLUX_BINARY: /opt/flux-build/flux\n    volumes:\n      - %s:/opt/flux-build:ro\n' "$FLUX_BUILD_DIR" >"$FLUX_OVERRIDE"
+    log 'recreating Coolify with the local Flux build'
+    local -a env_files=()
+    [[ -f .env ]] && env_files+=(--env-file .env)
+    docker compose -p "$PROJECT" -f docker-compose.dev-multi.yml -f docker-compose.node-dev.yml -f "$FLUX_OVERRIDE" \
+      "${env_files[@]}" --env-file "$ENV_FILE" up -d --no-deps coolify >/dev/null 2>&1
+    try_until 300 coolify_running || { echo 'Coolify did not become healthy with the local Flux build.' >&2; exit 1; }
+  else
+    log 'restarting Flux with the local build'
+    docker exec "$APP" /command/s6-svc -r /run/service/flux
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -340,7 +342,7 @@ serve_flux_restart() {
 
 scenario_preflight() {
   local container
-  for container in "$APP" "$FLUX" "$PROJECT-postgres-1" "$PROJECT-redis-1"; do
+  for container in "$APP" "$PROJECT-postgres-1" "$PROJECT-redis-1"; do
     [[ "$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null)" == running ]] || fail "container $container is not running"
   done
   coolify_running || fail 'Coolify is not healthy'
@@ -523,7 +525,7 @@ scenario_flux_restart() {
   [[ "$status" != queued ]] || fail 'deployment stayed queued for 60s'
   # Without a stop timeout: Flux goes away mid-command like after a crash.
   log "restarting Flux while the deployment is $status"
-  docker restart -t 0 "$FLUX" >/dev/null
+  docker exec "$APP" /command/s6-svc -k /run/service/flux
   sleep 5
   note "Flux restarted while the operation was $status, 5s later it was $(operation_status "$operation")"
   # Stale operation recovery runs every five minutes and confirms an uncertain operation that converged.
@@ -613,15 +615,10 @@ rotation_restore() {
   done
 }
 
-# Runs `ca-continue` and restarts Flux when the CA switch asks for it.
+# Runs `ca-continue`. The CA switch restarts the s6 service flux itself.
 rotation_continue() {
-  local output="$WORK/ca-continue.json" pid status
-  mkdir -p "$RESTART_DIR"
-  rm -f "$RESTART_DIR"/flux-restart.*
-  artisan ca-continue >"$output" 2>&1 &
-  pid=$!
-  serve_flux_restart "$pid"
-  wait "$pid" && status=0 || status=$?
+  local output="$WORK/ca-continue.json" status
+  artisan ca-continue >"$output" 2>&1 && status=0 || status=$?
   if ((status != 0)); then
     log "ca-continue failed: $(cat "$output")"
   fi

@@ -80,7 +80,7 @@ current_instance() {
 
 project_name() { echo "coolify-dev-$1"; }
 env_file() { echo "$ENV_DIR/$1.env"; }
-# Flux image override written by scripts/node-e2e --build.
+# Written by scripts/node-e2e --build: mounts a local Flux build into the coolify container.
 flux_override_file() { echo "$ENV_DIR/$1-flux-override.yml"; }
 env_value() { grep -E "^$2=" "$(env_file "$1")" | cut -d= -f2-; }
 is_side_by_side() { [[ -f "$(env_file "$1")" ]] && grep -qxF 'DEV_SIDE_BY_SIDE=1' "$(env_file "$1")"; }
@@ -203,8 +203,9 @@ compose() {
   fi
   if [[ -f "$NODE_COMPOSE_FILE" ]]; then
     compose_files+=(-f "$NODE_COMPOSE_FILE")
-    # Written by scripts/node-e2e --build: keeps the locally built Flux image on every start.
-    if [[ -f "$(flux_override_file "$name")" ]]; then
+    # Keeps the local Flux build of scripts/node-e2e --build on every start.
+    # Older files replaced the image of the flux container, which Flux in the coolify container replaced.
+    if grep -qs FLUX_BINARY "$(flux_override_file "$name")"; then
       compose_files+=(-f "$(flux_override_file "$name")")
     fi
   fi
@@ -480,6 +481,8 @@ start_lima_vm() {
 start_backend() {
   stop_other_checkout_instances
   echo "==> Instance ${instance} → $(env_value "$instance" APP_URL) (backend: ${backend})"
+  # Flux runs in the coolify container now. The old Flux container would hold the Flux port.
+  docker rm -f "$(project_name "$instance")-flux" "$(project_name "$instance")-flux-pki-init-1" >/dev/null 2>&1 || true
   compose "$instance" up -d --build
   wait_for_coolify
   tailscale_serve on
@@ -564,6 +567,7 @@ cmd_destroy() {
     fi
   fi
   rm -f "$(env_file "$name")" "$ENV_DIR/$name.appkey" "$(flux_override_file "$name")"
+  rm -rf "$ENV_DIR/$name-flux"
   awk -v n="$name" '$1 != n' "$SLOTS_FILE" >"$SLOTS_FILE.tmp"
   mv "$SLOTS_FILE.tmp" "$SLOTS_FILE"
 }
