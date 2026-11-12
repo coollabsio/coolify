@@ -1,14 +1,17 @@
 # V5 Control Architecture: Current State
 
 **Status:** Development only  
-**Feature gate:** `SENTINEL_HOST_ENABLED`  
-**Last reviewed:** 2026-09-13
+**Feature gate:** `SENTINEL_HOST_ENABLED`, on a development instance only  
+**Last reviewed:** 2026-11-12
 
 ## Purpose
 
-The current slice proves that Coolify can manage a host through a secure,
-outbound connection without using SSH for each normal request. SSH remains the
-bootstrap and recovery path.
+Coolify manages Nodes through a secure, outbound connection without SSH for
+each normal request. SSH remains the bootstrap and recovery path. On a cluster
+of Nodes, Coolify builds, deploys, moves, and serves cluster applications and
+databases. `nodesEnabled()` in `bootstrap/helpers/shared.php` is the only gate.
+It needs `SENTINEL_HOST_ENABLED=true` and a development instance, because Flux
+ships only in the development stack.
 
 ## Components
 
@@ -37,12 +40,16 @@ Host-native Sentinel (systemd)
   - typed, capability-gated host commands
   - host information collection
   - WireGuard and dedicated nftables reconciliation
+  - Podman workloads, volumes, secret files, and builds
+  - Caddy ingress and the ACME certificate issuer
         |
         v
 Node cluster data plane
   - full-mesh WireGuard on stable private addresses
-  - Corrosion endpoint replication over WireGuard
+  - Corrosion replication over WireGuard: endpoints, routes, certificates
   - private workload DNS on each Node WireGuard address
+  - Caddy on ingress Nodes, ports 80 and 443
+  - builder Nodes and one cluster image registry
 ```
 
 Flux does not make product decisions. Coolify selects and authorizes the server
@@ -359,10 +366,11 @@ released; they are not a temporary compatibility mode.
 
 ### Fresh v5 installations
 
-The accepted target supports combined, control-plane-only, and worker modes.
-Fresh installations can use the Node host stack. The full installer, complete
-application orchestration, volumes, secrets, HTTPS ingress, and placement flows
-are not implemented in this slice.
+The [0002 amendment](../decisions/0002-separate-legacy-upgrades-from-v5-installs.md#amendment-2026-11-11)
+defines the v5.0 scope. Coolify installs in Docker Compose with the current
+installer (`node-controller`). Nodes join over SSH from the Coolify UI
+(`node-worker`). The combined mode, with Coolify and a Node on one host, is
+postponed. The code has no separate installer mode for Nodes.
 
 ### Coolify Cloud
 
@@ -376,54 +384,100 @@ cross-instance command routing are not implemented yet.
 
 ### Implemented
 
+Control channel:
+
 - host-native Sentinel installation and update over SSH;
 - assignment polling with short-lived credentials;
 - direct TLS gRPC connection, heartbeats, and connection reporting;
 - private CA issuance, Flux leaf issuance, automatic leaf renewal, rollback,
-  and SSH trust repair;
-- `system.ping.v1`, `system.info.v1`, read-only `container.list.v1`, minimal
-  workload control, and typed Node network and discovery commands;
-- development-only UI controls and connection state;
-- separate `Node`, `NodeWorkload`, immutable workload revision, assignment, and
-  observed `NodeContainer` models;
-- stable Coolify installation identity and standard container identity labels;
-- transactional container observation reconciliation with managed, external,
-  and unrecognized ownership states.
-- scheduled, staggered container inventory for connected Nodes and calculated
-  workload state from complete inventory snapshots;
-- durable Coolify Node operation state, guarded transitions, idempotent
-  creation, and scheduled retention cleanup;
-- durable Sentinel command result replay and interrupted-command protection.
-- development Node UI deployment, operation state, state refresh, and uncertain
-  operation recovery.
-- durable start, stop, restart, and remove commands with observed-state
-  convergence and manual recovery.
-- team-owned Node cluster model, authorization, UI, membership, CIDR and stable
-  address allocation, revision tracking, and a 100-Node limit;
-- full-mesh WireGuard reconciliation with host-only private keys, observed
-  state, drift checks, staged activation, systemd rollback, and SSH repair;
-- scoped nftables reconciliation in the dedicated `coolify_cluster` table;
-- pinned host-native Corrosion, Sentinel-published owned and expiring endpoint
-  snapshots, cluster membership observation, and private internal workload DNS;
-- explicit two-QEMU-Node development topology for cross-Node network tests.
-- HTTP ingress: ingress Nodes run Caddy on port 80, managed by their Sentinel
-  with `ingress.reconcile.v1`. Coolify stores the domains and port of each
-  cluster application and sends the route list as the last network step.
-  Caddy routes to healthy containers from Corrosion. See
-  [decision 0005](../decisions/0005-node-ingress.md).
+  SSH trust repair, and staged CA rotation;
+- typed, capability-gated commands, durable Coolify operations, and the
+  Sentinel command journal with result replay;
+- Sentinel, Corrosion, discovery DNS, and container logs through Flux
+  ([decision 0003](../decisions/0003-transport-sentinel-logs-on-demand.md));
+- a team notification when a Node loses its Flux heartbeat, and again when it
+  recovers (`NotifyNodeReachability`).
+
+Cluster network:
+
+- team-owned clusters, CIDR and stable address allocation, and a 100-Node
+  limit;
+- full-mesh WireGuard and scoped nftables with staged activation and systemd
+  rollback;
+- Corrosion endpoint replication and private workload DNS;
+- the two-QEMU-Node development topology.
+
+Cluster applications:
+
+- deployment from an image, with start, stop, restart, remove, and recovery of
+  uncertain operations;
+- container health checks: a deployment waits until the new container is
+  healthy (`DeployNodeWorkloadJob`);
+- runtime variables, and variables delivered as secret files
+  ([decision 0008](../decisions/0008-node-workload-secrets.md));
+- private image pulls and pushes to an external registry with team registry
+  credentials (`RegistryCredential`);
+- builds on builder Nodes into the cluster registry, with the Dockerfile,
+  Railpack, and Static build packs
+  ([decision 0006](../decisions/0006-node-image-builds.md));
+- public and private Git repositories, push webhooks, and the deploy API
+  ([decision 0011](../decisions/0011-node-git-sources.md));
+- volumes pinned to one Node, and moves with volumes
+  ([decision 0007](../decisions/0007-node-volumes.md));
+- volume backups to S3 and restore
+  ([decision 0009](../decisions/0009-node-volume-backups.md));
+- databases of 8 engines as typed cluster applications with one volume
+  ([decision 0010](../decisions/0010-node-databases.md));
+- moves of stateless applications without downtime;
+- manual Sentinel upgrade with an SSH rollback, for one Node or for all Nodes
+  of a team one at a time (`UpgradeSentinel`).
+
+Ingress ([decision 0005](../decisions/0005-node-ingress.md)):
+
+- Caddy on ingress Nodes, with routes and endpoints from Corrosion;
+- the v4 domain settings: a port and a path per domain, www and HTTPS
+  redirects, the redirect type, and search indexing (`ingress.routes.v2`);
+- HTTPS with ACME HTTP-01 certificates, stored in Corrosion and served by
+  every ingress Node. The
+  [0005 amendment](../decisions/0005-node-ingress.md#amendment-2026-11-12)
+  describes how it works.
 
 ### Not implemented
 
-- production rollout and upgrade policy for host-native Sentinel;
-- multi-Flux routing and horizontal scaling;
-- complete application deployment orchestration, volumes, secrets, networks,
-  proxy configuration, health gates, rollback, and placement;
-- HTTPS for ingress Nodes;
-- the remaining Podman network and builder
-  capabilities that will move from the earlier coold design into Sentinel;
-- retirement of the existing Sentinel container.
+- Nodes outside a development instance, and the instance setting of
+  [decision 0015](../decisions/0015-node-release-criteria.md) that replaces
+  `SENTINEL_HOST_ENABLED`;
+- a Sentinel release with every capability that Coolify grants. `upstream.json`
+  pins `sentinel-host` 1.1.5. Sentinel v1.1.5 and v1.1.6 do not have private
+  Git builds, volume backup and restore, registry credentials, external pushes,
+  or `image.load.v1`;
+- **Upgrade cluster** as [decision 0013](../decisions/0013-host-sentinel-upgrades.md)
+  defines it. The code upgrades all Nodes of a team, not of one cluster, and
+  waits 60 seconds for a reconnect, not 5 minutes;
+- build-time secrets ([decision 0012](../decisions/0012-node-build-secrets.md));
+- database dump backups with `database.dump.v1`
+  ([decision 0010](../decisions/0010-node-databases.md));
+- recovery of an application with volumes from an offline Node
+  ([decision 0014](../decisions/0014-node-placement-and-failure.md)). A restore
+  to another Node still copies the other volumes from the source
+  (`MoveNodeWorkloadJob::copyVolumes()`);
+- revision rollback, exec and terminal, TCP and UDP port publishing, DNS
+  records, and placement by CPU architecture (decisions
+  [0017](../decisions/0017-node-revision-rollback.md),
+  [0018](../decisions/0018-node-exec-and-terminal.md),
+  [0016](../decisions/0016-node-port-publishing.md),
+  [0019](../decisions/0019-node-dns-records.md), and
+  [0020](../decisions/0020-node-cpu-architecture.md));
+- DNS-01 certificates and wildcard domains;
+- preview deployments, a Dockerfile without Git, and deployment without
+  downtime on one Node;
+- Docker Compose and one-click services on Nodes;
+- automatic placement and automatic failover;
+- multi-Flux routing and horizontal scaling.
 
 ## Next safe step
 
-Add volume backups to S3, with a restore to a Node. A Node that fails makes its
-volumes unavailable, so a backup is the only recovery path.
+Release Sentinel with the capabilities that Coolify grants in
+`IssueFluxCredential`, then pin that release in `upstream.json`. A Node that
+installs the pinned 1.1.5 today cannot build a private repository or back up a
+volume. The roadmap tracks this as items B13 and B1.

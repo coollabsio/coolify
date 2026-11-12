@@ -14,7 +14,7 @@ Flux
     ⇅ outbound TLS gRPC stream
 Host-native Sentinel managed by systemd
     ↓
-Current diagnostics; planned runtime, network, firewall, DNS, and Corrosion capabilities
+Podman runtime, WireGuard, nftables, Corrosion, discovery DNS, Caddy ingress, builds, and volumes
 ```
 
 Coolify owns product intent, authorization, and durable product state. Flux
@@ -38,7 +38,7 @@ Docker servers.
 | [Responsibility split](responsibility-split.md) | Ownership boundaries between Coolify, Flux, and Sentinel. |
 | [Primitives](primitives.md) | Target typed host-operation surface. Implementations can lag behind this catalog. |
 | [Active decisions](../decisions/README.md) | Accepted architecture and migration decisions. |
-| [Flux TLS design](../../superpowers/specs/2026-09-11-flux-tls-design.md) | Private-CA trust, renewal, recovery, and planned rotation. |
+| [Flux TLS design](../../superpowers/specs/2026-09-11-flux-tls-design.md) | Private-CA trust, renewal, recovery, and rotation. |
 
 Files under `docs/v5/archive/`, `docs/v5/migrations/`, `docs/v5/ui/`, and
 `docs/v5/architecture/adr/` are historical references. They do not define the
