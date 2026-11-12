@@ -1,7 +1,7 @@
 # V5 Control Architecture: Current State
 
 **Status:** Development only  
-**Feature gate:** `SENTINEL_HOST_ENABLED`, on a development instance only  
+**Feature gate:** the instance setting `is_nodes_enabled` (Settings > Advanced), on a development instance only  
 **Last reviewed:** 2026-11-12
 
 ## Purpose
@@ -10,8 +10,11 @@ Coolify manages Nodes through a secure, outbound connection without SSH for
 each normal request. SSH remains the bootstrap and recovery path. On a cluster
 of Nodes, Coolify builds, deploys, moves, and serves cluster applications and
 databases. `nodesEnabled()` in `bootstrap/helpers/shared.php` is the only gate.
-It needs `SENTINEL_HOST_ENABLED=true` and a development instance, because Flux
-ships only in the development stack.
+It needs the instance setting `is_nodes_enabled`
+([decision 0015](../decisions/0015-node-release-criteria.md)) and a
+development instance, because Flux ships only in the development stack.
+`nodesInUse()` keeps the control channel of existing Nodes working (Flux
+certificates, trust bundles, assignments) while the setting is off.
 
 ## Components
 
@@ -105,7 +108,7 @@ host-local operation.
   The job selects usable Nodes with a Flux heartbeat from the last two minutes
   and queues one unique inventory job per Node with a delay of 0 to 59 seconds.
   The schedule uses Node and connection state directly. It does not use the
-  `SENTINEL_HOST_ENABLED` development variable.
+  instance setting of decision 0015.
 - Each complete inventory stores its observation time. The Node page compares
   the newest workload revision with managed containers from that snapshot and
   shows `Running`, `Stopped`, `Outdated`, or `Missing`. It shows `Unknown`
@@ -429,8 +432,13 @@ Cluster applications:
 - databases of 8 engines as typed cluster applications with one volume
   ([decision 0010](../decisions/0010-node-databases.md));
 - moves of stateless applications without downtime;
-- manual Sentinel upgrade with an SSH rollback, for one Node or for all Nodes
-  of a team one at a time (`UpgradeSentinel`).
+- manual Sentinel upgrade with an SSH rollback, for one Node or for the Nodes
+  of one cluster one at a time, with a reconnect and capability check of up to
+  5 minutes ([decision 0013](../decisions/0013-host-sentinel-upgrades.md),
+  `UpgradeSentinel`);
+- build-time variables as build arguments and secrets as BuildKit secret
+  mounts ([decision 0012](../decisions/0012-node-build-secrets.md)), and
+  builds of a pasted Dockerfile without Git.
 
 Ingress ([decision 0005](../decisions/0005-node-ingress.md)):
 
@@ -444,17 +452,12 @@ Ingress ([decision 0005](../decisions/0005-node-ingress.md)):
 
 ### Not implemented
 
-- Nodes outside a development instance, and the instance setting of
-  [decision 0015](../decisions/0015-node-release-criteria.md) that replaces
-  `SENTINEL_HOST_ENABLED`;
+- Nodes outside a development instance: the production installer has no Flux
+  service, no Flux TLS certificate, and no Flux signing keys;
 - a Sentinel release with every capability that Coolify grants. `upstream.json`
   pins `sentinel-host` 1.1.5. Sentinel v1.1.5 and v1.1.6 do not have private
   Git builds, volume backup and restore, registry credentials, external pushes,
   or `image.load.v1`;
-- **Upgrade cluster** as [decision 0013](../decisions/0013-host-sentinel-upgrades.md)
-  defines it. The code upgrades all Nodes of a team, not of one cluster, and
-  waits 60 seconds for a reconnect, not 5 minutes;
-- build-time secrets ([decision 0012](../decisions/0012-node-build-secrets.md));
 - database dump backups with `database.dump.v1`
   ([decision 0010](../decisions/0010-node-databases.md));
 - recovery of an application with volumes from an offline Node

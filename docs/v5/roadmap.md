@@ -11,20 +11,22 @@ stable need.
 
 | # | Work | Decision | Notes |
 | --- | --- | --- | --- |
-| B1 | Pin `sentinel-host` to a release that has the volume, secret, health check, and build commands | 0006, 0007, 0008 | `upstream.json` pins `sentinel-host` 1.1.3. The volume commands are first in Sentinel v1.1.5. A Node that installs or upgrades Sentinel gets 1.1.3, so volumes, moves with volumes, and secret files fail on it. |
+| B1 | Pin `sentinel-host` to a release that has the new commands | 0006 to 0013 | `upstream.json` pins `sentinel-host` 1.1.5. Releases v1.1.5 and v1.1.6 do not have private Git, registry login, external push, volume backup and restore, `image.load.v1`, build variables, or inline Dockerfiles. Blocked by B13. |
 | B2 | ~~Private registry pulls~~ | 0006 "Before release" | Done (verified on dev): team registry credentials (Keys & Tokens), `--authfile` on tmpfs for `workload.deploy`. |
 | B3 | ~~Push built images to an external registry~~ | 0006 "Before release" | Done (verified on dev): image name + tag on Git apps, second push after the cluster push. |
 | B4 | ~~Static build source~~ | 0006 | Done: built by the Railpack job with the base directory. Railpack serves files only when the folder has `index.html`, `Staticfile`, or `public/`. |
-| B5 | Bring the status documents up to date | — | `architecture/current-state.md` still lists HTTPS ingress, volumes, secrets, and health gates as not implemented. Decision 0005 still says "HTTP only". Check that HTTPS follows the 0005 plan first. |
+| B5 | ~~Bring the status documents up to date~~ | — | Done on 2026-11-12. |
 | B6 | ~~Merge `next` into `v5-progress`~~ | — | Done on 2026-11-12 (merge `37aefab058`). |
 | B7 | ~~Volume backups and restore~~ | [0009](decisions/0009-node-volume-backups.md) | Done (verified on dev with one Node). Restore to another Node is untested; restore from a dead Node is not built. |
 | B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews come after beta. |
-| B9 | Build-time secrets | [0012](decisions/0012-node-build-secrets.md) | |
-| B10 | Installer scope: control plane plus SSH workers | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Mostly done. Check the install flow end to end. |
-| B11 | Host Sentinel cluster upgrades | [0013](decisions/0013-host-sentinel-upgrades.md) | |
-| B12 | Instance setting for Nodes, labeled Beta | [0015](decisions/0015-node-release-criteria.md) | Replaces `SENTINEL_HOST_ENABLED`. |
-| B13 | Release Sentinel, Flux, and `coolify-builder` with private Git and the Podman 6 health fix | 0011, 0013 | Published as `main-ea82bdb` images and tested on the dev Node; no versioned Sentinel release yet. B1 pins the release. |
-| B14 | Dockerfile without Git (v4 "Dockerfile" type) | 0006 | Needs an inline Dockerfile field in `image.build`. |
+| B9 | ~~Build-time secrets~~ | [0012](decisions/0012-node-build-secrets.md) | Done: plain build arguments and BuildKit secret mounts (capability `image.build.variables.v1`). A Dockerfile build does not rerun a cached step when only a secret value changes (same as v4). |
+| B10 | Installer scope: control plane plus SSH workers | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Worker onboarding over SSH verified with a second Node. Blocked for production: the production installer has no Flux service, Flux TLS certificate, or signing keys, and `nodesEnabled()` needs a development instance. Needs a design. |
+| B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
+| B12 | ~~Instance setting for Nodes, labeled Beta~~ | [0015](decisions/0015-node-release-criteria.md) | Done: `is_nodes_enabled` in Settings > Advanced (instance admins only), Beta labels. Existing tests still set the old config key. |
+| B13 | Release Sentinel, Flux, and `coolify-builder` with every new command | 0011, 0013 | `main-ea82bdb` images exist. Build variables and inline Dockerfiles are in Sentinel commit `6784fcd`, not pushed yet. |
+| B15 | Traffic between applications on different Nodes is dropped | 0005 | Sentinel bug: netavark (Podman 6) masquerades in its own nftables table, so the iptables `RETURN` exemptions in `configure_mesh_nat` (`crates/control/src/network.rs`) do not apply, and the forward chain drops the masqueraded source. |
+| B16 | Production Flux (service, TLS certificate, signing keys, firewall) | 0002, 0015 | Needed before Nodes can leave development instances. Needs a design. |
+| B14 | ~~Dockerfile without Git (v4 "Dockerfile" type)~~ | 0006 | Done: source type `dockerfile_inline`, capability `image.build.inline_dockerfile.v1`. |
 
 ## Build for stable
 
