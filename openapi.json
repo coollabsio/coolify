@@ -19898,7 +19898,7 @@
                     "Servers"
                 ],
                 "summary": "Update log drain settings",
-                "description": "Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.",
+                "description": "Update New Relic, Axiom, Amazon CloudWatch Logs, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.",
                 "operationId": "update-server-log-drains",
                 "parameters": [
                     {
@@ -29737,18 +29737,6 @@
                     "is_jump_server": {
                         "type": "boolean"
                     },
-                    "is_logdrain_axiom_enabled": {
-                        "type": "boolean"
-                    },
-                    "is_logdrain_cloudwatch_enabled": {
-                        "type": "boolean"
-                    },
-                    "is_logdrain_custom_enabled": {
-                        "type": "boolean"
-                    },
-                    "is_logdrain_newrelic_enabled": {
-                        "type": "boolean"
-                    },
                     "is_metrics_enabled": {
                         "type": "boolean"
                     },
@@ -29852,36 +29840,110 @@
                     "is_usable": {
                         "type": "boolean"
                     },
-                    "logdrain_axiom_api_key": {
-                        "type": "string"
+                    "logdrain_type": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "newrelic",
+                            "axiom",
+                            "cloudwatch",
+                            "custom"
+                        ],
+                        "description": "The active log drain, or null when no log drain is enabled."
+                    },
+                    "is_logdrain_newrelic_enabled": {
+                        "type": "boolean",
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "is_logdrain_axiom_enabled": {
+                        "type": "boolean",
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "is_logdrain_custom_enabled": {
+                        "type": "boolean",
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "is_logdrain_cloudwatch_enabled": {
+                        "type": "boolean",
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "logdrain_newrelic_license_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "logdrain_newrelic_base_uri": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
                     "logdrain_axiom_dataset_name": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "logdrain_axiom_api_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
                     "logdrain_axiom_domain": {
                         "type": "string",
-                        "description": "Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co."
-                    },
-                    "logdrain_cloudwatch_region": {
-                        "type": "string"
-                    },
-                    "logdrain_cloudwatch_group": {
-                        "type": "string"
-                    },
-                    "logdrain_cloudwatch_stream_prefix": {
-                        "type": "string"
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
                     "logdrain_custom_config": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
                     "logdrain_custom_config_parser": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
-                    "logdrain_newrelic_base_uri": {
-                        "type": "string"
+                    "logdrain_cloudwatch_region": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
-                    "logdrain_newrelic_license_key": {
-                        "type": "string"
+                    "logdrain_cloudwatch_group": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
+                    },
+                    "logdrain_cloudwatch_stream_prefix": {
+                        "type": "string",
+                        "nullable": true,
+                        "deprecated": true,
+                        "readOnly": true,
+                        "description": "Deprecated: use logdrain_type and the \/servers\/{uuid}\/log-drains endpoint instead."
                     },
                     "sentinel_metrics_history_days": {
                         "type": "integer"

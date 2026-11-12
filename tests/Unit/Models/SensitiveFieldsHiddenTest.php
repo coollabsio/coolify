@@ -13,7 +13,6 @@ use App\Models\OauthSetting;
 use App\Models\PrivateKey;
 use App\Models\PushoverNotificationSettings;
 use App\Models\S3Storage;
-use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -37,19 +36,7 @@ describe('Sensitive model fields are hidden by default', function () {
         expect($hidden)->toContain(
             'sentinel_token',
             'sentinel_custom_url',
-            'logdrain_newrelic_license_key',
-            'logdrain_axiom_api_key',
-            'logdrain_custom_config',
-            'logdrain_custom_config_parser',
-        );
-    });
-
-    test('Server hides logdrain api keys', function () {
-        $hidden = (new Server)->getHidden();
-
-        expect($hidden)->toContain(
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
+            'logdrain_config',
         );
     });
 
