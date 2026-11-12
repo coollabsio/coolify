@@ -7,6 +7,7 @@ use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
+use App\Services\ComposeIncludeFlattener;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -2782,6 +2783,16 @@ class Application extends BaseModel
             if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
                 throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
             }
+            if (ComposeIncludeFlattener::hasIncludes($composeFileContent)) {
+                $composeFileContent = (new ComposeIncludeFlattener($this->destination->server, "/tmp/{$uuid}"))
+                    ->flatten(ltrim("{$workdir}{$composeFile}", '/'), trim($workdir, '/'));
+            }
+        } catch (DeploymentException $e) {
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
+            throw new DeploymentException(e("The Docker Compose file at {$workdir}{$composeFile} (branch: {$this->git_branch}) has an include that Coolify cannot use, so Coolify did not load it. {$e->getMessage()}"), previous: $e);
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
