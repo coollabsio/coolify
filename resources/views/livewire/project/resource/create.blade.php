@@ -35,6 +35,8 @@
         <livewire:project.new.cluster-github-private-repository />
     @elseif ($type === 'cluster-private-deploy-key')
         <livewire:project.new.cluster-github-private-repository-deploy-key />
+    @elseif ($type === 'cluster-dockerfile')
+        <livewire:project.new.cluster-dockerfile />
     @else
         <livewire:project.new.select />
     @endif

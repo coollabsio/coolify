@@ -6,6 +6,8 @@ namespace App\Enums;
  * Where the image of a cluster application comes from. Static serves the base
  * directory as it is: Coolify builds it with Railpack, whose staticfile
  * provider serves a directory with an index.html through Caddy on port 80.
+ * An inline Dockerfile is the v4 "Dockerfile" resource: the user pastes it,
+ * and Coolify builds it with an empty context, without a Git repository.
  */
 enum NodeWorkloadSourceType: string
 {
@@ -13,11 +15,18 @@ enum NodeWorkloadSourceType: string
     case DOCKERFILE = 'dockerfile';
     case RAILPACK = 'railpack';
     case STATIC = 'static';
+    case DOCKERFILE_INLINE = 'dockerfile_inline';
 
     /** Whether Coolify builds the image from a Git repository. */
     public function builds(): bool
     {
         return $this !== self::IMAGE;
+    }
+
+    /** Whether the build clones a Git repository. */
+    public function usesGit(): bool
+    {
+        return $this->builds() && $this !== self::DOCKERFILE_INLINE;
     }
 
     /** @return list<self> The build packs of a Git application, in the order of the v4 picker. */
@@ -39,6 +48,7 @@ enum NodeWorkloadSourceType: string
             self::DOCKERFILE => 'Dockerfile',
             self::RAILPACK => 'Railpack',
             self::STATIC => 'Static',
+            self::DOCKERFILE_INLINE => 'Dockerfile without Git',
         };
     }
 }

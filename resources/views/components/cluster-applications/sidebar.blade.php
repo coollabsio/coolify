@@ -60,7 +60,7 @@
                 ['label' => 'Security', 'icon' => 'shield-alert'],
             ],
             'Deploy' => [
-                ['label' => 'Git Source', 'icon' => 'sources', 'visible' => $workload->buildsFromSource()],
+                ['label' => 'Git Source', 'icon' => 'sources', 'visible' => $workload->buildsFromGit()],
                 ['key' => 'servers', 'label' => 'Servers', 'icon' => 'servers'],
                 ['label' => 'Preview Deployments', 'icon' => 'eye'],
             ],

@@ -18,6 +18,9 @@ class Select extends Component
     /** The Git resource types that can target a cluster: a public repository, and the v4 GitHub App and deploy key sources. */
     private const CLUSTER_GIT_TYPES = ['public', 'private-gh-app', 'private-deploy-key'];
 
+    /** Built on a cluster like a Git type, from a pasted Dockerfile. */
+    private const CLUSTER_BUILD_TYPES = [...self::CLUSTER_GIT_TYPES, 'dockerfile'];
+
     public $current_step = 'type';
 
     public ?Server $server = null;
@@ -460,7 +463,7 @@ class Select extends Component
             return;
         }
         // Clusters run Docker images, build Git repositories, and run databases; Docker servers keep their flow.
-        if ((in_array($type, ['docker-image', ...self::CLUSTER_GIT_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null) && $this->clusters?->isNotEmpty()) {
+        if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null) && $this->clusters?->isNotEmpty()) {
             $this->current_step = 'targets';
 
             return;
@@ -567,7 +570,7 @@ class Select extends Component
     /** The resource type that a cluster target creates: a Git build, a database, or a Docker image. */
     private function clusterResourceType(): string
     {
-        if (in_array($this->type ?? null, self::CLUSTER_GIT_TYPES, true) || NodeDatabaseType::tryFrom((string) $this->type) !== null) {
+        if (in_array($this->type ?? null, self::CLUSTER_BUILD_TYPES, true) || NodeDatabaseType::tryFrom((string) $this->type) !== null) {
             return $this->type;
         }
 

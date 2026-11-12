@@ -55,7 +55,7 @@ class Create extends Component
 
             return;
         }
-        $clusterGitPages = ['public' => 'cluster-git-repository', 'private-gh-app' => 'cluster-private-gh-app', 'private-deploy-key' => 'cluster-private-deploy-key'];
+        $clusterGitPages = ['public' => 'cluster-git-repository', 'private-gh-app' => 'cluster-private-gh-app', 'private-deploy-key' => 'cluster-private-deploy-key', 'dockerfile' => 'cluster-dockerfile'];
         if (isset($clusterGitPages[$type->value()]) && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
             $this->type = $clusterGitPages[$type->value()];
 

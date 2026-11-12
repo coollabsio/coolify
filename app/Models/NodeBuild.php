@@ -62,6 +62,12 @@ class NodeBuild extends BaseModel
         $query->whereIn('status', NodeBuildStatus::activeValues());
     }
 
+    /** The branch and the build pack, or only the build pack of a build without Git. */
+    public function sourceLabel(): string
+    {
+        return filled($this->git_branch) ? $this->git_branch.' · '.$this->source_type->label() : $this->source_type->label();
+    }
+
     /** The name of the build container that Sentinel starts. */
     public function containerName(): string
     {

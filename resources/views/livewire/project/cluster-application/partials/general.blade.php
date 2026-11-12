@@ -73,12 +73,19 @@
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,dockerfileLocation,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,dockerfileLocation,dockerfile,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
         helper="How Coolify deploys the application. Changes create a new revision. A running application applies it automatically within about a minute, or redeploy to apply it now.">
-        @if ($workload->buildsFromSource())
+        @if ($workload->buildsFromSource() && ! $workload->buildsFromGit())
+            <p class="text-sm text-neutral-500 dark:text-fg-dim">Deploy builds this Dockerfile on a builder server of the cluster. The build context is empty, so COPY and ADD can only use remote sources.</p>
+            <div class="mt-6">
+                <x-forms.textarea label="Dockerfile" id="dockerfile" monacoEditorLanguage="dockerfile"
+                    useMonacoEditor rows="6" canGate="update" :canResource="$workload"> </x-forms.textarea>
+            </div>
+        @endif
+        @if ($workload->buildsFromGit())
             <div class="mb-5 w-full border-b border-neutral-200 pb-5 dark:border-white/[0.07]">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <x-forms.listbox id="buildPack" label="Build strategy" required canGate="update" :canResource="$workload"
@@ -112,6 +119,8 @@
                     </div>
                 </div>
             </x-application.settings-subsection>
+        @endif
+        @if ($workload->buildsFromSource())
             <x-application.settings-subsection title="Image registry"
                 helper="Each build is stored in the cluster registry. Set an image to also push each build there.">
                 <div class="grid gap-4 lg:grid-cols-2">

@@ -42,6 +42,12 @@ class NodeRegistry extends BaseModel
     /** Clones a private repository with the `git_https_token` or `git_ssh_private_key` of `image.build`. */
     public const PRIVATE_GIT_BUILD_CAPABILITY = 'image.build.private_git.v1';
 
+    /** Passes the `build_args` and `build_secrets` of `image.build` (decision 0012). */
+    public const BUILD_VARIABLES_CAPABILITY = 'image.build.variables.v1';
+
+    /** Builds the `dockerfile_content` of `image.build` without a repository. */
+    public const INLINE_DOCKERFILE_BUILD_CAPABILITY = 'image.build.inline_dockerfile.v1';
+
     protected $guarded = [];
 
     protected $hidden = ['ca_private_key_pem', 'private_key_pem', 'push_password', 'pull_password', 'htpasswd'];

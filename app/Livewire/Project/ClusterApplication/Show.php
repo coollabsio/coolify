@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\Build\CancelNodeBuild;
+use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateClusterDatabaseWorkload;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
@@ -125,6 +126,9 @@ class Show extends Component
     public string $baseDirectory = '';
 
     public string $dockerfileLocation = '';
+
+    /** The Dockerfile of an application without Git. */
+    public string $dockerfile = '';
 
     public string $buildPack = '';
 
@@ -1076,7 +1080,9 @@ class Show extends Component
         if ($operation->revision) {
             $add($operation->created_at, "Revision {$operation->revision->uuid} uses image {$operation->revision->image}.");
             if ($build = $operation->revision->build) {
-                $add($operation->created_at, 'The image was built from '.($build->commit_sha ? "commit {$build->commit_sha} of " : '')."branch {$build->git_branch}.");
+                $add($operation->created_at, $build->source_type->usesGit()
+                    ? 'The image was built from '.($build->commit_sha ? "commit {$build->commit_sha} of " : '')."branch {$build->git_branch}."
+                    : 'The image was built from the Dockerfile of the application.');
             }
         }
         $pullPolicy = data_get($operation->request, 'pull_policy');
@@ -1181,7 +1187,7 @@ class Show extends Component
             'revision' => $build?->commit_sha
                 ? substr($build->commit_sha, 0, 8)
                 : ($operation->revision ? substr($operation->revision->uuid, 0, 7) : null),
-            'image' => $build ? $build->git_branch.' · '.$build->source_type->label() : $operation->revision?->image,
+            'image' => $build ? $build->sourceLabel() : $operation->revision?->image,
             'imageTitle' => $operation->revision?->image,
             'createdAt' => $operation->created_at,
             'duration' => match ($operation->status) {
@@ -1209,7 +1215,7 @@ class Show extends Component
             'statusType' => $build->status->badgeType(),
             'source' => $build->requested_by_user_id !== null ? 'Manual' : 'Automatic',
             'revision' => $build->commit_sha ? substr($build->commit_sha, 0, 8) : null,
-            'image' => $build->git_branch.' · '.$build->source_type->label(),
+            'image' => $build->sourceLabel(),
             'imageTitle' => $build->git_repository,
             'createdAt' => $build->created_at,
             'duration' => match (true) {
@@ -1393,9 +1399,14 @@ class Show extends Component
     private function saveSourceConfiguration(): void
     {
         $this->gitBranch = trim($this->gitBranch);
+        $usesGit = $this->workload->buildsFromGit();
         $this->validate([
-            'gitBranch' => ['required', 'string', 'max:255', new ValidGitBranch],
-            'buildPack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
+            ...($usesGit ? [
+                'gitBranch' => ['required', 'string', 'max:255', new ValidGitBranch],
+                'buildPack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
+            ] : [
+                'dockerfile' => CreateClusterInlineDockerfileWorkload::dockerfileRules(),
+            ]),
             'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'startCommand' => ['nullable', 'string', 'max:16384'],
@@ -1420,10 +1431,12 @@ class Show extends Component
             'registry_credential_id' => $credential?->id,
             'docker_registry_image_name' => $imageName === '' ? null : $imageName,
             'docker_registry_image_tag' => filled($this->dockerRegistryImageTag) ? trim($this->dockerRegistryImageTag) : null,
-            'git_branch' => $this->gitBranch,
-            'source_type' => NodeWorkloadSourceType::from($this->buildPack),
-            'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
-            'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
+            ...($usesGit ? [
+                'git_branch' => $this->gitBranch,
+                'source_type' => NodeWorkloadSourceType::from($this->buildPack),
+                'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
+                'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
+            ] : ['dockerfile' => $this->dockerfile]),
         ]);
         $revision = $this->workload->revisions()->latest('id')->first();
         if ($revision !== null && $command !== ($revision->configuration['command'] ?? [])) {
@@ -1491,6 +1504,7 @@ class Show extends Component
         $this->gitBranch = (string) $this->workload->git_branch;
         $this->baseDirectory = (string) $this->workload->base_directory;
         $this->dockerfileLocation = (string) $this->workload->dockerfile_location;
+        $this->dockerfile = (string) $this->workload->dockerfile;
         $this->buildPack = (string) $this->workload->source_type?->value;
         $revision = $this->workload->revisions->first();
         $configuration = $revision?->configuration ?? [];

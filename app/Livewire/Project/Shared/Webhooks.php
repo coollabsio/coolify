@@ -76,7 +76,8 @@ class Webhooks extends Component
         $this->deploywebhook = generateDeployWebhook($this->resource);
         if ($this->resource instanceof NodeWorkload) {
             // A cluster application has no type of its own; one that builds from Git shows the v4 application page.
-            $this->isApplication = $this->isGitBased = $this->resource->buildsFromSource();
+            $this->isApplication = $this->resource->buildsFromSource();
+            $this->isGitBased = $this->resource->buildsFromGit();
             $this->repositoryWebhookSettingsUrl = str_starts_with((string) $this->resource->git_repository, 'https://')
                 ? preg_replace('/\.git\z/', '', $this->resource->git_repository).'/settings/hooks'
                 : null;

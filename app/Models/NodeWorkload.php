@@ -215,6 +215,12 @@ class NodeWorkload extends BaseModel
         return ($this->source_type ?? NodeWorkloadSourceType::IMAGE)->builds();
     }
 
+    /** Whether Coolify builds the image of this workload from a Git repository, not an inline Dockerfile. */
+    public function buildsFromGit(): bool
+    {
+        return ($this->source_type ?? NodeWorkloadSourceType::IMAGE)->usesGit();
+    }
+
     /** The GitHub App that reads a private repository (v4 `source_id`). */
     public function githubApp(): BelongsTo
     {
@@ -237,6 +243,44 @@ class NodeWorkload extends BaseModel
     public function usesPrivateGitSource(): bool
     {
         return $this->github_app_id !== null || $this->private_key_id !== null;
+    }
+
+    /**
+     * The Sentinel capabilities that a build of this workload needs. A build-time variable
+     * needs `image.build.variables.v1`, because an older Sentinel builds without it.
+     *
+     * @return list<string>
+     */
+    public function buildCapabilities(): array
+    {
+        return array_values(array_filter([
+            NodeRegistry::BUILD_CAPABILITY,
+            $this->usesPrivateGitSource() ? NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY : null,
+            $this->environment_variables()->where('is_buildtime', true)->exists() ? NodeRegistry::BUILD_VARIABLES_CAPABILITY : null,
+            $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeRegistry::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
+        ]));
+    }
+
+    /**
+     * Build-time variables, resolved like runtime variables (decision 0012). A secret is what logs
+     * always hide: a locked variable, a reference to a locked shared variable, or a secret file. The
+     * build reads it only through a BuildKit secret mount, so it is never a build arg and never in
+     * the image. Every other variable is a build arg, as in v4.
+     *
+     * @return array{args: array<string, string>, secrets: array<string, string>}
+     */
+    public function buildVariables(): array
+    {
+        [$secrets, $args] = $this->environment_variables()->where('is_buildtime', true)->get()
+            ->partition(fn (EnvironmentVariable $variable): bool => $variable->isLockedForLogs() || $variable->is_file_secret);
+        $resolve = fn (Collection $variables): array => $variables
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [
+                $variable->key => (string) $variable->get_real_environment_variables_with_server($variable->value, $this),
+            ])
+            ->sortKeys()
+            ->all();
+
+        return ['args' => $resolve($args), 'secrets' => $resolve($secrets)];
     }
 
     /**

@@ -91,7 +91,7 @@ trait StartsClusterWebhookBuilds
         }
 
         return $this->manualWebhookApplications($query, $fullName)
-            ->filter(fn (NodeWorkload $workload): bool => $workload->buildsFromSource())
+            ->filter(fn (NodeWorkload $workload): bool => $workload->buildsFromGit())
             ->values();
     }
 

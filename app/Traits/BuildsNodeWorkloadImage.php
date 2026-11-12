@@ -33,7 +33,7 @@ trait BuildsNodeWorkloadImage
     /**
      * What the builder does with the source: the `source_type` and its options.
      *
-     * @return array{source_type: string, dockerfile_path?: string}
+     * @return array{source_type: string, dockerfile_path?: string, dockerfile_content?: string}
      */
     abstract protected function source(NodeBuild $build): array;
 
@@ -52,7 +52,7 @@ trait BuildsNodeWorkloadImage
         try {
             // A private repository gets a new credential for each attempt; it is never stored.
             $credential = null;
-            if ($build->commit_sha === null) {
+            if ($build->commit_sha === null && $build->source_type->usesGit()) {
                 $credential = IssueNodeGitCredential::run($build->workload);
                 $build->update(['commit_sha' => ResolveGitCommit::run($build->git_repository, $build->git_branch, $credential)]);
             }

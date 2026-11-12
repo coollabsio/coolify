@@ -246,7 +246,9 @@
                                     ['value' => true, 'label' => 'Available during build'],
                                     ['value' => false, 'label' => 'Not available during build'],
                                 ]"
-                                    helper="Make this variable available during the Docker build process. Useful for build secrets and dependencies."
+                                    :helper="$showFileSecret
+                                        ? 'Make this variable available during the build. A locked variable or a secret file is a build secret: a Dockerfile reads it only with RUN --mount=type=secret,id=NAME, and it is never a build arg or in the image. Every other variable is a build arg, which ARG reads and which can stay in the image history.'
+                                        : 'Make this variable available during the Docker build process. Useful for build secrets and dependencies.'"
                                     :disabled="! $canUpdate" />
                             @endif
                             @if ($showRuntime)
@@ -265,6 +267,14 @@
                                     :disabled="! $canUpdate" />
                             @endif
                         </div>
+                    @endif
+
+                    @if ($showFileSecret && $is_buildtime && ($isLocked || $is_file_secret))
+                        <x-callout type="info" title="Build secret">
+                            The build gets this variable only as a secret mount. Read it in a Dockerfile with
+                            <code>RUN --mount=type=secret,id={{ $env->key }} cat /run/secrets/{{ $env->key }}</code>.
+                            An <code>ARG</code> does not receive it.
+                        </x-callout>
                     @endif
 
                     @if (!$isSharedVariable)

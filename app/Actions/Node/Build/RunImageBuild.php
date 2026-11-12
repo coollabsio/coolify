@@ -33,20 +33,22 @@ class RunImageBuild
     private const RESULT_PREFIX = 'COOLIFY_BUILD_RESULT ';
 
     /**
-     * @param  array{source_type: string, dockerfile_path?: string}  $source
+     * @param  array{source_type: string, dockerfile_path?: string, dockerfile_content?: string}  $source
      * @param  array{git_https_token?: string, git_ssh_private_key?: string}  $credential  Sent with this request only, never stored.
      * @return string The image digest, `sha256:...`.
      */
     public function handle(NodeBuild $build, Node $node, array $source, array $credential = []): string
     {
-        if ($credential !== []) {
-            $node->ensureReportedCapability(NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY);
+        foreach ($build->workload->buildCapabilities() as $capability) {
+            $node->ensureReportedCapability($capability);
         }
         $push = self::pushTarget($build);
         if ($push !== []) {
             $node->ensureReportedCapability(IssueNodeRegistryCredential::PUSH_CAPABILITY);
         }
-        $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null]));
+        // Build-time variables are sent with this request only, like the credential.
+        $variables = $build->workload->buildVariables();
+        $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null, ...array_values($variables['secrets'])], fn (?string $value): bool => filled($value)));
         $local = $node->cluster?->needsRegistryServer() === false;
         $build->update([
             'node_id' => $node->id,
@@ -59,14 +61,19 @@ class RunImageBuild
             'command_id' => (string) Str::uuid(),
             'build_id' => $build->uuid,
             'builder_image' => (string) config('constants.node.builder_image'),
-            'repository_url' => $build->git_repository,
-            'commit_sha' => $build->commit_sha,
-            'base_directory' => trim((string) $build->base_directory, '/'),
+            ...($build->source_type->usesGit() ? [
+                'repository_url' => $build->git_repository,
+                'commit_sha' => $build->commit_sha,
+                'base_directory' => trim((string) $build->base_directory, '/'),
+            ] : []),
             'image' => $build->image,
             'dockerfile_path' => '',
             ...$source,
             ...$credential,
             ...$push,
+            // Objects, because Flux reads maps and an empty PHP array encodes as a list.
+            ...($variables['args'] === [] ? [] : ['build_args' => (object) $variables['args']]),
+            ...($variables['secrets'] === [] ? [] : ['build_secrets' => (object) $variables['secrets']]),
         ], 660, $secrets);
 
         $deadline = now()->addMinutes((int) config('constants.node.build_timeout_minutes'));

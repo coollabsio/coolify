@@ -24,6 +24,7 @@ class SelectBuilderNode
         if ($clusterIds === []) {
             throw new RuntimeException('The application is not placed on a cluster server.');
         }
+        $capabilities = $workload->buildCapabilities();
         $candidates = Node::query()
             ->whereIn('node_cluster_id', $clusterIds)
             ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')])
@@ -32,16 +33,16 @@ class SelectBuilderNode
             ->get()
             ->filter(fn (Node $node): bool => $node->canBuild()
                 && $node->canReceiveNetworkCommands()
-                && $node->supportsCapability(NodeRegistry::BUILD_CAPABILITY) === true
-                && (! $workload->usesPrivateGitSource() || $node->supportsCapability(NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY) === true)
+                && collect($capabilities)->every(fn (string $capability): bool => $node->supportsCapability($capability) === true)
                 && data_get($node->metadata, 'builder_running') === true);
 
         // One build at a time on each builder Node; the job waits for a free one.
         $node = $candidates->first(fn (Node $node): bool => $node->active_builds_count === 0);
         if ($node === null) {
+            $features = array_diff($capabilities, [NodeRegistry::BUILD_CAPABILITY]);
             throw new RuntimeException($candidates->isEmpty()
-                ? ($workload->usesPrivateGitSource()
-                    ? 'No server in this cluster can build private repositories. Turn on the builder role on a server, and upgrade Sentinel to a version that supports '.NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY.'.'
+                ? ($features !== []
+                    ? 'No server in this cluster can build this application. Turn on the builder role on a server, and upgrade Sentinel to a version that supports '.implode(', ', $features).'.'
                     : 'No server in this cluster can build images. Turn on the builder role on a server, and upgrade Sentinel if needed.')
                 : NodeBuild::BUILDERS_BUSY);
         }

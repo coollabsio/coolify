@@ -14,7 +14,7 @@ use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
 /**
- * Queues a build of the workload's Git source. A workload has at most one
+ * Queues a build of the workload's Git source or inline Dockerfile. A workload has at most one
  * active build; asking again returns it. A webhook passes the pushed commit;
  * without one, the build resolves the head of the branch.
  */
@@ -26,8 +26,14 @@ class StartNodeBuild
     {
         $build = DB::transaction(function () use ($workload, $user, $commitSha): NodeBuild {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
-            if (! $workload->buildsFromSource() || blank($workload->git_repository) || blank($workload->git_branch)) {
-                throw new RuntimeException('This application has no Git source to build.');
+            if (! $workload->buildsFromSource()) {
+                throw new RuntimeException('This application has no source to build.');
+            }
+            $missingSource = $workload->source_type->usesGit()
+                ? (blank($workload->git_repository) || blank($workload->git_branch) ? 'This application has no Git source to build.' : null)
+                : (blank($workload->dockerfile) ? 'This application has no Dockerfile to build.' : null);
+            if ($missingSource !== null) {
+                throw new RuntimeException($missingSource);
             }
             $active = $workload->builds()->active()->latest('id')->first();
             if ($active !== null) {
@@ -42,13 +48,14 @@ class StartNodeBuild
                 'commit_sha' => $commitSha,
                 'base_directory' => $workload->base_directory,
                 'dockerfile_location' => $workload->dockerfile_location,
+                'dockerfile' => $workload->dockerfile,
                 'status' => NodeBuildStatus::QUEUED,
             ]);
         });
 
         if ($build->wasRecentlyCreated) {
             match ($build->source_type) {
-                NodeWorkloadSourceType::DOCKERFILE => DeployDockerfileWorkloadJob::dispatch($build->id),
+                NodeWorkloadSourceType::DOCKERFILE, NodeWorkloadSourceType::DOCKERFILE_INLINE => DeployDockerfileWorkloadJob::dispatch($build->id),
                 NodeWorkloadSourceType::RAILPACK, NodeWorkloadSourceType::STATIC => DeployRailpackWorkloadJob::dispatch($build->id),
                 NodeWorkloadSourceType::IMAGE => throw new RuntimeException('An image application is not built.'),
             };
