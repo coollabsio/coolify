@@ -39,6 +39,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ProjectSetting;
+use App\Models\ProxyConfigurationVersion;
 use App\Models\PushoverNotificationSettings;
 use App\Models\ResourceLink;
 use App\Models\S3Storage;
@@ -381,6 +382,7 @@ final class ServerTransferCoverage
         DatabaseBackupS3Replica::class => 'Backup history.',
         VolumeBackupS3Replica::class => 'Backup history.',
         DockerCleanupExecution::class => 'Execution history.',
+        ProxyConfigurationVersion::class => 'Configuration history. The current proxy configuration moves with the server.',
         GithubRunnerExecution::class => 'Execution history. The source stops tracking the runners of the server when it is transferred.',
     ];
 }

@@ -222,7 +222,7 @@ it('lets an admin save and reset the custom error page', function () {
 
     // The page loads the proxy configuration before the global save bar submits it.
     $component = Livewire::test('server.proxy', ['server' => $server])
-        ->set('proxySettings', "services:\n  traefik:\n    image: traefik:v3.6\n    ports:\n      - '80:80'\n")
+        ->set('proxySettings', "services:\n  traefik:\n    container_name: coolify-proxy\n    image: traefik:v3.6\n    ports:\n      - '80:80'\n")
         ->set('customErrorPage', '<h1>Maintenance</h1>')
         ->call('submit')
         ->assertDispatched('success');
