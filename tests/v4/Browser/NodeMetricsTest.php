@@ -9,7 +9,8 @@ uses(RefreshDatabase::class);
 
 it('renders node history charts and changes the time range', function () {
     $stack = seedBrowserResourceStack();
-    config(['app.env' => 'local', 'constants.sentinel.host_enabled' => true, 'app.maintenance.store' => 'array']);
+    config(['app.env' => 'local', 'app.maintenance.store' => 'array']);
+    setNodesEnabled(true);
     $node = Node::factory()->create(['team_id' => 0, 'private_key_id' => $stack['privateKey']->id]);
     Process::fake(fn () => Process::result(implode("\x1e", [
         '[{"time":1793600000000,"percent":12.5},{"time":1793600030000,"percent":20}]',

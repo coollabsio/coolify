@@ -136,7 +136,7 @@ it('publishes a ready target before it removes and withdraws the source workload
 it('queues a safe move from the Node page', function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $key = PrivateKey::factory()->create(['team_id' => $team->id]);

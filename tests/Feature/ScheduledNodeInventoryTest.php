@@ -27,7 +27,7 @@ beforeEach(function () {
 });
 
 it('queues inventory only for usable Nodes with a recent Flux heartbeat without the development gate', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
     $this->node->update(['is_reachable' => false]);
     $stale = Node::factory()->create(['is_usable' => true, 'is_reachable' => true, 'private_key_id' => $this->node->private_key_id]);
     $unusable = Node::factory()->create(['is_usable' => false, 'is_reachable' => true, 'private_key_id' => $this->node->private_key_id]);

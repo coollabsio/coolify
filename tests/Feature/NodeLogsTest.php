@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux:7080');
     config()->set('constants.flux.internal_token', 'internal-secret');
 
@@ -343,7 +343,7 @@ it('does not expose logs of a Node owned by another team', function () {
 });
 
 it('keeps Node logs behind the development feature gate', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
 
     $this->get(route('node.logs', $this->node->uuid))->assertNotFound();
 });

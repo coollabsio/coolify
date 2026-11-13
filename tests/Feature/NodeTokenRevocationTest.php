@@ -20,7 +20,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $keyPair = sodium_crypto_sign_seed_keypair(str_repeat('C', 32));
     config()->set('constants.flux.public_url', 'http://flux:7443');
     config()->set('constants.flux.development_allow_plaintext', true);

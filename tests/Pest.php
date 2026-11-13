@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\DB;
@@ -152,6 +153,30 @@ function loginAndSkipBoarding(string $email = 'test@example.com', string $passwo
 // {
 //     // ..
 // }
+
+/**
+ * Turns the Nodes instance setting (Settings > Advanced) on or off. Creates the settings row when a test has none.
+ */
+function setNodesEnabled(bool $enabled): void
+{
+    $settings = InstanceSettings::query()->find(0) ?? (new InstanceSettings)->forceFill(['id' => 0]);
+    $settings->forceFill(['is_nodes_enabled' => $enabled])->save();
+    Once::flush();
+}
+
+/**
+ * The `domains` and `domain_routes` attributes of a cluster workload that serves each host on one container port.
+ *
+ * @param  list<string>  $hosts
+ * @return array{domains: list<string>, domain_routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>}
+ */
+function nodeDomainAttributes(array $hosts, int $port, string $scheme = 'https'): array
+{
+    return [
+        'domains' => $hosts,
+        'domain_routes' => array_map(fn (string $host): array => ['scheme' => $scheme, 'host' => $host, 'port' => $port, 'path' => '', 'noindex' => false], $hosts),
+    ];
+}
 
 /**
  * Fakes all processes and keeps the content of every file that Server::uploadProxyFile()

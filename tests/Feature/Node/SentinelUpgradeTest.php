@@ -30,7 +30,7 @@ const SENTINEL_UPGRADE_DIGEST = 'sha256:0123456789abcdef0123456789abcdef01234567
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'is_nodes_enabled' => true]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.sentinel.host_repository', 'ghcr.io/coollabsio/sentinel-host');
     config()->set('constants.coolify.versions_url', 'https://cdn.example/coolify/versions.json');
     Http::fake(['cdn.example/*' => function () {

@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
 
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
@@ -117,7 +117,7 @@ it('shows a safe error when Corrosion cannot be read', function () {
 });
 
 it('keeps internal DNS behind the development feature gate', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
 
     $this->get(route('node.internal-dns', $this->node->uuid))->assertNotFound();
 });

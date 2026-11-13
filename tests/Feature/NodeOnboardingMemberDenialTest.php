@@ -22,7 +22,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
     config()->set('app.url', 'https://coolify.example.com');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     Queue::fake();
     Process::fake();
     InspectNodeHost::shouldRun()->never();

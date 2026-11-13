@@ -83,7 +83,7 @@ it('does not replace stored inventory when Flux returns an invalid response', fu
 it('does not publish discovery endpoints after a cluster inventory refresh', function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux:7080');
     config()->set('constants.flux.internal_token', 'internal-secret');
     $user = User::factory()->create();
@@ -131,7 +131,7 @@ it('does not publish discovery endpoints after a cluster inventory refresh', fun
 it('tracks workload ownership across a move without publishing discovery endpoints', function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux:7080');
     config()->set('constants.flux.internal_token', 'internal-secret');
     $user = User::factory()->create();

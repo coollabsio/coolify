@@ -27,7 +27,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux.internal');
     config()->set('constants.flux.internal_token', 'internal-token');
     Process::fake();

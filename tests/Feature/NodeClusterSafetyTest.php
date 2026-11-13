@@ -28,7 +28,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
     config()->set('app.url', 'https://coolify.example.com');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
     $this->actingAs($this->user);

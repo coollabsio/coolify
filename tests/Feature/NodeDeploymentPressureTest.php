@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
     $team = $this->user->teams()->firstOrFail();
