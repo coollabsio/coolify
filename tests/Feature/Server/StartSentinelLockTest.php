@@ -76,8 +76,9 @@ it('starts Sentinel with the settings saved after the server was loaded', functi
 
     StartSentinel::run($staleServer, restart: true, latestVersion: '1.0.2');
 
-    expect(collect($scripts)->first(fn (string $script): bool => str_contains($script, 'docker run -d')))
-        ->toContain('PUSH_INTERVAL_SECONDS=33');
+    // The variables are in an env file, so the token is not in the docker run command.
+    expect(sentinelEnvFile(collect($scripts)->first(fn (string $script): bool => str_contains($script, 'docker run -d'))))
+        ->toHaveKey('PUSH_INTERVAL_SECONDS', '33');
 });
 
 it('starts Sentinel once when the metrics page toggles metrics', function () {
