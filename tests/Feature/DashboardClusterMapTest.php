@@ -27,7 +27,7 @@ beforeEach(function () {
     Queue::fake();
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
 
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
@@ -75,7 +75,7 @@ function clusterMapData(): array
 }
 
 it('hides the map toggle when the cluster stack is disabled', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
     NodeCluster::factory()->create(['team_id' => $this->team->id, 'name' => 'Hidden mesh']);
 
     Livewire::test(Dashboard::class)
@@ -112,7 +112,7 @@ it('refreshes the map every fifteen seconds only while it is visible', function 
 });
 
 it('rejects the map component when the cluster stack is disabled', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
 
     Livewire::test(ClusterMap::class)->assertStatus(404);
 });
@@ -127,7 +127,7 @@ it('maps clusters, servers, and the applications on each server', function () {
         'metadata' => ['container_inventory_observed_at' => now()->toIso8601String()],
     ]);
     mapNode($this->team, $cluster, 'Gamma', ['is_reachable' => false]);
-    Cache::put($alpha->cacheKey(), ['status' => 'connected']);
+    Cache::put($alpha->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String()]);
 
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = $project->environments()->firstOrFail();
@@ -189,7 +189,7 @@ it('reports unknown and missing application states', function () {
 it('includes firewall rules and public domains as traffic', function () {
     $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
     $node = mapNode($this->team, $cluster, 'Edge');
-    $web = mapApp($this->team, 'web', ['domains' => ['shop.example.com', 'www.shop.example.com'], 'http_port' => 8080]);
+    $web = mapApp($this->team, 'web', nodeDomainAttributes(['shop.example.com', 'www.shop.example.com'], 8080));
     $database = mapApp($this->team, 'database');
     $internal = mapApp($this->team, 'internal', ['domains' => ['ignored.example.com']]);
     $node->workloads()->attach([$web->id, $database->id, $internal->id]);
@@ -221,7 +221,7 @@ it('includes firewall rules and public domains as traffic', function () {
         ['uuid' => $appRule->uuid, 'sourceType' => 'workload', 'sourceUuid' => $web->uuid, 'destinationUuid' => $database->uuid, 'protocol' => 'tcp', 'port' => 5432],
         ['uuid' => $serverRule->uuid, 'sourceType' => 'node', 'sourceUuid' => $node->uuid, 'destinationUuid' => $web->uuid, 'protocol' => 'icmp', 'port' => 0],
     ])->and($clusterData['ingress'])->toBe([
-        ['appUuid' => $web->uuid, 'domains' => ['shop.example.com', 'www.shop.example.com'], 'port' => 8080],
+        ['appUuid' => $web->uuid, 'domains' => ['shop.example.com', 'www.shop.example.com'], 'ports' => [8080]],
     ]);
 });
 
@@ -293,7 +293,7 @@ it('loads the map with a fixed number of queries', function () {
                 'metadata' => ['container_inventory_observed_at' => now()->toIso8601String()],
             ]));
             $workloads = collect(range(1, $apps))->map(function () use ($nodes) {
-                $workload = mapApp($this->team, fake()->unique()->word(), ['domains' => [fake()->unique()->domainName()], 'http_port' => 80]);
+                $workload = mapApp($this->team, fake()->unique()->word(), [...nodeDomainAttributes([fake()->unique()->domainName()], 80)]);
                 $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
                 $nodes->each(function (Node $node) use ($workload, $revision): void {
                     $node->workloads()->attach($workload);

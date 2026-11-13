@@ -10,6 +10,7 @@ use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Enums\NodeOperationStatus;
+use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Livewire\NodeCluster\Show as NodeClusterShow;
@@ -166,7 +167,7 @@ function fakeIngressFlux(ArrayObject $state): Collection
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux.internal');
     config()->set('constants.flux.internal_token', 'internal-token');
     config()->set('constants.flux.public_url', 'http://flux:7443');
@@ -187,78 +188,94 @@ describe('domain validation', function () {
         $this->node->workloads()->attach($this->workload, ['container_ip' => '100.64.0.10']);
     });
 
-    it('rejects an invalid domain', function (string $domains, string $message) {
-        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, $domains, 80, $this->user))
+    it('rejects an invalid domain', function (array $hosts, string $message) {
+        $routes = array_map(fn (string $host): array => ['host' => $host, 'port' => 80], $hosts);
+
+        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, $routes, $this->user))
             ->toThrow(ValidationException::class, $message);
         expect($this->workload->refresh()->domains)->toBeNull();
     })->with([
-        'scheme' => ['http://app.example.com', 'without http:// or https://'],
-        'IPv4 address' => ['203.0.113.10', 'is an IP address'],
-        'IPv6 address' => ['2001:db8::1', 'is an IP address'],
-        'wildcard' => ['*.example.com', 'Wildcard domains are not supported'],
-        'path' => ['app.example.com/api', 'without a path'],
-        'port' => ['app.example.com:8080', 'without a port'],
-        'single label' => ['localhost', 'not a fully qualified domain'],
-        'invalid characters' => ['app_name.example.com', 'invalid characters'],
-        'label with hyphen at the end' => ['app-.example.com', 'Labels cannot start or end with a hyphen'],
-        'duplicate within the application' => ["app.example.com\nAPP.example.com", 'app.example.com is listed more than once.'],
+        'scheme' => [['http://app.example.com'], 'without http:// or https://'],
+        'IPv4 address' => [['203.0.113.10'], 'is an IP address'],
+        'IPv6 address' => [['2001:db8::1'], 'is an IP address'],
+        'wildcard' => [['*.example.com'], 'Wildcard domains are not supported'],
+        'path' => [['app.example.com/api'], 'without a path'],
+        'port' => [['app.example.com:8080'], 'without a port'],
+        'single label' => [['localhost'], 'not a fully qualified domain'],
+        'invalid characters' => [['app_name.example.com'], 'invalid characters'],
+        'label with hyphen at the end' => [['app-.example.com'], 'Labels cannot start or end with a hyphen'],
+        'duplicate within the application' => [['app.example.com', 'APP.example.com'], 'https://app.example.com is listed more than once.'],
     ]);
 
     it('normalizes domains to trimmed lowercase hostnames', function () {
-        UpdateNodeWorkloadDomains::run($this->workload, " App.Example.COM ,\n\n api.example.com  shop.example.com", '8080', $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [
+            ['host' => ' App.Example.COM ', 'port' => '8080'],
+            ['host' => 'api.example.com', 'port' => 8080],
+            ['host' => 'shop.example.com ', 'port' => ' 8080 '],
+        ], $this->user);
 
         expect($this->workload->refresh()->domains)->toBe(['app.example.com', 'api.example.com', 'shop.example.com'])
-            ->and($this->workload->http_port)->toBe(8080);
+            ->and($this->workload->domainPorts())->toBe([8080])
+            ->and($this->workload->domain_routes[0])->toBe(['scheme' => 'https', 'host' => 'app.example.com', 'port' => 8080, 'path' => '', 'noindex' => false]);
     });
 
     it('requires a port in range when domains are set', function (mixed $port) {
-        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', $port, $this->user))
+        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => $port]], $this->user))
             ->toThrow(ValidationException::class);
         expect($this->workload->refresh()->domains)->toBeNull();
     })->with(['missing' => [''], 'zero' => [0], 'too high' => [65536], 'not a number' => ['http']]);
 
     it('limits an application to 20 domains', function () {
-        $domains = collect(range(1, 21))->map(fn (int $index): string => "app{$index}.example.com")->implode(',');
+        $routes = collect(range(1, 21))->map(fn (int $index): array => ['host' => "app{$index}.example.com", 'port' => 80])->all();
 
-        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, $domains, 80, $this->user))
+        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, $routes, $this->user))
             ->toThrow(ValidationException::class, 'Use at most 20 domains.');
     });
 
-    it('rejects a domain that another application of any team uses', function (bool $sameTeam) {
-        $owner = $sameTeam ? $this->team : Team::factory()->create();
-        routedWorkload($owner, ['domains' => ['app.example.com'], 'http_port' => 80]);
+    it('rejects a domain that another application of the team uses', function () {
+        routedWorkload($this->team, nodeDomainAttributes(['app.example.com'], 80));
 
-        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, 'shop.example.com, APP.example.com', 80, $this->user))
-            ->toThrow(ValidationException::class, 'app.example.com is already used by another application.');
+        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, [
+            ['host' => 'shop.example.com', 'port' => 80],
+            ['host' => 'APP.example.com', 'port' => 80],
+        ], $this->user))->toThrow(ValidationException::class, 'app.example.com is already used by another application.');
         expect($this->workload->refresh()->domains)->toBeNull();
-    })->with(['same team' => [true], 'another team' => [false]]);
+    });
+
+    it('allows a domain that an application of another team uses, because each cluster serves only its own team', function () {
+        routedWorkload(Team::factory()->create(), nodeDomainAttributes(['app.example.com'], 80));
+
+        UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $this->user);
+
+        expect($this->workload->refresh()->domains)->toBe(['app.example.com']);
+    });
 
     it('keeps the domains of the application itself when it saves again', function () {
-        UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', 80, $this->user);
-        UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com, www.example.com', 80, $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80], ['host' => 'www.example.com', 'port' => 80]], $this->user);
 
         expect($this->workload->refresh()->domains)->toBe(['app.example.com', 'www.example.com']);
     });
 
     it('removes every domain when the list is empty', function () {
-        UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', 80, $this->user);
-        UpdateNodeWorkloadDomains::run($this->workload, '', '', $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [], $this->user);
 
         expect($this->workload->refresh()->domains)->toBeNull()
-            ->and($this->workload->http_port)->toBeNull();
+            ->and($this->workload->domain_routes)->toBeNull();
     });
 });
 
 describe('routes and firewall', function () {
     it('builds one route per domain of each routed workload in the cluster', function () {
         [$cluster, [$first, $second]] = ingressCluster($this->user, 2);
-        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', 'domains' => ['shop.example.com', 'www.example.com'], 'http_port' => 8080]);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', ...nodeDomainAttributes(['shop.example.com', 'www.example.com'], 8080)]);
         $first->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
         $second->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $internal = routedWorkload($this->team, ['internal_dns_name' => 'internal']);
         $first->workloads()->attach($internal, ['container_ip' => '100.64.0.11']);
         [$otherCluster, [$otherNode]] = ingressCluster($this->user, 1);
-        $elsewhere = routedWorkload($this->team, ['internal_dns_name' => 'elsewhere', 'domains' => ['elsewhere.example.com'], 'http_port' => 80]);
+        $elsewhere = routedWorkload($this->team, ['internal_dns_name' => 'elsewhere', ...nodeDomainAttributes(['elsewhere.example.com'], 80)]);
         $otherNode->workloads()->attach($elsewhere, ['container_ip' => '100.64.9.10']);
 
         expect(BuildNodeClusterIngressRoutes::run($cluster))->toBe([
@@ -271,7 +288,7 @@ describe('routes and firewall', function () {
 
     it('routes a workload by uuid before it has an internal name', function () {
         [$cluster, [$node]] = ingressCluster($this->user, 1);
-        $shop = routedWorkload($this->team, ['internal_dns_name' => null, 'domains' => ['shop.example.com'], 'http_port' => 80]);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => null, ...nodeDomainAttributes(['shop.example.com'], 80)]);
         $node->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
 
         expect(BuildNodeClusterIngressRoutes::run($cluster))->toBe([
@@ -281,7 +298,7 @@ describe('routes and firewall', function () {
 
     it('maps the internal names of the cluster workloads to their uuids once each', function () {
         [$cluster, [$first, $second]] = ingressCluster($this->user, 2);
-        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', 'domains' => ['shop.example.com'], 'http_port' => 80]);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', ...nodeDomainAttributes(['shop.example.com'], 80)]);
         $first->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
         $second->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $worker = routedWorkload($this->team, ['internal_dns_name' => 'worker']);
@@ -302,7 +319,7 @@ describe('routes and firewall', function () {
         [$cluster, [$first, $second]] = ingressCluster($this->user, 2);
         $cluster->increment('desired_revision');
         $this->flux['alive'] = 1;
-        $shop = routedWorkload($this->team, ['domains' => ['shop.example.com', 'www.example.com'], 'http_port' => 8080]);
+        $shop = routedWorkload($this->team, [...nodeDomainAttributes(['shop.example.com', 'www.example.com'], 8080)]);
         $first->workloads()->attach($shop, ['container_ip' => '100.64.0.10']);
         $second->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $api = routedWorkload($this->team);
@@ -322,7 +339,7 @@ describe('network reconciliation', function () {
     it('sends ingress last with the full routes and names to every Node and enables Caddy only on ingress Nodes', function () {
         [$cluster, [$ingress, $plain]] = ingressCluster($this->user, 2);
         $ingress->update(['is_ingress' => true]);
-        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', 'domains' => ['shop.example.com'], 'http_port' => 3000]);
+        $shop = routedWorkload($this->team, ['internal_dns_name' => 'shop', ...nodeDomainAttributes(['shop.example.com'], 3000)]);
         $plain->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $cluster->increment('desired_revision');
         $this->flux['alive'] = 1;
@@ -394,7 +411,7 @@ describe('network reconciliation', function () {
         [$cluster, [$broken, $healthy]] = ingressCluster($this->user, 2);
         $broken->update(['is_ingress' => true]);
         $healthy->update(['is_ingress' => true]);
-        $shop = routedWorkload($this->team, ['domains' => ['shop.example.com'], 'http_port' => 80]);
+        $shop = routedWorkload($this->team, [...nodeDomainAttributes(['shop.example.com'], 80)]);
         $healthy->workloads()->attach($shop, ['container_ip' => '100.64.1.10']);
         $cluster->increment('desired_revision');
         $this->flux['alive'] = 1;
@@ -421,7 +438,7 @@ describe('triggers', function () {
     });
 
     it('bumps the revision and queues reachable Nodes when domains are saved', function () {
-        UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', 80, $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $this->user);
 
         expect($this->cluster->refresh()->desired_revision)->toBe($this->revision + 1);
         Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $this->cluster->id
@@ -430,10 +447,10 @@ describe('triggers', function () {
     });
 
     it('does not queue a run when nothing that routes traffic changed', function () {
-        UpdateNodeWorkloadDomains::run($this->workload, '', '8080', $this->user);
-        UpdateNodeWorkloadDomains::run($this->workload->refresh(), 'app.example.com', 80, $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload, [], $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload->refresh(), [['host' => 'app.example.com', 'port' => 80]], $this->user);
         Queue::fake();
-        UpdateNodeWorkloadDomains::run($this->workload->refresh(), 'APP.example.com', '80', $this->user);
+        UpdateNodeWorkloadDomains::run($this->workload->refresh(), [['host' => 'APP.example.com', 'port' => '80']], $this->user);
 
         Queue::assertNotPushed(ReconcileNodeClusterNetworkJob::class);
         expect($this->cluster->refresh()->desired_revision)->toBe($this->revision + 1);
@@ -459,7 +476,7 @@ describe('triggers', function () {
     });
 
     it('bumps the revision and queues reachable Nodes when a routed workload is deleted', function () {
-        $this->workload->update(['domains' => ['app.example.com'], 'http_port' => 80]);
+        $this->workload->update([...nodeDomainAttributes(['app.example.com'], 80)]);
 
         $this->workload->delete();
 
@@ -539,11 +556,13 @@ function fakeMoveWorkloadFlux(NodeWorkload $workload, NodeWorkloadRevision $revi
 
 describe('make-before-break move', function () {
     beforeEach(function () {
+        // The deploy waits for the health check settle time on the clock.
+        Sleep::fake(syncWithCarbon: true);
         [$this->cluster, [$this->source, $this->target]] = ingressCluster($this->user, 2);
         $this->source->update(['is_ingress' => true]);
         $this->target->update(['is_ingress' => true, 'metadata' => healthyIngressNodeMetadata()]);
         $this->flux['alive'] = 1;
-        $this->workload = routedWorkload($this->team, ['name' => 'Move App', 'domains' => ['app.example.com'], 'http_port' => 80]);
+        $this->workload = routedWorkload($this->team, ['name' => 'Move App', ...nodeDomainAttributes(['app.example.com'], 80)]);
         $this->source->workloads()->attach($this->workload);
         $this->sourceIp = EnsureNodeWorkloadAddress::run($this->source, $this->workload);
         $this->revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $this->workload->id]);
@@ -567,19 +586,20 @@ describe('make-before-break move', function () {
 
         expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
             ->and($targetIp)->not->toBeNull()
-            ->and($allowed->pluck('server_id')->all())->toBe([$this->source->uuid, $this->target->uuid])
+            // The job applies the revision itself, and the sync queue applies it again: every Node gets it before the deploy.
+            ->and($allowed->pluck('server_id')->unique()->values()->all())->toBe([$this->source->uuid, $this->target->uuid])
             ->and($allowed->every(fn (array $request): bool => in_array(
                 ['destination_ip' => $targetIp, 'protocol' => 'tcp', 'port' => 80],
                 $request['data']['ingress_rules'],
                 true,
             )))->toBeTrue()
-            ->and($ingressApplied)->toHaveCount(2)
+            ->and($ingressApplied->pluck('server_id')->unique()->values()->all())->toBe([$this->source->uuid, $this->target->uuid])
             // Every Node applied the revision with the target address before the deployment.
             ->and($ingressApplied->keys()->max())->toBeLessThan($deploy)
             ->and($this->requests->get($deploy)['data']['container_ip'])->toBe($targetIp)
             // The source keeps serving for the settle period after the target became ready.
             ->and($commands->slice($deploy, $remove - $deploy)->contains('sleep'))->toBeTrue()
-            ->and($this->requests->slice($deploy, $remove - $deploy)->firstWhere('command', 'sleep')['seconds'])->toBe(MoveNodeWorkloadJob::INGRESS_SETTLE_SECONDS)
+            ->and($this->requests->slice($deploy, $remove - $deploy)->where('command', 'sleep')->pluck('seconds'))->toContain(MoveNodeWorkloadJob::INGRESS_SETTLE_SECONDS)
             ->and($this->requests->get($remove)['server_id'])->toBe($this->source->uuid)
             ->and($this->source->workloads()->whereKey($this->workload->id)->exists())->toBeFalse();
 
@@ -594,6 +614,10 @@ describe('make-before-break move', function () {
 
     it('fails without touching the source when the network does not apply the target in time', function () {
         Queue::fake();
+        // The clock stands still, so the Nodes keep their heartbeat for the whole wait.
+        Sleep::fake();
+        // Another network run holds the lock, so the job cannot apply the revision itself and waits.
+        $this->cluster->networkLock()->get();
         $operation = CreateMoveOperation::run($this->source, $this->target, $this->revision, $this->user);
         (new MoveNodeWorkloadJob($operation->id))->handle();
 
@@ -623,14 +647,17 @@ describe('make-before-break move', function () {
     });
 
     it('moves a workload without ingress routes without waiting', function () {
-        $this->workload->update(['domains' => null, 'http_port' => null]);
+        Queue::fake();
+        $this->workload->update(['domains' => null, 'domain_routes' => null]);
         $operation = CreateMoveOperation::run($this->source, $this->target, $this->revision, $this->user);
         (new MoveNodeWorkloadJob($operation->id))->handle();
 
+        // The new placement only queues one revision for the name table; the move does not wait for it.
         expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
-            ->and($this->requests->pluck('command')->all())->toBe(['workload.deploy', 'workload.lifecycle'])
-            ->and($this->cluster->refresh()->desired_revision)->toBe($this->baseRevision);
-        Sleep::assertNeverSlept();
+            ->and($this->requests->pluck('command')->reject(fn (string $command): bool => $command === 'sleep')->values()->all())->toBe(['workload.deploy', 'workload.lifecycle'])
+            ->and($this->requests->where('command', 'sleep')->pluck('seconds')->unique()->values()->all())->toBe([DeployNodeWorkloadJob::POLL_SECONDS])
+            ->and($this->cluster->refresh()->desired_revision)->toBe($this->baseRevision + 1);
+        Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 1);
     });
 });
 
@@ -682,7 +709,7 @@ describe('ingress toggle', function () {
 
         $this->get(route('node-cluster.nodes', $this->cluster->uuid))
             ->assertSee('Active')
-            ->assertSee($this->node->ip);
+            ->assertSee($this->node->name);
     });
 
     it('prevents members from toggling ingress', function () {
@@ -740,40 +767,42 @@ describe('cluster application domains page', function () {
         $this->edge->update(['is_ingress' => true]);
 
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->set('newDomain', 'App.Example.com')
-            ->set('newDomainPort', '3000')
+            ->set('newDomainParts.host', 'App.Example.com')
+            ->set('newDomainParts.port', '3000')
             ->call('addDomain')
             ->assertHasNoErrors()
             ->assertDispatched('success')
-            ->set('newDomain', 'www.example.com')
+            ->set('newDomainParts.host', 'www.example.com')
             ->call('addDomain')
             ->assertHasNoErrors()
-            ->assertSet('httpPort', '3000');
+            ->assertSet('newDomainParts.port', '3000');
 
         $this->get(route('project.cluster-application.domains', $this->parameters))
             ->assertOk()
-            ->assertSee('HTTPS is not available yet.')
+            ->assertSee('HTTPS is not available for this cluster')
+            // The configured URL, and the link that ingress serves over HTTP until it has a certificate.
+            ->assertSee('https://app.example.com')
             ->assertSee('http://app.example.com')
-            ->assertSee('http://www.example.com')
-            ->assertSee('Point an A record for each domain to one or more of these addresses.')
+            ->assertSee('https://www.example.com')
+            ->assertSee('Create matching Type / Name / Value records at your DNS provider.')
             ->assertSee($this->edge->ip)
             ->assertDontSee('No ingress server');
 
         expect($this->workload->refresh()->domains)->toBe(['app.example.com', 'www.example.com'])
-            ->and($this->workload->http_port)->toBe(3000);
+            ->and($this->workload->domainPorts())->toBe([3000]);
         Queue::assertPushed(ReconcileNodeClusterNetworkJob::class);
     });
 
     it('shows validation errors on the domain fields', function () {
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->set('newDomain', '*.example.com')
-            ->set('newDomainPort', '80')
+            ->set('newDomainParts.host', '*.example.com')
+            ->set('newDomainParts.port', '80')
             ->call('addDomain')
-            ->assertHasErrors(['newDomain'])
-            ->set('newDomain', 'app.example.com')
-            ->set('newDomainPort', '')
+            ->assertHasErrors(['newDomainParts.host' => '*.example.com is a wildcard domain. Wildcard domains are not supported yet.'])
+            ->set('newDomainParts.host', 'app.example.com')
+            ->set('newDomainParts.port', '')
             ->call('addDomain')
-            ->assertHasErrors(['newDomainPort']);
+            ->assertHasErrors(['newDomainParts.host' => 'Set the container port that receives HTTP traffic.']);
 
         expect($this->workload->refresh()->domains)->toBeNull();
     });
@@ -790,13 +819,13 @@ describe('cluster application domains page', function () {
         $this->actingAs($member);
 
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->set('newDomain', 'app.example.com')
-            ->set('newDomainPort', '80')
+            ->set('newDomainParts.host', 'app.example.com')
+            ->set('newDomainParts.port', '80')
             ->call('addDomain')
             ->assertForbidden();
 
         expect($this->workload->refresh()->domains)->toBeNull()
-            ->and(fn () => UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', 80, $member))->toThrow(AuthorizationException::class);
+            ->and(fn () => UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $member))->toThrow(AuthorizationException::class);
     });
 
     it('does not let another team open or change the application domains', function () {
@@ -807,7 +836,7 @@ describe('cluster application domains page', function () {
 
         $this->get(route('project.cluster-application.show', $this->parameters))->assertNotFound();
 
-        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, 'app.example.com', 80, $stranger))->toThrow(AuthorizationException::class)
+        expect(fn () => UpdateNodeWorkloadDomains::run($this->workload, [['host' => 'app.example.com', 'port' => 80]], $stranger))->toThrow(AuthorizationException::class)
             ->and($this->workload->refresh()->domains)->toBeNull();
         Queue::assertNotPushed(ReconcileNodeClusterNetworkJob::class);
     });

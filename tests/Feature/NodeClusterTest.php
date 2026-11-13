@@ -33,7 +33,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
     session(['currentTeam' => $this->user->teams()->firstOrFail()]);
@@ -72,9 +72,10 @@ it('allocates stable workload subnets and container addresses', function () {
 
     $address = EnsureNodeWorkloadAddress::run($first, $workload);
 
-    expect($first->refresh()->workload_cidr)->toBe('100.64.0.0/24')
-        ->and($second->refresh()->workload_cidr)->toBe('100.64.1.0/24')
-        ->and($address)->toBe('100.64.0.2')
+    // Workload subnets come from 198.18.0.0/15, which hosts, VPCs, and Tailscale do not use.
+    expect($first->refresh()->workload_cidr)->toBe('198.18.0.0/24')
+        ->and($second->refresh()->workload_cidr)->toBe('198.18.1.0/24')
+        ->and($address)->toBe('198.18.0.2')
         ->and(EnsureNodeWorkloadAddress::run($first, $workload))->toBe($address)
         ->and($first->workloads()->whereKey($workload->id)->firstOrFail()->pivot->container_ip)->toBe($address);
 });
@@ -110,7 +111,7 @@ it('renders cluster groups with the cluster actions on the servers page', functi
         ->toContain('<x-section-heading class="mb-0!" title="Clusters"')
         ->toContain('New cluster')
         ->toContain('Not in a cluster')
-        ->toContain('Cluster settings')
+        ->toContain("route('node-cluster.show', ['cluster_uuid' => \$cluster->uuid])")
         ->toContain('wire:key="cluster-group-{{ $cluster->uuid }}"')
         ->not->toContain('<x-slot:title>')
         ->not->toContain('title="Create cluster"');
@@ -129,13 +130,16 @@ it('validates and canonicalizes private cidrs', function (string $cidr) {
     'invalid prefix' => '10.10.0.0/33',
 ]);
 
-it('rejects cidr overlap across all teams', function () {
+it('rejects cidr overlap within the team and allows it across teams', function () {
     $team = $this->user->teams()->firstOrFail();
     CreateNodeCluster::run($team, $this->user, 'First', cidr: '10.20.0.0/16');
 
-    $foreign = User::factory()->create();
-    expect(fn () => CreateNodeCluster::run($foreign->teams()->firstOrFail(), $foreign, 'Overlap', cidr: '10.20.1.0/24'))
+    expect(fn () => CreateNodeCluster::run($team, $this->user, 'Overlap', cidr: '10.20.1.0/24'))
         ->toThrow(DomainException::class, 'overlaps');
+
+    // Each cluster is its own WireGuard mesh and a Node joins one cluster of its team.
+    $foreign = User::factory()->create();
+    expect(CreateNodeCluster::run($foreign->teams()->firstOrFail(), $foreign, 'Other team', cidr: '10.20.1.0/24')->cidr)->toBe('10.20.1.0/24');
 });
 
 it('assigns unique stable addresses and increments the desired revision', function () {
@@ -653,7 +657,8 @@ it('lists cluster nodes with network state and offers unassigned nodes', functio
     $this->get(route('node-cluster.nodes', $cluster->uuid))
         ->assertSuccessful()
         ->assertSee('Member node')
-        ->assertSee($member->fresh()->wireguard_ip)
+        // Server lists show no IP addresses.
+        ->assertDontSee($member->fresh()->wireguard_ip)
         ->assertSee('Ready')
         ->assertSee('Pending')
         ->assertSee('Add server')
@@ -811,8 +816,7 @@ it('lists the applications of the cluster on the resources page', function () {
         'project_id' => $project->id,
         'environment_id' => $environment->id,
         'name' => 'storefront',
-        'domains' => ['shop.example.com'],
-        'http_port' => 80,
+        ...nodeDomainAttributes(['shop.example.com'], 80),
     ]);
     $node->workloads()->attach($workload);
     $other = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'billing-api']);
