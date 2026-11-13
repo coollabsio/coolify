@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Service;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -87,7 +88,7 @@ class StackForm extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->service->name;
             $this->description = $this->service->description;
-            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $canViewCompose = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->service);
             $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
             $this->dockerCompose = $canViewCompose ? redactLockedValuesInGeneratedCompose($this->service->docker_compose, $this->service) : null;
             $this->connectToDockerNetwork = $this->service->connect_to_docker_network;

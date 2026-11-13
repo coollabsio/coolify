@@ -15,10 +15,12 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\User;
 use App\Policies\ResourceCreatePolicy;
+use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Access\AccessResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -72,6 +74,10 @@ class ConfigLinks
      */
     public function gitAttributes(User $user, int $teamId, array $data): array
     {
+        Validator::make($data, [
+            'repository' => ['required', 'string', 'max:500', new ValidGitRepositoryUrl(allowRepositoryPath: true)],
+            'file_path' => ['nullable', 'string', 'max:255', 'regex:#^[A-Za-z0-9._/-]+\z#', 'not_regex:#(^|/)\.\.(/|\z)#'],
+        ])->validate();
         $server = Server::query()->where('team_id', $teamId)->where('uuid', $data['read_server_uuid'] ?? '')->first();
         if ($server === null || ! Gate::forUser($user)->allows('placeResource', $server)) {
             throw ValidationException::withMessages(['read_server_uuid' => ['Use a server of this team that you can place resources on.']]);

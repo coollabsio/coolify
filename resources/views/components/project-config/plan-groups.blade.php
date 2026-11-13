@@ -2,9 +2,10 @@
     Changes of one plan, one row per resource. A row with field changes expands. A removed resource can
     offer "Also delete its data" when $deleteDataModel is set (a Livewire array property).
 --}}
-@props(['changes' => [], 'deleteDataModel' => null, 'canDelete' => false, 'compact' => false])
+@props(['changes' => [], 'deleteDataModel' => null, 'canDelete' => false, 'compact' => false, 'values' => false])
 @php
-    $groups = \App\Services\ProjectConfig\ConfigPlanView::groups($changes ?? []);
+    $changes = $values ? ($changes ?? []) : \App\Services\ProjectConfig\ConfigPlanView::withoutValues(['changes' => $changes ?? []])['changes'];
+    $groups = \App\Services\ProjectConfig\ConfigPlanView::groups($changes);
     $tagClass = fn (array $group) => match (true) {
         $group['removes'] => 'text-red-600 dark:text-red-400',
         $group['kind'] === 'create' => 'text-emerald-600 dark:text-emerald-400',

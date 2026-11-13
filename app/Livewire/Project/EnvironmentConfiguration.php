@@ -276,6 +276,8 @@ class EnvironmentConfiguration extends Component
         try {
             $environment = $this->environment();
             $this->authorize('view', $environment);
+            // Commands and Compose files can hold credentials.
+            $this->authorizeTeamAdminOf((int) $environment->project->team_id);
             $file = json_encode(app(ConfigExporter::class)->export($environment), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
 
             return response()->streamDownload(fn () => print ($file), 'coolify.json', ['Content-Type' => 'application/json']);

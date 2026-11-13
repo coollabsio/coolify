@@ -16,6 +16,7 @@ use App\Services\ProjectConfig\ConfigLinks;
 use App\Services\ProjectConfig\ConfigParser;
 use App\Services\ProjectConfig\ConfigPlan;
 use App\Services\ProjectConfig\ConfigPlanner;
+use App\Services\ProjectConfig\ConfigPlanView;
 use App\Services\ProjectConfig\ConfigResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,7 @@ class ProjectConfigController extends Controller
 {
     #[OA\Get(
         summary: 'Export coolify.json',
-        description: 'Export an environment as a coolify.json file. Variable values are never exported.',
+        description: 'Export an environment as a coolify.json file. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.',
         path: '/environments/{uuid}/config/export',
         operationId: 'export-environment-config',
         security: [['bearerAuth' => []]],
@@ -37,6 +38,7 @@ class ProjectConfigController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'The coolify.json file.', content: new OA\JsonContent(type: 'object')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token cannot read sensitive data.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
@@ -45,6 +47,10 @@ class ProjectConfigController extends Controller
         $environment = $this->environment($uuid);
         if ($environment instanceof JsonResponse) {
             return $environment;
+        }
+
+        if (! self::canReadSensitive()) {
+            return response()->json(['message' => 'Exporting needs the read:sensitive ability.'], 403);
         }
 
         return response()->json($exporter->export($environment));
@@ -95,7 +101,9 @@ class ProjectConfigController extends Controller
             ], 422);
         }
 
-        return response()->json($planner->plan($resolved, ApplyContext::for($link, $request->user()))->toArray());
+        $plan = $planner->plan($resolved, ApplyContext::for($link, $request->user()))->toArray();
+
+        return response()->json(self::canReadSensitive() ? $plan : ConfigPlanView::withoutValues($plan));
     }
 
     #[OA\Post(summary: 'Link coolify.json', description: 'Link an environment to coolify.json. Creates a missing project or environment.', path: '/config/links', operationId: 'create-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
@@ -390,6 +398,11 @@ class ProjectConfigController extends Controller
         ];
     }
 
+    private static function canReadSensitive(): bool
+    {
+        return request()->attributes->get('can_read_sensitive', false) === true;
+    }
+
     public static function serializeRevision(EnvironmentConfigRevision $revision): array
     {
         return [
@@ -399,7 +412,7 @@ class ProjectConfigController extends Controller
             'file_hash' => $revision->file_hash,
             'status' => $revision->status->value,
             'error' => $revision->error,
-            'plan' => $revision->plan,
+            'plan' => self::canReadSensitive() ? $revision->plan : ConfigPlanView::withoutValues($revision->plan),
             'approved_at' => $revision->approved_at,
             'applied_at' => $revision->applied_at,
             'created_at' => $revision->created_at,

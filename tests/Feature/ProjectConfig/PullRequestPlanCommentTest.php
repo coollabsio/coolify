@@ -90,3 +90,35 @@ it('dispatches a comment for a same-repository pull request only', function () {
     $send('acme/api');
     Queue::assertPushed(CommentConfigPlanJob::class, fn ($job) => $job->link->is($this->link) && $job->pullRequestId === 7 && $job->headSha === str_repeat('d', 40));
 });
+
+it('does not let file keys and messages inject Markdown into the comment', function () {
+    app()->instance(RepositoryFileReader::class, new class extends RepositoryFileReader
+    {
+        public function read(EnvironmentConfigLink $link, ?string $commit = null): RepositoryFile
+        {
+            return new RepositoryFile(json_encode(['version' => 1, 'project' => "**bold**\n[link](https://evil.example) <img src=x>", 'resources' => [
+                "x`[pwn](https://evil.example)`\n# Owned" => ['type' => 'application'],
+            ]]), (string) $commit, false);
+        }
+    });
+    $existing = [];
+    prCommentFake($existing);
+
+    CommentConfigPlanJob::dispatchSync($this->link, 7, str_repeat('b', 40));
+
+    Http::assertSent(function (Request $request) {
+        if ($request->method() !== 'POST') {
+            return false;
+        }
+        $body = $request['body'];
+        // Outside code spans, a link must be escaped.
+        $outsideCode = preg_replace('/`[^`\n]*`/', '', $body);
+
+        return str_contains($body, 'The file is not valid')
+            && ! str_contains($outsideCode, '[pwn](')
+            && ! str_contains($outsideCode, '[link](')
+            && ! str_contains($outsideCode, '**bold**')
+            && ! preg_match('/(?<!\\\\)<img/', $outsideCode)
+            && ! preg_match('/^# Owned/m', $body);
+    });
+});

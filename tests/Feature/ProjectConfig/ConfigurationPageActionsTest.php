@@ -112,3 +112,11 @@ it('polls only while a sync is in progress', function () {
     $revision->update(['status' => ConfigRevisionStatus::Applied]);
     $page()->assertDontSeeHtml('wire:poll.3s');
 });
+
+it('lets only a team admin download the export', function () {
+    $this->actingAs(pageMember($this));
+    Livewire::test(EnvironmentConfiguration::class, $this->params)->call('downloadExport')->assertNoFileDownloaded();
+
+    $this->actingAs($this->fx['user']);
+    Livewire::test(EnvironmentConfiguration::class, $this->params)->call('downloadExport')->assertFileDownloaded('coolify.json');
+});

@@ -15863,7 +15863,7 @@
                     "Project config"
                 ],
                 "summary": "Export coolify.json",
-                "description": "Export an environment as a coolify.json file. Variable values are never exported.",
+                "description": "Export an environment as a coolify.json file. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.",
                 "operationId": "export-environment-config",
                 "parameters": [
                     {
@@ -15888,6 +15888,9 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token cannot read sensitive data."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"

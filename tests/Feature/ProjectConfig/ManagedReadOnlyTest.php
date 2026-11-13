@@ -113,3 +113,19 @@ it('still denies after the user switches to another team they own', function () 
 
     expect($this->managed->fresh()->ports_exposes)->toBe('3000');
 });
+
+it('still shows commands of a managed resource to a team admin, but not to a member', function () {
+    $this->managed->update(['install_command' => 'npm ci && echo marker9731']);
+    $member = User::factory()->create();
+    $this->fx['team']->members()->attach($member->id, ['role' => 'member']);
+
+    expect(Gate::forUser($this->fx['user'])->allows('update', $this->managed))->toBeFalse()
+        ->and(ManagedResources::canUpdateIgnoringFile($this->fx['user'], $this->managed))->toBeTrue()
+        ->and(ManagedResources::canUpdateIgnoringFile($member, $this->managed))->toBeFalse()
+        ->and(ManagedResources::isManaged($this->managed))->toBeTrue();
+
+    $this->actingAs($this->fx['user']);
+    Livewire::test(General::class, ['application' => $this->managed->fresh()])->assertSet('installCommand', 'npm ci && echo marker9731');
+    $this->actingAs($member);
+    Livewire::test(General::class, ['application' => $this->managed->fresh()])->assertSet('installCommand', null);
+});

@@ -26,10 +26,12 @@
                 @endif
             </div>
             <div class="flex w-fit shrink-0 items-center gap-2">
-                <x-forms.button wire:click="downloadExport" title="Download coolify.json with the current settings">
-                    <x-reicon name="download" class="size-3.5" />
-                    Export
-                </x-forms.button>
+                @if ($isTeamAdmin)
+                    <x-forms.button wire:click="downloadExport" title="Download coolify.json with the current settings">
+                        <x-reicon name="download" class="size-3.5" />
+                        Export
+                    </x-forms.button>
+                @endif
                 @if ($link && $isTeamAdmin)
                     @if ($link->isSuspended())
                         <x-forms.button wire:click="previewResume">Resume sync</x-forms.button>
@@ -87,7 +89,7 @@
                             <x-forms.button wire:click="$set('resumePlan', null)">Cancel</x-forms.button>
                             <x-forms.button isHighlighted wire:click="confirmResume">Resume and apply</x-forms.button>
                         </x-slot:actions>
-                        <x-project-config.plan-groups :changes="$resumePlan['changes'] ?? []" />
+                        <x-project-config.plan-groups :changes="$resumePlan['changes'] ?? []" :values="$isTeamAdmin" />
                     </x-application.settings-section>
                 @endif
 
@@ -105,7 +107,7 @@
                     @php($changeCount = count($waiting->plan['changes'] ?? []))
                     <x-application.settings-section title="Changes waiting for approval" flush
                         helper="{{ $waiting->commit_sha ? 'Commit '.substr($waiting->commit_sha, 0, 7).'. ' : '' }}Removed resources stop and leave Coolify. Their data stays unless you select it.">
-                        <x-project-config.plan-groups :changes="$waiting->plan['changes'] ?? []" deleteDataModel="deleteData" :canDelete="$canApprove" />
+                        <x-project-config.plan-groups :changes="$waiting->plan['changes'] ?? []" deleteDataModel="deleteData" :canDelete="$canApprove" :values="$isTeamAdmin" />
                         <div class="flex items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.06]">
                             <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
                                 {{ $changeCount }} {{ $changeCount === 1 ? 'change' : 'changes' }}. Deploys from this push wait for the approval.
@@ -237,7 +239,7 @@
                                                 <p class="px-4 pt-2 text-[12px] text-red-600 dark:text-red-400">{{ $revision->error }}</p>
                                             @endif
                                             @if ($revisionChanges !== [])
-                                                <x-project-config.plan-groups :changes="$revisionChanges" compact />
+                                                <x-project-config.plan-groups :changes="$revisionChanges" compact :values="$isTeamAdmin" />
                                             @endif
                                         </td>
                                     </tr>

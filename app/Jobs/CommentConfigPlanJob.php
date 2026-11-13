@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -51,7 +52,7 @@ class CommentConfigPlanJob implements ShouldBeEncrypted, ShouldQueue
                 ? "coolify.json was not found at `{$this->link->file_path}`."
                 : $this->planBody($planner->plan($revisions->resolve($this->link, (string) $file->contents), ApplyContext::for($this->link)));
         } catch (ConfigException $e) {
-            $body = "The file is not valid:\n\n".collect($e->errors())->map(fn ($error) => '- `'.($error->path ?: 'file').'`: '.$error->message)->implode("\n");
+            $body = "The file is not valid:\n\n".collect($e->errors())->map(fn ($error) => '- '.self::code($error->path ?: 'file').': '.self::text($error->message))->implode("\n");
         } catch (Throwable) {
             $body = 'Coolify could not read coolify.json of this pull request.';
         }
@@ -72,7 +73,7 @@ class CommentConfigPlanJob implements ShouldBeEncrypted, ShouldQueue
         if ($plan->errors !== []) {
             $lines[] = '**The plan has errors:**';
             foreach ($plan->errors as $error) {
-                $lines[] = "- `{$error->path}`";
+                $lines[] = '- '.self::code($error->path);
             }
             $lines[] = 'See the details with `coolify config plan` or on the coolify.json page of the environment.';
             $lines[] = '';
@@ -84,7 +85,7 @@ class CommentConfigPlanJob implements ShouldBeEncrypted, ShouldQueue
             $lines[] = '| --- | --- | --- |';
             foreach ($plan->changes as $change) {
                 $kind = $change->kind->value.($change->destructive ? ' (destructive)' : '');
-                $lines[] = "| `{$change->key}` | {$kind} | ".($change->path === '' ? '-' : "`{$change->path}`").' |';
+                $lines[] = '| '.self::code($change->key).' | '.$kind.' | '.($change->path === '' ? '-' : self::code($change->path)).' |';
             }
         }
         if ($plan->isDestructive()) {
@@ -93,6 +94,22 @@ class CommentConfigPlanJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Keys and paths come from the pull request: inline code without backticks, pipes, or line breaks.
+     */
+    private static function code(string $text): string
+    {
+        return '`'.Str::limit(trim((string) preg_replace('/[`|\s]+/', ' ', $text)), 200).'`';
+    }
+
+    /**
+     * Messages can quote the file: one line with Markdown and HTML characters escaped.
+     */
+    private static function text(string $text): string
+    {
+        return (string) preg_replace('/[\\\\`*_\[\]<>|~!#]/', '\\\\$0', (string) preg_replace('/\s+/', ' ', $text));
     }
 
     private function writeComment(GithubApp $source, string $body): void

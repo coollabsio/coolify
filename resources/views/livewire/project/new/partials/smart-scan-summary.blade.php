@@ -82,7 +82,7 @@
                 <p class="px-4 pt-3 pb-1 text-[12px] text-neutral-500 dark:text-fg-dim">
                     Creating this environment from the file adds:
                 </p>
-                <x-project-config.plan-groups :changes="$configPlan['changes'] ?? []" compact />
+                <x-project-config.plan-groups :changes="$configPlan['changes'] ?? []" compact :values="$canLinkConfigFile" />
             @else
                 <x-checkpoint-item icon="file-content" title="Plan not loaded"
                     description="Show the plan to see the resources that the file creates." />

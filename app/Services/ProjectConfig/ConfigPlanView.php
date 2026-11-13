@@ -23,6 +23,23 @@ final class ConfigPlanView
      * @param  list<array<string, mixed>>  $changes
      * @return list<array{key: string, kind: string, tag: string, destructive: bool, removes: bool, detail: ?string, fields: list<array{path: string, value: string, destructive: bool}>}>
      */
+    /**
+     * The plan without stored and new values. Commands, Compose, and file content can hold credentials,
+     * so only users who can read sensitive data see them.
+     *
+     * @param  array<string, mixed>|null  $plan
+     * @return array<string, mixed>|null
+     */
+    public static function withoutValues(?array $plan): ?array
+    {
+        if ($plan === null) {
+            return null;
+        }
+        $plan['changes'] = array_map(fn (array $change) => ['secret' => true, 'from' => null, 'to' => null] + $change, $plan['changes'] ?? []);
+
+        return $plan;
+    }
+
     public static function groups(array $changes): array
     {
         $groups = [];

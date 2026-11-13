@@ -6,6 +6,7 @@ use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentVariable;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\User;
 use App\Services\ProjectConfig\Adapters\StandaloneDatabaseAdapter;
 use App\Services\ProjectConfig\Children\EnvironmentVariables;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Illuminate\Validation\ValidationException;
 class ManagedResources
 {
     private static int $applying = 0;
+
+    private static int $ignoringLock = 0;
 
     /**
      * Runs the callback as the coolify.json apply, which may change managed records.
@@ -56,7 +59,24 @@ class ManagedResources
 
     public static function isManaged(?Model $resource): bool
     {
-        return self::link($resource) !== null;
+        return self::$ignoringLock === 0 && self::link($resource) !== null;
+    }
+
+    /**
+     * Whether the user could update the resource if coolify.json did not manage it. Pages use it to decide
+     * who sees credentials, commands, and Compose files, which the read-only lock must not hide.
+     */
+    public static function canUpdateIgnoringFile(?User $user, Model $resource): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+        self::$ignoringLock++;
+        try {
+            return $user->can('update', $resource);
+        } finally {
+            self::$ignoringLock--;
+        }
     }
 
     /**

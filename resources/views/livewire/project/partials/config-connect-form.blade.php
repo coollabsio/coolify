@@ -31,7 +31,7 @@
             @foreach ($connectPlan['errors'] ?? [] as $error)
                 <p class="px-3 pt-2 text-[12px] text-red-600 dark:text-red-400"><code>{{ $error['path'] }}</code>: {{ $error['message'] }}</p>
             @endforeach
-            <x-project-config.plan-groups :changes="$connectPlan['changes'] ?? []" compact />
+            <x-project-config.plan-groups :changes="$connectPlan['changes'] ?? []" compact values />
         </div>
         <x-callout type="warning" title="Who can change this environment">
             Anyone who can push to {{ $connectBranch }} of {{ $connectRepository }} can change these resources and use the shared variables of this team.

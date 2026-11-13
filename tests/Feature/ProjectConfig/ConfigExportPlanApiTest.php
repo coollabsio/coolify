@@ -109,3 +109,25 @@ it('does not trim or empty the posted file', function () {
         ->assertStatus(422)
         ->assertJsonFragment(['path' => '']);
 });
+
+it('needs read:sensitive to export, because commands can hold credentials', function () {
+    $token = $this->fx['user']->createToken('read-only', ['read'], teamId: $this->fx['team']->id)->plainTextToken;
+
+    $this->withHeaders(configApiHeaders($token))->getJson("/api/v1/environments/{$this->fx['environment']->uuid}/config/export")->assertForbidden();
+});
+
+it('hides stored and new values in the plan without read:sensitive', function () {
+    $file = $this->withHeaders(configApiHeaders($this->token))->getJson("/api/v1/environments/{$this->fx['environment']->uuid}/config/export")->json();
+    $file['resources']['my-api']['build']['install_command'] = 'npm ci && echo marker9731';
+    $token = $this->fx['user']->createToken('read-only', ['read'], teamId: $this->fx['team']->id)->plainTextToken;
+
+    $plan = $this->withHeaders(configApiHeaders($token))
+        ->postJson("/api/v1/environments/{$this->fx['environment']->uuid}/config/plan", ['file' => json_encode($file)])
+        ->assertOk()
+        ->json();
+
+    $change = collect($plan['changes'])->firstWhere('path', 'build.install_command');
+    expect($change)->not->toBeNull()
+        ->and($change['to'])->toBeNull()
+        ->and(json_encode($plan))->not->toContain('marker9731');
+});

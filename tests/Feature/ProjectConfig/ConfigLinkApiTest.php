@@ -170,3 +170,18 @@ it('hides links of another team and checks token abilities', function () {
     linkApi('POST', "/config/links/{$uuid}/apply", ['file' => '{}'], $readToken)->assertForbidden();
     linkApi('POST', '/config/links', ['project' => 'acme', 'environment' => 'x', 'mode' => 'api'], $readToken)->assertForbidden();
 });
+
+it('lists revision plans without values for a token without read:sensitive', function () {
+    $uuid = linkApiCreate();
+    linkApi('POST', "/config/links/{$uuid}/apply", ['file' => linkApiFile(['api' => linkApiApp()])]);
+    $app = linkApiApp();
+    $app['build']['install_command'] = 'npm ci && echo marker9731';
+    linkApi('POST', "/config/links/{$uuid}/apply", ['file' => linkApiFile(['api' => $app])]);
+    $readToken = $this->fx['user']->createToken('r', ['read'], teamId: $this->fx['team']->id)->plainTextToken;
+
+    expect(linkApi('GET', "/config/links/{$uuid}/revisions", [], $readToken)->assertOk()->getContent())->not->toContain('marker9731');
+    $changes = collect(linkApi('GET', "/config/links/{$uuid}/revisions", [], $readToken)->assertOk()->json('0.plan.changes'));
+    expect($changes)->not->toBeEmpty()
+        ->and($changes->pluck('to')->filter()->all())->toBe([])
+        ->and(collect(linkApi('GET', "/config/links/{$uuid}/revisions")->json('0.plan.changes'))->pluck('to')->filter())->not->toBeEmpty();
+});
