@@ -2,9 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\BackupNodeVolume;
+use App\Actions\Node\DumpNodeDatabase;
 use App\Events\BackupCreated;
 use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
+use App\Models\NodeWorkload;
 use App\Models\NotificationThrottle;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -59,7 +62,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase|NodeWorkload $database;
 
     public ?string $container_name = null;
 
@@ -120,6 +123,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
+        if ($this->backup->isNodeDatabase()) {
+            $this->handleNodeDatabase();
+
             return;
         }
 
@@ -572,6 +581,107 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->team) {
                 BackupCreated::dispatch($this->team->id);
             }
+        }
+    }
+
+    /**
+     * A cluster database (decision 0010): Sentinel dumps each database on its Node and streams the
+     * dump to the S3 storage of the schedule. There is no local file, so only the S3 retention applies.
+     */
+    private function handleNodeDatabase(): void
+    {
+        $failed = false;
+        $this->team = Team::find($this->backup->team_id);
+        try {
+            $workload = $this->database = DumpNodeDatabase::workload($this->backup);
+            if (! $this->team) {
+                throw new \RuntimeException('The team of the backup no longer exists.');
+            }
+            $this->markStaleExecutionsAsFailed();
+            $deadline = now()->addSeconds((int) ($this->backup->timeout ?? 3600));
+            $runHadProblem = false;
+            foreach ($this->nodeDatabasesToBackup($workload) as $database) {
+                $this->backup_log_uuid = $this->executionUuidPrefix.new_public_id(8);
+                $this->backup_log = $this->backup->executions()->create([
+                    'uuid' => $this->backup_log_uuid,
+                    'database_name' => $database,
+                    'filename' => DumpNodeDatabase::key($workload, $database),
+                    // Set when the dump is in S3: retention deletes an execution without a local
+                    // file and without an S3 copy, and a failed execution stays visible.
+                    'local_storage_deleted' => false,
+                ]);
+                $this->backup_log->s3Replicas()->create(['s3_storage_id' => $this->backup->s3_storage_id]);
+                BackupCreated::dispatch($this->team->id);
+                try {
+                    $dump = DumpNodeDatabase::run($this->backup, $this->backup_log, $deadline);
+                    $this->backup_log->s3Replicas()->update(['s3_uploaded' => true]);
+                    $this->backup_log->refreshS3Summary();
+                    $this->backup_log->update(['status' => 'success', 'size' => $dump['size'], 'sha256' => $dump['sha256'], 'local_storage_deleted' => true, 'finished_at' => now()]);
+                    $this->notifyTeam(new BackupSuccess($this->backup, $workload, $database));
+                } catch (Throwable $exception) {
+                    $runHadProblem = true;
+                    $message = $this->redact(BackupNodeVolume::redactUrls($exception->getMessage()));
+                    $this->backup_log->s3Replicas()->whereNull('s3_uploaded')->update(['s3_uploaded' => false]);
+                    $this->backup_log->refreshS3Summary();
+                    $this->backup_log->update(['status' => 'failed', 'message' => $message, 'finished_at' => now()]);
+                    $this->notifyTeam(new BackupFailed($this->backup, $workload, $message, $database));
+                }
+            }
+            $this->removeExpiredBackups();
+            if (! $runHadProblem) {
+                $this->notifyIfRecovered();
+            }
+        } catch (Throwable $exception) {
+            $failed = true;
+
+            throw $exception;
+        } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+            if ($this->team) {
+                BackupCreated::dispatch($this->team->id);
+            }
+        }
+    }
+
+    /**
+     * The databases of a cluster database that the schedule dumps: `all` for the whole instance,
+     * otherwise the configured list or the initial database of the container.
+     *
+     * @return list<string>
+     */
+    private function nodeDatabasesToBackup(NodeWorkload $workload): array
+    {
+        $key = $workload->database_type->backupDatabaseKey();
+        if ($this->backup->dump_all || $key === null) {
+            return [DumpNodeDatabase::ALL];
+        }
+        $databases = collect(explode(',', (string) $this->backup->databases_to_backup))->map(fn (string $name): string => trim($name))->filter()->values();
+        if ($databases->isEmpty()) {
+            $databases = collect([(string) $workload->environment_variables()->where('key', $key)->value('value')])->filter();
+        }
+        if ($databases->isEmpty()) {
+            return [DumpNodeDatabase::ALL];
+        }
+        $invalid = $databases->first(fn (string $name): bool => preg_match('/^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$/', $name) !== 1);
+        if ($invalid !== null) {
+            throw new \RuntimeException("The database name \"{$invalid}\" is invalid. Use letters, digits, `_`, and `-`.");
+        }
+
+        return $databases->unique()->values()->all();
+    }
+
+    /** Notification failures never change the status of a backup (#9088). */
+    private function notifyTeam(object $notification): void
+    {
+        try {
+            $this->team?->notify($notification);
+        } catch (Throwable $exception) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 
@@ -1246,6 +1356,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         // Don't overwrite a finished execution: handle() already reported it, and a post-backup
         // error (e.g. notification failure) must not mark a successful backup as failed (#9088).
         $unfinished = $executions->whereNotIn('status', ['success', 'failed']);
+        if ($this->backup->isNodeDatabase()) {
+            $unfinished->each(fn (ScheduledDatabaseBackupExecution $execution) => DumpNodeDatabase::abandon($this->backup, $execution));
+        }
         foreach ($unfinished as $execution) {
             $execution->update([
                 'status' => 'failed',
@@ -1291,6 +1404,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if (str_contains($attribute, 'password')) {
                     $lockedSecrets[] = $database->getAttribute($attribute);
                 }
+            }
+            if ($database instanceof NodeWorkload) {
+                $lockedSecrets = [...$lockedSecrets, ...$database->environment_variables()->where('key', 'like', '%PASSWORD%')->pluck('value')->all()];
             }
         } catch (Throwable) {
             return SensitiveDataRedactor::FAILURE_MESSAGE;

@@ -54,6 +54,8 @@ class IssueFluxCredential
             'volume.verify.v1',
             'volume.backup.v1',
             'volume.restore.v1',
+            'database.dump.v1',
+            'database.restore.v1',
             'workload.stop_timeout.v1',
             'workload.healthcheck.v1',
             'workload.secrets.v1',

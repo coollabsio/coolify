@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Node\BackupNodeVolume;
+use App\Actions\Node\DumpNodeDatabase;
 use App\Actions\Node\RunNodeWorkloadCommand;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Models\NodeVolume;
@@ -343,6 +344,12 @@ class ScheduledJobManager implements ShouldQueue
 
         foreach ($backups as $backup) {
             try {
+                if ($backup->isNodeDatabase()) {
+                    $this->processScheduledNodeDatabaseBackup($backup);
+
+                    continue;
+                }
+
                 $server = $backup->server();
 
                 if (blank(data_get($backup, 'database')) || blank($server)) {
@@ -738,6 +745,62 @@ class ScheduledJobManager implements ShouldQueue
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing task', [
                 'task_id' => $task->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * A dump backup of a cluster database (decision 0010) runs in the instance timezone, and only
+     * on a Node that is online and reports the dump capabilities. DatabaseBackupJob runs it
+     * through Sentinel.
+     */
+    private function processScheduledNodeDatabaseBackup(ScheduledDatabaseBackup $backup): void
+    {
+        try {
+            $workload = $backup->database;
+            if (! $workload instanceof NodeWorkload) {
+                $backup->delete();
+                $this->skippedCount++;
+                $this->logSkip('backup', 'database_deleted', ['backup_id' => $backup->id, 'team_id' => $backup->team_id]);
+
+                return;
+            }
+
+            $timezone = $this->instanceTimezone();
+            $scheduleKey = "scheduled-backup:{$backup->id}";
+            $delivery = app(ScheduledJobDeliveryService::class);
+            $node = $workload->nodes()->orderBy('nodes.id')->first();
+            $skipReason = match (true) {
+                $workload->database_type?->dumpEngine() === null => 'dump_not_supported',
+                $node === null => 'database_not_deployed',
+                ! $node->hasRecentFluxHeartbeat() => 'node_offline',
+                collect(DumpNodeDatabase::CAPABILITIES)->contains(fn (string $capability): bool => $node->supportsCapability($capability) !== true) => 'node_capability_missing',
+                isCloud() && $backup->team_id !== 0 && ! data_get($backup, 'team.subscription.stripe_invoice_paid', false) => 'subscription_unpaid',
+                default => null,
+            };
+            if ($skipReason !== null) {
+                if ($delivery->recordSkipped($scheduleKey, $backup->frequency, $timezone, $this->executionTime)) {
+                    $this->skippedCount++;
+                    $this->logSkip('backup', $skipReason, ['backup_id' => $backup->id, 'team_id' => $backup->team_id, 'node_id' => $node?->id]);
+                }
+
+                return;
+            }
+
+            if ($delivery->recordAndPublish($scheduleKey, $backup->frequency, $timezone, 'database-backup', $backup->id, [], $this->executionTime)) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Backup dispatched', [
+                    'backup_id' => $backup->id,
+                    'database_id' => $backup->database_id,
+                    'database_type' => $backup->database_type,
+                    'team_id' => $backup->team_id,
+                    'node_id' => $node->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing backup', [
+                'backup_id' => $backup->id,
                 'error' => $e->getMessage(),
             ]);
         }

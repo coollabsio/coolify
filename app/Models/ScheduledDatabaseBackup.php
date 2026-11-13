@@ -66,6 +66,12 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->morphTo();
     }
 
+    /** A dump backup of a database on a cluster (decision 0010), which Sentinel runs on its Node. */
+    public function isNodeDatabase(): bool
+    {
+        return $this->database_type === (new NodeWorkload)->getMorphClass();
+    }
+
     public function latest_log(): HasOne
     {
         return $this->hasOne(ScheduledDatabaseBackupExecution::class)->latest();

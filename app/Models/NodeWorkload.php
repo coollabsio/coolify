@@ -210,6 +210,18 @@ class NodeWorkload extends BaseModel
         return filled($this->database_type);
     }
 
+    /** The page of the workload, like `link()` of v4 resources, for notifications. */
+    public function link(): ?string
+    {
+        $project = $this->project()->value('uuid');
+        $environment = $this->environment()->value('uuid');
+        if ($project === null || $environment === null) {
+            return null;
+        }
+
+        return route('project.cluster-application.show', ['project_uuid' => $project, 'environment_uuid' => $environment, 'workload_uuid' => $this->uuid]);
+    }
+
     /** Whether Coolify builds the image of this workload from a Git repository. */
     public function buildsFromSource(): bool
     {

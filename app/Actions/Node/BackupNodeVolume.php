@@ -57,14 +57,7 @@ class BackupNodeVolume
         }
         self::ensureNodeSupportsBackups($node);
         $s3 = self::storage($backup, $workload);
-        $key = (string) $execution->filename;
-        $client = self::client($s3);
 
-        $uploadId = $client->createMultipartUpload([
-            'Bucket' => $s3->bucket,
-            'Key' => $key,
-            'ContentType' => 'application/zstd',
-        ])['UploadId'];
         $request = [
             'server_id' => $node->uuid,
             'backup_id' => $execution->uuid,
@@ -73,22 +66,43 @@ class BackupNodeVolume
             'stop_timeout_seconds' => $backup->stop_during_backup ? 120 : 0,
         ];
 
+        return self::upload('volume.backup', $request, $s3, (string) $execution->filename, $deadline, fn (int $bytes) => $execution->update(['size' => $bytes]));
+    }
+
+    /**
+     * Runs an upload of Sentinel (`volume.backup`, or `database.dump` of decision 0010) into a new
+     * multipart upload of `$key`, completes it, and checks the stored size. On a failure it stops
+     * the upload on the Node and aborts the multipart upload.
+     *
+     * @param  array<string, mixed>  $request
+     * @param  callable(int): void|null  $progress  Gets the uploaded size every few seconds.
+     * @return array{size: int, sha256: string}
+     */
+    public static function upload(string $command, array $request, S3Storage $s3, string $key, Carbon $deadline, ?callable $progress = null): array
+    {
+        $client = self::client($s3);
+        $uploadId = $client->createMultipartUpload([
+            'Bucket' => $s3->bucket,
+            'Key' => $key,
+            'ContentType' => 'application/zstd',
+        ])['UploadId'];
+
         try {
-            $state = $this->poll($request, $client, $s3, $key, $uploadId, 1);
+            $state = self::poll($command, $request, $client, $s3, $key, $uploadId, 1);
             $progressWrittenAt = now();
             while ($state['state'] === 'running') {
                 if (now()->gte($deadline)) {
                     throw new RuntimeException('The backup did not finish within the timeout of the schedule.');
                 }
                 Sleep::for(self::POLL_SECONDS)->seconds();
-                $state = $this->poll($request, $client, $s3, $key, $uploadId, $state['next_part_number']);
-                if ($progressWrittenAt->lte(now()->subSeconds(self::PROGRESS_SECONDS))) {
-                    $execution->update(['size' => $state['bytes_done']]);
+                $state = self::poll($command, $request, $client, $s3, $key, $uploadId, $state['next_part_number']);
+                if ($progress !== null && $progressWrittenAt->lte(now()->subSeconds(self::PROGRESS_SECONDS))) {
+                    $progress($state['bytes_done']);
                     $progressWrittenAt = now();
                 }
             }
             if ($state['state'] === 'failed') {
-                throw new RuntimeException('Sentinel could not back up the volume: '.($state['error'] !== '' ? $state['error'] : 'no reason reported.'));
+                throw new RuntimeException('Sentinel could not finish the backup: '.($state['error'] !== '' ? $state['error'] : 'no reason reported.'));
             }
 
             $parts = collect($state['parts'])->sortBy('part_number')->values();
@@ -112,7 +126,7 @@ class BackupNodeVolume
 
             return ['size' => $state['archive_bytes'], 'sha256' => $state['sha256']];
         } catch (Throwable $exception) {
-            $this->abort($request, $client, $s3, $key, $uploadId);
+            self::abort($command, $request, $client, $s3, $key, $uploadId);
 
             throw new RuntimeException(self::redactUrls($exception->getMessage()), 0, $exception);
         }
@@ -170,7 +184,7 @@ class BackupNodeVolume
      * @param  array<string, mixed>  $request
      * @return array{state: string, used_bytes: int, part_size_bytes: int, next_part_number: int, parts: list<array{part_number: int, etag: string, size_bytes: int}>, bytes_done: int, archive_bytes: int, sha256: string, error: string}
      */
-    private function poll(array $request, S3Client $client, S3Storage $s3, string $key, string $uploadId, int $nextPart): array
+    private static function poll(string $command, array $request, S3Client $client, S3Storage $s3, string $key, string $uploadId, int $nextPart): array
     {
         $partUrls = [];
         if ($nextPart > 0) {
@@ -187,17 +201,17 @@ class BackupNodeVolume
             }
         }
 
-        return self::send([...$request, 'part_urls' => $partUrls]);
+        return self::send($command, [...$request, 'part_urls' => $partUrls]);
     }
 
     /**
      * @param  array<string, mixed>  $request
      * @return array{state: string, used_bytes: int, part_size_bytes: int, next_part_number: int, parts: list<array{part_number: int, etag: string, size_bytes: int}>, bytes_done: int, archive_bytes: int, sha256: string, error: string}
      */
-    private static function send(array $request): array
+    public static function send(string $command, array $request): array
     {
         $commandId = (string) Str::uuid();
-        $data = SendFluxCommand::run('volume.backup', [...$request, 'command_id' => $commandId], 150);
+        $data = SendFluxCommand::run($command, [...$request, 'command_id' => $commandId], 150);
         $validator = Validator::make($data, [
             'command_id' => ['required', 'string', 'in:'.$commandId],
             'state' => ['required', 'in:running,succeeded,failed'],
@@ -214,7 +228,7 @@ class BackupNodeVolume
             'error' => ['nullable', 'string', 'max:4000'],
         ]);
         if ($validator->fails()) {
-            throw new RuntimeException('Flux returned an invalid volume backup state.');
+            throw new RuntimeException('Flux returned an invalid backup state.');
         }
         $validated = $validator->validated();
 
@@ -248,7 +262,7 @@ class BackupNodeVolume
         }
         if (($node = $volume->node()->first()) !== null) {
             try {
-                self::send([
+                self::send('volume.backup', [
                     'server_id' => $node->uuid,
                     'backup_id' => $execution->uuid,
                     'volume_name' => $volume->podmanName(),
@@ -278,10 +292,10 @@ class BackupNodeVolume
      *
      * @param  array<string, mixed>  $request
      */
-    private function abort(array $request, S3Client $client, S3Storage $s3, string $key, string $uploadId): void
+    private static function abort(string $command, array $request, S3Client $client, S3Storage $s3, string $key, string $uploadId): void
     {
         try {
-            self::send([...$request, 'abort' => true]);
+            self::send($command, [...$request, 'abort' => true]);
         } catch (Throwable) {
         }
         try {

@@ -30,6 +30,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
         'local_storage_deleted',
         's3_storage_deleted',
         's3_uploaded',
+        'sha256',
     ];
 
     protected function casts(): array

@@ -123,14 +123,15 @@ enum NodeDatabaseType: string
 
     /**
      * The start command, or an empty list for the image default. The shell reads the password from
-     * the environment of the container, so it is not stored in the revision.
+     * the environment of the container, so it is not stored in the revision. Redis allows `DEBUG`
+     * from inside the container only: the restore of a dump reloads it with `DEBUG RELOAD`.
      *
      * @return list<string>
      */
     public function startCommand(): array
     {
         return match ($this) {
-            self::REDIS => ['sh', '-c', 'exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes'],
+            self::REDIS => ['sh', '-c', 'exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes --enable-debug-command local'],
             self::KEYDB => ['sh', '-c', 'exec keydb-server --requirepass "$REDIS_PASSWORD" --appendonly yes'],
             self::DRAGONFLY => ['sh', '-c', 'exec dragonfly --requirepass "$REDIS_PASSWORD"'],
             default => [],
@@ -163,6 +164,28 @@ enum NodeDatabaseType: string
             'health_check_retries' => 5,
             'health_check_start_period' => 5,
         ];
+    }
+
+    /**
+     * The engine of `database.dump.v1` and `database.restore.v1` (decision 0010), or null when
+     * Sentinel has no fixed dump for it. ClickHouse has none: its `BACKUP` writes to a backup disk
+     * or to S3 with the S3 key, and a Node never gets the S3 key (decision 0009).
+     */
+    public function dumpEngine(): ?string
+    {
+        return $this === self::CLICKHOUSE ? null : $this->value;
+    }
+
+    /** The credential variable with the database that a new backup schedule dumps; null when a dump holds the whole instance. */
+    public function backupDatabaseKey(): ?string
+    {
+        return match ($this) {
+            self::POSTGRESQL => 'POSTGRES_DB',
+            self::MYSQL => 'MYSQL_DATABASE',
+            self::MARIADB => 'MARIADB_DATABASE',
+            self::MONGODB => 'MONGO_INITDB_DATABASE',
+            default => null,
+        };
     }
 
     /**
