@@ -114,7 +114,7 @@ class RunImageBuild
                 'command_id' => (string) Str::uuid(),
                 'build_id' => $build->uuid,
                 'image' => $build->image,
-                'keep_tags' => $node->cluster->registry?->keep_tags ?? 5,
+                'keep_tags' => $node->cluster->registry?->keep_tags ?? 10,
             ], 660);
         }
 
