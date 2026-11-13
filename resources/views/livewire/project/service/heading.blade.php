@@ -2,6 +2,12 @@
     @teleport('#resource-star-slot-mobile')
         <livewire:star-toggle :resource="$service" :wire:key="'star-mobile-'.$service->getMorphClass().'-'.$service->uuid" />
     @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$service" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$service" /></div>
+    @endteleport
     @php
         $serviceStatus = str($service->status ?? 'exited');
         $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
@@ -37,7 +43,6 @@
                         {{ $service->name }}
                     </h1>
                     <div class="relative flex w-full min-w-0 items-center gap-2">
-                        <x-project-config.managed-badge :resource="$service" />
                         <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
                             :container-name="$selectedResource ? 'Container' : 'Containers'" />
                         <x-services.links :service="$service" compact />

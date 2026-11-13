@@ -8,12 +8,6 @@
                     Environment settings in {{ $project->name }}
                 </p>
             </div>
-            <div class="flex w-fit shrink-0 items-center gap-2">
-                <a class="button whitespace-nowrap" {{ wireNavigate() }}
-                    href="{{ route('project.environment.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
-                    coolify.json
-                </a>
-            </div>
             @can('createAnyResource')
                 <div class="flex w-fit shrink-0 items-center gap-2">
                     <a class="button whitespace-nowrap" {{ wireNavigate() }}
@@ -42,6 +36,24 @@
                 </div>
             </section>
         </form>
+
+        @php($configStatus = \App\Services\ProjectConfig\ConfigSyncStatus::forEnvironment($environment))
+        @php($configUrl = route('project.environment.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]))
+        <x-application.settings-section title="Config as code"
+            helper="Manage the resources of this environment with a coolify.json file in a git repository.">
+            <x-slot:actions>
+                <a href="{{ $configUrl }}" {{ wireNavigate() }} class="button">{{ $configStatus ? 'Open' : 'Set Up' }}</a>
+            </x-slot:actions>
+            <div class="flex items-center gap-3 text-[13px]">
+                @if ($configStatus)
+                    <x-project-config.sync-badge :status="$configStatus" />
+                    <span class="text-neutral-500 dark:text-fg-dim">Settings managed by the file are read-only in Coolify.</span>
+                @else
+                    <x-status-badge label="Not connected" />
+                    <span class="text-neutral-500 dark:text-fg-dim">Every setting is edited in Coolify.</span>
+                @endif
+            </div>
+        </x-application.settings-section>
 
         @can('delete', $environment)
             <section

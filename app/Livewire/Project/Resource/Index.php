@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\VulnerabilityMarkers;
+use App\Services\ProjectConfig\ConfigSyncStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
@@ -190,6 +191,8 @@ class Index extends Component
             'clickhouses' => $this->clickhouses,
             'sqlites' => $this->sqlites,
             'services' => $this->services,
+            'configStatus' => $this->configStatus(),
+            'configUrl' => route('project.environment.configuration', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]),
             'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
             'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'Database'),
             'redisJs' => $this->toSearchableArray($this->redis, 'database', 'Database'),
@@ -204,8 +207,18 @@ class Index extends Component
         ]);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function configStatus(): ?array
+    {
+        return once(fn () => ConfigSyncStatus::forEnvironment($this->environment));
+    }
+
     private function toSearchableArray(Collection $items, string $type, string $typeLabel): array
     {
+        $linked = $this->configStatus() !== null && $this->configStatus()['state'] !== 'paused';
+
         return $items->map(fn ($item) => [
             'uuid' => $item->uuid,
             'name' => $item->name,
@@ -232,6 +245,7 @@ class Index extends Component
                 'name' => $tag->name,
             ])->values()->toArray(),
             'security' => $this->markers[ResourceScans::key($item)] ?? null,
+            'managed' => $linked && filled($item->config_key ?? null),
         ])->values()->toArray();
     }
 }
