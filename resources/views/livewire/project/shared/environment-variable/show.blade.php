@@ -36,6 +36,11 @@
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
             @endif
+            @if ($configValueMissing)
+                <span class="table-badge table-badge-danger shrink-0" title="coolify.json requires this value. Set it here, then deploy.">Needs a value</span>
+            @elseif ($configForm)
+                <span class="table-badge shrink-0" title="Set by coolify.json">coolify.json</span>
+            @endif
             @if ($composeInfo)
                 <span class="table-badge shrink-0"
                     title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>

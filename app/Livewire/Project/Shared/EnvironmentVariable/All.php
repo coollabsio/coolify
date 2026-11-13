@@ -709,6 +709,7 @@ class All extends Component
         'is_required',
         'is_shown_once',
         'is_shared',
+        'config_meta',
         'resourceable_type',
         'resourceable_id',
         'created_at',
