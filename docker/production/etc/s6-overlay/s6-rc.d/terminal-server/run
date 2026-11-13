@@ -3,4 +3,4 @@
 cd /var/www/html
 
 echo "   INFO  Terminal WebSocket server is starting..."
-exec node /terminal/terminal-server.js
+exec node --env-file-if-exists=.env /terminal/terminal-server.js
