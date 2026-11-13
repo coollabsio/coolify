@@ -15857,6 +15857,551 @@
                 }
             }
         },
+        "\/environments\/{uuid}\/config\/export": {
+            "get": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Export coolify.json",
+                "description": "Export an environment as a coolify.json file. Variable values are never exported.",
+                "operationId": "export-environment-config",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The coolify.json file.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/environments\/{uuid}\/config\/plan": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Plan coolify.json",
+                "description": "Compare a coolify.json file with the environment. Nothing changes.",
+                "operationId": "plan-environment-config",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "file"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "description": "The coolify.json file as text.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The plan.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Link coolify.json",
+                "description": "Link an environment to coolify.json. Creates a missing project or environment.",
+                "operationId": "create-config-link",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "project",
+                                    "environment",
+                                    "mode"
+                                ],
+                                "properties": {
+                                    "project": {
+                                        "type": "string"
+                                    },
+                                    "environment": {
+                                        "type": "string"
+                                    },
+                                    "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                            "api",
+                                            "git"
+                                        ]
+                                    },
+                                    "auto_apply": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The link."
+                    },
+                    "403": {
+                        "description": "Not allowed."
+                    },
+                    "409": {
+                        "description": "The environment already has a link."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links\/{uuid}": {
+            "get": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Get a coolify.json link",
+                "operationId": "get-config-link",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The link."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Disconnect coolify.json",
+                "description": "Removes the link. The resources stay and can be edited in Coolify again.",
+                "operationId": "delete-config-link",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Disconnected."
+                    },
+                    "403": {
+                        "description": "Team admins only."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Update a coolify.json link",
+                "operationId": "update-config-link",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "auto_apply": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The link."
+                    },
+                    "403": {
+                        "description": "Team admins only."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links\/{uuid}\/revisions": {
+            "get": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "List revisions",
+                "operationId": "list-config-revisions",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Revisions, newest first."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links\/{uuid}\/apply": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Apply coolify.json",
+                "description": "In api mode, plan the posted file and apply it when the plan is safe.",
+                "operationId": "apply-config",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The revision waits for approval."
+                    },
+                    "202": {
+                        "description": "The revision is applied or queued."
+                    },
+                    "409": {
+                        "description": "The link is suspended."
+                    },
+                    "422": {
+                        "description": "The file is not valid."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/revisions\/{uuid}\/approve": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Approve a plan",
+                "operationId": "approve-config-revision",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "delete_data": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Approved."
+                    },
+                    "403": {
+                        "description": "Not allowed."
+                    },
+                    "422": {
+                        "description": "Not waiting, or a key is not removed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links\/{uuid}\/suspend": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Suspend a link",
+                "operationId": "suspend-config-link",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Suspended."
+                    },
+                    "403": {
+                        "description": "Team admins only."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/links\/{uuid}\/resume": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Resume a link",
+                "description": "Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies.",
+                "operationId": "resume-config-link",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "confirm",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The plan, or the link and its new revision."
+                    },
+                    "403": {
+                        "description": "Team admins only."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/revisions\/{uuid}\/release": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Release a stuck apply",
+                "operationId": "release-config-revision",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Released."
+                    },
+                    "403": {
+                        "description": "Team admins only."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/config\/revisions\/{uuid}\/retry": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Retry a revision",
+                "operationId": "retry-config-revision",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Planned again."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/projects": {
             "get": {
                 "tags": [
@@ -30509,6 +31054,10 @@
         {
             "name": "Notifications",
             "description": "Notifications"
+        },
+        {
+            "name": "Project config",
+            "description": "Project config"
         },
         {
             "name": "Projects",
