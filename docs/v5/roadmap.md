@@ -34,7 +34,7 @@ stable need.
 | --- | --- | --- |
 | S1 | ~~Databases on Nodes~~ | [0010](decisions/0010-node-databases.md). Done: 8 engines deploy healthy; dump backups and imports for 7 engines (`database.dump.v1`, `database.restore.v1`). ClickHouse dumps left out (its `BACKUP` needs the S3 key on the Node). |
 | S2 | ~~Offline Node notifications and recovery~~ | [0014](decisions/0014-node-placement-and-failure.md). Done: "Server offline" state, affected apps in the notification, recovery move from backups, fencing when the Node returns. Recovery from the Node page is not built. |
-| S3 | Revision rollback | [0017](decisions/0017-node-revision-rollback.md) |
+| S3 | ~~Revision rollback~~ | [0017](decisions/0017-node-revision-rollback.md). Done: Rollback on an earlier deployment adds a new latest revision with its image and the current settings, environment, and secrets, and deploys it the normal way; a Git image that left the registry (now 10 images) is built again from the same commit. Single-Node `localhost/` images and image-app tags are not checked. |
 | S4 | ~~Exec and terminal~~ | [0018](decisions/0018-node-exec-and-terminal.md). Done: scheduled tasks and a container terminal through Flux. |
 | S5 | ~~Deploy without downtime on one Node~~ | [0022](decisions/0022-node-rolling-deploys.md). Done: two container slots, make-before-break without a writable volume, stop-then-start with one. Stop-then-start fails no requests in the test (slowest 0.25 s): Caddy holds requests while the only container restarts (Sentinel `011223e`, `a8bef06`: the passive health check only for several upstreams), and Sentinel publishes every second while a health check is `starting` (`ce966b5`). |
 
