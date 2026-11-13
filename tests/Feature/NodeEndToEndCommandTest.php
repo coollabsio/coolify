@@ -123,14 +123,14 @@ it('sets and removes the domains of the end-to-end workload', function () {
 
     expect($exitCode)->toBe(Command::SUCCESS)
         ->and($set['domains'])->toBe(['whoami.node-e2e.test'])
-        ->and($set['http_port'])->toBe(80)
+        ->and($set['domain_routes'])->toBe([['scheme' => 'https', 'host' => 'whoami.node-e2e.test', 'port' => 80, 'path' => '', 'noindex' => false]])
         ->and($status['workload']['domains'])->toBe(['whoami.node-e2e.test'])
-        ->and($status['workload']['http_port'])->toBe(80);
+        ->and($status['workload']['domain_routes'][0]['port'])->toBe(80);
 
     [, $removed] = nodeEndToEnd(['action' => 'domains', 'argument' => '', '--http-port' => '']);
 
     expect($removed['domains'])->toBe([])
-        ->and($removed['http_port'])->toBeNull()
+        ->and($removed['domain_routes'])->toBe([])
         ->and($this->workload->refresh()->domains)->toBeNull();
 });
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Node\NotifyNodeClusterNetworkHealth;
 use App\Jobs\NotifyNodeHealthJob;
 use App\Jobs\SendMessageToTelegramJob;
 use App\Models\InstanceSettings;
@@ -165,6 +166,10 @@ it('notifies once when the cluster network fails and once when it recovers', fun
 
     $this->cluster->update(['network_status' => 'error']);
     runNodeHealthCheck();
+    // A revision bump or drift repair can mark the network unhealthy for a moment, so the alert waits for the grace period.
+    Notification::assertNothingSent();
+    $this->travel(NotifyNodeClusterNetworkHealth::GRACE_PERIOD_SECONDS)->seconds();
+    runNodeHealthCheck();
     runNodeHealthCheck();
 
     $this->cluster->update(['network_status' => 'reconciling']);
@@ -193,6 +198,9 @@ it('notifies when the cluster network is degraded', function () {
     connectNode($this->node);
     $this->cluster->update(['network_status' => 'degraded']);
 
+    runNodeHealthCheck();
+    Notification::assertNothingSent();
+    $this->travel(NotifyNodeClusterNetworkHealth::GRACE_PERIOD_SECONDS)->seconds();
     runNodeHealthCheck();
 
     Notification::assertSentToTimes($this->team, ClusterNetworkUnhealthy::class, 1);

@@ -32,7 +32,7 @@ it('repairs only the versioned public CA trust files and validates the restarted
         ->toContain('restore_file /etc/coolify/sentinel-flux-ca.pem')
         ->toContain('systemctl restart sentinel.service')
         ->toContain('systemctl is-active --quiet sentinel.service')
-        ->toContain('curl --fail --silent http://127.0.0.1:8888/api/health')
+        ->toContain('curl --fail --silent --connect-timeout 2 --max-time 5 http://127.0.0.1:8888/api/health')
         ->not->toContain($authority->certificate_pem)
         ->not->toContain($authority->private_key_pem)
         ->not->toContain(base64_encode($authority->private_key_pem))

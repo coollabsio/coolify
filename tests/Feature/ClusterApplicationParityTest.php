@@ -39,6 +39,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux:7080');
     config()->set('constants.flux.internal_token', 'test-token');
     $this->user = User::factory()->create();
@@ -359,7 +360,7 @@ describe('danger zone', function () {
         Queue::fake();
         Notification::fake();
         ($this->fakeFlux)();
-        $this->workload->update(['domains' => ['hello.example.com'], 'http_port' => 80]);
+        $this->workload->update([...nodeDomainAttributes(['hello.example.com'], 80)]);
         $revisionBefore = $this->cluster->refresh()->desired_revision;
 
         (new DeleteNodeWorkloadJob($this->workload->id, $this->user->id))->handle();

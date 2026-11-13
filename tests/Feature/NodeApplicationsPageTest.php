@@ -244,6 +244,7 @@ it('shows no actions to members and rejects their lifecycle calls', function () 
     Queue::assertNothingPushed();
 });
 
+// The dataset uses closures, so now() is read when each test runs, not when the file loads.
 it('shows the latest operation of an application on this server', function (array $attributes, string $text, string $toneClass) {
     $revision = $this->workload->revisions()->firstOrFail();
     NodeOperation::factory()->create([
@@ -271,14 +272,14 @@ it('shows the latest operation of an application on this server', function (arra
     preg_match('/<p data-node-workload-activity class="([^"]*)"/', $html, $matches);
     expect($matches[1] ?? '')->toContain($toneClass);
 })->with([
-    'deployed' => [['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subHours(15)], 'Deployed 15 hours ago', 'text-neutral-500'],
-    'stopped' => [['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'stop'], 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subMinutes(2)], 'Stopped 2 minutes ago', 'text-neutral-500'],
-    'restart queued' => [['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'restart'], 'status' => NodeOperationStatus::QUEUED], 'Restart queued', 'text-neutral-700'],
-    'deploy running' => [['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::RUNNING, 'started_at' => now()->subMinutes(1)], 'Deploy started 1 minute ago', 'text-neutral-700'],
-    'container removed' => [['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'remove'], 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subMinutes(5)], 'Container removed 5 minutes ago', 'text-neutral-500'],
-    'move failed' => [['command_type' => 'workload.move.v1', 'status' => NodeOperationStatus::FAILED, 'completed_at' => now()->subHour()], 'Move failed 1 hour ago', 'text-error'],
-    'deploy timed out' => [['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::TIMED_OUT, 'completed_at' => now()->subHour()], 'Deploy timed out 1 hour ago', 'text-error'],
-    'resources updated' => [['command_type' => 'workload.resources.v1', 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subHour()], 'Resources updated 1 hour ago', 'text-neutral-500'],
+    'deployed' => [fn (): array => ['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subHours(15)], 'Deployed 15 hours ago', 'text-neutral-500'],
+    'stopped' => [fn (): array => ['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'stop'], 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subMinutes(2)], 'Stopped 2 minutes ago', 'text-neutral-500'],
+    'restart queued' => [fn (): array => ['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'restart'], 'status' => NodeOperationStatus::QUEUED], 'Restart queued', 'text-neutral-700'],
+    'deploy running' => [fn (): array => ['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::RUNNING, 'started_at' => now()->subMinutes(1)], 'Deploy started 1 minute ago', 'text-neutral-700'],
+    'container removed' => [fn (): array => ['command_type' => 'workload.lifecycle.v1', 'request' => ['action' => 'remove'], 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subMinutes(5)], 'Container removed 5 minutes ago', 'text-neutral-500'],
+    'move failed' => [fn (): array => ['command_type' => 'workload.move.v1', 'status' => NodeOperationStatus::FAILED, 'completed_at' => now()->subHour()], 'Move failed 1 hour ago', 'text-error'],
+    'deploy timed out' => [fn (): array => ['command_type' => 'workload.deploy.v1', 'status' => NodeOperationStatus::TIMED_OUT, 'completed_at' => now()->subHour()], 'Deploy timed out 1 hour ago', 'text-error'],
+    'resources updated' => [fn (): array => ['command_type' => 'workload.resources.v1', 'status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()->subHour()], 'Resources updated 1 hour ago', 'text-neutral-500'],
 ]);
 
 it('links the latest deployment to its deployment page', function () {
