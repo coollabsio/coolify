@@ -67,7 +67,7 @@ services:
     volumes:
       - dev_redis_data:/data
   vite:
-    image: node:24-alpine
+    image: peakimages/aube:2.10.0-node26-v0.1.0
     pull_policy: always
     container_name: coolify-vite
     working_dir: /var/www/html
@@ -79,7 +79,7 @@ services:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "aube install --dev && aube run --no-install dev"
     networks:
       - coolify
   testing-host:

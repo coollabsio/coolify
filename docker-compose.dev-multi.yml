@@ -119,7 +119,7 @@ services:
 
   vite:
     profiles: ["vite"]
-    image: node:24-alpine
+    image: peakimages/aube:2.10.0-node26-v0.1.0
     pull_policy: always
     working_dir: /var/www/html
     environment:
@@ -131,7 +131,7 @@ services:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "aube install --dev && aube run --no-install dev"
     networks:
       - coolify
 
