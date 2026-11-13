@@ -11,7 +11,7 @@ stable need.
 
 | # | Work | Decision | Notes |
 | --- | --- | --- | --- |
-| B1 | Pin `sentinel-host` to a release that has the new commands | 0006 to 0013 | `upstream.json` pins `sentinel-host` 1.1.5. Releases v1.1.5 and v1.1.6 do not have private Git, registry login, external push, volume backup and restore, `image.load.v1`, build variables, or inline Dockerfiles. Blocked by B13. |
+| B1 | ~~Pin `sentinel-host` to a release that has the new commands~~ | 0006 to 0013 | Done: `upstream.json` pins `sentinel` and `sentinel-host` 1.1.7 (`sha256:f076eef7…`). Nodes get it from the CDN `versions.json` after the next release syncs it. Verified on dev with both Nodes. |
 | B2 | ~~Private registry pulls~~ | 0006 "Before release" | Done (verified on dev): team registry credentials (Keys & Tokens), `--authfile` on tmpfs for `workload.deploy`. |
 | B3 | ~~Push built images to an external registry~~ | 0006 "Before release" | Done (verified on dev): image name + tag on Git apps, second push after the cluster push. |
 | B4 | ~~Static build source~~ | 0006 | Done: built by the Railpack job with the base directory. Railpack serves files only when the folder has `index.html`, `Staticfile`, or `public/`. |
@@ -23,7 +23,7 @@ stable need.
 | B10 | ~~Installer scope: control plane plus SSH workers~~ | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Done: worker onboarding over SSH verified with a second Node; production Flux is B16. |
 | B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
 | B12 | ~~Instance setting for Nodes, labeled Beta~~ | [0015](decisions/0015-node-release-criteria.md) | Done: `is_nodes_enabled` in Settings > Advanced (instance admins only), Beta labels. Tests turn Nodes on with `setNodesEnabled()` (tests/Pest.php); the Node, Flux, Sentinel, and cluster tests pass (2026-11-13). CI runs no PHP tests, so run them locally. |
-| B13 | Release Sentinel, Flux, and `coolify-builder` with every new command | 0011, 0013, 0021 | Sentinel `a8bef06` is pushed and published as `main-a8bef06`; `FLUX_IMAGE` in both Dockerfiles pins it (Coolify `aaad15331c`). A versioned Sentinel release (and B1) is still open. |
+| B13 | ~~Release Sentinel, Flux, and `coolify-builder` with every new command~~ | 0011, 0013, 0021 | Done: [Sentinel v1.1.7](https://github.com/coollabsio/sentinel/releases/tag/v1.1.7) (`93ac30c`). `FLUX_IMAGE` pins `main-a8bef06`, the same code without the version bump and the quinn-udp update. |
 | B15 | ~~Traffic between applications on different Nodes is dropped~~ | 0005 | Fixed in Sentinel `8ee8341`: a `mesh_nat` chain in `coolify_cluster` (priority srcnat - 5) keeps the workload source IP before the netavark masquerade. Also fixed `ae0217c`: discovery DNS answers every name of its zones and no longer loops through systemd-resolved. |
 | B16 | ~~Production Flux~~ | [0021](decisions/0021-production-flux.md) | Done: Flux is an s6 service in the Coolify container, secrets in the database, Flux URL setting, restart after renewal, onboarding reachability check. |
 | B14 | ~~Dockerfile without Git (v4 "Dockerfile" type)~~ | 0006 | Done: source type `dockerfile_inline`, capability `image.build.inline_dockerfile.v1`. |
