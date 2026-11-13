@@ -36,7 +36,7 @@ stable need.
 | S2 | ~~Offline Node notifications and recovery~~ | [0014](decisions/0014-node-placement-and-failure.md). Done: "Server offline" state, affected apps in the notification, recovery move from backups, fencing when the Node returns. Recovery from the Node page is not built. |
 | S3 | Revision rollback | [0017](decisions/0017-node-revision-rollback.md) |
 | S4 | ~~Exec and terminal~~ | [0018](decisions/0018-node-exec-and-terminal.md). Done: scheduled tasks and a container terminal through Flux. |
-| S5 | ~~Deploy without downtime on one Node~~ | [0022](decisions/0022-node-rolling-deploys.md). Done: two container slots, make-before-break without a writable volume, stop-then-start with one. Stop-then-start downtime is about 3 s (Sentinel `011223e`: Caddy keeps a failed upstream out for 5 s, not 30 s; `ce966b5`: publish every second while a health check is `starting`). |
+| S5 | ~~Deploy without downtime on one Node~~ | [0022](decisions/0022-node-rolling-deploys.md). Done: two container slots, make-before-break without a writable volume, stop-then-start with one. Stop-then-start fails no requests in the test (slowest 0.25 s): Caddy holds requests while the only container restarts (Sentinel `011223e`, `a8bef06`: the passive health check only for several upstreams), and Sentinel publishes every second while a health check is `starting` (`ce966b5`). |
 
 ## Build when there is time
 
