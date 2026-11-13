@@ -65,6 +65,8 @@ it('skips the dashboard fetch of an unreachable server without a remote call', f
 
 it('tries a failing server once and skips it until the failure window ends', function () {
     markTrafficServerReachable($this->server);
+    // Without a pinned host key, the first command would also run a host key scan.
+    $this->server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
     Process::fake(fn () => Process::result(
         errorOutput: "ssh: connect to host {$this->server->ip} port 22: Connection timed out",
         exitCode: 255,
