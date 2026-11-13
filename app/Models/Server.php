@@ -347,8 +347,6 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
         'server_metadata' => 'array',
-        'logdrain_axiom_api_key' => 'encrypted',
-        'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
@@ -362,8 +360,6 @@ class Server extends BaseModel
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
-        'logdrain_axiom_api_key',
-        'logdrain_newrelic_license_key',
         'proxy_error_page',
     ];
 
@@ -2311,9 +2307,9 @@ $siteAddress {
         return $this->isFunctional();
     }
 
-    public function isLogDrainEnabled()
+    public function isLogDrainEnabled(): bool
     {
-        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
+        return $this->settings->logdrain_type !== null;
     }
 
     /**
@@ -2321,7 +2317,7 @@ $siteAddress {
      */
     public function isFluentBitLogDrainEnabled(): bool
     {
-        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+        return $this->settings->logdrain_type?->usesFluentBit() ?? false;
     }
 
     public function validateOS(): bool|Stringable

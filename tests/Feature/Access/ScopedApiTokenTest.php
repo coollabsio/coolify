@@ -203,7 +203,7 @@ describe('server secrets in resource responses', function () {
     beforeEach(function () {
         $this->server->settings->forceFill([
             'sentinel_token' => 'sentinel-token-canary',
-            'logdrain_axiom_api_key' => 'axiom-key-canary',
+            'logdrain_config' => ['axiom' => ['api_key' => 'axiom-key-canary']],
         ])->save();
         $this->server->proxy->last_saved_proxy_configuration = 'proxy-config-canary';
         $this->server->validation_logs = 'validation-logs-canary';
