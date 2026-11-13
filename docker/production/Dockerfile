@@ -14,7 +14,7 @@ ARG NODE_VERSION=24.22.1
 ARG PHP_UV_VERSION=0.3.0
 # Flux, the Node connection broker (decision 0021). Pin a published ghcr.io/coollabsio/flux tag with its multi-arch digest:
 # docker buildx imagetools inspect ghcr.io/coollabsio/flux:<tag> --format '{{json .Manifest.Digest}}'
-ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:main-a8bef06@sha256:a2c7632658dcc298b40ff1bfe30c09b0424d78126a67c4fcfcbed8ab8ec5ac7d
+ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:1.1.7@sha256:1a2f0e0937850c92fea2d14b8403d082c49035b2f68520720ebed1a1f21bc8a3
 
 # Add user/group
 ARG USER_ID=9999
