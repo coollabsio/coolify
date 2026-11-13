@@ -524,12 +524,14 @@ function clone_application(Application $source, $destination, array $overrides =
     }
 
     // Clone the application
+    // A clone is not managed by coolify.json: config_key is unique per environment.
     $newApplication = $source->replicate([
         'id',
         'created_at',
         'updated_at',
         'additional_servers_count',
         'additional_networks_count',
+        'config_key',
     ])->fill(array_merge([
         'uuid' => $uuid,
         'name' => $name,
@@ -653,6 +655,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
+                'config_meta',
             ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),
@@ -671,6 +674,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
+                'config_meta',
             ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),

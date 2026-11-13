@@ -21,6 +21,9 @@ class ManagedResources
 
     private static int $ignoringLock = 0;
 
+    /** @var array<int, ?EnvironmentConfigLink> Links by environment id, for one request or job. */
+    private array $links = [];
+
     /**
      * Runs the callback as the coolify.json apply, which may change managed records.
      *
@@ -52,9 +55,34 @@ class ManagedResources
         if ($resource === null || $resource->getAttribute('config_key') === null || ! $resource->getAttribute('environment_id')) {
             return null;
         }
-        $link = EnvironmentConfigLink::query()->where('environment_id', $resource->getAttribute('environment_id'))->first();
+        $environmentId = (int) $resource->getAttribute('environment_id');
+        $cache = self::cache();
+        if (! array_key_exists($environmentId, $cache->links)) {
+            $cache->links[$environmentId] = EnvironmentConfigLink::query()->where('environment_id', $environmentId)->first();
+        }
+        $link = $cache->links[$environmentId];
 
         return $link !== null && ! $link->isSuspended() ? $link : null;
+    }
+
+    /**
+     * Policies ask for every variable row, so the links are cached per request or job.
+     */
+    private static function cache(): self
+    {
+        app()->scopedIf(self::class);
+
+        return app(self::class);
+    }
+
+    /**
+     * Called when a link is saved or deleted.
+     */
+    public static function forgetLinks(): void
+    {
+        if (app()->resolved(self::class)) {
+            app(self::class)->links = [];
+        }
     }
 
     public static function isManaged(?Model $resource): bool

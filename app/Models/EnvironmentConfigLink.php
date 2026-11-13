@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,6 +18,12 @@ class EnvironmentConfigLink extends BaseModel
     public const MODE_GIT = 'git';
 
     public const MODE_API = 'api';
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => ManagedResources::forgetLinks());
+        static::deleted(fn () => ManagedResources::forgetLinks());
+    }
 
     protected $fillable = [
         'environment_id',

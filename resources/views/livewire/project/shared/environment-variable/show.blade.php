@@ -2,6 +2,7 @@
     $rowScope = $isSharedVariable ? 'shared' : (data_get($env, 'is_preview') ? 'preview' : 'production');
     $rowScopeLabel = $isSharedVariable ? str($type)->headline() : ($rowScope === 'preview' ? 'Preview' : 'Production');
     $canUpdate = auth()->user()?->can('update', $this->env) ?? false;
+    $canDelete = auth()->user()?->can('delete', $this->env) ?? false;
     $canEditValue = $canUpdate && !$isLocked && !$isDisabled && !$isValueHidden;
     $showValueType = !$is_redis_credential && !$isMagicVariable;
     $showInterpolation = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
@@ -267,11 +268,11 @@
                         <x-environment-variable-warning :problematic-variables="$problematicVariables" />
                     @endif
 
-                    @if ($canUpdate || auth()->user()?->can('delete', $this->env))
+                    @if ($canUpdate || $canDelete)
                         <div
                             class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                             <div data-environment-variable-delete-action>
-                                @can('delete', $this->env)
+                                @if ($canDelete)
                                     @if (!$isMagicVariable)
                                         <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
                                             buttonTitle="Delete" submitAction="delete"
@@ -281,7 +282,7 @@
                                             shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                                             step2ButtonText="Permanently Delete" />
                                     @endif
-                                @endcan
+                                @endif
                             </div>
                             <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
                                 @if ($this->connectLink)

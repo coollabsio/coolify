@@ -71,7 +71,10 @@ class EnvironmentVariables implements ChildRecords
                 continue;
             }
             if ($row->is_preview) {
-                $preview[$row->key] = $this->entry($row);
+                // A preview that follows production is not a preview entry of its own.
+                if (empty($row->config_meta['follows'])) {
+                    $preview[$row->key] = $this->entry($row);
+                }
             } else {
                 $production[$row->key] = $this->entry($row);
             }
@@ -142,8 +145,10 @@ class EnvironmentVariables implements ChildRecords
             }
         }
 
+        $productionKeys = $rows->where('is_preview', false)->pluck('key')->all();
         foreach ($rows as $row) {
-            if (array_key_exists($row->key, $desired)) {
+            // The file cannot express a preview-only variable, so it stays as Coolify has it.
+            if (array_key_exists($row->key, $desired) || ($row->is_preview && ! in_array($row->key, $productionKeys, true))) {
                 continue;
             }
             if (! $this->isGenerated($owner, $row->key)) {
@@ -197,9 +202,16 @@ class EnvironmentVariables implements ChildRecords
         }
         $row->order = $order;
         $created = ! $row->exists;
+        $previewQuery = fn () => EnvironmentVariable::query()
+            ->where('resourceable_type', $owner->getMorphClass())
+            ->where('resourceable_id', $owner->getKey())
+            ->where('key', $name)
+            ->where('is_preview', true);
+        // Only the copy that the created hook makes is replaced; an existing preview row keeps its value.
+        $replacesHookCopy = $created && ! $isPreview && $owner instanceof Application && ! $previewQuery()->exists();
         $row->withoutAuditLogging(fn () => $row->save());
 
-        if ($created && ! $isPreview && $owner instanceof Application) {
+        if ($replacesHookCopy) {
             EnvironmentVariable::query()
                 ->where('resourceable_type', $owner->getMorphClass())
                 ->where('resourceable_id', $owner->getKey())
@@ -213,23 +225,38 @@ class EnvironmentVariables implements ChildRecords
         return $row;
     }
 
-    private function copyToPreview(Model $owner, EnvironmentVariable $production, ?EnvironmentVariable $preview): void
+    /**
+     * The file has no preview for the variable, so the preview follows production. A preview value that was set
+     * in Coolify stays: the filled value of a required variable, and a value from before the file managed it.
+     */
+    private function copyToPreview(Application $owner, EnvironmentVariable $production, ?EnvironmentVariable $preview): void
     {
+        $isCopy = (bool) $preview?->is_production_value_copy;
+        $isRequired = ($production->config_meta['form'] ?? null) === 'required';
+        $keepsValue = $preview !== null && filled($preview->value)
+            && ($isRequired || (! $isCopy && empty($preview->config_meta)));
+        $copiesValue = $isCopy || $owner->settings?->use_production_values_in_previews !== false;
+
         $preview ??= new EnvironmentVariable([
             'key' => $production->key,
             'resourceable_type' => $owner->getMorphClass(),
             'resourceable_id' => $owner->getKey(),
             'is_preview' => true,
         ]);
-        $preview->value = $production->value;
-        $preview->config_meta = $production->config_meta;
+        if (! $keepsValue) {
+            $preview->value = $copiesValue ? $production->value : '';
+        }
+        // A kept value that the file does not describe reads as a required preview, so the plan shows it.
+        $preview->config_meta = $keepsValue && ! $isRequired ? ['form' => 'required'] : ($production->config_meta ?? []) + ['follows' => true];
         foreach (self::FLAG_COLUMNS as $column) {
             $preview->{$column} = $production->{$column};
         }
         $preview->order = $production->order;
         $preview->withoutAuditLogging(fn () => $preview->save());
-        // After the save: the saving hook clears the flag when a preview value changes.
-        EnvironmentVariable::query()->whereKey($preview->getKey())->update(['is_production_value_copy' => filled($production->value)]);
+        if (! $keepsValue) {
+            // After the save: the saving hook clears the flag when a preview value changes.
+            EnvironmentVariable::query()->whereKey($preview->getKey())->update(['is_production_value_copy' => $copiesValue && filled($production->value)]);
+        }
     }
 
     public static function generate(string $kind, ?int $length): string

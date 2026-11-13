@@ -172,3 +172,69 @@ it('fails validation for unknown child references before any write', function ()
         'resources.api.files.../etc/passwd',
     );
 });
+
+function childPreviewRow(Application $app, string $key): ?EnvironmentVariable
+{
+    return EnvironmentVariable::where('resourceable_id', $app->id)->where('resourceable_type', $app->getMorphClass())
+        ->where('key', $key)->where('is_preview', true)->first();
+}
+
+/** A variable set in Coolify before the file managed it: production and preview have different values. */
+function childAdoptedVariable(Application $app, string $key, string $production, string $preview): void
+{
+    ManagedResources::whileApplying(function () use ($app, $key, $production, $preview) {
+        EnvironmentVariable::create(['key' => $key, 'value' => $production, 'resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id]);
+        childPreviewRow($app, $key)->update(['value' => $preview]);
+    });
+}
+
+it('keeps a different preview value of a required variable through export and apply', function () {
+    $app = $this->application->fresh();
+    childAdoptedVariable($app, 'DB_URL', 'postgres://prod', 'postgres://pr');
+    $exported = $this->adapter->read($app, $this->ctx)['env'];
+    expect($exported['DB_URL'])->toBe(['required' => true]);
+
+    $app = childWrite(['env' => $exported]);
+    $app = childWrite(['env' => $exported + ['NEW' => ['value' => '1']]]);
+
+    expect(childWriteValue($app, 'DB_URL'))->toBe('postgres://prod')
+        ->and(childWriteValue($app, 'DB_URL', true))->toBe('postgres://pr')
+        ->and($this->adapter->read($app, $this->ctx)['env'])->toBe($this->adapter->canonical('api', childWriteDesired(['env' => $exported + ['NEW' => ['value' => '1']]]))['env']);
+});
+
+it('keeps preview-only variables that the file cannot express', function () {
+    $app = $this->application->fresh();
+    ManagedResources::whileApplying(fn () => EnvironmentVariable::create(['key' => 'PR_ONLY', 'value' => 'pr', 'is_preview' => true, 'resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id]));
+
+    $app = childWrite(['env' => ['A' => ['value' => '1']]]);
+
+    expect(childWriteValue($app, 'PR_ONLY', true))->toBe('pr');
+});
+
+it('keeps an adopted preview value when the file adds the variable, and shows it in the plan', function () {
+    $app = $this->application->fresh();
+    ManagedResources::whileApplying(fn () => EnvironmentVariable::create(['key' => 'API_URL', 'value' => 'https://pr.acme.com', 'is_preview' => true, 'resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id]));
+
+    $app = childWrite(['env' => ['API_URL' => ['value' => 'https://api.acme.com']]]);
+
+    expect(childWriteValue($app, 'API_URL', true))->toBe('https://pr.acme.com')
+        ->and($this->adapter->read($app, $this->ctx)['env']['API_URL'])->toEqual(['value' => 'https://api.acme.com', 'preview' => ['required' => true]]);
+});
+
+it('follows production again when the file removes the preview value', function () {
+    childWrite(['env' => ['API_URL' => ['value' => 'https://api.acme.com', 'preview' => ['value' => 'https://pr.acme.com']]]]);
+    $app = childWrite(['env' => ['API_URL' => ['value' => 'https://api.acme.com']]]);
+
+    expect(childWriteValue($app, 'API_URL', true))->toBe('https://api.acme.com')
+        ->and($this->adapter->read($app, $this->ctx)['env'])->toBe(['API_URL' => ['value' => 'https://api.acme.com']]);
+});
+
+it('leaves a new preview copy empty when previews do not use production values', function () {
+    $desired = ['settings' => ['use_production_values_in_previews' => false], 'env' => ['TOKEN' => ['value' => 'secret']]];
+    childWrite($desired);
+    $app = childWrite($desired);
+
+    expect(childWriteValue($app, 'TOKEN', true))->toBe('')
+        ->and(childPreviewRow($app, 'TOKEN')->is_production_value_copy)->toBeFalse()
+        ->and($this->adapter->read($app, $this->ctx)['env'])->toBe(['TOKEN' => ['value' => 'secret']]);
+});

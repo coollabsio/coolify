@@ -186,10 +186,12 @@ class CloneMe extends Component
 
         foreach ($databases as $database) {
             $uuid = new_public_id();
+            // A clone is not managed by coolify.json.
             $newDatabase = $database->replicate([
                 'id',
                 'created_at',
                 'updated_at',
+                'config_key',
             ])->fill([
                 'uuid' => $uuid,
                 'status' => 'exited',
@@ -300,6 +302,7 @@ class CloneMe extends Component
                     'id',
                     'created_at',
                     'updated_at',
+                    'config_meta',
                 ])->fill($payload);
                 $newEnvironmentVariable->save();
             }

@@ -691,10 +691,13 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
     $teamId = $source->team()->id;
     $uuid = $overrides['uuid'] ?? new_public_id();
 
+    // A clone is not managed by coolify.json: config_key is unique per environment.
     $newService = $source->replicate([
         'id',
         'created_at',
         'updated_at',
+        'config_key',
+        'config_meta',
     ])->fill([
         'name' => clone_resource_name($source->name, $uuid),
         ...$overrides,
@@ -726,6 +729,7 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             'id',
             'created_at',
             'updated_at',
+            'config_meta',
         ])->fill([
             'resourceable_id' => $newService->id,
             'resourceable_type' => $newService->getMorphClass(),

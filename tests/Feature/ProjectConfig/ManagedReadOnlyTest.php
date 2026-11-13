@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -112,6 +113,30 @@ it('still denies after the user switches to another team they own', function () 
     $component->set('portsExposes', '9000')->call('submit');
 
     expect($this->managed->fresh()->ports_exposes)->toBe('3000');
+});
+
+it('looks up the link of an environment once, and sees link changes', function () {
+    $other = $this->managed->replicate(['uuid', 'config_key'])->forceFill(['uuid' => new_public_id(), 'config_key' => 'web']);
+    ManagedResources::whileApplying(fn () => $other->save());
+
+    DB::enableQueryLog();
+    $managed = collect(range(1, 5))->map(fn () => ManagedResources::isManaged($this->managed) && ManagedResources::isManaged($other))->unique()->all();
+    $linkQueries = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'environment_config_links'))->count();
+    DB::disableQueryLog();
+
+    expect($managed)->toBe([true])->and($linkQueries)->toBe(1);
+
+    $this->link->update(['suspended_at' => now()]);
+    expect(ManagedResources::isManaged($this->managed))->toBeFalse();
+
+    $this->link->update(['suspended_at' => null]);
+    expect(ManagedResources::isManaged($this->managed))->toBeTrue();
+
+    $this->link->delete();
+    expect(ManagedResources::isManaged($this->managed))->toBeFalse();
+
+    EnvironmentConfigLink::factory()->create(['environment_id' => $this->fx['environment']->id]);
+    expect(ManagedResources::isManaged($this->managed))->toBeTrue();
 });
 
 it('still shows commands of a managed resource to a team admin, but not to a member', function () {
