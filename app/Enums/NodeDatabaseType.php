@@ -139,6 +139,28 @@ enum NodeDatabaseType: string
     }
 
     /**
+     * Whether a container with this start command cannot restore a dump. Redis needs `DEBUG RELOAD`,
+     * which the start command allows since dump backups exist.
+     *
+     * @param  list<string>  $command
+     */
+    public function startCommandBlocksRestore(array $command): bool
+    {
+        return $this === self::REDIS && ! str_contains(implode(' ', $command), '--enable-debug-command');
+    }
+
+    /**
+     * Whether this is a start command that an earlier version of startCommand() returned, so the
+     * current one can replace it. A command that the user changed is not one.
+     *
+     * @param  list<string>  $command
+     */
+    public function isEarlierStartCommand(array $command): bool
+    {
+        return $this === self::REDIS && $command === ['sh', '-c', 'exec redis-server --requirepass "$REDIS_PASSWORD" --appendonly yes'];
+    }
+
+    /**
      * The health check columns of the workload, with the v4 database intervals. The commands need no
      * credentials, because a health check command cannot read variables.
      *

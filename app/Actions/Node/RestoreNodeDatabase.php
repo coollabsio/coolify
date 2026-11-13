@@ -2,8 +2,11 @@
 
 namespace App\Actions\Node;
 
+use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\RestoreNodeDatabaseJob;
+use App\Models\Node;
 use App\Models\NodeWorkload;
+use App\Models\NodeWorkloadRevision;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -57,6 +60,7 @@ class RestoreNodeDatabase
         $backup = self::check($workload, $execution);
         $node = DumpNodeDatabase::node($workload);
         $s3 = self::storage($execution, $workload);
+        self::ensureRestorableStartCommand($workload, $node, $deadline);
         $restoreId = $execution->uuid.'-'.Str::lower(Str::random(8));
         $request = [
             'server_id' => $node->uuid,
@@ -91,6 +95,47 @@ class RestoreNodeDatabase
                 throw new RuntimeException('The backup could not be restored: '.($state['error'] !== '' ? $state['error'] : 'Sentinel reported no reason.'));
             }
             Sleep::for(self::POLL_SECONDS)->seconds();
+        }
+    }
+
+    /**
+     * Deploys the database again when its container runs with a start command that cannot restore a
+     * dump: a Redis database from before dump backups has no `--enable-debug-command`. Only the
+     * start command of an earlier version is replaced. A command that the user changed stays.
+     */
+    public static function ensureRestorableStartCommand(NodeWorkload $workload, Node $node, Carbon $deadline): void
+    {
+        $type = $workload->database_type;
+        $blocked = fn (?NodeWorkloadRevision $revision): bool => $revision !== null
+            && $type->startCommandBlocksRestore($revision->configuration['command'] ?? []);
+        if (! $blocked($workload->deployedRevision())) {
+            return;
+        }
+        $latest = $workload->revisions()->latest('id')->firstOrFail();
+        if ($blocked($latest)) {
+            if (! $type->isEarlierStartCommand($latest->configuration['command'] ?? [])) {
+                throw new RuntimeException('The start command of this database does not allow a restore. Add "--enable-debug-command local" to the start command, redeploy the database, and restore again.');
+            }
+            $workload->createRevision(
+                $latest->image,
+                [...($latest->configuration ?? []), 'command' => $type->startCommand()],
+                $latest->environment ?? [],
+                $latest->secrets ?? [],
+            );
+        }
+
+        $requestedBy = User::query()->find(self::state($workload)['requested_by'] ?? null);
+        $deployment = CreateDeploymentOperation::run($node, PrepareNodeWorkloadRevision::run($workload), $requestedBy);
+        $operation = $deployment['operation'];
+        if ($deployment['created']) {
+            // Inline: with one queue worker, a queued deployment would wait behind this job.
+            (new DeployNodeWorkloadJob($operation->id, $deadline))->handle();
+        }
+        while ($operation->refresh()->status->isActive() && now()->lt($deadline)) {
+            Sleep::for(self::POLL_SECONDS)->seconds();
+        }
+        if ($blocked($workload->deployedRevision())) {
+            throw new RuntimeException(trim('The database could not be deployed again with the start command that a restore needs. Redeploy the database and restore again. '.($operation->error ?? '')));
         }
     }
 
