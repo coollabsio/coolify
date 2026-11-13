@@ -34,6 +34,24 @@ trait ResolvesDestination
     }
 
     /**
+     * Why the entry names no usable destination, or null when it does.
+     */
+    protected function destinationError(Server $server, ?string $network): ?string
+    {
+        if ($this->destination($server, $network) !== null) {
+            return null;
+        }
+        $networks = $server->destinations()->pluck('network')->sort()->implode(', ');
+        if ($networks === '') {
+            return "Server \"{$server->name}\" has no Docker destination. Add one in Coolify first.";
+        }
+
+        return $network === null
+            ? "Server \"{$server->name}\" has more than one destination. Add \"destination\" with one of: {$networks}."
+            : "Server \"{$server->name}\" has no destination with network \"{$network}\". Use one of: {$networks}.";
+    }
+
+    /**
      * @return array{server?: string, destination?: string}
      */
     protected function readDestination(?object $destination): array

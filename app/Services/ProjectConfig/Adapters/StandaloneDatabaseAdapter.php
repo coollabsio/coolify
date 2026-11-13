@@ -335,8 +335,8 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
         $errors = [];
 
         $server = $this->server($desired, $ctx);
-        if ($server !== null && $this->destination($server, $desired['destination'] ?? null) === null) {
-            $errors[] = new ConfigError("{$base}.destination", 'This server has more than one destination. Add the network name of one.');
+        if ($server !== null && ($message = $this->destinationError($server, $desired['destination'] ?? null)) !== null) {
+            $errors[] = new ConfigError("{$base}.destination", $message);
         }
 
         $validator = Validator::make($desired, [

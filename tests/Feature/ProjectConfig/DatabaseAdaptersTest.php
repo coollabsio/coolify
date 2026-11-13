@@ -6,6 +6,7 @@ use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use App\Models\EnvironmentVariable;
 use App\Models\S3Storage;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Services\ProjectConfig\AdapterRegistry;
 use App\Services\ProjectConfig\ApplyContext;
@@ -149,4 +150,21 @@ it('manages backups and rejects an S3 storage of another team', function () {
 it('rejects vault references on databases', function () {
     expect(array_map(fn ($e) => $e->path, dbPlan(['db' => ['type' => 'postgresql', 'server' => 'prod-1', 'env' => ['X' => ['ref' => 'vault.X']]]])->errors))
         ->toContain('resources.db.env.X');
+});
+
+it('explains a missing, ambiguous, or unknown destination', function () {
+    $messages = function (array $extra) {
+        return collect(dbPlan(['db' => ['type' => 'redis', 'server' => 'prod-1'] + $extra, 'api' => [
+            'type' => 'application', 'server' => 'prod-1', 'build' => ['pack' => 'dockerfile'], 'ports' => ['exposes' => '80'],
+            'source' => ['repository' => 'https://github.com/acme/api', 'branch' => 'main'],
+        ] + $extra])->errors)->filter(fn ($e) => str_ends_with($e->path, '.destination'))->pluck('message')->unique()->values()->all();
+    };
+
+    StandaloneDocker::where('server_id', $this->fx['server']->id)->delete();
+    expect($messages([]))->toBe(['Server "prod-1" has no Docker destination. Add one in Coolify first.']);
+
+    StandaloneDocker::forceCreate(['name' => 'a', 'network' => 'net-a', 'server_id' => $this->fx['server']->id, 'uuid' => 'sda']);
+    StandaloneDocker::forceCreate(['name' => 'b', 'network' => 'net-b', 'server_id' => $this->fx['server']->id, 'uuid' => 'sdb']);
+    expect($messages([]))->toBe(['Server "prod-1" has more than one destination. Add "destination" with one of: net-a, net-b.'])
+        ->and($messages(['destination' => 'nope']))->toBe(['Server "prod-1" has no destination with network "nope". Use one of: net-a, net-b.']);
 });

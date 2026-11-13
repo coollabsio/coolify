@@ -135,3 +135,18 @@ it('gives the internal url, host, and port as references', function () {
         ->and($this->adapter->referenceValue($app, 'port'))->toBe('8080')
         ->and($this->adapter->referenceValue($app, 'internal_url'))->toBe("http://{$app->uuid}:8080");
 });
+
+it('treats health check timings from the Dockerfile as derived while the file leaves the health check off', function () {
+    $desired = writeTestDesired();
+    $app = $this->adapter->create('api', $desired, $this->ctx);
+    $app->forceFill(['custom_healthcheck_found' => true, 'health_check_retries' => 3, 'health_check_start_period' => 1, 'health_check_timeout' => 3])->save();
+
+    expect(writeTestPlanIsEmpty($desired))->toBeTrue();
+
+    $this->adapter->update($app->fresh(), writeTestDesired(['ports' => ['exposes' => '8080']]), $this->ctx);
+    expect($app->fresh()->health_check_retries)->toBe(3);
+
+    $this->adapter->update($app->fresh(), writeTestDesired(['health_check' => ['enabled' => true, 'retries' => 7]]), $this->ctx);
+    expect($app->fresh()->health_check_retries)->toBe(7)
+        ->and($app->fresh()->health_check_timeout)->toBe(5);
+});

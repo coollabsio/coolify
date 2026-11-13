@@ -45,6 +45,14 @@ class ApplicationAdapter implements ResourceAdapter
 
     private const SETTINGS = 'application_settings';
 
+    /**
+     * Health check timings that a deployment copies from the Dockerfile HEALTHCHECK while Coolify's own health check is off.
+     */
+    private const DOCKERFILE_HEALTHCHECK_COLUMNS = [
+        'health_check_interval' => 'interval', 'health_check_timeout' => 'timeout',
+        'health_check_retries' => 'retries', 'health_check_start_period' => 'start_period',
+    ];
+
     private ?FieldMap $map = null;
 
     /** @var list<ChildRecords>|null */
@@ -280,6 +288,14 @@ class ApplicationAdapter implements ResourceAdapter
         return Application::query()->where('environment_id', $environment->id)->whereNull('config_key')->where('id', '!=', 0)->orderBy('id')->get();
     }
 
+    /**
+     * The Dockerfile has a HEALTHCHECK and the file does not turn on Coolify's health check, so the timings come from the Dockerfile.
+     */
+    private function usesDockerfileHealthcheck(Application $application, array $entry): bool
+    {
+        return (bool) $application->custom_healthcheck_found && ! ($entry['health_check']['enabled'] ?? false);
+    }
+
     public function canonical(string $key, array $desired): array
     {
         $desired['name'] ??= $key;
@@ -306,6 +322,14 @@ class ApplicationAdapter implements ResourceAdapter
         /** @var Application $resource */
         $result = ['type' => 'application', 'name' => $resource->name];
         $result += $this->readMappedFields($this->fieldMap(), ['applications' => $resource, self::SETTINGS => $resource->settings]);
+        if ($this->usesDockerfileHealthcheck($resource, $result)) {
+            foreach (self::DOCKERFILE_HEALTHCHECK_COLUMNS as $key) {
+                unset($result['health_check'][$key]);
+            }
+            if (($result['health_check'] ?? null) === []) {
+                unset($result['health_check']);
+            }
+        }
 
         $destination = $resource->destination;
         $server = $destination?->server;
@@ -395,10 +419,8 @@ class ApplicationAdapter implements ResourceAdapter
 
         $server = $this->server($desired, $ctx);
         if ($server !== null) {
-            if ($this->destination($server, $desired['destination'] ?? null) === null) {
-                $errors[] = new ConfigError("{$base}.destination", $server->destinations()->count() > 1
-                    ? 'This server has more than one destination. Add the network name of one.'
-                    : 'No destination with this network is on the server.');
+            if (($message = $this->destinationError($server, $desired['destination'] ?? null)) !== null) {
+                $errors[] = new ConfigError("{$base}.destination", $message);
             }
         }
 
@@ -553,7 +575,11 @@ class ApplicationAdapter implements ResourceAdapter
 
     private function fill(Application $application, string $key, array $desired, ApplyContext $ctx): void
     {
-        $application->forceFill($this->columnsFromFile($desired)['applications']);
+        $columns = $this->columnsFromFile($desired)['applications'];
+        if ($this->usesDockerfileHealthcheck($application, $desired)) {
+            $columns = array_diff_key($columns, self::DOCKERFILE_HEALTHCHECK_COLUMNS);
+        }
+        $application->forceFill($columns);
         $application->name = $desired['name'] ?? $key;
 
         $server = $this->server($desired, $ctx) ?? throw new LogicException("Server \"{$desired['server']}\" not found.");
