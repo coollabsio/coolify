@@ -3789,7 +3789,8 @@ input[type="search"]::-webkit-search-results-decoration {
     pointer-events: none;
 }
 
-.deployment-table-row a:not(.deployment-row-link) {
+.deployment-table-row a:not(.deployment-row-link),
+.deployment-table-row button {
     pointer-events: auto;
 }
 
