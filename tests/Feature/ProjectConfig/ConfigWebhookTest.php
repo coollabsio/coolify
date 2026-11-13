@@ -135,3 +135,33 @@ it('routes manual GitLab, Gitea, and Bitbucket pushes', function () {
 
     Queue::assertPushed(PlanEnvironmentConfigJob::class, 3);
 });
+
+it('deploys managed apps of the repository after the apply when the push is signed with the link secret', function () {
+    $this->link->update(['source_type' => null, 'source_id' => null, 'repository' => 'https://github.com/acme/api.git']);
+    $app = webhookApp(['config_key' => 'api', 'source_type' => null, 'source_id' => null, 'git_repository' => 'https://github.com/acme/api', 'manual_webhook_secret_github' => 'app-secret-x']);
+
+    webhookGithubManualPush(webhookPushPayload(modified: ['src/index.js']), 'link-secret');
+
+    expect(ApplicationDeploymentQueue::where('application_id', $app->id)->count())->toBe(0);
+    Queue::assertPushed(PlanEnvironmentConfigJob::class, fn ($job) => $job->heldApplicationUuids === [$app->uuid]);
+});
+
+it('plans the link and holds the app when the push is signed with the app secret', function () {
+    $this->link->update(['source_type' => null, 'source_id' => null, 'repository' => 'https://github.com/acme/api.git']);
+    $app = webhookApp(['config_key' => 'api', 'source_type' => null, 'source_id' => null, 'git_repository' => 'https://github.com/acme/api', 'manual_webhook_secret_github' => 'app-secret-x']);
+
+    webhookGithubManualPush(webhookPushPayload(modified: ['src/index.js']), 'app-secret-x');
+
+    expect(ApplicationDeploymentQueue::where('application_id', $app->id)->count())->toBe(0);
+    Queue::assertPushed(PlanEnvironmentConfigJob::class, fn ($job) => $job->link->is($this->link) && $job->heldApplicationUuids === [$app->uuid]);
+});
+
+it('does not plan a link for an unmanaged app signed with its own secret', function () {
+    $this->link->update(['source_type' => null, 'source_id' => null, 'repository' => 'https://github.com/acme/api.git']);
+    $app = webhookApp(['config_key' => null, 'source_type' => null, 'source_id' => null, 'git_repository' => 'https://github.com/acme/api', 'manual_webhook_secret_github' => 'app-secret-x']);
+
+    webhookGithubManualPush(webhookPushPayload(modified: ['src/index.js']), 'app-secret-x');
+
+    expect(ApplicationDeploymentQueue::where('application_id', $app->id)->count())->toBe(1);
+    Queue::assertNotPushed(PlanEnvironmentConfigJob::class);
+});

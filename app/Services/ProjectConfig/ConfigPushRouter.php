@@ -17,6 +17,9 @@ class ConfigPushRouter
     /** @var array<int, array{link: EnvironmentConfigLink, commit: ?string, held: list<string>}> */
     private array $pending = [];
 
+    /** @var array<int, array{link: EnvironmentConfigLink, commit: ?string}> manual-webhook links that match the push but not its signature */
+    private array $candidates = [];
+
     private bool $flushRegistered = false;
 
     /**
@@ -38,14 +41,36 @@ class ConfigPushRouter
                     continue;
                 }
             } elseif ($verifySecret === null || blank($link->webhook_secret) || ! $verifySecret((string) $link->webhook_secret)) {
+                // The push can still be signed with the secret of a managed application of this repository (see hold()).
+                $this->candidates[$link->id] = ['link' => $link, 'commit' => $commit];
+
                 continue;
             }
 
-            $link->update(['pending_commit_sha' => $commit, 'pending_held_deployments' => [], 'pending_pushed_at' => now()]);
-            $this->pending[$link->id] = ['link' => $link, 'commit' => $commit, 'held' => []];
+            $this->addPending($link, $commit);
+            // One repository webhook signs with one secret, so the managed applications of the repository wait for this push.
+            if ($source === null) {
+                $managed = Application::query()
+                    ->where('environment_id', $link->environment_id)
+                    ->whereNotNull('config_key')
+                    ->where('git_branch', $branch)
+                    ->get()
+                    ->filter(fn (Application $application) => $repositoryMatches($application->git_repository));
+                foreach ($managed as $application) {
+                    $this->pending[$link->id]['held'][] = $application->uuid;
+                }
+                $link->update(['pending_held_deployments' => array_values(array_unique($this->pending[$link->id]['held']))]);
+            }
         }
+    }
 
-        if ($this->pending !== [] && ! $this->flushRegistered) {
+    private function addPending(EnvironmentConfigLink $link, ?string $commit): void
+    {
+        $link->update(['pending_commit_sha' => $commit, 'pending_held_deployments' => [], 'pending_pushed_at' => now()]);
+        $this->pending[$link->id] = ['link' => $link, 'commit' => $commit, 'held' => []];
+        unset($this->candidates[$link->id]);
+
+        if (! $this->flushRegistered) {
             $this->flushRegistered = true;
             app()->terminating(fn () => $this->flush());
         }
@@ -58,6 +83,12 @@ class ConfigPushRouter
     {
         if ($application->config_key === null) {
             return false;
+        }
+        // The webhook verified the signature of this managed application, so the push is authentic for its environment link too.
+        foreach ($this->candidates as $entry) {
+            if ((int) $entry['link']->environment_id === (int) $application->environment_id && ! $entry['link']->isSuspended()) {
+                $this->addPending($entry['link'], $entry['commit']);
+            }
         }
         foreach ($this->pending as $id => $entry) {
             if ((int) $entry['link']->environment_id === (int) $application->environment_id) {
