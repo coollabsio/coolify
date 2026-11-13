@@ -26,6 +26,9 @@
                                 <x-status-summary :status="$resource->status" />
                             </div>
                             <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-500 dark:text-fg-dim">
+                                <span>Address</span>
+                                <code
+                                    class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($resource, 'destination.server.ip') }}</code>
                                 <span>Network</span>
                                 <code
                                     class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($resource, 'destination.network') }}</code>
@@ -95,6 +98,9 @@
                                         </div>
                                         <p
                                             class="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-500 dark:text-fg-dim">
+                                            <span>Address</span>
+                                            <code
+                                                class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($destination, 'server.ip') }}</code>
                                             <span>Network</span>
                                             <code
                                                 class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($destination, 'network') }}</code>
@@ -173,7 +179,7 @@
 
             @if (data_get($resource, 'build_pack') !== 'dockercompose')
                 <x-application.settings-section id="available-servers-section" title="Add another server"
-                    helper="Attach another available server and network as a deployment destination." :flush="$resource->persistentStorages()->count() === 0">
+                    helper="Attach another available server and network as a deployment destination. Put your own load balancer in front of the servers." :flush="$resource->persistentStorages()->count() === 0">
                     @if ($resource->persistentStorages()->count() > 0)
                         <x-callout type="warning" title="Additional servers are unavailable">
                             This application has persistent storage volumes. Applications with persistent storage
@@ -193,10 +199,13 @@
                                             <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
                                                 {{ data_get($network, 'server.name') }}
                                             </h4>
-                                            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                                                Network
+                                            <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-500 dark:text-fg-dim">
+                                                <span>Address</span>
                                                 <code
-                                                    class="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($network, 'name') }}</code>
+                                                    class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($network, 'server.ip') }}</code>
+                                                <span>Network</span>
+                                                <code
+                                                    class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($network, 'name') }}</code>
                                             </p>
                                         </div>
                                     </div>
