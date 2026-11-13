@@ -58,10 +58,10 @@ Gaps in finished work that have no row above.
 
 | # | Gap | From |
 | --- | --- | --- |
-| G1 | A Redis database created before S1 has no debug flag in its start command, so an import fails until the database is deployed again with the new start command. | S1 |
-| G2 | `MoveNodeWorkloadJob` has its own copy of the network-revision wait; it should use the shared action. | S2 |
-| G3 | The **Sentinel** section of a Node shows the old connection state after **Repair trust** until a reload, because Sentinel reconnects a few seconds after the action. | B16 |
-| G4 | Port 7443 is published on every install. If another program on the host uses it, the Coolify container cannot start after the upgrade. `FLUX_PORT` changes the port. | 0021 |
+| G1 | ~~A Redis database created before S1 has no debug flag in its start command, so an import fails until the database is deployed again with the new start command.~~ Done: an import deploys such a database again with the current start command first. A start command that the user changed stays, and the import tells which flag to add. | S1 |
+| G2 | ~~`MoveNodeWorkloadJob` has its own copy of the network-revision wait; it should use the shared action.~~ Done: the move calls `ApplyNodeClusterNetworkRevision`. | S2 |
+| G3 | ~~The **Sentinel** section of a Node shows the old connection state after **Repair trust** until a reload, because Sentinel reconnects a few seconds after the action.~~ Done: the section reads the state every 3 seconds for 30 seconds after a repair, a restart, an update, and a token rotation. | B16 |
+| G4 | ~~Port 7443 is published on every install. If another program on the host uses it, the Coolify container cannot start after the upgrade. `FLUX_PORT` changes the port.~~ Done: `upgrade.sh` writes the next free port as `FLUX_PORT` when another program uses port 7443. | 0021 |
 | G5 | The Sentinel release workflow (`release.yaml`) does not publish `coolify-builder` with the version tag. Only `release-main.yaml` publishes it as `main-<sha>`. | B13 |
 
 ## Postponed
