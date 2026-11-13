@@ -1,6 +1,6 @@
 # Coolify v5 Roadmap
 
-**Last reviewed:** 2026-11-12
+**Last reviewed:** 2026-11-13
 
 This list sorts the open v5 work. Every item in "Build" has an accepted
 decision. The accepted decisions are in [decisions/README.md](decisions/README.md).
@@ -23,9 +23,9 @@ stable need.
 | B10 | ~~Installer scope: control plane plus SSH workers~~ | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Done: worker onboarding over SSH verified with a second Node; production Flux is B16. |
 | B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
 | B12 | ~~Instance setting for Nodes, labeled Beta~~ | [0015](decisions/0015-node-release-criteria.md) | Done: `is_nodes_enabled` in Settings > Advanced (instance admins only), Beta labels. Existing tests still set the old config key. |
-| B13 | Release Sentinel, Flux, and `coolify-builder` with every new command | 0011, 0013, 0021 | Sentinel `26334ea` is pushed and published as `main-26334ea`; `FLUX_IMAGE` in both Dockerfiles pins it. A versioned Sentinel release (and B1) is still open. |
+| B13 | Release Sentinel, Flux, and `coolify-builder` with every new command | 0011, 0013, 0021 | Sentinel `a8bef06` is pushed and published as `main-a8bef06`; `FLUX_IMAGE` in both Dockerfiles pins it (Coolify `aaad15331c`). A versioned Sentinel release (and B1) is still open. |
 | B15 | ~~Traffic between applications on different Nodes is dropped~~ | 0005 | Fixed in Sentinel `8ee8341`: a `mesh_nat` chain in `coolify_cluster` (priority srcnat - 5) keeps the workload source IP before the netavark masquerade. Also fixed `ae0217c`: discovery DNS answers every name of its zones and no longer loops through systemd-resolved. |
-| B16 | ~~Production Flux~~ | [0021](decisions/0021-production-flux.md) | Done: Flux is an s6 service in the Coolify container, secrets in the database, Flux URL setting, restart after renewal, onboarding reachability check. The `FLUX_IMAGE` pin in both Dockerfiles is `main-ea82bdb`, which lacks the build fields of Sentinel `6784fcd`; move it with B13. |
+| B16 | ~~Production Flux~~ | [0021](decisions/0021-production-flux.md) | Done: Flux is an s6 service in the Coolify container, secrets in the database, Flux URL setting, restart after renewal, onboarding reachability check. |
 | B14 | ~~Dockerfile without Git (v4 "Dockerfile" type)~~ | 0006 | Done: source type `dockerfile_inline`, capability `image.build.inline_dockerfile.v1`. |
 
 ## Build for stable
