@@ -47,7 +47,7 @@
         </x-forms.button>
     </x-slot:actions>
 
-    <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @endif class="flex flex-col gap-5">
+    <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @elseif ($fluxConnectionPolls > 0) wire:poll.3s="pollFluxConnection" @endif class="flex flex-col gap-5">
         <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5">
             <div>
                 <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Connection</dt>

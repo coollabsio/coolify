@@ -49,6 +49,9 @@ class Show extends Component
     /** @var list<string> */
     private const SECTIONS = ['general', 'workloads', 'containers', 'sentinel', 'danger'];
 
+    /** With a poll every 3 seconds, the section follows a Sentinel reconnect for 30 seconds. */
+    private const FLUX_CONNECTION_POLLS = 10;
+
     public Node $node;
 
     public array $connection = [];
@@ -66,6 +69,10 @@ class Show extends Component
     /** @var array{uuid: string, status: string, version: ?string, error: ?string, updated_at: ?string}|null */
     #[Locked]
     public ?array $sentinelUpgrade = null;
+
+    /** Polls left for the connection state after an action that makes Sentinel reconnect. */
+    #[Locked]
+    public int $fluxConnectionPolls = 0;
 
     /** @var array<string, string> */
     public array $dnsNames = [];
@@ -112,7 +119,9 @@ class Show extends Component
 
     public function installSentinel(): void
     {
-        $this->runAction(fn () => InstallSentinel::run($this->node), 'Host Sentinel installed and started.');
+        if ($this->runAction(fn () => InstallSentinel::run($this->node), 'Host Sentinel installed and started.')) {
+            $this->watchFluxConnection();
+        }
     }
 
     public function upgradeSentinel(): void
@@ -138,7 +147,18 @@ class Show extends Component
 
     public function restartSentinel(): void
     {
-        $this->runAction(fn () => $this->node->restartSentinel(), 'Host Sentinel restarted.');
+        if ($this->runAction(fn () => $this->node->restartSentinel(), 'Host Sentinel restarted.')) {
+            $this->watchFluxConnection();
+        }
+    }
+
+    /** Sentinel reconnects a few seconds after a restart, so the section reads the state again for a short time. */
+    public function pollFluxConnection(): void
+    {
+        $this->authorize('view', $this->node);
+        $this->fluxConnectionPolls = max(0, $this->fluxConnectionPolls - 1);
+        $this->node->refresh();
+        $this->loadFluxConnection();
     }
 
     public function validateNode(): void
@@ -345,13 +365,17 @@ class Show extends Component
 
     public function repairFluxTrust(): void
     {
-        $this->runAction(fn () => RepairFluxTrust::run($this->node), 'Sentinel Flux trust repaired.');
+        if ($this->runAction(fn () => RepairFluxTrust::run($this->node), 'Sentinel Flux trust repaired.')) {
+            $this->watchFluxConnection();
+        }
     }
 
     public function rotateSentinelToken(): void
     {
         $this->authorize('manageSentinel', $this->node);
-        $this->runAction(fn () => RotateSentinelToken::run($this->node), 'Sentinel token rotated. The previous token no longer works.');
+        if ($this->runAction(fn () => RotateSentinelToken::run($this->node), 'Sentinel token rotated. The previous token no longer works.')) {
+            $this->watchFluxConnection();
+        }
     }
 
     public function deleteNode(mixed $password = null): bool|string
@@ -582,6 +606,13 @@ class Show extends Component
         ];
     }
 
+    private function watchFluxConnection(): void
+    {
+        $this->node->refresh();
+        $this->loadFluxConnection();
+        $this->fluxConnectionPolls = self::FLUX_CONNECTION_POLLS;
+    }
+
     private function loadNodeData(): void
     {
         if ($this->section === 'containers') {
@@ -605,14 +636,19 @@ class Show extends Component
         }
     }
 
-    private function runAction(callable $action, string $message): void
+    /** Whether the action ran without an error. */
+    private function runAction(callable $action, string $message): bool
     {
         try {
             $this->authorize('manageSentinel', $this->node);
             $action();
             $this->dispatch('success', $message);
+
+            return true;
         } catch (\Throwable $e) {
             handleError($e, $this);
+
+            return false;
         }
     }
 }

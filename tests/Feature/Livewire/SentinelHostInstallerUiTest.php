@@ -65,6 +65,41 @@ it('shows and runs node Sentinel controls in development', function () {
         ->assertDispatched('success', 'Sentinel Flux trust repaired.');
 });
 
+it('follows the Sentinel reconnect after a trust repair without a page reload', function () {
+    RepairFluxTrust::partialMock()->shouldReceive('handle')->once()->andReturn('');
+    Cache::put($this->node->cacheKey(), ['status' => 'disconnected']);
+
+    $component = Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
+        ->assertSee('Disconnected')
+        ->assertDontSeeHtml('wire:poll.3s="pollFluxConnection"')
+        ->call('repairFluxTrust')
+        ->assertSet('fluxConnectionPolls', 10)
+        ->assertSeeHtml('wire:poll.3s="pollFluxConnection"');
+
+    // Sentinel reconnects a few seconds after the action.
+    Cache::put($this->node->cacheKey(), ['status' => 'connected', 'transport' => 'tls']);
+
+    $component->call('pollFluxConnection')
+        ->assertSet('fluxConnectionPolls', 9)
+        ->assertSee('Connected')
+        ->assertDontSee('Disconnected');
+
+    foreach (range(1, 9) as $poll) {
+        $component->call('pollFluxConnection');
+    }
+    $component->assertSet('fluxConnectionPolls', 0)
+        ->assertDontSeeHtml('wire:poll.3s="pollFluxConnection"');
+});
+
+it('does not poll the connection state after a failed trust repair', function () {
+    RepairFluxTrust::partialMock()->shouldReceive('handle')->once()->andThrow(new RuntimeException('SSH failed.'));
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
+        ->call('repairFluxTrust')
+        ->assertSet('fluxConnectionPolls', 0)
+        ->assertDontSeeHtml('wire:poll.3s="pollFluxConnection"');
+});
+
 it('refreshes the node Flux connection state from cache', function () {
     $component = Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
         ->assertSee('Disconnected');
