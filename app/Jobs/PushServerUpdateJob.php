@@ -45,6 +45,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Horizon\Contracts\Silenced;
 
 class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
@@ -308,6 +309,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         }
                         $containerName = $labels->get('com.docker.compose.service');
                         if ($containerName) {
+                            $containerName = composeContainerStatusKey($containerName, $labels->get('com.docker.compose.container-number'));
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
                             $restartCount = data_get($container, 'restart_count');
                             if (is_numeric($restartCount)) {
@@ -657,7 +659,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
             // Filter out excluded containers
             $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
-                return ! $excludedContainers->contains($containerName);
+                return ! $excludedContainers->contains(Str::before((string) $containerName, '#'));
             });
 
             // If all containers are excluded, calculate status from excluded containers

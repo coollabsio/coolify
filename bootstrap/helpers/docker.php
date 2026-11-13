@@ -276,6 +276,35 @@ function containerIdsByOwnerScript(string $type, string $uuid, array $extraFilte
     return 'container_ids=$({ '.implode('; ', $commands).'; } | sort -u)';
 }
 
+/**
+ * One container of each Compose service, so that a command runs once on a service with replicas.
+ */
+function oneContainerPerComposeService(Collection $containers): Collection
+{
+    return $containers->unique(function ($container): string {
+        preg_match('/(?:^|,)com\.docker\.compose\.service=([^,]*)/', (string) data_get($container, 'Labels'), $service);
+
+        return $service[1] ?? (string) data_get($container, 'Names');
+    })->values();
+}
+
+/**
+ * True when the name belongs to the Compose service: `{service}-{uuid}`, or `{uuid}-{service}-{number}` for a replica.
+ */
+function containerNameMatchesComposeService(string $containerName, string $service, string $uuid): bool
+{
+    return str_starts_with($containerName, "{$service}-{$uuid}")
+        || preg_match('/^'.preg_quote("{$uuid}-{$service}-", '/').'\d+$/', $containerName) === 1;
+}
+
+/**
+ * The key of a container in a status aggregation. Replicas share a Compose service, and each one must count.
+ */
+function composeContainerStatusKey(string $service, mixed $containerNumber): string
+{
+    return (int) $containerNumber > 1 ? "{$service}#{$containerNumber}" : $service;
+}
+
 function getCurrentApplicationContainerStatus(Server $server, Application $application, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
@@ -686,12 +715,13 @@ function generateApplicationContainerName(Application $application, $pull_reques
 }
 
 /**
- * Generated (rolling update) container names end with the timestamp from generateApplicationContainerName().
+ * Generated (rolling update) container names end with the timestamp from generateApplicationContainerName(),
+ * and with the number of the replica when the application has replicas.
  * Drop the legacy pattern once containers created before the ISO 8601 suffix are gone.
  */
 function isGeneratedContainerName(string $containerName): bool
 {
-    $isoTimestampSuffix = '/-\d{8}T\d{6}$/';
+    $isoTimestampSuffix = '/-\d{8}T\d{6}(-\d+)?$/';
     $legacyTimestampSuffix = '/-\d{12}$/';
 
     return preg_match($isoTimestampSuffix, $containerName) === 1

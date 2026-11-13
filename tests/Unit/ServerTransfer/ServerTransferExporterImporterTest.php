@@ -383,6 +383,17 @@ test('an imported Compose app keeps the image overrides of its security updates'
     expect(Application::where('uuid', $applicationUuid)->firstOrFail()->docker_compose_image_overrides)->toBe($overrides);
 });
 
+test('an imported application keeps its replicas', function () {
+    $this->application->forceFill(['replicas' => 3])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Application::where('uuid', $applicationUuid)->firstOrFail()->replicas)->toBe(3);
+});
+
 test('a static application keeps the port that the user set after turning on static', function () {
     $this->application->settings->forceFill(['is_static' => true])->save();
     $this->application->refresh()->forceFill(['ports_exposes' => '8080'])->saveQuietly();

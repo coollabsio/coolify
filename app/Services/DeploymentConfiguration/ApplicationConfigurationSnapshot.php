@@ -331,6 +331,7 @@ class ApplicationConfigurationSnapshot
             'limits_cpus' => 'CPU limit',
             'limits_cpuset' => 'CPU set',
             'limits_cpu_shares' => 'CPU shares',
+            'replicas' => 'Replicas',
             'swarm_replicas' => 'Swarm replicas',
             'swarm_placement_constraints' => 'Swarm placement constraints',
         ])->map(fn (string $label, string $key): array => $this->item($key, $label, data_get($this->application, $key), 'redeploy'))->values()->all();

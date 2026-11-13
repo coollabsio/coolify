@@ -178,12 +178,14 @@
             @endif
 
             @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                @php
+                    $additionalServersUnavailableReason = $resource->additionalServersUnavailableReason();
+                @endphp
                 <x-application.settings-section id="available-servers-section" title="Add another server"
-                    helper="Attach another available server and network as a deployment destination. Put your own load balancer in front of the servers." :flush="$resource->persistentStorages()->count() === 0">
-                    @if ($resource->persistentStorages()->count() > 0)
+                    helper="Attach another available server and network as a deployment destination. Put your own load balancer in front of the servers." :flush="! $additionalServersUnavailableReason">
+                    @if ($additionalServersUnavailableReason)
                         <x-callout type="warning" title="Additional servers are unavailable">
-                            This application has persistent storage volumes. Applications with persistent storage
-                            cannot use multiple servers because those volumes are not shared between hosts.
+                            {{ $additionalServersUnavailableReason }}
                         </x-callout>
                     @elseif ($networks->isNotEmpty())
                         <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
