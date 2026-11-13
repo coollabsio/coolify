@@ -45,6 +45,7 @@ beforeEach(function () {
     }
 
     $this->sentScripts = [];
+    $this->startedAt = time();
     Process::fake(function (PendingProcess $process) {
         // The SSH command batch goes to the server on stdin.
         if (! is_string($process->input) || $process->input === '') {
@@ -89,17 +90,97 @@ it('inspects the host inside one elevated shell for a non-root ssh user', functi
         ->and(loggedHostCommands($this->log))->not->toContain('apt-get elevated=0');
 });
 
-it('prepares the host inside one elevated shell for a non-root ssh user', function () {
+/**
+ * Lets the whole host script run without a write to the host of the test: the `sudo` of the sandbox moves
+ * every /etc, /var, and /run path of the script below the sandbox, and the tools that install Podman are stubs.
+ */
+function relocateHostRootToSandbox(string $sandbox, string $bin, string $log): string
+{
+    $root = "{$sandbox}/root";
+    File::ensureDirectoryExists("{$root}/etc/tmpfiles.d");
+    File::ensureDirectoryExists("{$root}/var/run");
+    foreach (['mktemp', 'rm', 'install'] as $tool) {
+        symlink(trim((string) shell_exec('command -v '.escapeshellarg($tool))), "{$bin}/{$tool}");
+    }
+    foreach (['sha256sum', 'tar', 'cp', 'systemd-tmpfiles'] as $tool) {
+        File::put("{$bin}/{$tool}", "#!/bin/bash\nprintf '%s elevated=%s\\n' ".escapeshellarg($tool).' "${ELEVATED:-0}" >> '.escapeshellarg($log)."\nexit 0\n");
+        chmod("{$bin}/{$tool}", 0755);
+    }
+    // A non-root user gets `sudo bash -c '... | base64 -d | bash'`, so the decoded script is relocated where it is decoded.
+    // A script that still names a host path is replaced, so it can never run.
+    [$base64, $sed, $grep] = array_map(fn (string $tool): string => trim((string) shell_exec('command -v '.escapeshellarg($tool))), ['base64', 'sed', 'grep']);
+    $relocate = escapeshellarg('s#\(^\|[ "(>]\)/\(etc\|var\|run\)/#\1'.$root.'/\2/#g');
+    $strip = escapeshellarg('s#'.$root.'/##g');
+    $hostPath = escapeshellarg('\(^\|[^A-Za-z0-9_}/.-]\)/\(etc\|var\|run\)/');
+    unlink("{$bin}/base64");
+    File::put("{$bin}/base64", <<<SH
+#!/bin/bash
+script="\$({$base64} "\$@" | {$sed} {$relocate})"
+if printf '%s\\n' "\$script" | {$sed} {$strip} | {$grep} -q {$hostPath}; then
+    script='echo "The script still names a host path." >&2; exit 97'
+fi
+printf '%s\\n' "\$script"
+
+SH);
+    chmod("{$bin}/base64", 0755);
+
+    return $root;
+}
+
+it('prepares the host with every package, Podman, service, and socket step elevated for a non-root ssh user', function () {
+    $root = relocateHostRootToSandbox($this->sandbox, $this->bin, $this->log);
+    // The script ends with `test -S /var/run/docker.sock`.
+    $socket = stream_socket_server("unix://{$root}/var/run/docker.sock");
+
     try {
         PrepareNodeHost::run(nodeWithSshUser('coolify', $this->privateKey));
-    } catch (Throwable) {
-        // The sandbox has no mktemp, so the script stops before the Podman install, which writes to /etc of the host.
+    } finally {
+        fclose($socket);
     }
 
     $commands = loggedHostCommands($this->log);
-    expect($commands[0] ?? null)->toBe('sudo bash')
-        ->and($commands)->toBe(['sudo bash', 'apt-get elevated=1', 'apt-get elevated=1'])
-        ->and(collect($commands)->filter(fn (string $line): bool => str_ends_with($line, 'elevated=0')))->toBeEmpty();
+    expect($commands)->toBe([
+        'sudo bash',
+        'apt-get elevated=1',
+        'apt-get elevated=1',
+        'curl elevated=1',
+        'sha256sum elevated=1',
+        'tar elevated=1',
+        'systemctl elevated=1',
+        'cp elevated=1',
+        'systemctl elevated=1',
+        'systemctl elevated=1',
+        'systemctl elevated=1',
+        'systemd-tmpfiles elevated=1',
+        'podman elevated=1',
+    ])
+        ->and(trim((string) file_get_contents("{$root}/etc/coolify/podman-version")))->toBe(PrepareNodeHost::PODMAN_VERSION)
+        ->and(fileperms("{$root}/etc/coolify") & 0777)->toBe(0700)
+        ->and(file_get_contents("{$root}/etc/tmpfiles.d/coolify-docker-socket.conf"))->toStartWith('L+ ')
+        ->and(file_exists('/etc/coolify/podman-version') && filemtime('/etc/coolify/podman-version') >= $this->startedAt)->toBeFalse();
+});
+
+it('does not install Podman again when the host has the pinned version', function () {
+    $root = relocateHostRootToSandbox($this->sandbox, $this->bin, $this->log);
+    File::ensureDirectoryExists("{$root}/etc/coolify");
+    File::put("{$root}/etc/coolify/podman-version", PrepareNodeHost::PODMAN_VERSION."\n");
+    $socket = stream_socket_server("unix://{$root}/var/run/docker.sock");
+
+    try {
+        PrepareNodeHost::run(nodeWithSshUser('coolify', $this->privateKey));
+    } finally {
+        fclose($socket);
+    }
+
+    expect(loggedHostCommands($this->log))->toBe([
+        'sudo bash',
+        'apt-get elevated=1',
+        'apt-get elevated=1',
+        'systemctl elevated=1',
+        'systemctl elevated=1',
+        'systemd-tmpfiles elevated=1',
+        'podman elevated=1',
+    ]);
 });
 
 it('validates the callback url inside one elevated shell for a non-root ssh user', function () {
