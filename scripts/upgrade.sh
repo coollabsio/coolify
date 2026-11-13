@@ -250,6 +250,45 @@ quote_root_user_env_values() {
     done
 }
 
+# Whether a program listens on this TCP port of the host, on any address.
+host_port_in_use() {
+    local port="$1"
+
+    if command -v ss >/dev/null 2>&1; then
+        [ -n "$(ss -Hltn "sport = :${port}" 2>/dev/null)" ]
+    else
+        (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null
+    fi
+}
+
+# Whether the running Coolify container is the program that publishes this host port.
+coolify_publishes_port() {
+    docker port coolify 2>/dev/null | grep -q ":${1}\$"
+}
+
+# Docker Compose publishes Flux, the connection service of Nodes, on host port FLUX_PORT (default 7443).
+# When another program uses port 7443, the Coolify container cannot start. Use the next free port then.
+ensure_flux_port() {
+    local default_port=7443 port
+
+    if grep -q "^FLUX_PORT=." "$ENV_FILE"; then
+        return 0
+    fi
+    if ! host_port_in_use "$default_port" || coolify_publishes_port "$default_port"; then
+        return 0
+    fi
+    for port in $(seq $((default_port + 1)) $((default_port + 100))); do
+        if ! host_port_in_use "$port"; then
+            update_env_var "FLUX_PORT" "$port"
+            log "Port ${default_port} is in use by another program. Set FLUX_PORT=${port}"
+            echo "     NOTICE: Port ${default_port} is in use by another program. Coolify publishes Flux (Nodes) on port ${port} instead (FLUX_PORT in ${ENV_FILE})."
+            return 0
+        fi
+    done
+    log "WARNING: Port ${default_port} is in use and no free port was found for FLUX_PORT"
+    echo "     WARNING: Port ${default_port} is in use by another program. Set FLUX_PORT in ${ENV_FILE} to a free port."
+}
+
 log "Checking environment variables..."
 quote_root_user_env_values
 set_env_var "REGISTRY_URL" "$REGISTRY_URL"
@@ -261,6 +300,7 @@ update_env_var "PUSHER_BACKEND_PORT" "6001"
 if grep -q '^PUSHER_BACKEND_HOST=coolify-realtime$' "$ENV_FILE"; then
     set_env_var "PUSHER_BACKEND_HOST" "127.0.0.1"
 fi
+ensure_flux_port
 log "Environment variables check complete"
 echo "     Done."
 

@@ -95,7 +95,11 @@ path, and an internal API on the Docker network.
 - No SSH from Coolify to its own host for Flux, and no second image to pin
   and upgrade.
 - Port 7443 is published on every install. Nothing listens on it while Nodes
-  are off.
+  are off. When another program of the host listens on port 7443 and
+  `FLUX_PORT` is not set, `upgrade.sh` (also run by `install.sh`) writes the
+  next free port as `FLUX_PORT` to `/data/coolify/source/.env` and prints a
+  notice, so the Coolify container still starts. The default `Flux port` is
+  then that port.
 - A restart of the Coolify container (an upgrade) and each certificate renewal
   drop the Node connections for a few seconds. Workloads keep running.
 
