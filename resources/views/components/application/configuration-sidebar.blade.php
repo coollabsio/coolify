@@ -74,9 +74,9 @@
                 'visible' => $application->git_based(),
             ],
             [
-                'label' => 'Servers',
-                'route' => 'project.application.servers',
-                'active' => $currentRoute === 'project.application.servers',
+                'label' => 'Scaling',
+                'route' => 'project.application.scaling',
+                'active' => $currentRoute === 'project.application.scaling',
                 'badge' => true,
             ],
             [
@@ -169,7 +169,7 @@
             'Deployment Logs' => 'time-back',
             'Runtime Logs' => 'unordered-list',
             'Git Source' => 'sources',
-            'Servers' => 'servers',
+            'Scaling' => 'servers',
             'Scheduled Tasks' => 'calendar',
             'Webhooks' => 'webhook',
             'Preview Deployments' => 'eye',
@@ -189,7 +189,7 @@
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
-            'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
+            'Deploy' => ['Git Source', 'Scaling', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Maintenance Mode', 'Resource Limits', 'Rollback', 'Tags'],
             'Danger Zone' => ['Danger Zone'],

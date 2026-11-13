@@ -27,7 +27,7 @@
                 <livewire:project.service.storage :resource="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())
                 <livewire:project.application.source :application="$application" />
-            @elseif ($currentRoute === 'project.application.servers')
+            @elseif ($currentRoute === 'project.application.scaling')
                 <livewire:project.shared.destination :resource="$application" />
             @elseif ($currentRoute === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
