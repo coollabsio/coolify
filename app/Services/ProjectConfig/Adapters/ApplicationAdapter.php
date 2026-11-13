@@ -194,7 +194,7 @@ class ApplicationAdapter implements ResourceAdapter
             'is_consistent_container_name_enabled' => false, 'is_gzip_enabled' => true, 'is_stripprefix_enabled' => true,
             'connect_to_docker_network' => false, 'is_container_label_escape_enabled' => true, 'is_env_sorting_enabled' => false,
             'is_container_label_readonly_enabled' => true, 'is_preserve_repository_enabled' => false, 'disable_build_cache' => false,
-            'is_spa' => false, 'is_git_shallow_clone_enabled' => true, 'is_pr_deployments_public_enabled' => false,
+            'is_spa' => false, 'is_git_shallow_clone_enabled' => true, 'is_pr_deployments_public_enabled' => false, 'use_production_values_in_previews' => true,
             'use_build_secrets' => false, 'inject_build_args_to_dockerfile' => true, 'include_source_commit_in_build' => false,
             'redact_all_env_values_in_logs' => true, 'include_coolify_default_variables' => true, 'is_permanent_redirect_enabled' => false,
             'is_image_scan_enabled' => true, 'is_auto_cancel_queued_deployments_enabled' => true,

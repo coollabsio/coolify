@@ -52,6 +52,7 @@ class EnvironmentVariables implements ChildRecords
             Field::derived('order', 'Coolify orders variables as the file lists them.'),
             Field::derived('uses_legacy_escaping', 'Coolify sets it for variables saved by old versions.'),
             Field::derived('preserve_compose_null', 'Coolify sets it from the Compose file.'),
+            Field::derived('is_production_value_copy', 'Coolify sets it when the preview variable copies the production value.'),
         ], ['environment_variables' => ['resourceable_type', 'resourceable_id']]);
     }
 
@@ -227,6 +228,8 @@ class EnvironmentVariables implements ChildRecords
         }
         $preview->order = $production->order;
         $preview->withoutAuditLogging(fn () => $preview->save());
+        // After the save: the saving hook clears the flag when a preview value changes.
+        EnvironmentVariable::query()->whereKey($preview->getKey())->update(['is_production_value_copy' => filled($production->value)]);
     }
 
     public static function generate(string $kind, ?int $length): string

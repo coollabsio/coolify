@@ -909,6 +909,12 @@
                                 "null"
                             ]
                         },
+                        "use_production_values_in_previews": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
                         "use_build_secrets": {
                             "type": [
                                 "boolean",

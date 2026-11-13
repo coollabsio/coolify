@@ -114,6 +114,18 @@ it('writes an explicit preview value', function () {
         ->and(childWriteValue($app, 'API_URL', true))->toBe('https://pr.acme.com');
 });
 
+it('marks a preview row that copies the production value', function () {
+    $previewRow = fn (Application $app, string $key) => EnvironmentVariable::where('resourceable_id', $app->id)->where('key', $key)->where('is_preview', true)->first();
+    childWrite(['env' => ['NODE_ENV' => ['value' => 'production']]]);
+    $app = childWrite([
+        'env' => ['NODE_ENV' => ['value' => 'staging'], 'API_URL' => ['value' => 'https://api.acme.com', 'preview' => ['value' => 'https://pr.acme.com']]],
+    ]);
+
+    expect($previewRow($app, 'NODE_ENV')->value)->toBe('staging')
+        ->and($previewRow($app, 'NODE_ENV')->is_production_value_copy)->toBeTrue()
+        ->and($previewRow($app, 'API_URL')->is_production_value_copy)->toBeFalse();
+});
+
 it('reads back what it wrote for every child group', function () {
     $other = Server::factory()->create(['team_id' => $this->fx['team']->id, 'name' => 'prod-2']);
     $token = IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
