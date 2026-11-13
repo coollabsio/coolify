@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
+use App\Http\Controllers\Api\ProjectConfigController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\S3StoragesController;
@@ -254,6 +255,20 @@ Route::group([
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
     Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
+
+    Route::get('/environments/{uuid}/config/export', [ProjectConfigController::class, 'export'])->middleware(['api.ability:read']);
+    Route::post('/environments/{uuid}/config/plan', [ProjectConfigController::class, 'plan'])->middleware(['api.ability:read']);
+    Route::post('/config/links', [ProjectConfigController::class, 'createLink'])->middleware(['api.ability:write']);
+    Route::get('/config/links/{uuid}', [ProjectConfigController::class, 'showLink'])->middleware(['api.ability:read']);
+    Route::patch('/config/links/{uuid}', [ProjectConfigController::class, 'updateLink'])->middleware(['api.ability:write']);
+    Route::delete('/config/links/{uuid}', [ProjectConfigController::class, 'deleteLink'])->middleware(['api.ability:write', 'api.ability:delete']);
+    Route::get('/config/links/{uuid}/revisions', [ProjectConfigController::class, 'revisions'])->middleware(['api.ability:read']);
+    Route::post('/config/links/{uuid}/apply', [ProjectConfigController::class, 'apply'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::post('/config/links/{uuid}/suspend', [ProjectConfigController::class, 'suspend'])->middleware(['api.ability:write']);
+    Route::post('/config/links/{uuid}/resume', [ProjectConfigController::class, 'resume'])->middleware(['api.ability:write']);
+    Route::post('/config/revisions/{uuid}/approve', [ProjectConfigController::class, 'approve'])->middleware(['api.ability:write', 'api.ability:deploy', 'api.ability:delete']);
+    Route::post('/config/revisions/{uuid}/release', [ProjectConfigController::class, 'release'])->middleware(['api.ability:write']);
+    Route::post('/config/revisions/{uuid}/retry', [ProjectConfigController::class, 'retry'])->middleware(['api.ability:write']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
     Route::post('/tags', [TagsController::class, 'create'])->middleware(['api.ability:write']);

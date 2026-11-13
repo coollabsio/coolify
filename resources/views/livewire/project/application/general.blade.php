@@ -10,6 +10,12 @@
         <x-unsaved-bar action="submit"
             targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
+            <x-project-config.readonly-notice :resource="$application" />
+            @if ($application->settings->has_unlinked_config_file)
+                <x-callout type="info" title="coolify.json found, not linked">
+                    The repository has a coolify.json file, but no link uses it. Export this environment and link it to manage these settings from the file.
+                </x-callout>
+            @endif
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
             @if ($buildPack === 'dockercompose' && filled($dockerComposeRaw))
                 <x-slot:actions>

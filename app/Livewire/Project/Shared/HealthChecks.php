@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Closure;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -119,7 +120,7 @@ class HealthChecks extends Component
             $this->resource->save();
         } else {
             // Sync from model. The command and response text can embed credentials, so only users who can update the resource get them.
-            $canViewSecrets = auth()->user()?->can('update', $this->resource) ?? false;
+            $canViewSecrets = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->resource);
             $this->healthCheckEnabled = $this->resource->health_check_enabled;
             $this->healthCheckType = $this->resource->health_check_type ?? 'http';
             $this->healthCheckCommand = $canViewSecrets ? $this->resource->health_check_command : null;

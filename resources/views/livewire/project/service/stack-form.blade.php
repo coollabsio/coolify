@@ -1,4 +1,5 @@
 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
+    <x-project-config.readonly-notice :resource="$service" />
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Service details"

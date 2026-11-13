@@ -8,6 +8,7 @@ use App\Traits\HasSafeStringAttribute;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -97,6 +98,11 @@ class Environment extends BaseModel
     public function environment_variables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
+    }
+
+    public function configLink(): HasOne
+    {
+        return $this->hasOne(EnvironmentConfigLink::class);
     }
 
     public function applications()

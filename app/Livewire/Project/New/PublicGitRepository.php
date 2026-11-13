@@ -276,6 +276,11 @@ class PublicGitRepository extends Component
 
     public function submit()
     {
+        if ($this->usesConfigFile()) {
+            $this->previewConfigFile();
+
+            return;
+        }
         try {
             $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 

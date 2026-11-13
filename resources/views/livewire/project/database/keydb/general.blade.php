@@ -1,5 +1,6 @@
 <div class="application-settings-form">
     <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-project-config.readonly-notice :resource="$database" />
         <x-unsaved-bar action="submit" />
 
         <x-application.settings-section id="database-details-section" title="Database details"

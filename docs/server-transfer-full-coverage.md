@@ -83,6 +83,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Canvas positions | drag the nodes on the environment canvas |
 | ✅ | Resource links | a link between 2 resources on this server, and a link to a resource on another server. Expected: the first moves, the second does not, and the export warns |
 | ✅ | Environment with resources only on another server | Expected: it is not exported, and the prechecks show a `NOTE:` line |
+| ☐ | coolify.json link | link one environment (`POST /api/v1/config/links`) and apply a file with an application, a database, and a service. Expected: `config_key`, variable forms, and service domain ownership move; the link and revisions do not; the target finish list has a "coolify.json of environment" step |
 
 ## 6. Applications (one per build pack and source)
 

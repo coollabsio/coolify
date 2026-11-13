@@ -15,6 +15,8 @@ use App\Models\DnsProviderZone;
 use App\Models\DockerCleanupExecution;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
+use App\Models\EnvironmentConfigLink;
+use App\Models\EnvironmentConfigRevision;
 use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
@@ -267,7 +269,7 @@ final class ServerTransferCoverage
             'environment_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
             'source_type' => self::LINKED, 'source_id' => self::LINKED, 'private_key_id' => self::LINKED,
         ],
-        ApplicationSetting::class => ['application_id' => self::LINKED],
+        ApplicationSetting::class => ['application_id' => self::LINKED, 'has_unlinked_config_file' => self::RUNTIME],
         ApplicationPreview::class => [
             'application_id' => self::LINKED, 'last_online_at' => self::RUNTIME, 'domain_dns_statuses' => self::RUNTIME,
             'restart_count' => self::RUNTIME, 'restart_limit_reached' => self::RUNTIME, 'last_restart_at' => self::RUNTIME,
@@ -349,6 +351,8 @@ final class ServerTransferCoverage
      */
     public const NOT_TRANSFERRED = [
         Team::class => 'Instance-wide: the target imports into one of its own teams.',
+        EnvironmentConfigLink::class => 'The coolify.json link belongs to the environment on the source instance; link the environment again on the target.',
+        EnvironmentConfigRevision::class => 'History of the coolify.json link of the source instance.',
         User::class => 'Instance-wide: users are not moved with a server.',
         TeamInvitation::class => 'Team data, not server data.',
         Subscription::class => 'Billing of the source instance.',

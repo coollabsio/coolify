@@ -37,6 +37,24 @@
             </section>
         </form>
 
+        @php($configStatus = \App\Services\ProjectConfig\ConfigSyncStatus::forEnvironment($environment))
+        @php($configUrl = route('project.environment.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]))
+        <x-application.settings-section title="Config as code"
+            helper="Manage the resources of this environment with a coolify.json file in a git repository.">
+            <x-slot:actions>
+                <a href="{{ $configUrl }}" {{ wireNavigate() }} class="button">{{ $configStatus ? 'Open' : 'Set Up' }}</a>
+            </x-slot:actions>
+            <div class="flex items-center gap-3 text-[13px]">
+                @if ($configStatus)
+                    <x-project-config.sync-badge :status="$configStatus" />
+                    <span class="text-neutral-500 dark:text-fg-dim">Settings managed by the file are read-only in Coolify.</span>
+                @else
+                    <x-status-badge label="Not connected" />
+                    <span class="text-neutral-500 dark:text-fg-dim">Every setting is edited in Coolify.</span>
+                @endif
+            </div>
+        </x-application.settings-section>
+
         @can('delete', $environment)
             <section
                 class="overflow-hidden rounded-[10px] border border-red-300 bg-red-50/80 dark:border-red-500/25 dark:bg-red-500/[0.06]">

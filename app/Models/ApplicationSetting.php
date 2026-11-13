@@ -73,6 +73,7 @@ class ApplicationSetting extends Model
     ];
 
     protected $casts = [
+        'has_unlinked_config_file' => 'boolean',
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
         'is_build_server_enabled' => 'boolean',

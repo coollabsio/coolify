@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
@@ -160,6 +161,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             if ($this->resource instanceof Application) {
                 $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
@@ -187,6 +189,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
@@ -211,6 +214,7 @@ class All extends Component
     {
         try {
             $this->authorize('manageEnvironment', $this->resource);
+            $this->authorize('update', $this->resource);
 
             if ($this->resource instanceof Application) {
                 $this->resource->settings->include_coolify_default_variables = $this->include_coolify_default_variables;
@@ -709,6 +713,7 @@ class All extends Component
         'is_required',
         'is_shown_once',
         'is_shared',
+        'config_meta',
         'resourceable_type',
         'resourceable_id',
         'created_at',
@@ -943,7 +948,7 @@ class All extends Component
      */
     private function canViewComposeContent(): bool
     {
-        return $this->canViewComposeContent ??= auth()->user()?->can('update', $this->resource) ?? false;
+        return $this->canViewComposeContent ??= ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->resource);
     }
 
     private function composeEnvironmentAssignments(): Collection

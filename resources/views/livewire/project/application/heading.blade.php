@@ -3,6 +3,12 @@
     @teleport('#resource-star-slot-mobile')
         <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
     @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
     <div>
         @if ($application->build_pack === 'nixpacks')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">

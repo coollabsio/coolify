@@ -583,6 +583,9 @@ class ServerTransferExporter
     private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
     {
         $steps = [];
+        if ($applications->contains(fn (Application $application) => filled($application->config_key))) {
+            $steps[] = 'Some resources were managed by coolify.json. Link their environments again on {target_url}: the link does not move with the server.';
+        }
         // A manual webhook is set in the repository itself, so its URL still points to this instance. Every
         // application has the secrets, so list the git applications that do not deploy through a private App.
         $manualWebhookApps = $applications
@@ -956,6 +959,7 @@ class ServerTransferExporter
             'custom_labels',
             'is_maintenance_enabled',
             'maintenance_page',
+            'config_key',
         ] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $application->{$hidden};
@@ -1030,6 +1034,7 @@ class ServerTransferExporter
             }
             $attrs[$field] = $database->{$field};
         }
+        $attrs['config_key'] = $database->config_key;
 
         // Secrets are often $hidden and sometimes omitted from $fillable (e.g. redis_password).
         foreach ($columns as $column) {
@@ -1102,6 +1107,8 @@ class ServerTransferExporter
             }
             $attrs[$field] = $service->{$field};
         }
+        $attrs['config_key'] = $service->config_key;
+        $attrs['config_meta'] = $service->config_meta;
 
         // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
         foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
@@ -1301,6 +1308,7 @@ class ServerTransferExporter
                 'preserve_compose_null' => (bool) $variable->preserve_compose_null,
                 'comment' => $variable->comment,
                 'order' => $variable->order,
+                'config_meta' => $variable->config_meta,
                 // The Coolify version that created the variable.
                 'version' => $variable->version,
             ];

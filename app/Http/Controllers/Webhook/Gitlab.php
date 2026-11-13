@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitlab extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -438,6 +440,9 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
             $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            if ($x_gitlab_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals($secret, (string) $x_gitlab_token));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
             // GitLab sends a static token. A repeated wrong token is one guess.
             $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);

@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Auth\Access\Response;
 
 class ApplicationPolicy
@@ -39,6 +40,9 @@ class ApplicationPolicy
      */
     public function update(User $user, Application $application): Response
     {
+        if (ManagedResources::isManaged($application)) {
+            return Response::deny(ManagedResources::denyReason($application));
+        }
         if ($user->canAccess(AccessLevel::Write, $application)) {
             return Response::allow();
         }

@@ -118,9 +118,18 @@
                             </div>
 
                             <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
-                                    x-text="`${environment.resourceCount} ${environment.resourceCount === 1 ? 'resource' : 'resources'}`">
-                                </p>
+                                <div class="flex min-w-0 items-center gap-2.5">
+                                    <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
+                                        x-text="`${environment.resourceCount} ${environment.resourceCount === 1 ? 'resource' : 'resources'}`">
+                                    </p>
+                                    <a x-show="environment.config" x-cloak :href="environment.config?.href" {{ wireNavigate() }}
+                                        :title="environment.config?.title"
+                                        class="relative z-10 inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                        <x-reicon name="file-content" class="size-3.5" />
+                                        <span class="size-1.5 rounded-full" :class="environment.config?.dotClass"></span>
+                                        <span class="sr-only" x-text="environment.config?.title"></span>
+                                    </a>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="environment.addResourceHref" :href="environment.addResourceHref"
@@ -171,6 +180,11 @@
                             <a :href="environment.href" {{ wireNavigate() }}
                                 class="relative truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                 x-text="environment.name"></a>
+                            <span x-show="environment.config" x-cloak :title="environment.config?.title"
+                                class="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-neutral-500 dark:text-fg-dim shrink">
+                                <span class="size-1.5 shrink-0 rounded-full" :class="environment.config?.dotClass"></span>
+                                <span class="truncate" x-text="environment.config?.label"></span>
+                            </span>
                         </div>
 
                         <div class="environment-resource-count text-[12px] text-neutral-600 dark:text-fg-dim"

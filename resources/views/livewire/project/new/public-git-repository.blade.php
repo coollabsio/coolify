@@ -46,7 +46,7 @@
                         <h2>Build configuration</h2>
                         <p>Choose how Coolify builds and runs this repository.</p>
                     </div>
-                    <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
+                    @include('livewire.project.new.partials.build-submit-button')
                 </div>
                 <div class="application-settings-section-body space-y-5">
                     @if ($rate_limit_remaining && $rate_limit_reset)
@@ -62,58 +62,62 @@
                         <x-forms.input id="git_branch" label="Branch"
                             :disabled="$git_source !== 'other'"
                             helper="You can choose another branch after the application is created." />
-                        <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
-                            ['value' => 'railpack', 'label' => 'Railpack'],
-                            ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
-                            ['value' => 'static', 'label' => 'Static'],
-                            ['value' => 'dockerfile', 'label' => 'Dockerfile'],
-                            ['value' => 'dockercompose', 'label' => 'Docker Compose'],
-                        ]" />
-                        @if ($show_is_static)
-                            <x-forms.listbox id="isStatic" label="Output type" onChange="instantSave"
-                                :options="[
-                                    ['value' => false, 'label' => 'Web application'],
-                                    ['value' => true, 'label' => 'Static site'],
-                                ]" />
-                            <x-forms.input type="number" id="port" label="Port"
-                                :readonly="$isStatic || $build_pack === 'static'"
-                                helper="Port the application listens on." />
-                        @endif
-                        @if ($isStatic)
-                            <x-forms.input id="publish_directory" label="Publish directory"
-                                helper="Directory containing the generated static assets." />
-                        @endif
+                        @unless ($this->usesConfigFile())
+                            <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
+                                ['value' => 'railpack', 'label' => 'Railpack'],
+                                ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
+                                ['value' => 'static', 'label' => 'Static'],
+                                ['value' => 'dockerfile', 'label' => 'Dockerfile'],
+                                ['value' => 'dockercompose', 'label' => 'Docker Compose'],
+                            ]" />
+                            @if ($show_is_static)
+                                <x-forms.listbox id="isStatic" label="Output type" onChange="instantSave"
+                                    :options="[
+                                        ['value' => false, 'label' => 'Web application'],
+                                        ['value' => true, 'label' => 'Static site'],
+                                    ]" />
+                                <x-forms.input type="number" id="port" label="Port"
+                                    :readonly="$isStatic || $build_pack === 'static'"
+                                    helper="Port the application listens on." />
+                            @endif
+                            @if ($isStatic)
+                                <x-forms.input id="publish_directory" label="Publish directory"
+                                    helper="Directory containing the generated static assets." />
+                            @endif
+                        @endunless
                     </div>
 
-                    @if ($build_pack === 'nixpacks')
-                        <x-nixpacks-deprecated-callout />
-                    @endif
+                    @unless ($this->usesConfigFile())
+                        @if ($build_pack === 'nixpacks')
+                            <x-nixpacks-deprecated-callout />
+                        @endif
 
-                    {{-- Dockerfile: pick a detected file or type a path --}}
-                    @if ($build_pack === 'dockerfile')
-                        <x-forms.listbox id="selectedDockerfile" label="Dockerfile" live searchable allowCustom placeholder="/Dockerfile"
-                            emptyText="No Dockerfiles detected. Type a path in the search field."
-                            searchPlaceholder="Search or type a path…"
-                            helper="Select a detected Dockerfile, or type a path relative to the base directory."
-                            :options="collect($detectedDockerfiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
-                    @endif
+                        {{-- Dockerfile: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockerfile')
+                            <x-forms.listbox id="selectedDockerfile" label="Dockerfile" live searchable allowCustom placeholder="/Dockerfile"
+                                emptyText="No Dockerfiles detected. Type a path in the search field."
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Dockerfile, or type a path relative to the base directory."
+                                :options="collect($detectedDockerfiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
+                        @endif
 
-                    {{-- Docker Compose file selector: pick a detected file or type a path --}}
-                    @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 0)
-                        <x-forms.listbox id="selectedDockerComposeFile" label="Docker Compose File" live searchable allowCustom
-                            searchPlaceholder="Search or type a path…"
-                            helper="Select a detected Docker Compose file, or type a path relative to the base directory."
-                            :options="collect($detectedDockerComposeFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
-                    @endif
+                        {{-- Docker Compose file selector: pick a detected file or type a path --}}
+                        @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 0)
+                            <x-forms.listbox id="selectedDockerComposeFile" label="Docker Compose File" live searchable allowCustom
+                                searchPlaceholder="Search or type a path…"
+                                helper="Select a detected Docker Compose file, or type a path relative to the base directory."
+                                :options="collect($detectedDockerComposeFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()" />
+                        @endif
 
-                    @if ($build_pack === 'dockercompose')
-                        <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
-                            file="docker_compose_location" fileLabel="Compose file" compose
-                            defaultFile="/docker-compose.yaml" />
-                    @else
-                        <x-forms.input id="base_directory" label="Base directory" placeholder="/"
-                            helper="Repository directory used as the build root." />
-                    @endif
+                        @if ($build_pack === 'dockercompose')
+                            <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
+                                file="docker_compose_location" fileLabel="Compose file" compose
+                                defaultFile="/docker-compose.yaml" />
+                        @else
+                            <x-forms.input id="base_directory" label="Base directory" placeholder="/"
+                                helper="Repository directory used as the build root." />
+                        @endif
+                    @endunless
                 </div>
             </section>
         </form>

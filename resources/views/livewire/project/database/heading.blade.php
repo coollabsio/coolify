@@ -2,6 +2,12 @@
     @teleport('#resource-star-slot-mobile')
         <livewire:star-toggle :resource="$database" :wire:key="'star-mobile-'.$database->getMorphClass().'-'.$database->uuid" />
     @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$database" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$database" /></div>
+    @endteleport
     @php
         $databasePageItems = [
             [
