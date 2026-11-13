@@ -62,7 +62,7 @@ Gaps in finished work that have no row above.
 | G2 | ~~`MoveNodeWorkloadJob` has its own copy of the network-revision wait; it should use the shared action.~~ Done: the move calls `ApplyNodeClusterNetworkRevision`. | S2 |
 | G3 | ~~The **Sentinel** section of a Node shows the old connection state after **Repair trust** until a reload, because Sentinel reconnects a few seconds after the action.~~ Done: the section reads the state every 3 seconds for 30 seconds after a repair, a restart, an update, and a token rotation. | B16 |
 | G4 | ~~Port 7443 is published on every install. If another program on the host uses it, the Coolify container cannot start after the upgrade. `FLUX_PORT` changes the port.~~ Done: `upgrade.sh` writes the next free port as `FLUX_PORT` when another program uses port 7443. | 0021 |
-| G5 | ~~The Sentinel release workflow does not publish `coolify-builder` with the version tag~~ | B13 | Fixed in Sentinel `7bd87ff`: `release.yaml` builds and publishes `coolify-builder:<version>` and lists its digest in the run summary. Proven with the next Sentinel release. |
+| G5 | ~~The Sentinel release workflow does not publish `coolify-builder` with the version tag~~ Fixed in Sentinel `7bd87ff`: `release.yaml` publishes `coolify-builder:<version>` and lists its digest in the run summary; the next Sentinel release proves it. | B13 |
 
 ## Postponed
 
