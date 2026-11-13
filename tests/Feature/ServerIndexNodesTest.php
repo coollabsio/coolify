@@ -22,7 +22,7 @@ beforeEach(function () {
     Queue::fake();
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
     $this->actingAs($this->user);
@@ -69,7 +69,7 @@ it('groups cluster servers by cluster above the Docker servers', function () {
         ->assertSee('Upgrade available')
         ->assertSee('Unreachable')
         ->assertSee('Off')
-        ->assertSee('Cluster settings')
+        // The cluster name links to the cluster page; there is no separate settings button.
         ->assertSee(route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]), escape: false)
         ->assertSee(route('node.show', ['node_uuid' => $member->uuid]), escape: false)
         ->assertSee(route('node.show', ['node_uuid' => $loose->uuid]), escape: false)
@@ -117,7 +117,7 @@ it('shows empty states for a cluster without servers and for missing Docker serv
 });
 
 it('keeps the classic servers page when the cluster stack is disabled', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Hidden mesh');
     AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $this->team->id, 'name' => 'Hidden cluster server']));
     serverIndexDockerServer($this->team->id, 'Docker host one');
@@ -183,7 +183,8 @@ it('marks Servers as the active sidebar item on cluster pages', function (string
     $content = $this->get(route($routeName, [$parameter => $uuid]))->assertOk()->getContent();
 
     expect($content)
-        ->toMatch('/<a title="Servers"[^>]*class="menu-item menu-item-active"/')
+        // The sidebar calls the item Servers & Clusters while Nodes are on.
+        ->toMatch('/<a title="Servers &amp; Clusters"[^>]*class="menu-item menu-item-active"/')
         ->not->toContain('title="Clusters"');
 })->with([
     'cluster' => ['node-cluster.show', 'cluster_uuid'],

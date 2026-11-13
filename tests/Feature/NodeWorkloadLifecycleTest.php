@@ -222,7 +222,7 @@ it('recovers from observed lifecycle state without replaying the command', funct
 
 it('queues an authorized lifecycle action from the Node page', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -247,16 +247,18 @@ it('queues an authorized lifecycle action from the Node page', function () {
         ->assertDispatched('success');
 
     $operation = $this->node->operations()->firstOrFail();
+    // The request names the container slot that the action targets.
     expect($operation->request)->toBe([
         'revision_uuid' => $this->revision->uuid,
         'action' => 'restart',
+        'container_name' => 'coolify-'.$this->workload->uuid.'-main',
     ]);
     Queue::assertPushed(ManageNodeWorkloadJob::class, fn ($job) => $job->operationId === $operation->id);
 });
 
 it('updates a permanent workload dns name from the Node page', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -290,7 +292,7 @@ it('updates a permanent workload dns name from the Node page', function () {
 
 it('does not queue a network revision when the internal DNS name did not change', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -311,7 +313,7 @@ it('does not queue a network revision when the internal DNS name did not change'
 
 it('rejects invalid or colliding workload dns names from the Node page', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -339,7 +341,7 @@ it('rejects invalid or colliding workload dns names from the Node page', functio
 
 it('does not let members or cross-team identifiers change workload dns names', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->workload->update(['internal_dns_name' => 'example-app']);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
@@ -369,7 +371,7 @@ it('does not let members or cross-team identifiers change workload dns names', f
 
 it('links workloads to their application page and shows the latest operation', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -402,7 +404,7 @@ it('links workloads to their application page and shows the latest operation', f
 
 it('hides workload mutations from team members', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
     $this->actingAs($member);
@@ -417,7 +419,7 @@ it('hides workload mutations from team members', function () {
 
 it('queues lifecycle recovery from the server Activity page', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -435,7 +437,7 @@ it('queues lifecycle recovery from the server Activity page', function () {
 
 it('cannot manage a workload that is not assigned to the Node', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $unassigned = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
     $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $unassigned->id]);
     $user = User::factory()->create();
@@ -453,7 +455,7 @@ it('cannot manage a workload that is not assigned to the Node', function () {
 
 it('rejects invalid lifecycle actions', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
@@ -489,7 +491,7 @@ function lifecycleContainer(object $test, string $state): array
 
 it('does not ask for a redeploy after an internal DNS name changed', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);

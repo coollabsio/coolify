@@ -207,8 +207,8 @@ it('deploys a clustered workload with its stable managed network address', funct
     DispatchWorkloadDeployment::run($this->operation);
 
     Http::assertSent(fn ($request): bool => $request['network_name'] === 'coolify-'.$this->node->uuid
-        && $request['network_subnet'] === '100.64.0.0/24'
-        && $request['container_ip'] === '100.64.0.2'
+        && $request['network_subnet'] === '198.18.0.0/24'
+        && $request['container_ip'] === '198.18.0.2'
         && $request['dns_server'] === $this->node->fresh()->wireguard_ip);
 });
 
@@ -379,12 +379,13 @@ it('does not dispatch a completed operation again', function () {
 
 it('queues an assigned revision from the Node page without storing environment values', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
     $node = Node::factory()->create(deploymentReadyNodeAttributes($team->id, $this->key->id, $cluster->id));
-    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    // Without the Coolify default variables, the current environment matches the revision, so it is deployed as is.
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id, 'include_coolify_default_variables' => false]);
     $node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create([
         'node_workload_id' => $workload->id,
@@ -417,7 +418,7 @@ it('queues an assigned revision from the Node page without storing environment v
 
 it('deploys the current environment variables from the node page', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
@@ -435,13 +436,14 @@ it('deploys the current environment variables from the node page', function () {
         ->assertDispatched('success');
 
     $deployed = $node->operations()->firstOrFail()->revision;
+    // The Coolify default variables are on by default; this workload has no project or environment.
     expect($deployed->id)->not->toBe($revision->id)
-        ->and($deployed->environment)->toBe(['APP_ENV' => 'production']);
+        ->and($deployed->environment)->toBe(['APP_ENV' => 'production', 'COOLIFY_APP_NAME' => $workload->name]);
 });
 
 it('queues an uncertain deployment again with the same operation identity', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
@@ -466,7 +468,7 @@ it('queues an uncertain deployment again with the same operation identity', func
 
 it('cannot deploy a revision that is not assigned to the Node', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
@@ -492,7 +494,7 @@ it('records a queue failure before dispatch', function () {
 
 it('allows the same revision to be deployed again after a final operation', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
@@ -520,7 +522,7 @@ it('allows the same revision to be deployed again after a final operation', func
 
 it('does not queue a second deployment while the same revision is active', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);

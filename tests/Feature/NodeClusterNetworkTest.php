@@ -21,7 +21,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux.internal');
     config()->set('constants.flux.internal_token', 'internal-token');
     config()->set('constants.flux.public_url', 'https://192.0.2.1:7443');
@@ -95,7 +95,7 @@ it('reconciles a complete full mesh through durable typed operations', function 
             str_ends_with($request->url(), 'network.firewall.reconcile') => Http::response([...$base, 'changed' => true, 'rollback_cancelled' => true, 'applied_revision' => $data['revision'], 'configuration_hash' => 'firewall-hash', 'drifted' => false, 'table' => 'coolify_cluster', 'ingress_enforced' => true]),
             str_ends_with($request->url(), 'discovery.corrosion.reconcile') => Http::response([...$base, 'changed' => true, 'version' => 'v1.0.0', 'member_state' => 'joining', 'endpoint_count' => 2, 'last_convergence_unix_seconds' => null]),
             str_ends_with($request->url(), 'discovery.corrosion.inspect') => Http::response([...$base, 'version' => 'v1.0.0', 'member_state' => 'converged', 'endpoint_count' => 2, 'last_convergence_unix_seconds' => 1_700_000_000]),
-            str_ends_with($request->url(), 'ingress.reconcile') => Http::response([...$base, 'enabled' => $data['enabled'], 'active' => false, 'revision' => $data['revision'], 'route_count' => count($data['routes']), 'name_count' => count($data['names']), 'caddy_version' => $data['caddy_version']]),
+            str_ends_with($request->url(), 'ingress.reconcile') => Http::response([...$base, 'enabled' => $data['enabled'], 'active' => $data['enabled'], 'revision' => $data['revision'], 'route_count' => count($data['routes']), 'name_count' => count($data['names']), 'caddy_version' => $data['caddy_version']]),
             default => Http::response([], 404),
         };
     });
@@ -118,9 +118,11 @@ it('reconciles a complete full mesh through durable typed operations', function 
             ->and($node->hasAppliedNetworkRevision($cluster->desired_revision))->toBeTrue();
     }
     $ingressRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'ingress.reconcile'));
+    // The first server that joins a cluster without an ingress server turns ingress on.
     expect($ingressRequests)->toHaveCount(2)
-        ->and($ingressRequests->every(fn (array $request): bool => $request['data']['enabled'] === false
-            && $request['data']['routes'] === []
+        ->and($ingressRequests->mapWithKeys(fn (array $request): array => [$request['data']['server_id'] => $request['data']['enabled']])->all())
+        ->toBe([$first->uuid => true, $second->uuid => false])
+        ->and($ingressRequests->every(fn (array $request): bool => $request['data']['routes'] === []
             && $request['data']['names'] === []))->toBeTrue();
 
     $wireguardRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'network.wireguard.reconcile'));

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Node\CheckNodeFluxConnection;
 use App\Actions\Node\InspectNodeHost;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeHost;
@@ -26,7 +27,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
     config()->set('app.url', 'https://coolify.example.com');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
     $this->actingAs($this->user);
@@ -38,7 +39,7 @@ it('shows the node onboarding route and call to action', function () {
     $this->get(route('node.onboarding'))->assertOk()->assertSee('Connect your server');
 
     Livewire::test(ServerIndex::class)
-        ->assertSee('Add server')
+        ->assertSeeHtml('id="server-index-add-actions"')
         ->assertSee('Cluster server')
         ->assertSee(route('node.onboarding'), escape: false);
 });
@@ -103,6 +104,8 @@ it('runs each installation stage and marks the node ready', function () {
         'node_cluster_id' => $cluster->id,
     ]);
     PrepareNodeHost::shouldRun()->andReturn('ready');
+    // The Node must reach Flux over TLS before Sentinel is installed (decision 0021).
+    CheckNodeFluxConnection::shouldRun()->once();
     InstallSentinel::shouldRun()->andReturn('installed');
     ValidateNode::shouldRun()->andReturn(true);
     PingFluxConnection::shouldRun()->andReturn(['ok' => true]);
@@ -173,7 +176,8 @@ it('stores and displays technical details for the failed installation stage', fu
 it('prepares the Docker-compatible socket required by Sentinel', function () {
     expect(PrepareNodeHost::installationScript())
         ->toContain('systemctl enable --now podman.socket')
-        ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
+        ->toContain('L+ /run/docker.sock - - - - /run/podman/podman.sock')
+        ->toContain('systemd-tmpfiles --create /etc/tmpfiles.d/coolify-docker-socket.conf')
         ->toContain('test -S /var/run/docker.sock');
 });
 

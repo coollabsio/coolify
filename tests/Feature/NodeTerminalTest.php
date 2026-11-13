@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.ssh.mux_enabled', false);
 
     $this->user = User::factory()->create();
@@ -61,7 +61,7 @@ it('renders each Node section route with the sidebar', function (string $routeNa
     }
     $response->assertSee($activeLabel);
 })->with([
-    'general' => ['node.show', 'General', 'Resource usage'],
+    'general' => ['node.show', 'General', 'Server overview'],
     'workloads' => ['node.workloads', 'Applications', 'No applications on this server'],
     'containers' => ['node.containers', 'Containers', 'No containers found'],
     'sentinel' => ['node.sentinel', 'Sentinel', 'Troubleshooting'],
@@ -154,7 +154,7 @@ it('does not expose a foreign node overview through the current team', function 
 });
 
 it('keeps the node terminal behind the development feature gate', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+    setNodesEnabled(false);
 
     $this->get(route('node.command', $this->node->uuid))->assertNotFound();
 });
@@ -177,7 +177,8 @@ it('issues a terminal session that redeems to an ssh command for an authorized n
 
     $this->postJson(route('terminal.session'), ['token' => $token])
         ->assertSuccessful()
-        ->assertJson(fn ($json) => $json->where('command', fn (string $command): bool => str_contains($command, "'root'@'192.0.2.10'")));
+        ->assertJson(fn ($json) => $json->where('command', fn (string $command): bool => str_contains($command, "'root'@'192.0.2.10'"))
+            ->whereType('session_id', 'string'));
 });
 
 it('refuses to redeem a node terminal session after the node stops being ready', function () {
