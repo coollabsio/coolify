@@ -44,13 +44,21 @@ function scaleTestService(string $compose): Service
     ]);
 }
 
-it('rejects a compose application service with more than one replica', function (string $compose, string $setting) {
-    expect(fn () => applicationParser(scaleTestApplication($compose)))
-        ->toThrow(Exception::class, "Service \"celery\" sets {$setting} to 2. Coolify sets a container_name for each service");
+it('lets Docker Compose name the containers of a compose application service with more than one replica', function (string $compose) {
+    expect(data_get(applicationParser(scaleTestApplication($compose)), 'services.celery'))->not->toHaveKey('container_name');
 })->with([
-    'scale' => ["services:\n  celery:\n    image: alpine\n    scale: 2\n", 'scale'],
-    'deploy.replicas' => ["services:\n  celery:\n    image: alpine\n    deploy:\n      replicas: 2\n", 'deploy.replicas'],
+    'scale' => ["services:\n  celery:\n    image: alpine\n    scale: 2\n"],
+    'deploy.replicas' => ["services:\n  celery:\n    image: alpine\n    deploy:\n      replicas: 2\n"],
 ]);
+
+it('runs one container of a compose application service with more than one replica in a preview', function () {
+    $compose = "services:\n  celery:\n    image: alpine\n    scale: 2\n    deploy:\n      labels:\n        keep: me\n";
+    $service = data_get(applicationParser(scaleTestApplication($compose), pull_request_id: 7), 'services.celery-pr-7');
+
+    expect($service)->toHaveKey('container_name')
+        ->not->toHaveKey('scale')
+        ->and(data_get($service, 'deploy'))->toBe(['labels' => ['keep' => 'me'], 'replicas' => 1]);
+});
 
 it('rejects a service stack service with more than one replica', function () {
     expect(fn () => serviceParser(scaleTestService("services:\n  celery:\n    image: alpine\n    scale: '2'\n")))

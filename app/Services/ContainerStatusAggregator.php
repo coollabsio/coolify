@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Container Status Aggregator Service
@@ -65,7 +66,7 @@ class ContainerStatusAggregator
     public function aggregateForCompose(Collection $containerStatuses, ?string $dockerComposeRaw, int $maxRestartCount = 0): string
     {
         $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
-        $relevantStatuses = $containerStatuses->reject(fn ($status, $containerName) => $excludedContainers->contains($containerName));
+        $relevantStatuses = $containerStatuses->reject(fn ($status, $containerName) => $excludedContainers->contains(Str::before((string) $containerName, '#')));
 
         if ($relevantStatuses->isEmpty()) {
             return $this->calculateExcludedStatusFromStrings($containerStatuses);

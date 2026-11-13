@@ -164,6 +164,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 // `docker ps -a` also lists stopped containers, for example the old container of a rolling update.
                 getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
                     ->filter(fn ($container) => data_get($container, 'State') === 'running')
+                    ->pipe(oneContainerPerComposeService(...))
                     ->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
                     });
@@ -194,7 +195,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || $containerName === $this->task->container || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                if (count($this->containers) == 1 || $containerName === $this->task->container || containerNameMatchesComposeService($containerName, (string) $this->task->container, $this->resource->uuid)) {
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
                     $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName).' '.$this->task->containerCommand();
                     $exec = $this->boundedTaskCommand($execCommand);

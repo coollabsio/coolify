@@ -701,6 +701,12 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -1376,6 +1382,12 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -2053,6 +2065,12 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -2725,6 +2743,12 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -3339,6 +3363,12 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -3884,6 +3914,12 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -4636,6 +4672,12 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "replicas": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 10,
+                                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -28977,6 +29019,10 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Docker compose custom build command."
+                    },
+                    "replicas": {
+                        "type": "integer",
+                        "description": "Number of containers on one server. Not used by the dockercompose build pack."
                     },
                     "swarm_replicas": {
                         "type": "integer",
