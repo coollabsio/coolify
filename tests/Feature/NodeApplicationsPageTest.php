@@ -26,7 +26,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $this->user = User::factory()->create(['name' => 'Ada Owner']);
     $this->team = $this->user->teams()->firstOrFail();
     $this->actingAs($this->user);
@@ -59,7 +59,7 @@ function applicationsPageWorkload(object $test, string $name, ?string $container
         'project_id' => $test->project->id,
         'environment_id' => $test->environment->id,
         'internal_dns_name' => str($name)->slug()->toString(),
-        'domains' => [str($name)->slug().'.example.com'],
+        ...nodeDomainAttributes([str($name)->slug().'.example.com'], 80),
     ]);
     $test->node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create([
@@ -95,6 +95,24 @@ it('shows the Links dropdown instead of the image and internal hostname lines', 
         ->assertDontSee('docker.io/library/nginx:1.27')
         ->assertDontSeeHtml('Copy internal hostname')
         ->assertDontSee('Recent activity');
+});
+
+it('links a domain over HTTPS once ingress serves its certificate', function () {
+    config()->set('constants.coolify.acme_directory_url', 'https://acme.example.test/directory');
+    $this->node->update([
+        'is_ingress' => true,
+        'sentinel_capabilities' => ['ingress.tls.v1'],
+        'metadata' => [
+            ...$this->node->metadata,
+            'ingress_certificates_at' => now()->timestamp,
+            'ingress_certificates' => [['host' => 'example-app.example.com', 'not_after' => now()->addMonth()->timestamp]],
+        ],
+    ]);
+    $this->otherNode->update(['sentinel_capabilities' => ['ingress.tls.v1']]);
+
+    applicationsPage($this)
+        ->assertSee('https://example-app.example.com')
+        ->assertDontSee('http://example-app.example.com');
 });
 
 it('labels the refresh button and has no remove button on a row', function () {

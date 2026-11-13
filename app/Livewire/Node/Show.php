@@ -468,8 +468,13 @@ class Show extends Component
                 ->groupBy('node_workload_id'))
             ->get()
             ->keyBy('node_workload_id');
+        // The applications of a Node run in its cluster, so one lookup serves the links of every row.
+        $cluster = $this->node->cluster;
+        $domainCertificates = $cluster !== null && $workloads->contains(fn (NodeWorkload $workload): bool => filled($workload->domains)) && $cluster->supportsIngressTls()
+            ? $cluster->ingressCertificates()
+            : [];
 
-        $workloadRows = $workloads->map(function (NodeWorkload $workload) use ($latestOperations): array {
+        $workloadRows = $workloads->map(function (NodeWorkload $workload) use ($latestOperations, $domainCertificates): array {
             $state = DetermineWorkloadState::make()->fromInventory(
                 $this->node,
                 fn () => $workload->revisions->first(),
@@ -484,6 +489,7 @@ class Show extends Component
 
             return [
                 'workload' => $workload,
+                'domainCertificates' => collect($domainCertificates)->only($workload->domains ?? [])->all(),
                 'revision' => $workload->revisions->first(),
                 'status' => str($state->value)->title()->toString(),
                 'statusType' => $state->badgeType(),

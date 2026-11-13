@@ -44,7 +44,7 @@
                             <x-status-badge class="shrink-0" :status="$row['status']" :type="$row['statusType']" />
                             {{-- Below sm the panel spans the row like on the application page, above it sits under the trigger. --}}
                             <div class="flex shrink-0 sm:relative">
-                                <x-cluster-applications.links :workload="$workload" compact />
+                                <x-cluster-applications.links :workload="$workload" :domain-certificates="$row['domainCertificates']" compact />
                             </div>
                         </div>
                         <p data-node-workload-activity class="mt-1 truncate text-[12px] leading-4 {{ $activityToneClass }}">

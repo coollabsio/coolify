@@ -1,4 +1,5 @@
-@props(['workload', 'fullWidth' => false, 'compact' => false])
+{{-- Pass domainCertificates when a list renders many rows, so each row does not query the clusters. --}}
+@props(['workload', 'fullWidth' => false, 'compact' => false, 'domainCertificates' => null])
 
 @php
     $internalHostname = $workload->internal_dns_name
@@ -53,7 +54,7 @@
             </div>
         @endif
         @php
-            $domainCertificates = $workload->domainCertificates();
+            $domainCertificates ??= $workload->domainCertificates();
         @endphp
         @forelse ($workload->domain_routes ?? [] as $route)
             @php
