@@ -23,7 +23,7 @@ stable need.
 | B10 | ~~Installer scope: control plane plus SSH workers~~ | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Done: worker onboarding over SSH verified with a second Node; production Flux is B16. |
 | B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
 | B12 | ~~Instance setting for Nodes, labeled Beta~~ | [0015](decisions/0015-node-release-criteria.md) | Done: `is_nodes_enabled` in Settings > Advanced (instance admins only), Beta labels. Tests turn Nodes on with `setNodesEnabled()` (tests/Pest.php); the Node, Flux, Sentinel, and cluster tests pass (2026-11-13). CI runs no PHP tests, so run them locally. |
-| B13 | ~~Release Sentinel, Flux, and `coolify-builder` with every new command~~ | 0011, 0013, 0021 | Done: [Sentinel v1.1.7](https://github.com/coollabsio/sentinel/releases/tag/v1.1.7) (`93ac30c`). `FLUX_IMAGE` pins `main-a8bef06`, the same code without the version bump and the quinn-udp update. |
+| B13 | ~~Release Sentinel, Flux, and `coolify-builder` with every new command~~ | 0011, 0013, 0021 | Done: [Sentinel v1.1.7](https://github.com/coollabsio/sentinel/releases/tag/v1.1.7) (`93ac30c`). `FLUX_IMAGE` pins `flux:1.1.7` by digest. The builder default (`constants.node.builder_image`) pins `coolify-builder:main-93ac30c` by digest, the build of the release commit, because the Sentinel release workflow does not publish `coolify-builder`. |
 | B15 | ~~Traffic between applications on different Nodes is dropped~~ | 0005 | Fixed in Sentinel `8ee8341`: a `mesh_nat` chain in `coolify_cluster` (priority srcnat - 5) keeps the workload source IP before the netavark masquerade. Also fixed `ae0217c`: discovery DNS answers every name of its zones and no longer loops through systemd-resolved. |
 | B16 | ~~Production Flux~~ | [0021](decisions/0021-production-flux.md) | Done: Flux is an s6 service in the Coolify container, secrets in the database, Flux URL setting, restart after renewal, onboarding reachability check. |
 | B14 | ~~Dockerfile without Git (v4 "Dockerfile" type)~~ | 0006 | Done: source type `dockerfile_inline`, capability `image.build.inline_dockerfile.v1`. |
@@ -62,6 +62,7 @@ Gaps in finished work that have no row above.
 | G2 | `MoveNodeWorkloadJob` has its own copy of the network-revision wait; it should use the shared action. | S2 |
 | G3 | The **Sentinel** section of a Node shows the old connection state after **Repair trust** until a reload, because Sentinel reconnects a few seconds after the action. | B16 |
 | G4 | Port 7443 is published on every install. If another program on the host uses it, the Coolify container cannot start after the upgrade. `FLUX_PORT` changes the port. | 0021 |
+| G5 | The Sentinel release workflow (`release.yaml`) does not publish `coolify-builder` with the version tag. Only `release-main.yaml` publishes it as `main-<sha>`. | B13 |
 
 ## Postponed
 
