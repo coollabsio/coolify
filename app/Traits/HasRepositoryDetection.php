@@ -14,12 +14,8 @@ use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
-use App\Services\ProjectConfig\ApplyContext;
-use App\Services\ProjectConfig\ConfigException;
+use App\Services\ProjectConfig\ConfigLinkPreview;
 use App\Services\ProjectConfig\ConfigLinks;
-use App\Services\ProjectConfig\ConfigPlanner;
-use App\Services\ProjectConfig\ConfigRevisions;
-use App\Services\ProjectConfig\RepositoryFileReader;
 use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Log;
@@ -85,6 +81,11 @@ trait HasRepositoryDetection
     public ?string $configPlanError = null;
 
     /**
+     * How to create the resources when the scan found coolify.json: 'file' or 'manual'.
+     */
+    public string $configSource = 'file';
+
+    /**
      * Unsaved application with the repository, branch, and Git source or deploy key to scan.
      */
     abstract protected function applicationForDetection(): Application;
@@ -128,6 +129,24 @@ trait HasRepositoryDetection
             $this->dispatch('error', 'Smart Scan could not read the repository. Check the repository access and the branch.');
         }
         $this->detectionRan = true;
+        if ($this->detectedConfigFile !== null) {
+            $this->configSource = 'file';
+            $this->previewConfigFile();
+        }
+    }
+
+    public function usesConfigFile(): bool
+    {
+        return $this->detectedConfigFile !== null && $this->configSource === 'file';
+    }
+
+    public function canLinkConfigFile(): bool
+    {
+        try {
+            return auth()->user()->isAdminOfTeam((int) $this->detectionEnvironment()->project->team_id);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -160,15 +179,9 @@ trait HasRepositoryDetection
             $link->setRelation('environment', $environment);
             $link->setRelation('readServer', $destination->server);
 
-            $file = app(RepositoryFileReader::class)->read($link);
-            if ($file->missing) {
-                throw new \RuntimeException('coolify.json was not found on this branch.');
-            }
-            $resolved = app(ConfigRevisions::class)->resolve($link, (string) $file->contents);
-            $this->configPlan = app(ConfigPlanner::class)->plan($resolved, ApplyContext::for($link, auth()->user()))->toArray()
-                + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]];
-        } catch (ConfigException $e) {
-            $this->configPlanError = $e->getMessage();
+            ['plan' => $plan, 'error' => $this->configPlanError] = app(ConfigLinkPreview::class)->plan($link, auth()->user());
+            $this->configPlan = $plan === null ? null
+                : $plan + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]];
         } catch (\Throwable $e) {
             $this->configPlanError = $e instanceof \RuntimeException ? $e->getMessage() : 'Coolify could not read coolify.json.';
         }

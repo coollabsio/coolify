@@ -1,7 +1,9 @@
 <?php
 
+use App\Data\RepositoryDetectionResult;
 use App\Jobs\PlanEnvironmentConfigJob;
 use App\Livewire\Project\New\PublicGitRepository;
+use App\Models\Application;
 use App\Models\EnvironmentConfigLink;
 use App\Models\User;
 use App\Services\ProjectConfig\RepositoryFile;
@@ -28,11 +30,24 @@ beforeEach(function () {
     });
 });
 
-function addRepoForm(object $test, User $user)
+class AddRepoFormWithConfigFile extends PublicGitRepository
+{
+    public function fakeScan(): void
+    {
+        $this->applyDetectionResult(new RepositoryDetectionResult(configFile: 'coolify.json'));
+    }
+
+    public function render()
+    {
+        return view('livewire.project.new.public-git-repository');
+    }
+}
+
+function addRepoForm(object $test, User $user, string $component = PublicGitRepository::class)
 {
     $test->actingAs($user);
 
-    return Livewire::test(PublicGitRepository::class, ['type' => 'public'])
+    return Livewire::test($component, ['type' => 'public'])
         ->set('parameters', ['project_uuid' => $test->fx['project']->uuid, 'environment_uuid' => $test->fx['environment']->uuid])
         ->set('query', ['destination' => $test->fx['destination']->uuid])
         ->set('git_repository', 'https://github.com/acme/web')
@@ -81,4 +96,17 @@ it('does not let a member link the environment', function () {
     addRepoForm($this, $member)->call('useConfigFile');
 
     expect(EnvironmentConfigLink::count())->toBe(0);
+});
+
+it('shows the plan instead of creating an application when the form uses coolify.json', function () {
+    addRepoForm($this, $this->fx['user'], AddRepoFormWithConfigFile::class)
+        ->set('branchFound', true)
+        ->call('fakeScan')
+        ->assertSet('configSource', 'file')
+        ->call('submit')
+        ->assertSet('configPlan.changes.0.key', 'web')
+        ->assertSee('Create resources')
+        ->assertDontSee('Build pack');
+
+    expect(Application::count())->toBe(0);
 });
