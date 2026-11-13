@@ -167,9 +167,9 @@
                                 Needed when the repository does not use a GitHub App. Add one push webhook with this secret.
                             </p>
                             <div x-show="open" x-cloak class="mt-3 grid gap-3 sm:grid-cols-2">
-                                <x-forms.copy-input label="Secret" :text="$webhook['webhook_secret']" />
+                                <x-forms.input type="password" label="Secret" :value="$webhook['webhook_secret']" readonly copyable />
                                 @foreach ($webhook['webhook_urls'] as $provider => $url)
-                                    <x-forms.copy-input :label="ucfirst($provider).' URL'" :text="$url" />
+                                    <x-forms.copy-input :label="(['github' => 'GitHub', 'gitlab' => 'GitLab'][$provider] ?? ucfirst($provider)).' URL'" :text="$url" />
                                 @endforeach
                             </div>
                         </div>
