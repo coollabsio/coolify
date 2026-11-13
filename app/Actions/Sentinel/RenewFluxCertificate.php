@@ -94,10 +94,19 @@ class RenewFluxCertificate
     private function restartAndValidate(FluxCertificate $certificate): void
     {
         RestartFlux::run();
+        self::ensureServed($certificate);
+    }
+
+    /**
+     * Connects to Flux in this container on its listen port and checks that it serves this leaf
+     * for its first name, signed by the CA file of Flux. Flux needs a moment after a restart.
+     */
+    public static function ensureServed(FluxCertificate $certificate, int $attempts = 30): void
+    {
         $caFile = rtrim(config('constants.coolify.base_config_path'), '/').'/flux/pki/ca.pem';
         $identity = $certificate->identities[0];
 
-        retry(30, function () use ($caFile, $identity, $certificate): void {
+        retry($attempts, function () use ($caFile, $identity, $certificate): void {
             $context = stream_context_create(['ssl' => [
                 'capture_peer_cert' => true,
                 'cafile' => $caFile,
@@ -105,7 +114,7 @@ class RenewFluxCertificate
                 'verify_peer_name' => true,
                 'peer_name' => $identity,
             ]]);
-            $client = @stream_socket_client('ssl://127.0.0.1:'.FluxRuntime::LISTEN_PORT, $errorCode, $errorMessage, 5, STREAM_CLIENT_CONNECT, $context);
+            $client = @stream_socket_client('ssl://127.0.0.1:'.FluxRuntime::listenPort(), $errorCode, $errorMessage, 5, STREAM_CLIENT_CONNECT, $context);
             if ($client === false) {
                 throw new RuntimeException("Flux TLS is not reachable: {$errorMessage}");
             }

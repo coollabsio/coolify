@@ -155,6 +155,8 @@ return [
         'binary' => env('FLUX_BINARY', '/usr/local/bin/flux'),
         // The default public port of the Flux URL. Flux listens on 7443 inside the Coolify container.
         'port' => (int) env('FLUX_PORT', 7443),
+        // The gRPC port of Flux inside the Coolify container. The compose file publishes it, so it has no environment variable.
+        'listen_port' => 7443,
         'public_url' => env('FLUX_PUBLIC_URL'),
         'issuer' => env('FLUX_ISSUER', env('APP_ID')),
         // Without these variables, Coolify uses the values that it generated and stored in the instance settings.

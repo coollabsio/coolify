@@ -15,11 +15,14 @@ class FluxRuntime
 {
     use AsAction;
 
-    /** The gRPC port for Sentinel. The compose file publishes it. */
-    public const LISTEN_PORT = 7443;
-
     /** The internal API for Coolify, on the loopback interface of the container only. */
     public const INTERNAL_LISTEN_ADDRESS = '127.0.0.1:7080';
+
+    /** The gRPC port for Sentinel inside the Coolify container. The compose file publishes it. */
+    public static function listenPort(): int
+    {
+        return (int) config('constants.flux.listen_port', 7443);
+    }
 
     /**
      * Flux runs when Nodes are on or a Node exists, and Coolify uses the Flux of this container (not Coolify Cloud).
@@ -60,7 +63,7 @@ class FluxRuntime
         $environment = [
             'PATH' => getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin',
             'RUST_LOG' => getenv('RUST_LOG') ?: null,
-            'FLUX_LISTEN_ADDR' => '0.0.0.0:'.self::LISTEN_PORT,
+            'FLUX_LISTEN_ADDR' => '0.0.0.0:'.self::listenPort(),
             'FLUX_INTERNAL_LISTEN_ADDR' => self::INTERNAL_LISTEN_ADDRESS,
             'FLUX_INTERNAL_EVENTS_URL' => 'http://127.0.0.1:8080/api/v1/internal/sentinel/control/events',
             'FLUX_INTERNAL_TOKEN' => config('constants.flux.internal_token'),

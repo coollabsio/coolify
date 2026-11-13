@@ -396,3 +396,69 @@ it('cleans temporary files and preserves the current leaf when staging writes fa
         ->and(file_get_contents($this->directory.'/flux/pki/server.pem'))->toBe($previous->certificate_pem)
         ->and(file_get_contents($this->directory.'/flux/pki/server-key.pem'))->toBe($previous->private_key_pem);
 });
+
+/**
+ * Serves the materialized leaf with `openssl s_server` on a free loopback port, like Flux after a restart,
+ * and makes that port the Flux listen port.
+ *
+ * @return resource
+ */
+function serveMaterializedFluxLeaf(string $directory)
+{
+    $probe = stream_socket_server('tcp://127.0.0.1:0');
+    $port = (int) substr(strrchr(stream_socket_get_name($probe, false), ':'), 1);
+    fclose($probe);
+    config(['constants.flux.listen_port' => $port]);
+
+    $server = proc_open(
+        ['openssl', 's_server', '-accept', "127.0.0.1:{$port}", '-cert', $directory.'/flux/pki/server.pem', '-key', $directory.'/flux/pki/server-key.pem', '-www', '-quiet'],
+        [['pipe', 'r'], ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']],
+        $pipes,
+    );
+    for ($attempt = 0; $attempt < 50; $attempt++) {
+        $client = @stream_socket_client("tcp://127.0.0.1:{$port}", $errorCode, $errorMessage, 1);
+        if ($client !== false) {
+            fclose($client);
+            break;
+        }
+        usleep(100_000);
+    }
+
+    return $server;
+}
+
+it('checks the served leaf on the Flux listen port of the configuration', function () {
+    $certificate = IssueFluxCertificate::run(['flux.example.test']);
+    MaterializeFluxCertificate::run($certificate);
+    $server = serveMaterializedFluxLeaf($this->directory);
+
+    try {
+        RenewFluxCertificate::ensureServed($certificate, 5);
+
+        // Another leaf of the same CA for the same name is not the served one.
+        $other = IssueFluxCertificate::run(['flux.example.test']);
+        expect(fn () => RenewFluxCertificate::ensureServed($other, 1))
+            ->toThrow(RuntimeException::class, 'Flux did not serve the expected TLS certificate.');
+    } finally {
+        proc_terminate($server);
+        proc_close($server);
+    }
+
+    expect(fn () => RenewFluxCertificate::ensureServed($certificate, 1))
+        ->toThrow(RuntimeException::class, 'Flux TLS is not reachable');
+})->skip(fn () => blank(shell_exec('command -v openssl')), 'openssl is not installed');
+
+it('does not accept a served leaf for another name', function () {
+    $served = IssueFluxCertificate::run(['other.example.test']);
+    MaterializeFluxCertificate::run($served);
+    $server = serveMaterializedFluxLeaf($this->directory);
+
+    try {
+        $served->identities = ['flux.example.test'];
+        expect(fn () => RenewFluxCertificate::ensureServed($served, 1))
+            ->toThrow(RuntimeException::class, 'Flux TLS is not reachable');
+    } finally {
+        proc_terminate($server);
+        proc_close($server);
+    }
+})->skip(fn () => blank(shell_exec('command -v openssl')), 'openssl is not installed');
