@@ -7,6 +7,7 @@ use App\Jobs\ApplyEnvironmentConfigJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentConfigRevision;
+use App\Models\EnvironmentVariable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -83,7 +84,7 @@ class ConfigApplier
             $plan = $this->planner->plan($resolved, $ctx);
 
             if ($plan->hasErrors()) {
-                $this->fail($revision, collect($plan->errors)->map(fn (ConfigError $e) => "{$e->path}: {$e->message}")->implode(' '));
+                $this->revisions->fail($revision, collect($plan->errors)->map(fn (ConfigError $e) => "{$e->path}: {$e->message}")->implode(' '), [ConfigRevisionStatus::Applying]);
 
                 return null;
             }
@@ -98,21 +99,25 @@ class ConfigApplier
 
             $changed = ManagedResources::whileApplying(fn () => DB::transaction(fn () => $this->write($revision, $resolved, $plan, $ctx)));
         } catch (Throwable $e) {
-            $this->fail($revision, $e->getMessage());
+            $this->revisions->fail($revision, $e->getMessage(), [ConfigRevisionStatus::Applying]);
 
             return null;
         }
 
-        $revision->update(['status' => ConfigRevisionStatus::Applied, 'applied_at' => now(), 'error' => null]);
-        $link->update(['last_applied_revision_id' => $revision->id]);
-        auditLog('system.project_config.applied', [
-            'team_id' => $link->teamId(),
-            'environment_uuid' => $link->environment->uuid,
-            'revision_uuid' => $revision->uuid,
-            'commit_sha' => $revision->commit_sha,
-            'approved_by' => $revision->approved_by,
-            'changes' => count($plan->changes),
-        ]);
+        $applied = EnvironmentConfigRevision::query()->whereKey($revision->id)
+            ->where('status', ConfigRevisionStatus::Applying->value)
+            ->update(['status' => ConfigRevisionStatus::Applied->value, 'applied_at' => now(), 'error' => null]);
+        if ($applied > 0) {
+            $link->update(['last_applied_revision_id' => $revision->id]);
+            auditLog('system.project_config.applied', [
+                'team_id' => $link->teamId(),
+                'environment_uuid' => $link->environment->uuid,
+                'revision_uuid' => $revision->uuid,
+                'commit_sha' => $revision->commit_sha,
+                'approved_by' => $revision->approved_by,
+                'changes' => count($plan->changes),
+            ]);
+        }
 
         $skip = [];
         foreach (array_keys($plan->missingRequired) as $key) {
@@ -120,6 +125,10 @@ class ConfigApplier
             if ($model !== null) {
                 $skip[] = $model->uuid;
             }
+        }
+        if ($applied === 0) {
+            // Released during the apply: its held deploys were failed.
+            $skip = [...$skip, ...array_column($revision->held_deployments ?? [], 'application_uuid')];
         }
         $this->held->release($revision->fresh(), $changed, $skip);
         foreach ($this->restarts as [$model, $created]) {
@@ -166,6 +175,9 @@ class ConfigApplier
                 $model = $adapter->create($key, $desired, $ctx);
             } elseif (isset($writeKeys[$key])) {
                 $adapter->update($model, $desired, $ctx);
+            } elseif ($this->hasStaleRefs($model, $desired, $ctx)) {
+                $adapter->update($model, $desired, $ctx);
+                $changedKeys[$key] = true;
             }
             foreach (['internal_url', 'host', 'port'] as $property) {
                 $value = $adapter->referenceValue($model, $property);
@@ -181,6 +193,32 @@ class ConfigApplier
         }
 
         return $deploy;
+    }
+
+    /**
+     * Whether a stored `resource.<key>.*` variable differs from the value the reference resolves to now.
+     */
+    private function hasStaleRefs(Model $model, array $desired, ApplyContext $ctx): bool
+    {
+        foreach ($desired['env'] ?? [] as $name => $entry) {
+            foreach ([[$entry, false], [$entry['preview'] ?? null, true]] as [$candidate, $isPreview]) {
+                $ref = $candidate['ref'] ?? null;
+                if (! is_string($ref) || ! isset($ctx->resolvedRefs[$ref])) {
+                    continue;
+                }
+                $stored = EnvironmentVariable::query()
+                    ->where('resourceable_type', $model->getMorphClass())
+                    ->where('resourceable_id', $model->getKey())
+                    ->where('key', $name)
+                    ->where('is_preview', $isPreview)
+                    ->first();
+                if ($stored?->value !== $ctx->resolvedRefs[$ref]) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -225,6 +263,8 @@ class ConfigApplier
             return;
         }
         $this->setKey($model, null);
+        // Soft delete first, like the Danger page: the resource leaves lists and deploys at once.
+        $model->delete();
         $adapter->delete($model, in_array($change->key, $revision->delete_data ?? [], true));
     }
 
@@ -243,13 +283,10 @@ class ConfigApplier
             $revision->held_deployments ?? [],
         );
 
-        return $new->status === ConfigRevisionStatus::Planned ? $new : null;
-    }
+        if ($new->status === ConfigRevisionStatus::Failed) {
+            $this->revisions->fail($new, (string) $new->error);
+        }
 
-    private function fail(EnvironmentConfigRevision $revision, string $reason): void
-    {
-        $revision->update(['status' => ConfigRevisionStatus::Failed, 'error' => $reason]);
-        $this->held->fail($revision, $reason);
-        $this->revisions->notifyFailed($revision);
+        return $new->status === ConfigRevisionStatus::Planned ? $new : null;
     }
 }

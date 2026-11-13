@@ -18,6 +18,7 @@ class ConfigRevisions
         private readonly ConfigParser $parser,
         private readonly ConfigResolver $resolver,
         private readonly ConfigPlanner $planner,
+        private readonly HeldDeployments $held,
     ) {}
 
     /**
@@ -65,6 +66,27 @@ class ConfigRevisions
         }
 
         return $revision;
+    }
+
+    /**
+     * Marks a revision failed, fails its held deploys, and notifies the team. With $from, only a revision in one of these statuses.
+     *
+     * @param  list<ConfigRevisionStatus>  $from
+     */
+    public function fail(EnvironmentConfigRevision $revision, string $reason, array $from = []): bool
+    {
+        $query = EnvironmentConfigRevision::query()->whereKey($revision->id);
+        if ($from !== []) {
+            $query->whereIn('status', array_map(fn (ConfigRevisionStatus $status) => $status->value, $from));
+        }
+        if ($query->update(['status' => ConfigRevisionStatus::Failed->value, 'error' => $reason]) === 0) {
+            return false;
+        }
+        $revision->refresh();
+        $this->held->fail($revision, $reason);
+        $this->notifyFailed($revision);
+
+        return true;
     }
 
     public function notifyFailed(EnvironmentConfigRevision $revision): void

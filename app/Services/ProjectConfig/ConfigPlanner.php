@@ -55,6 +55,9 @@ class ConfigPlanner
 
                 continue;
             }
+            if ($model->config_key === $import['to']) {
+                continue;
+            }
             if ($model->config_key !== null) {
                 $errors[] = new ConfigError($path, "This resource is already managed as \"{$model->config_key}\".");
 
@@ -125,6 +128,8 @@ class ConfigPlanner
                 $target = str_starts_with($ref, 'resource.') ? explode('.', $ref)[1] : null;
                 if ($target !== null && ($env->resources[$target]['type'] ?? null) === 'service') {
                     $errors[] = new ConfigError("resources.{$key}.env.{$name}", 'Services have no single address. Reference a service domain with a value instead.');
+                } elseif ($target !== null && $this->refHasNoValue($ref, $env->resources[$target] ?? null)) {
+                    $errors[] = new ConfigError("resources.{$key}.env.{$name}", "\"{$target}\" has no ".explode('.', $ref)[2].'.');
                 }
             }
         }
@@ -165,6 +170,23 @@ class ConfigPlanner
             from: $group === 'env' ? null : $difference['from'],
             to: $group === 'env' ? null : $difference['to'],
         );
+    }
+
+    /**
+     * Whether `resource.<key>.<property>` resolves to nothing: an application without an exposed port, or a database without a port (SQLite).
+     */
+    private function refHasNoValue(string $ref, ?array $target): bool
+    {
+        $property = explode('.', $ref)[2];
+        if ($target === null || $property === 'host' || ! $this->registry->has($target['type'])) {
+            return false;
+        }
+        if ($target['type'] === 'application') {
+            return $property === 'port' && blank(explode(',', (string) ($target['ports']['exposes'] ?? ''))[0]);
+        }
+        $adapter = $this->registry->for($target['type']);
+
+        return $adapter->referenceValue(new ($adapter->modelClass()), 'port') === null;
     }
 
     /**

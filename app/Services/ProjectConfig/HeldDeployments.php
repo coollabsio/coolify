@@ -9,6 +9,7 @@ use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use Illuminate\Database\Eloquent\Model;
 
@@ -57,11 +58,18 @@ class HeldDeployments
             $commits[$held['application_uuid']] = $held['commit_sha'] ?? null;
         }
 
+        $this->deployEach($revision->link, array_diff_key($commits, array_flip($skipUuids)));
+    }
+
+    /**
+     * Deploys applications of the environment of the link. Removed applications are soft deleted and skipped.
+     *
+     * @param  array<string, ?string>  $commits  application uuid => commit
+     */
+    public function deployEach(EnvironmentConfigLink $link, array $commits): void
+    {
         foreach ($commits as $uuid => $commit) {
-            if (in_array($uuid, $skipUuids, true)) {
-                continue;
-            }
-            $application = Application::query()->where('uuid', $uuid)->first();
+            $application = $this->application($link, $uuid);
             if ($application !== null) {
                 $this->deploy($application, $commit);
             }
@@ -74,7 +82,7 @@ class HeldDeployments
     public function fail(EnvironmentConfigRevision $revision, string $reason): void
     {
         foreach ($revision->held_deployments ?? [] as $held) {
-            $application = Application::query()->where('uuid', $held['application_uuid'])->first();
+            $application = $this->application($revision->link, $held['application_uuid']);
             if ($application === null) {
                 continue;
             }
@@ -92,5 +100,10 @@ class HeldDeployments
             ]);
             $deployment->addLogEntry("coolify.json was not applied: {$reason}", 'stderr');
         }
+    }
+
+    private function application(EnvironmentConfigLink $link, string $uuid): ?Application
+    {
+        return Application::query()->where('environment_id', $link->environment_id)->where('uuid', $uuid)->first();
     }
 }

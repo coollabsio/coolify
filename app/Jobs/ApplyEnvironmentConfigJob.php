@@ -19,6 +19,8 @@ class ApplyEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout = 600;
 
+    public bool $deleteWhenMissingModels = true;
+
     public function __construct(public EnvironmentConfigRevision $revision)
     {
         $this->onQueue('high');

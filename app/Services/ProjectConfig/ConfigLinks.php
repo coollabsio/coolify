@@ -144,7 +144,9 @@ class ConfigLinks
 
     public function dispatchWhenPlanned(EnvironmentConfigRevision $revision): void
     {
-        if ($revision->status === ConfigRevisionStatus::Planned && ! $revision->link->isSuspended()) {
+        if ($revision->status === ConfigRevisionStatus::Failed) {
+            $this->revisions->fail($revision, (string) $revision->error);
+        } elseif ($revision->status === ConfigRevisionStatus::Planned && ! $revision->link->isSuspended()) {
             ApplyEnvironmentConfigJob::dispatch($revision);
         }
     }
@@ -162,12 +164,29 @@ class ConfigLinks
 
     /**
      * Removes the link. The resources stay and can be edited in Coolify again; their keys stay for a later link.
+     * The file no longer gates deploys, so held deploys of revisions that did not apply run now.
      */
     public function disconnect(EnvironmentConfigLink $link, User $user): void
     {
         $this->authorizeTeamAdmin($link, $user);
         auditLog('system.project_config.disconnected', ['team_id' => $link->teamId(), 'environment_uuid' => $link->environment->uuid, 'actor_id' => $user->id]);
+        $commits = [];
+        $waiting = $link->revisions()
+            ->whereIn('status', [ConfigRevisionStatus::Planned->value, ConfigRevisionStatus::WaitingApproval->value])
+            ->orderBy('id')
+            ->get();
+        foreach ($waiting as $revision) {
+            foreach ($revision->held_deployments ?? [] as $held) {
+                $commits[$held['application_uuid']] = $held['commit_sha'] ?? null;
+            }
+        }
+        if ($link->pending_pushed_at !== null) {
+            foreach ((array) $link->pending_held_deployments as $uuid) {
+                $commits[$uuid] ??= $link->pending_commit_sha;
+            }
+        }
         $link->delete();
+        app(HeldDeployments::class)->deployEach($link, $commits);
     }
 
     public function setAutoApply(EnvironmentConfigLink $link, User $user, bool $autoApply): void
@@ -215,9 +234,7 @@ class ConfigLinks
 
     public function release(EnvironmentConfigRevision $revision, User $user): void
     {
-        EnvironmentConfigRevision::query()->whereKey($revision->id)
-            ->where('status', ConfigRevisionStatus::Applying->value)
-            ->update(['status' => ConfigRevisionStatus::Failed->value, 'error' => "Released by {$user->name}."]);
+        $this->revisions->fail($revision, "Released by {$user->name}.", [ConfigRevisionStatus::Applying]);
     }
 
     public function retry(EnvironmentConfigRevision $revision, User $user): EnvironmentConfigRevision

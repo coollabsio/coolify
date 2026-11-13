@@ -7,7 +7,6 @@ use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use App\Services\ProjectConfig\ConfigLinks;
 use App\Services\ProjectConfig\ConfigRevisions;
-use App\Services\ProjectConfig\HeldDeployments;
 use App\Services\ProjectConfig\RepositoryFileException;
 use App\Services\ProjectConfig\RepositoryFileReader;
 use Illuminate\Bus\Queueable;
@@ -28,6 +27,8 @@ class PlanEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout = 300;
 
+    public bool $deleteWhenMissingModels = true;
+
     /**
      * @param  list<string>  $heldApplicationUuids
      */
@@ -40,7 +41,7 @@ class PlanEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
         $this->onQueue('high');
     }
 
-    public function handle(RepositoryFileReader $reader, ConfigRevisions $revisions, ConfigLinks $links, HeldDeployments $held): void
+    public function handle(RepositoryFileReader $reader, ConfigRevisions $revisions, ConfigLinks $links): void
     {
         $link = $this->link->fresh();
         if ($link === null) {
@@ -55,8 +56,11 @@ class PlanEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
                 'commit_sha' => $this->commit,
                 'status' => ConfigRevisionStatus::Skipped,
                 'error' => 'A newer push replaced this one.',
-                'held_deployments' => $heldDeployments ?: null,
             ]);
+            // The held deploys wait for the file of the newest push instead.
+            if ($this->heldApplicationUuids !== []) {
+                self::dispatch($link, $this->trigger, $link->pending_commit_sha, $this->heldApplicationUuids);
+            }
 
             return;
         }
@@ -71,15 +75,7 @@ class PlanEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $revisions->supersedeOlder($revision);
-        $revision->refresh();
-
-        if ($revision->status === ConfigRevisionStatus::Failed) {
-            $held->fail($revision, (string) $revision->error);
-            $revisions->notifyFailed($revision);
-
-            return;
-        }
-        $links->dispatchWhenPlanned($revision);
+        $links->dispatchWhenPlanned($revision->refresh());
     }
 
     private function failed(EnvironmentConfigLink $link, ?string $commit, string $error, array $heldDeployments): EnvironmentConfigRevision

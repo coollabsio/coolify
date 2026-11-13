@@ -66,8 +66,10 @@ class ConfigPushRouter
 
     private function addPending(EnvironmentConfigLink $link, ?string $commit): void
     {
-        $link->update(['pending_commit_sha' => $commit, 'pending_held_deployments' => [], 'pending_pushed_at' => now()]);
-        $this->pending[$link->id] = ['link' => $link, 'commit' => $commit, 'held' => []];
+        // An earlier push whose flush did not run yet keeps its held deploys.
+        $held = $link->pending_pushed_at !== null ? array_values((array) $link->pending_held_deployments) : [];
+        $link->update(['pending_commit_sha' => $commit, 'pending_held_deployments' => $held, 'pending_pushed_at' => now()]);
+        $this->pending[$link->id] = ['link' => $link, 'commit' => $commit, 'held' => $held];
         unset($this->candidates[$link->id]);
 
         if (! $this->flushRegistered) {
