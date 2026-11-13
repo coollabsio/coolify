@@ -948,8 +948,12 @@ it('filters docker compose generated service variables from build args', functio
     expect($envArgs->has('SERVICE_URL_APP'))->toBeFalse();
 });
 
-it('does not fall back to production vars when preview copies are deleted', function () {
+it('falls back to production runtime vars without a preview copy only when previews use production values', function (bool $isPublic, bool $usesProductionValues, bool $fallsBack) {
     [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update([
+        'is_pr_deployments_public_enabled' => $isPublic,
+        'use_production_values_in_previews' => $usesProductionValues,
+    ]);
 
     createApplicationEnvironmentVariable($application, [
         'key' => 'APP_NAME',
@@ -967,16 +971,20 @@ it('does not fall back to production vars when preview copies are deleted', func
 
     $application->environment_variables_preview()->where('key', 'APP_NAME')->delete();
 
-    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
         'pull_request_id' => 99,
     ]);
 
     /** @var Collection $runtimeEnvs */
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
-    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBeFalse();
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_NAME=')))->toBe($fallsBack);
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('PREVIEW_FLAG=')))->toBeTrue();
-});
+})->with([
+    'public PR deployments off' => [false, true, true],
+    'public PR deployments on' => [true, true, false],
+    'production values in previews off' => [false, false, false],
+]);
 
 it('does not give production runtime values to a preview copy that is not a runtime variable', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
@@ -1063,6 +1071,33 @@ it('keeps copied production values for previews when public PR deployments are o
     $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
 
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=')))->toBeTrue();
+});
+
+it('keeps copied production values out of previews when production values in previews are off', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+    createApplicationEnvironmentVariable($application, ['key' => 'API_URL', 'value' => 'https://api.example.com']);
+    $application->environment_variables_preview()->where('key', 'API_URL')->first()
+        ->update(['value' => 'https://preview-api.example.com']);
+    $application->settings()->update(['use_production_values_in_previews' => false]);
+    createApplicationEnvironmentVariable($application, ['key' => 'NEW_SECRET', 'value' => 'new-production-secret']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    foreach ([$runtimeEnvs, $buildtimeEnvs] as $envLines) {
+        expect($envLines->filter(fn (string $env) => str($env)->contains('production-secret')))->toBeEmpty()
+            ->and($envLines->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=')))->toBeFalse()
+            ->and($envLines->contains(fn (string $env) => str($env)->startsWith('API_URL=') && str($env)->contains('preview-api.example.com')))->toBeTrue()
+            ->and($envLines->contains(fn (string $env) => str($env)->startsWith('NEW_SECRET=')))->toBeTrue();
+    }
 });
 
 it('keeps buildpack variables read at container start in the runtime env', function (int $pullRequestId, bool $isPreview) {

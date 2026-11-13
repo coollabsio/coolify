@@ -6,6 +6,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.5] - 2026-11-10
+
+### Fixed
+
+- Crashed the `Keys & Tokens` > `API Tokens` page with a 500 error for a token with scopes stored in an unexpected format
+- Failed connection to SFTP backup storages on an IPv6 address, and a connection error without the network reason
+  - The error now shows the network reason, for example `Connection refused` or `Connection timed out`
+
+## [v4.7.4] - 2026-11-10
+
+### Fixed
+
+- Kept the records of failed database backups forever
+  - The daily database cleanup deletes failed database backups that are older than 60 days
+- Missing production runtime variables in preview deployments when the variable has no preview variable
+  - A preview gets these production runtime variables again, except when `PR deployment access` is public. The deployment log lists each variable that a preview does not get
+
+## [v4.7.3] - 2026-11-09
+
+### Added
+
+- An `Export` menu on the vulnerability lists of a resource, of a server (`Security` > `Vulnerabilities`), and of the team `Security` page, to copy the list as a Markdown table or download it as CSV or JSON
+  - The export contains the rows that the list shows, with its tab, search, and filters, from all pages
+  - The finding lists can also copy the vulnerability IDs
+
+### Fixed
+
+- Broken links in backup notifications of the instance database and of service databases
+  - They link to `Settings` > `Backup` and to the service page
+- Denied root team owners and admins to change and download the instance backup on `Settings` > `Backup` ([#12503](https://github.com/coollabsio/coolify/issues/12503), [#12505](https://github.com/coollabsio/coolify/issues/12505))
+- Vulnerability scans of large images that stopped with a Syft or Grype timeout
+  - The default Grype time limit is 10 minutes. Set the `Syft time limit`, the `Grype time limit`, and the `Scanner CPU limit` on the `Vulnerabilities` page of a server, or with `image_scan_syft_timeout`, `image_scan_grype_timeout`, and `image_scan_cpus` in the server image scanning API
+  - The `Scanner CPU limit` and the `Scanner memory limit` offer only values that the server has. The API refuses higher values
+
+## [v4.7.2] - 2026-11-09
+
+### Security
+
+- Restricted the `Redeploy` and `Stop` actions of an application destination to the servers that the application runs on
+
+### Changed
+
+- Names in the top breadcrumb, which now link to their page
+  - The section name, such as `Servers`, opens the list page of the section
+  - The project, environment, resource, server, storage, source, destination, and tag names open their own page
+  - The arrow next to a name still opens the switch list
+
+### Fixed
+
+- Closed root account setup window right after a fresh install, so the first account could not be created on the `Register` page
+- Image scans of large images that stopped because the scanner ran out of memory
+  - The scanner frees memory sooner when it gets close to its limit. Set a higher limit with `Scanner memory limit` on the `Vulnerabilities` page of a server, or with `image_scan_memory_mb` in the server image scanning API. The default stays 1 GB
+- Missing scanner disk usage on the `Image Scanning` page of a server and in the `scanner_disk_used_bytes` API field
+  - The `Delete scanner data` button also stays hidden now after the scanner data is deleted
+- The `Nightly` update channel was hard to find, because only the `Channel` list in `Settings` > `Updates` named it ([#12492](https://github.com/coollabsio/coolify/issues/12492))
+  - On the `Stable` channel, `Settings` > `Updates` shows a hint about `Nightly`. The upgrade dialog shows the update channel and links to `Settings` > `Updates`
+
+## [v4.7.1] - 2026-11-09
+
+### Added
+
+- The reason of a failed image scan in a `Show error log` section on the `Security` page and in the Laravel log
+  - The error log shows the failed step, its exit code, and the end of the command output. Only users who can change the resource or server see it
+
+### Fixed
+
+- Failed image scans on self-hosted instances, because the scanner templates were missing from the Coolify image
+- Ignored custom container labels and wildcard domains in maintenance mode ([#12498](https://github.com/coollabsio/coolify/issues/12498))
+  - With editable container labels, maintenance mode uses the Traefik router rules and the Caddy site addresses of the labels
+- Showed an error on the `Vulnerabilities` page
+- Showed warning callouts in the accent color instead of yellow when a custom theme is active
+
 ## [v4.7.0] - 2026-11-09
 
 ### Breaking Changes

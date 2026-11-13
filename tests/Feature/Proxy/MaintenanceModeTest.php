@@ -302,3 +302,64 @@ it('does not let a member or another team change maintenance mode', function (st
         ->and($service->maintenance_page)->toBeNull();
     Process::assertNothingRan();
 })->with(['member', 'other team']);
+
+it('routes the Traefik routers of custom labels, so wildcard rules also get the maintenance page', function () {
+    $wildcardRule = 'HostRegexp(`^.+\.example\.com$`)';
+    $application = maintenanceApplication(['fqdn' => null, 'is_maintenance_enabled' => true, 'custom_labels' => base64_encode(implode("\n", [
+        'traefik.enable=true',
+        'traefik.http.routers.wildcard-http.entryPoints=http',
+        "traefik.http.routers.wildcard-http.rule={$wildcardRule}",
+        'traefik.http.routers.wildcard-https.entrypoints=https',
+        "traefik.http.routers.wildcard-https.rule={$wildcardRule}",
+        'traefik.http.routers.wildcard-https.priority=500',
+        'traefik.http.routers.wildcard-https.tls=true',
+        'traefik.http.routers.wildcard-https.tls.certresolver=dns',
+        'traefik.http.routers.internal.tls=true',
+    ]))]);
+    $application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $application->refresh();
+
+    $routers = Yaml::parse(maintenanceServer()->maintenanceTraefikConfiguration(collect([$application])))['http']['routers'];
+
+    expect($routers)->toHaveCount(2)
+        ->and($routers["coolify-maintenance-{$application->uuid}-wildcard-http"])->toBe([
+            'entryPoints' => ['http'],
+            'rule' => $wildcardRule,
+            'service' => 'coolify-maintenance-noop',
+            'middlewares' => ['coolify-maintenance-headers', "coolify-maintenance-{$application->uuid}"],
+            'priority' => strlen($wildcardRule) + 1,
+        ])
+        ->and($routers["coolify-maintenance-{$application->uuid}-wildcard-https"])->toMatchArray([
+            'entryPoints' => ['https'],
+            'priority' => 501,
+            'tls' => ['certResolver' => 'dns'],
+        ]);
+});
+
+it('writes Caddy maintenance blocks with the site addresses of custom labels', function () {
+    $this->server->proxy->type = ProxyTypes::CADDY->value;
+    $this->server->save();
+    $application = maintenanceApplication(['fqdn' => null, 'is_maintenance_enabled' => true, 'custom_labels' => base64_encode(implode("\n", [
+        'caddy_0=https://*.example.com',
+        'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}',
+        'caddy_0.handle_path=/*',
+        'caddy_1=https://evil.example.com {',
+    ]))]);
+    $application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $application->refresh();
+
+    $caddyfile = maintenanceServer()->caddyBaseCaddyfile(collect([$application]));
+
+    expect($caddyfile)
+        ->toContain("\n\nhttps://*.example.com {\n\t@coolify-maintenance-{$application->uuid}-0 path /*\n\thandle @coolify-maintenance-{$application->uuid}-0 {")
+        ->not->toContain('evil.example.com');
+});
+
+it('uses the domains when the container labels are read-only', function () {
+    $application = maintenanceApplication(['is_maintenance_enabled' => true, 'custom_labels' => base64_encode('traefik.http.routers.custom.rule=Host(`other.example.com`)')]);
+
+    $routers = Yaml::parse(maintenanceServer()->maintenanceTraefikConfiguration(collect([$application])))['http']['routers'];
+
+    expect($routers)->toHaveKeys(["coolify-maintenance-{$application->uuid}-0-http", "coolify-maintenance-{$application->uuid}-0-https"])
+        ->and(collect($routers)->pluck('rule')->unique()->all())->toBe(['Host(`app.example.com`) && PathPrefix(`/`)']);
+});

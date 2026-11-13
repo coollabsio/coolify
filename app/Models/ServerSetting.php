@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LogDrainType;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use App\Helpers\SshMultiplexingHelper;
@@ -29,10 +30,6 @@ use OpenApi\Attributes as OA;
         'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
-        'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean'],
-        'is_logdrain_custom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_traffic_analytics_enabled' => ['type' => 'boolean'],
         'traffic_topn' => ['type' => 'integer'],
@@ -57,16 +54,21 @@ use OpenApi\Attributes as OA;
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
         'is_usable' => ['type' => 'boolean'],
-        'logdrain_axiom_api_key' => ['type' => 'string'],
-        'logdrain_axiom_dataset_name' => ['type' => 'string'],
-        'logdrain_axiom_domain' => ['type' => 'string', 'description' => 'Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co.'],
-        'logdrain_cloudwatch_region' => ['type' => 'string'],
-        'logdrain_cloudwatch_group' => ['type' => 'string'],
-        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string'],
-        'logdrain_custom_config' => ['type' => 'string'],
-        'logdrain_custom_config_parser' => ['type' => 'string'],
-        'logdrain_newrelic_base_uri' => ['type' => 'string'],
-        'logdrain_newrelic_license_key' => ['type' => 'string'],
+        'logdrain_type' => ['type' => 'string', 'nullable' => true, 'enum' => ['newrelic', 'axiom', 'cloudwatch', 'custom'], 'description' => 'The active log drain, or null when no log drain is enabled.'],
+        'is_logdrain_newrelic_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_axiom_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_custom_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_newrelic_license_key' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_newrelic_base_uri' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_dataset_name' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_api_key' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_domain' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_custom_config' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_custom_config_parser' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_region' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_group' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
         'sentinel_metrics_history_days' => ['type' => 'integer'],
         'sentinel_metrics_refresh_rate_seconds' => ['type' => 'integer'],
         'sentinel_token' => ['type' => 'string'],
@@ -103,16 +105,33 @@ class ServerSetting extends Model
 
     public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
 
-    /**
-     * Axiom edge deployment for US East 1. See https://axiom.co/docs/reference/edge-deployments.
-     */
-    public const string DEFAULT_AXIOM_DOMAIN = 'us-east-1.aws.edge.axiom.co';
+    /** Memory limit of each scanner container (Syft, Grype, regctl), in MB. */
+    public const int DEFAULT_IMAGE_SCAN_MEMORY_MB = 1024;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_MEMORY_OPTIONS_MB = [1024, 2048, 4096, 8192];
+
+    /** Time limit of one Syft run and of one Grype run, in seconds. */
+    public const int DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS = 600;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS = [300, 600, 1200, 1800, 3600];
+
+    /** CPUs of each scanner container. */
+    public const float DEFAULT_IMAGE_SCAN_CPUS = 1.0;
+
+    /** @var list<float> */
+    public const array IMAGE_SCAN_CPU_OPTIONS = [0.5, 1.0, 2.0, 4.0];
 
     protected $fillable = [
         'server_id',
         'is_image_scan_enabled',
+        'image_scan_memory_mb',
         'image_candidate_scans_today',
         'image_candidate_scans_date',
+        'image_scan_syft_timeout',
+        'image_scan_grype_timeout',
+        'image_scan_cpus',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -124,21 +143,9 @@ class ServerSetting extends Model
         'cloudflare_tunnel_id',
         'cloudflare_tunnel_account_id',
         'cloudflare_tunnel_integration_token_id',
-        'is_logdrain_newrelic_enabled',
-        'logdrain_newrelic_license_key',
-        'logdrain_newrelic_base_uri',
-        'is_logdrain_axiom_enabled',
-        'logdrain_axiom_dataset_name',
-        'logdrain_axiom_api_key',
-        'logdrain_axiom_domain',
         'is_swarm_worker',
-        'is_logdrain_custom_enabled',
-        'logdrain_custom_config',
-        'logdrain_custom_config_parser',
-        'is_logdrain_cloudwatch_enabled',
-        'logdrain_cloudwatch_region',
-        'logdrain_cloudwatch_group',
-        'logdrain_cloudwatch_stream_prefix',
+        'logdrain_type',
+        'logdrain_config',
         'concurrent_builds',
         'dynamic_timeout',
         'force_disabled',
@@ -185,6 +192,7 @@ class ServerSetting extends Model
         'patch_checked_at',
         'is_auto_security_updates_enabled',
         'auto_security_updates_time',
+        'auto_security_updates_last_run',
     ];
 
     /**
@@ -196,11 +204,18 @@ class ServerSetting extends Model
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
         'is_image_scan_enabled' => false,
+        'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
+        'image_scan_syft_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_grype_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_cpus' => self::DEFAULT_IMAGE_SCAN_CPUS,
     ];
 
     protected $casts = [
         'force_disabled' => 'boolean',
+        'image_scan_syft_timeout' => 'integer',
+        'image_scan_grype_timeout' => 'integer',
+        'image_scan_cpus' => 'float',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
@@ -219,7 +234,8 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
-        'logdrain_custom_config' => 'encrypted',
+        'logdrain_type' => LogDrainType::class,
+        'logdrain_config' => 'encrypted:array',
         'traffic_ip_mode' => TrafficIpMode::class,
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
@@ -228,8 +244,9 @@ class ServerSetting extends Model
         'patch_check_result' => 'array',
         'patch_checked_at' => 'datetime',
         'is_auto_security_updates_enabled' => 'boolean',
-        'is_logdrain_cloudwatch_enabled' => 'boolean',
+        'auto_security_updates_last_run' => 'array',
         'is_image_scan_enabled' => 'boolean',
+        'image_scan_memory_mb' => 'integer',
         'image_candidate_scans_today' => 'integer',
         'image_candidate_scans_date' => 'date',
         'ssh_host_key_trusted_at' => 'datetime',
@@ -246,10 +263,7 @@ class ServerSetting extends Model
         'is_build_server',
         'sentinel_token',
         'sentinel_custom_url',
-        'logdrain_newrelic_license_key',
-        'logdrain_axiom_api_key',
-        'logdrain_custom_config',
-        'logdrain_custom_config_parser',
+        'logdrain_config',
         'geoip_maxmind_license_key',
     ];
 
@@ -303,6 +317,22 @@ class ServerSetting extends Model
                 }
             }
         });
+    }
+
+    /**
+     * The saved config of a log drain type, or of the active type. Each type keeps its own
+     * values, so a user can switch the destination without losing them.
+     *
+     * @return array<string, mixed>
+     */
+    public function logDrainConfig(?LogDrainType $type = null): array
+    {
+        $type ??= $this->logdrain_type;
+        if (! $type) {
+            return [];
+        }
+
+        return (array) data_get($this->logdrain_config ?? [], $type->value, []);
     }
 
     public function effectiveServerRole(): ServerRole

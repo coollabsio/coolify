@@ -174,7 +174,7 @@ class ApiTokens extends Component
             'search' => Str::lower(collect([$token->name, ...($token->abilities ?? [])])
                 ->merge($token->scopes === null
                     ? ['All resources in the team']
-                    : collect($token->scopes)->map(fn ($scope) => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? null)->filter())
+                    : collect(Grant::listFrom($token->scopes))->map(fn (Grant $scope) => $scopeLabels[$scope->scope->value.':'.$scope->uuid] ?? null)->filter())
                 ->join(' ')),
         ])->values()->all();
     }

@@ -442,3 +442,15 @@ describe('scan now marks', function () {
         expect(Cache::has(ScanImage::progressCacheKey($web)))->toBeFalse();
     });
 });
+
+it('gives a scan job of many images the time limits of its server, so it stays below the queue retry_after', function () {
+    $service = startScansService();
+    foreach (range(1, 8) as $n) {
+        startScansServiceApplication($service, "nginx:1.{$n}");
+    }
+
+    $job = new ScanResourceImagesJob($service->fresh());
+
+    expect($job->timeout)->toBe(8 * ScanImage::lockTtl($this->server))
+        ->and($job->timeout)->toBeLessThan(config('queue.connections.redis.retry_after'));
+});

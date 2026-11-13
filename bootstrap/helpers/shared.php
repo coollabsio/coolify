@@ -1831,11 +1831,17 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 
     return null;
 }
+/**
+ * Finds a standalone database of the team for the API and MCP. The instance database (coolify-db) is never returned.
+ */
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
     foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
         $database = $modelClass::whereUuid($uuid)->first();
-        if ($database && $database->team()->id == $teamId) {
+        if ($database instanceof StandalonePostgresql && $database->isInstanceDatabase()) {
+            return null;
+        }
+        if ($database && $database->team()?->id == $teamId) {
             return $database->unsetRelation('environment');
         }
     }
@@ -4647,29 +4653,17 @@ function generate_fluentd_configuration(): array
     ];
 }
 
+/**
+ * The `logging` setting of a container on a server with an active log drain.
+ */
 function generate_log_drain_configuration(Server $server): array
 {
-    if ($server->isFluentBitLogDrainEnabled()) {
-        return generate_fluentd_configuration();
+    $type = $server->settings->logdrain_type;
+    if (! $type) {
+        return [];
     }
 
-    $settings = $server->settings;
-    $options = [
-        'awslogs-region' => $settings->logdrain_cloudwatch_region,
-        'awslogs-group' => $settings->logdrain_cloudwatch_group,
-        'awslogs-create-group' => 'true',
-        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
-        'mode' => 'non-blocking',
-        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
-        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
-    ];
-
-    return [
-        'driver' => 'awslogs',
-        'options' => collect($options)
-            ->reject(fn ($value) => blank($value))
-            ->all(),
-    ];
+    return $type->driver()->containerLogging($server->settings->logDrainConfig($type));
 }
 
 function isAssociativeArray($array)

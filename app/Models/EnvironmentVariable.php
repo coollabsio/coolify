@@ -121,6 +121,7 @@ class EnvironmentVariable extends BaseModel
         'is_multiline' => 'boolean',
         'is_literal' => 'boolean',
         'is_preview' => 'boolean',
+        'is_production_value_copy' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'uses_legacy_escaping' => 'boolean',
@@ -144,6 +145,12 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping',
     ];
 
+    /**
+     * Not stored: false leaves the preview copy of a new production variable of an application empty.
+     * It cannot copy the value when the "New preview variables" setting of the application is "Leave empty".
+     */
+    public ?bool $copyValueToPreview = null;
+
     protected static function booted()
     {
         static::deleting(fn (ModelsEnvironmentVariable $environmentVariable) => ManagedResources::guardVariable($environmentVariable, deleting: true));
@@ -163,9 +170,14 @@ class EnvironmentVariable extends BaseModel
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
                         // The preview copy is part of the same change, so it gets no audit rows of its own.
-                        $preview = new ModelsEnvironmentVariable([
+                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false
+                            && $environment_variable->copyValueToPreview !== false;
+                        // forceFill: is_production_value_copy is not fillable.
+                        $preview = (new ModelsEnvironmentVariable)->forceFill([
                             'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
+                            // Without production values, the copy only shows which keys the previews need.
+                            'value' => $usesProductionValue ? $environment_variable->value : '',
+                            'is_production_value_copy' => $usesProductionValue && filled($environment_variable->value),
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
@@ -193,6 +205,10 @@ class EnvironmentVariable extends BaseModel
                 $environmentVariable->preserve_compose_null = false;
             }
             $environmentVariable->authorizeAddedSharedVariableReferences();
+            // A changed preview value is the user's own value, not the copy of production.
+            if ($environmentVariable->exists && $environmentVariable->is_preview && $environmentVariable->isDirty('value')) {
+                $environmentVariable->is_production_value_copy = false;
+            }
             $environmentVariable->updateIsShared();
         });
     }

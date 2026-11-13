@@ -641,6 +641,22 @@ class Application extends BaseModel
     }
 
     /**
+     * The custom container labels, when the user edits them. Docker Compose applications
+     * take their labels from the compose file, so their domain routes apply.
+     *
+     * @return Collection<int, string>|null
+     */
+    public function maintenanceProxyLabels(): ?Collection
+    {
+        if ($this->build_pack === 'dockercompose' || $this->settings?->is_container_label_readonly_enabled !== false || blank($this->custom_labels)) {
+            return null;
+        }
+        $labels = decodeBase64EncodedLabels($this->custom_labels) ?? $this->custom_labels;
+
+        return collect(preg_split("/\r\n|\n|\r/", $labels));
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     public function maintenanceServers(): Collection
@@ -1289,6 +1305,43 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true);
+    }
+
+    /**
+     * IDs of preview variables that have the production value: automatic copies of a production variable that
+     * the user did not change, and preview variables with the same value as the production variable with the
+     * same key. An automatic copy stays in the list after production changes (for example a rotated secret),
+     * because the old production value can still be valid. Empty values do not count, because they hold no
+     * production data. Give $previewIds to check only those preview variables.
+     *
+     * @param  array<int, int>|null  $previewIds
+     * @return array<int, int>
+     */
+    public function previewEnvironmentVariableIdsWithProductionValues(?array $previewIds = null): array
+    {
+        if ($previewIds === []) {
+            return [];
+        }
+
+        $previewVariables = $this->environment_variables_preview()
+            ->when($previewIds !== null, fn ($query) => $query->whereKey($previewIds))
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value));
+
+        if ($previewVariables->isEmpty()) {
+            return [];
+        }
+
+        $productionValues = $this->environment_variables()
+            ->whereIn('key', $previewVariables->pluck('key')->unique()->values()->all())
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->pluck('value', 'key');
+
+        return $previewVariables
+            ->filter(fn (EnvironmentVariable $env) => $env->is_production_value_copy || $productionValues->get($env->key) === $env->value)
+            ->pluck('id')
+            ->all();
     }
 
     public function runtime_environment_variables_preview()

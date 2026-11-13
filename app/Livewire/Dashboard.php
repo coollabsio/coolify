@@ -199,7 +199,7 @@ class Dashboard extends Component
             ! $server->settings->is_reachable => ['Unreachable', 'error'],
             ! $server->settings->is_usable => ['Not ready', 'warning'],
             $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-            default => ['Ready', 'success'],
+            default => ['Operational', 'success'],
         };
     }
 

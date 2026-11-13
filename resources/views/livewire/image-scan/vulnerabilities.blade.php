@@ -51,8 +51,11 @@
             </x-slot:actions>
 
             <div class="flex flex-col gap-4">
-                @foreach ($errorMessages as $message)
-                    <x-callout type="danger" title="The last scan could not run">{{ $message }}</x-callout>
+                @foreach ($errorMessages as $error)
+                    <x-callout type="danger" title="The last scan could not run">
+                        {{ $error['message'] }}
+                        <x-image-scan.error-log :detail="$error['detail']" />
+                    </x-callout>
                 @endforeach
 
                 @if ($isScanning)
@@ -151,6 +154,10 @@
         @if ($scans->isNotEmpty())
             <x-application.settings-section id="all-findings-section" :title="'All findings ('.number_format($findingCount).')'"
                 collapsible flush>
+                <x-slot:actions>
+                    <x-image-scan.export-menu :count="$shownCount" />
+                </x-slot:actions>
+
                 @if ($truncated)
                     <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                         <x-callout type="info" title="Too many results">Only part of the results is shown, with the problems that attackers are using first.</x-callout>

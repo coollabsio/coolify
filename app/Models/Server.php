@@ -347,8 +347,6 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
         'server_metadata' => 'array',
-        'logdrain_axiom_api_key' => 'encrypted',
-        'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
@@ -362,8 +360,6 @@ class Server extends BaseModel
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
-        'logdrain_axiom_api_key',
-        'logdrain_newrelic_license_key',
         'proxy_error_page',
     ];
 
@@ -1019,9 +1015,9 @@ class Server extends BaseModel
     }
 
     /**
-     * Traefik routers that use the same rule as the resource routers, with a priority one
-     * higher. Traefik uses the rule length as the default priority, so a resource on a longer
-     * path of the same host keeps its own router.
+     * Traefik routers that use the same rule as the resource routers (from the domains, or
+     * from custom labels), with a priority one higher. Traefik uses the rule length as the
+     * default priority, so a resource on a longer path of the same host keeps its own router.
      *
      * @param  Collection<int, Application|Service>  $resources
      */
@@ -1030,7 +1026,7 @@ class Server extends BaseModel
         $routers = [];
         $middlewares = [];
         foreach ($resources as $resource) {
-            $routes = $resource->maintenanceRoutes();
+            $routes = $resource->maintenanceTraefikRouters();
             if ($routes->isEmpty()) {
                 continue;
             }
@@ -1042,22 +1038,15 @@ class Server extends BaseModel
                     'query' => '/'.$resource->maintenancePageFile(),
                 ],
             ];
-            foreach ($routes as $index => $route) {
-                $rule = "Host(`{$route['host']}`) && PathPrefix(`{$route['path']}`)";
-                $router = [
-                    'entryPoints' => ['http'],
-                    'rule' => $rule,
+            foreach ($routes as $route) {
+                $routers["coolify-maintenance-{$resource->uuid}-{$route['name']}"] = array_filter([
+                    'entryPoints' => $route['entryPoints'],
+                    'rule' => $route['rule'],
                     'service' => 'coolify-maintenance-noop',
                     'middlewares' => ['coolify-maintenance-headers', $middleware],
-                    'priority' => strlen($rule) + 1,
-                ];
-                $routers["coolify-maintenance-{$resource->uuid}-{$index}-http"] = $router;
-                if ($route['scheme'] === 'https') {
-                    $routers["coolify-maintenance-{$resource->uuid}-{$index}-https"] = array_merge($router, [
-                        'entryPoints' => ['https'],
-                        'tls' => ['certResolver' => 'letsencrypt'],
-                    ]);
-                }
+                    'priority' => $route['priority'],
+                    'tls' => $route['tls'],
+                ], fn ($value) => $value !== null);
             }
         }
 
@@ -1096,11 +1085,10 @@ class Server extends BaseModel
         $resources ??= $this->maintenanceResources();
         $sites = [];
         foreach ($resources as $resource) {
-            foreach ($resource->maintenanceRoutes() as $index => $route) {
-                $address = caddySiteAddress($route['scheme'], $route['host'], $route['force_https']);
+            foreach ($resource->maintenanceCaddySites() as $index => $site) {
                 $matcher = "@coolify-maintenance-{$resource->uuid}-{$index}";
-                $sites[$address][] = implode("\n", [
-                    "\t{$matcher} path {$route['path']}*",
+                $sites[$site['address']][] = implode("\n", [
+                    "\t{$matcher} path {$site['path']}",
                     "\thandle {$matcher} {",
                     "\t\treverse_proxy ".self::PROXY_ERROR_PAGE_CONTAINER.':80 {',
                     "\t\t\trewrite /{$resource->maintenancePageFile()}",
@@ -2299,9 +2287,9 @@ $siteAddress {
         return $this->isFunctional();
     }
 
-    public function isLogDrainEnabled()
+    public function isLogDrainEnabled(): bool
     {
-        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
+        return $this->settings->logdrain_type !== null;
     }
 
     /**
@@ -2309,7 +2297,7 @@ $siteAddress {
      */
     public function isFluentBitLogDrainEnabled(): bool
     {
-        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+        return $this->settings->logdrain_type?->usesFluentBit() ?? false;
     }
 
     public function validateOS(): bool|Stringable

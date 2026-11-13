@@ -32,6 +32,7 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications',
         'server_unreachable_slack_notifications',
         'server_patch_slack_notifications',
+        'server_auto_update_slack_notifications',
         'traefik_outdated_slack_notifications',
         'image_vulnerabilities_slack_notifications',
     ];
@@ -57,6 +58,7 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications' => 'boolean',
         'server_unreachable_slack_notifications' => 'boolean',
         'server_patch_slack_notifications' => 'boolean',
+        'server_auto_update_slack_notifications' => 'boolean',
         'traefik_outdated_slack_notifications' => 'boolean',
         'image_vulnerabilities_slack_notifications' => 'boolean',
     ];

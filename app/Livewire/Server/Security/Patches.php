@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\Security;
 
 use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
+use App\Jobs\ServerAutoSecurityUpdatesCheckJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Livewire\Concerns\ManagesServerPackageUpdates;
 use App\Models\Server;
@@ -234,7 +235,11 @@ class Patches extends Component
             $this->applyAutomaticSecurityUpdates($enabled, $time);
             $settings->is_auto_security_updates_enabled = $enabled;
             $settings->auto_security_updates_time = $time;
+            $settings->auto_security_updates_last_run = null;
             $settings->save();
+            if ($enabled) {
+                ServerAutoSecurityUpdatesCheckJob::dispatch($this->server);
+            }
             $this->syncSettings();
             $this->dispatch('success', $enabled ? 'Automatic security updates turned on.' : 'Automatic security updates turned off.');
         } catch (\Throwable $e) {

@@ -566,6 +566,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1014,6 +1017,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1910,6 +1916,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2295,6 +2304,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2666,6 +2678,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -3217,6 +3232,9 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -3552,6 +3570,9 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                copy_value_to_preview:
+                  type: boolean
+                  description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'
               type: object
       responses:
         '201':
@@ -3656,7 +3677,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, copy_value_to_preview: { type: boolean, description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.' } }, type: object }
               type: object
       responses:
         '201':
@@ -12421,6 +12442,10 @@ paths:
               schema:
                 properties:
                   is_image_scan_enabled: { description: 'Whether the server scans the images of its resources.', type: boolean }
+                  image_scan_memory_mb: { description: 'Memory limit of each scanner step, in MB.', type: integer, enum: [1024, 2048, 4096, 8192] }
+                  image_scan_syft_timeout: { description: 'Time limit of one Syft run (package list of an image), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
+                  image_scan_grype_timeout: { description: 'Time limit of one Grype run (vulnerability match), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
+                  image_scan_cpus: { description: 'CPU limit of each scanner step.', type: number, enum: [0.5, 1, 2, 4] }
                   scanner_state: { description: 'State of the scanner on the server. Null when unknown.', type: [string, 'null'], enum: [pulling, updating_database, ready, failed] }
                   scanner_failed_step: { description: 'The step that failed when scanner_state is failed.', type: [string, 'null'] }
                   scanner_built_at: { description: 'Time of the vulnerability database on the server.', type: [string, 'null'], format: date-time }
@@ -12441,7 +12466,7 @@ paths:
       tags:
         - Servers
       summary: 'Update image scanning settings'
-      description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off. Turning it on gets the scanner on the server in the background.'
+      description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the limits of the scanner (memory, CPUs, and the Syft and Grype time limits). Send at least one field. Turning it on gets the scanner on the server in the background. A new limit applies to the next scan.'
       operationId: update-server-image-scanning
       parameters:
         -
@@ -12456,11 +12481,25 @@ paths:
         content:
           application/json:
             schema:
-              required:
-                - is_image_scan_enabled
               properties:
                 is_image_scan_enabled:
                   type: boolean
+                image_scan_memory_mb:
+                  description: 'Memory limit of each scanner step, in MB. A value above the memory of the server is refused.'
+                  type: integer
+                  enum: [1024, 2048, 4096, 8192]
+                image_scan_syft_timeout:
+                  description: 'Time limit of one Syft run (package list of an image), in seconds.'
+                  type: integer
+                  enum: [300, 600, 1200, 1800, 3600]
+                image_scan_grype_timeout:
+                  description: 'Time limit of one Grype run (vulnerability match), in seconds.'
+                  type: integer
+                  enum: [300, 600, 1200, 1800, 3600]
+                image_scan_cpus:
+                  description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'
+                  type: number
+                  enum: [0.5, 1, 2, 4]
               type: object
       responses:
         '200':
@@ -12530,7 +12569,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
+      description: 'Update New Relic, Axiom, Amazon CloudWatch Logs, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -18602,6 +18641,9 @@ components:
           type: boolean
         is_pr_deployments_public_enabled:
           type: boolean
+        use_production_values_in_previews:
+          type: boolean
+          description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'
         use_build_secrets:
           type: boolean
         redact_all_env_values_in_logs:
@@ -18904,14 +18946,6 @@ components:
           type: boolean
         is_jump_server:
           type: boolean
-        is_logdrain_axiom_enabled:
-          type: boolean
-        is_logdrain_cloudwatch_enabled:
-          type: boolean
-        is_logdrain_custom_enabled:
-          type: boolean
-        is_logdrain_newrelic_enabled:
-          type: boolean
         is_metrics_enabled:
           type: boolean
         is_traffic_analytics_enabled:
@@ -18962,6 +18996,9 @@ components:
           description: 'Host key that the server sent when it did not match the pinned key.'
         is_ssh_host_key_check_disabled:
           type: boolean
+        is_ssh_host_key_check_enforced:
+          type: boolean
+          description: 'Refuse a changed host key on this server, also when the instance only warns.'
         ssh_host_key_fingerprints:
           type: array
           items:
@@ -18984,27 +19021,95 @@ components:
           type: boolean
         is_usable:
           type: boolean
-        logdrain_axiom_api_key:
+        logdrain_type:
           type: string
-        logdrain_axiom_dataset_name:
-          type: string
-        logdrain_axiom_domain:
-          type: string
-          description: 'Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co.'
-        logdrain_cloudwatch_region:
-          type: string
-        logdrain_cloudwatch_group:
-          type: string
-        logdrain_cloudwatch_stream_prefix:
-          type: string
-        logdrain_custom_config:
-          type: string
-        logdrain_custom_config_parser:
-          type: string
-        logdrain_newrelic_base_uri:
-          type: string
+          nullable: true
+          enum:
+            - newrelic
+            - axiom
+            - cloudwatch
+            - custom
+          description: 'The active log drain, or null when no log drain is enabled.'
+        is_logdrain_newrelic_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_axiom_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_custom_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_cloudwatch_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
         logdrain_newrelic_license_key:
           type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_newrelic_base_uri:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_dataset_name:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_api_key:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_domain:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_custom_config:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_custom_config_parser:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_region:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_group:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_stream_prefix:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
         sentinel_metrics_history_days:
           type: integer
         sentinel_metrics_refresh_rate_seconds:

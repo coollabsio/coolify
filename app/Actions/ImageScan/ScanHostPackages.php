@@ -28,10 +28,6 @@ class ScanHostPackages
 
     private const TIMEOUT_DEFAULT = 120;
 
-    private const TIMEOUT_SBOM = 720;
-
-    private const TIMEOUT_GRYPE = 360;
-
     /** A host has more findings than an image; all of them are counted. */
     private const MAX_PARSED_FINDINGS = 20000;
 
@@ -55,27 +51,28 @@ class ScanHostPackages
 
             $packages = ScanImage::runStep($server, $commands->hostPackagesSize(), 'packages-size', self::TIMEOUT_DEFAULT);
             if ($packages['code'] !== 0 || $packages['size'] === null) {
-                throw new ScanFailed(ImageScanErrorCode::Unknown);
+                throw new ScanFailed(ImageScanErrorCode::Unknown, detail: "step packages-size exited with code {$packages['code']}");
             }
             ScanImage::checkDiskSpace($commands, $packages['size'] * 1024);
 
-            $sbom = ScanImage::runStep($server, $commands->sbomFromHost(), 'sbom', self::TIMEOUT_SBOM);
+            $sbom = ScanImage::runStep($server, $commands->sbomFromHost(), 'sbom', ScanImage::sbomStepTimeout($server));
             $copy = $sbom['exit_codes']['copy'] ?? 2;
             if ($copy !== 0) {
-                throw new ScanFailed($copy === 1 ? ImageScanErrorCode::NoPackageDatabase : ImageScanErrorCode::Unknown);
+                throw new ScanFailed($copy === 1 ? ImageScanErrorCode::NoPackageDatabase : ImageScanErrorCode::Unknown, detail: "step copy exited with code {$copy}");
             }
             ScanImage::assertSucceeded($sbom, 'sbom');
 
-            $grype = ScanImage::runStep($server, $commands->grype(ScannerCommands::HOST_SBOM), 'grype', self::TIMEOUT_GRYPE);
+            $grype = ScanImage::runStep($server, $commands->grype(ScannerCommands::HOST_SBOM), 'grype', ScanImage::grypeStepTimeout($server));
             ScanImage::assertSucceeded($grype, 'grype');
 
             $runningKernel = trim((string) instant_remote_process(['uname -r'], $server, throwError: false, timeout: self::TIMEOUT_DEFAULT));
             $this->complete($server, $grype, $databaseBuiltAt, $runningKernel);
         } catch (ScanFailed $e) {
-            self::recordFailure($server, $e->errorCode, $e->context);
+            $e->log($server, 'the host packages');
+            self::recordFailure($server, $e->errorCode, $e->errorContext());
         } catch (Throwable $e) {
             report($e);
-            self::recordFailure($server, ImageScanErrorCode::Unknown);
+            self::recordFailure($server, ImageScanErrorCode::Unknown, (new ScanFailed(ImageScanErrorCode::Unknown, detail: $e::class.': '.$e->getMessage()))->errorContext());
         } finally {
             instant_remote_process($commands->cleanup(), $server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
             $lock->release();

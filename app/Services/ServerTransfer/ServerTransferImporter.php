@@ -54,6 +54,7 @@ use App\Notifications\Internal\GeneralNotification;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ProjectIconStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
@@ -729,6 +730,8 @@ class ServerTransferImporter
 
         $settingsPayload = data_get($payload, 'settings', []);
         if (is_array($settingsPayload) && $server->settings) {
+            // Bundles of older instances have a flag and columns for each log drain.
+            $settingsPayload = LegacyLogDrainFields::convert($settingsPayload);
             $safe = collect($settingsPayload)
                 ->except([
                     'id', 'server_id', 'created_at', 'updated_at',
@@ -738,6 +741,7 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'auto_security_updates_last_run',
                     'image_candidate_scans_today', 'image_candidate_scans_date',
                     'ssh_host_key_pending',
                 ])
@@ -1565,6 +1569,7 @@ class ServerTransferImporter
                     'is_literal' => (bool) data_get($variable, 'is_literal', false),
                     'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
                     'is_preview' => $isPreview || (bool) data_get($variable, 'is_preview', false),
+                    'is_production_value_copy' => (bool) data_get($variable, 'is_production_value_copy', false),
                     'is_runtime' => (bool) data_get($variable, 'is_runtime', true),
                     'is_buildtime' => (bool) data_get($variable, 'is_buildtime', true),
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),

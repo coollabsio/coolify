@@ -72,7 +72,9 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
         // Self-hosted Horizon works through 'high' first, so scans there would delay deployments.
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
         $images = $imageRefs === [] ? $this->derivedImageCount() : count($imageRefs);
-        $this->timeout = $images * ScanImage::LOCK_TTL;
+        // The limits of the scan server, not the highest ones: a service with many images stays below `retry_after`.
+        $server = $this->server($this->deployment());
+        $this->timeout = $images * ($server instanceof Server ? ScanImage::lockTtl($server) : ScanImage::MAX_LOCK_TTL);
     }
 
     /**
@@ -104,7 +106,7 @@ class ScanResourceImagesJob implements ShouldBeEncrypted, ShouldQueue
                 'run_id' => self::QUEUED_STAGE,
                 'stage' => self::QUEUED_STAGE,
                 'started_at' => now()->toIso8601String(),
-            ], ScanImage::LOCK_TTL);
+            ], ScanImage::MAX_LOCK_TTL);
             Cache::forget(ScanImage::lastErrorCacheKey($owner));
         }
     }

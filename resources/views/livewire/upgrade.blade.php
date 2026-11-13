@@ -54,6 +54,15 @@
                                     {{ $currentVersion }} <span class="mx-0.5">&rarr;</span>
                                     {{ $latestVersion }}
                                 </p>
+                                <p class="mt-0.5 text-[12px] leading-4"
+                                    style="color: var(--coollabs-subtle)">
+                                    {{ $updateChannel === 'custom' ? 'Custom image' : ucfirst($updateChannel) . ' channel' }}
+                                    <span class="mx-0.5">&middot;</span>
+                                    <a href="{{ route('settings.updates') }}" {{ wireNavigate() }}
+                                        @click="modalOpen=false"
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light">Change
+                                        channel</a>
+                                </p>
                             </div>
                             <button type="button" x-show="!showProgress || upgradeError"
                                 @click="upgradeError ? closeErrorModal() : modalOpen=false"
@@ -142,6 +151,17 @@
                                     <x-callout type="warning" title="Caution">
                                         <p>Any deployments running during the update process will fail.</p>
                                     </x-callout>
+
+                                    @unless (in_array($updateChannel, ['nightly', 'custom'], true))
+                                        <p class="text-[13px] leading-5 text-neutral-700 dark:text-fg">
+                                            Read the
+                                            <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light"
+                                                href="https://github.com/coollabsio/coolify/releases/tag/v{{ $latestVersion }}"
+                                                target="_blank" rel="noopener noreferrer">release notes of
+                                                {{ $latestVersion }}</a>
+                                            before you upgrade.
+                                        </p>
+                                    @endunless
 
                                     <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">
                                         If something goes wrong, check the

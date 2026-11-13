@@ -4,6 +4,7 @@ set -euo pipefail
 OPTION="$*"
 LIMIT="${2:-}"
 IMAGE=coollabsio/coolify
+VARIANTS=""
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
 KEEP_NIGHTLY_DAYS=14
@@ -105,9 +106,11 @@ read_dockerhub_untagged_manifests() {
 	url="$base"
 	: > "$WORK_DIR/listing.tsv"
 	while [ -n "$url" ]; do
-		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" \
-			&& jq -r '.manifests[] | [.manifest_digest, .media_type, (.tags // [] | join(",")), .last_pushed, (if (.media_type // "" | test("index|list")) then .size else .total_size end), ([.os, .arch] | map(select(. != null and . != "")) | join("/"))] | @tsv' <<< "$page" >> "$WORK_DIR/listing.tsv" \
-			|| { warn "the undocumented manifests listing of the Docker Hub API failed, the untagged manifests that no tag references wait for a later run"; return; }
+		if ! page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" \
+			|| ! jq -r '.manifests[] | [.manifest_digest, .media_type, (.tags // [] | join(",")), .last_pushed, (if (.media_type // "" | test("index|list")) then .size else .total_size end), ([.os, .arch] | map(select(. != null and . != "")) | join("/"))] | @tsv' <<< "$page" >> "$WORK_DIR/listing.tsv"; then
+			warn "the undocumented manifests listing of the Docker Hub API failed, the untagged manifests that no tag references wait for a later run"
+			return
+		fi
 		key="$(jq -r 'select(.manifests | length > 0) | .last_evaluated_key // empty' <<< "$page")"
 		url="${key:+$base&last_evaluated_key=$(jq -rn --arg key "$key" '$key | @uri')}"
 	done
@@ -121,8 +124,9 @@ select_kept_tags() {
 	{ cut -f 3 "$WORK_DIR/ghcr-active.tsv" | tr ',' '\n' && cut -f 3 "$WORK_DIR/dockerhub.tsv"; } | sed '/^$/d' | sort -u > "$WORK_DIR/tags.txt"
 	git ls-remote --tags "https://github.com/$IMAGE.git" | sed -n 's|.*refs/tags/||p' | sed 's/\^{}$//; p; s/^v//' > "$WORK_DIR/keep.txt" \
 		|| die "could not list the git tags of github.com/$IMAGE"
-	gh pr list --repo "$IMAGE" --state open --limit 1000 --json number --jq '.[] | "pr-\(.number)"' >> "$WORK_DIR/keep.txt" \
+	gh pr list --repo "$IMAGE" --state open --limit 1000 --json number --jq '.[] | "pr-\(.number)"' > "$WORK_DIR/pull-requests.txt" \
 		|| die "gh could not list the open pull requests of $IMAGE"
+	awk -v variants="$VARIANTS" '{ print; n = split(variants, variant, ","); for (i = 1; i <= n; i++) print $0 "-" variant[i] }' "$WORK_DIR/pull-requests.txt" >> "$WORK_DIR/keep.txt"
 	tr ',' '\n' <<< "$KEEP_TAG_EXCEPTIONS" >> "$WORK_DIR/keep.txt"
 	cutoff="$(jq -nr --argjson days "$KEEP_NIGHTLY_DAYS" 'now - $days * 86400 | strftime("%Y%m%d")')"
 	{
@@ -317,7 +321,10 @@ delete_dockerhub_manifest() {
 	local token status
 	token="$(registry_token docker.io pull,push,delete)"
 	status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' --head -H "Authorization: Bearer $token" -H "Accept: $MANIFEST_TYPES" "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")"
-	[ "$status" = 200 ] || { echo "$status"; return; }
+	[ "$status" = 200 ] || {
+		echo "$status"
+		return
+	}
 	while status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $token" "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")" && [ "$status" = 429 ]; do
 		sleep 60
 		token="$(registry_token docker.io pull,push,delete)"

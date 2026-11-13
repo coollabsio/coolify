@@ -56,3 +56,9 @@ ref
 
 # Service parser template snapshots: generated locally by scripts/parser-snapshot-diff, not committed
 /tests/Fixtures/parser/expected/templates/
+
+# Marketing videos and build output make the repository large
+/marketing/**/*.mp4
+/marketing/**/*.mov
+/marketing/**/*.webm
+/marketing/**/build/

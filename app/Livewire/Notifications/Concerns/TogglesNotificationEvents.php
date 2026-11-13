@@ -19,6 +19,7 @@ trait TogglesNotificationEvents
         'serverReachable',
         'serverUnreachable',
         'serverPatch',
+        'serverAutoUpdate',
         'traefikOutdated',
         'imageVulnerabilities',
     ];

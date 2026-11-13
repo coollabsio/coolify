@@ -29,7 +29,8 @@ class PinnedSftpConnectionProvider implements ConnectionProvider
     public static function create(string $host, string $address, int $port, string $username, ?string $password, ?string $privateKey, ?string $pinnedHostKey, int $timeout): self
     {
         $provider = app(SftpConnectionProvider::class, [
-            'host' => $address,
+            // phpseclib passes the host to fsockopen(), which needs brackets around an IPv6 address.
+            'host' => filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "[{$address}]" : $address,
             'username' => $username,
             'password' => $password,
             'privateKey' => $privateKey,

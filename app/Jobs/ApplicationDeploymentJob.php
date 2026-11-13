@@ -462,6 +462,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         try {
             $this->validateDeploymentEnvironmentVariableKeys();
+            $this->warnAboutPreviewVariablesNotPassed();
             $this->ensureRegistryImageForMultipleServers();
             $this->ensureRegistryImageIsNotShared();
             $this->warnAboutVolumesOnMultipleServers();
@@ -2185,9 +2186,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
-            // A preview from before v4.5.1 also gets the production variables that have no preview copy.
-            if ($this->preview?->keeps_production_values && $runtime_environment_variables_preview->isNotEmpty()) {
-                $previewKeys = $runtime_environment_variables_preview->pluck('key')->all();
+            // The production runtime variables that have no preview variable.
+            if ($this->previewGetsProductionRuntimeFallback()) {
+                $previewKeys = $this->application->environment_variables_preview()->pluck('key')->all();
                 $sorted_environment_variables
                     ->filter(fn (EnvironmentVariable $env) => $env->is_runtime && ! in_array($env->key, $previewKeys, true) && ! $this->shouldOmitBlankComposeEnvironmentVariable($env))
                     ->each(fn (EnvironmentVariable $env) => $envs->push($this->runtimeEnvironmentAssignment($env)));
@@ -2195,12 +2196,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty()) {
+                if (! empty($ports) && $this->deployedPreviewVariables()->where('key', 'PORT')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'PORT='))) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
             // Add HOST if not exists
-            if ($this->deployedPreviewVariables()->where('key', 'HOST')->isEmpty()) {
+            if ($this->deployedPreviewVariables()->where('key', 'HOST')->isEmpty() && ! $envs->contains(fn (string $env) => str_starts_with($env, 'HOST='))) {
                 $envs->push('HOST=0.0.0.0');
             }
         }
@@ -2807,9 +2808,71 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * IDs of preview variables that have the same value as the production variable with the same key.
-     * Coolify copies each new production variable to the previews. With public PR deployments, a
-     * preview can run code from a fork, so it gets only the preview values that the user changed.
+     * A preview can run code from a fork when public PR deployments are on, and "Use production values in
+     * previews" off means the user does not want production values in previews, so in both cases it must not
+     * get production values. A preview from before v4.5.1 keeps them, because it was deployed with them.
+     */
+    private function previewUsesProductionValues(): bool
+    {
+        $settings = $this->application->settings;
+
+        return ($settings->use_production_values_in_previews && ! $settings->is_pr_deployments_public_enabled) || (bool) $this->preview?->keeps_production_values;
+    }
+
+    /**
+     * A preview gets the production runtime variables that have no preview variable, as before v4.5.1.
+     * This needs at least one runtime preview variable, so previews without preview variables stay
+     * without production values.
+     */
+    private function previewGetsProductionRuntimeFallback(): bool
+    {
+        return $this->pull_request_id !== 0
+            && $this->previewUsesProductionValues()
+            && $this->application->runtime_environment_variables_preview()->where('is_runtime', true)->exists();
+    }
+
+    /**
+     * Log the variables that this preview deployment does not get, so users know what to add.
+     */
+    private function warnAboutPreviewVariablesNotPassed(): void
+    {
+        if ($this->pull_request_id === 0) {
+            return;
+        }
+
+        $previewVariables = $this->application->environment_variables_preview()->get();
+        $skippedKeys = $previewVariables->whereIn('id', $this->previewVariableIdsWithProductionValues())->pluck('key');
+        if ($skippedKeys->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry('⚠️ Public PR deployments are on or "Use production values in previews" is off, so this preview does not get the preview variables that still have the production value: '.$skippedKeys->implode(', '), 'stderr');
+            $this->application_deployment_queue->addLogEntry('   To use them, give them a preview value in Environment Variables > Preview Deployments.', type: 'info');
+        }
+
+        $getsRuntimeFallback = $this->previewGetsProductionRuntimeFallback();
+        $passesBuildtimeVariables = $this->deploymentPassesBuildtimeVariables();
+        $missingKeys = $this->application->environment_variables()->get()
+            ->reject(fn (EnvironmentVariable $env) => $previewVariables->contains('key', $env->key))
+            ->reject(fn (EnvironmentVariable $env) => $this->build_pack === 'dockercompose' && $this->isGeneratedDockerComposeEnvironmentVariable($env))
+            ->map(function (EnvironmentVariable $env) use ($getsRuntimeFallback, $passesBuildtimeVariables): ?string {
+                $missingAtRuntime = $env->is_runtime && ! $getsRuntimeFallback;
+                $missingAtBuildtime = $env->is_buildtime && $passesBuildtimeVariables;
+                if (! $missingAtRuntime && ! $missingAtBuildtime) {
+                    return null;
+                }
+
+                return $env->is_runtime && ! $missingAtRuntime ? "{$env->key} (at build time)" : $env->key;
+            })
+            ->filter();
+        if ($missingKeys->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry('⚠️ These production variables have no preview variable, so this preview does not get them: '.$missingKeys->implode(', '), 'stderr');
+            $this->application_deployment_queue->addLogEntry('   To use them, add them in Environment Variables > Preview Deployments.', type: 'info');
+        }
+    }
+
+    /**
+     * IDs of preview variables that still have the production value, which this preview deployment skips.
+     * With public PR deployments, a preview can run code from a fork. With "Use production values in
+     * previews" off, the user does not want production values in previews at all. In both cases a
+     * preview gets only the preview values that the user changed.
      *
      * @return array<int, int>
      */
@@ -2819,16 +2882,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues;
         }
 
-        if ($this->pull_request_id === 0 || ! $this->application->settings->is_pr_deployments_public_enabled || $this->preview?->keeps_production_values) {
+        if ($this->pull_request_id === 0 || $this->previewUsesProductionValues()) {
             return $this->previewVariableIdsWithProductionValues = [];
         }
 
-        $productionValues = $this->application->environment_variables()->get()->pluck('value', 'key');
-
-        return $this->previewVariableIdsWithProductionValues = $this->application->environment_variables_preview()->get()
-            ->filter(fn (EnvironmentVariable $env) => $productionValues->has($env->key) && $productionValues->get($env->key) === $env->value)
-            ->pluck('id')
-            ->all();
+        return $this->previewVariableIdsWithProductionValues = $this->application->previewEnvironmentVariableIdsWithProductionValues();
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\StartLogDrain;
+use App\Enums\LogDrainType;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -27,7 +28,7 @@ test('a server name with a line break cannot add a section to the fluent-bit con
         'name' => "prod\n[OUTPUT]\n    Name stdout\r\n    Match *",
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
-    $server->settings()->update($settings);
+    $server->settings->update($settings);
 
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
@@ -45,8 +46,8 @@ test('a server name with a line break cannot add a section to the fluent-bit con
         ->and(preg_match_all('/^\[OUTPUT\]/m', $config))->toBe(1)
         ->and($config)->not->toMatch('/^\s*Name stdout/m');
 })->with([
-    'new relic' => [['is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1']],
-    'axiom' => [['is_logdrain_axiom_enabled' => true, 'logdrain_axiom_dataset_name' => 'dataset', 'logdrain_axiom_api_key' => 'key']],
+    'new relic' => [['logdrain_type' => LogDrainType::NewRelic, 'logdrain_config' => ['newrelic' => ['license_key' => 'key', 'base_uri' => 'https://log-api.newrelic.com/log/v1']]]],
+    'axiom' => [['logdrain_type' => LogDrainType::Axiom, 'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key']]]],
 ]);
 
 test('a server name with spaces is written as a single fluent-bit value', function (array $settings) {
@@ -56,7 +57,7 @@ test('a server name with spaces is written as a single fluent-bit value', functi
         'name' => 'Test Server #1',
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
-    $server->settings()->update($settings);
+    $server->settings->update($settings);
 
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
@@ -72,8 +73,8 @@ test('a server name with spaces is written as a single fluent-bit value', functi
 
     expect($config)->toContain("Set                 coolify.server_name Test-Server-#1\n");
 })->with([
-    'new relic' => [['is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1']],
-    'axiom' => [['is_logdrain_axiom_enabled' => true, 'logdrain_axiom_dataset_name' => 'dataset', 'logdrain_axiom_api_key' => 'key']],
+    'new relic' => [['logdrain_type' => LogDrainType::NewRelic, 'logdrain_config' => ['newrelic' => ['license_key' => 'key', 'base_uri' => 'https://log-api.newrelic.com/log/v1']]]],
+    'axiom' => [['logdrain_type' => LogDrainType::Axiom, 'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key']]]],
 ]);
 
 test('the built-in fluent-bit config uses the container labels only when the default variables are missing', function (array $settings) {
@@ -82,7 +83,7 @@ test('the built-in fluent-bit config uses the container labels only when the def
         'team_id' => $team->id,
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
-    $server->settings()->update($settings);
+    $server->settings->update($settings);
 
     $commands = new Collection;
     Process::fake(function ($process) use ($commands) {
@@ -99,6 +100,6 @@ test('the built-in fluent-bit config uses the container labels only when the def
     expect($config)->toMatch('/Rename\s+COOLIFY_PROJECT_NAME coolify\.project_name\n(.*\n)*\s+Rename\s+coolify\.projectName coolify\.project_name\n(.*\n)*\s+Remove\s+coolify\.projectName\n/')
         ->and($config)->toMatch('/Rename\s+coolify\.serviceName coolify\.service_name\n/');
 })->with([
-    'new relic' => [['is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1']],
-    'axiom' => [['is_logdrain_axiom_enabled' => true, 'logdrain_axiom_dataset_name' => 'dataset', 'logdrain_axiom_api_key' => 'key']],
+    'new relic' => [['logdrain_type' => LogDrainType::NewRelic, 'logdrain_config' => ['newrelic' => ['license_key' => 'key', 'base_uri' => 'https://log-api.newrelic.com/log/v1']]]],
+    'axiom' => [['logdrain_type' => LogDrainType::Axiom, 'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key']]]],
 ]);

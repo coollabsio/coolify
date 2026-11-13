@@ -41,6 +41,10 @@
             @elseif ($configForm)
                 <span class="table-badge shrink-0" title="Set by coolify.json">coolify.json</span>
             @endif
+            @if ($sameAsProduction)
+                <span class="table-badge shrink-0"
+                    title="This preview variable has the production value: an unchanged copy of the production variable, or the same value. Change the value to give previews their own value.">Production value</span>
+            @endif
             @if ($composeInfo)
                 <span class="table-badge shrink-0"
                     title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>

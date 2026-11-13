@@ -22,7 +22,7 @@
                     <x-forms.listbox id="update_channel" label="Channel" :options="[
                         ['value' => 'stable', 'label' => 'Stable', 'description' => 'Stable releases'],
                         ['value' => 'preview', 'label' => 'Preview', 'description' => 'Betas and release candidates, then the stable release'],
-                        ['value' => 'nightly', 'label' => 'Nightly', 'description' => 'A build of the next version twice a day, then every release'],
+                        ['value' => 'nightly', 'label' => 'Nightly', 'description' => 'Early access to the next version, two builds each day. Less tested'],
                         ['value' => 'custom', 'label' => 'Custom image', 'description' => 'A pinned image, such as the build of a pull request'],
                     ]"
                         helper="The versions this instance upgrades to." />
@@ -35,6 +35,13 @@
                     <div x-show="$wire.update_channel !== 'custom'" @if ($update_channel === 'custom') x-cloak @endif
                         class="hidden lg:block"></div>
 
+                    <div x-show="$wire.update_channel === 'stable'" @if ($update_channel !== 'stable') x-cloak @endif
+                        class="lg:col-span-2">
+                        <x-callout type="info" title="Try the next version early">
+                            The Nightly channel installs a build of the next version two times each day.
+                            Nightly builds get less testing and can break this instance.
+                        </x-callout>
+                    </div>
                     <div x-show="$wire.update_channel === 'nightly'" @if ($update_channel !== 'nightly') x-cloak @endif
                         class="lg:col-span-2">
                         <x-callout type="danger" title="Nightly builds can break this instance">

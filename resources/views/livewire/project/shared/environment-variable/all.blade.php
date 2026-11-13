@@ -192,7 +192,7 @@
                                 Add
                             </button>
                         </x-slot:content>
-                        <livewire:project.shared.environment-variable.add :resource="$resource" />
+                        <livewire:project.shared.environment-variable.add :resource="$resource" :showPreview="$showPreview" />
                     </x-modal-input>
                 @endcan
         </x-table.toolbar>
@@ -248,7 +248,8 @@
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
                                     :env="$row['environmentVariable']" :type="$resource->type()"
-                                    :composeInfo="$row['composeInfo']" :showEnvironmentType="$showEnvironmentType" />
+                                    :composeInfo="$row['composeInfo']" :showEnvironmentType="$showEnvironmentType"
+                                    :sameAsProduction="$row['sameAsProduction']" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"

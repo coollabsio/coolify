@@ -49,24 +49,26 @@ class ScanImage
 {
     use AsAction;
 
-    /**
-     * The longest run of handle() under the lock: database status, update, and status again, inspect, pull, and
-     * inspect again, Grype on a stored SBOM that is gone, disk check, SBOM, packages, Grype, cleanup. The lock must
-     * not expire under a scan that still runs.
-     */
-    public const LOCK_TTL = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
+    /** lockTtl() without its SBOM and its two Grype runs. */
+    private const LOCK_TTL_WITHOUT_SCANNERS = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
         + 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_PULL
-        + self::TIMEOUT_GRYPE + self::TIMEOUT_DEFAULT + self::TIMEOUT_SBOM + 2 * self::TIMEOUT_GRYPE
+        + self::TIMEOUT_DEFAULT + self::TIMEOUT_PACKAGES
         + self::TIMEOUT_DEFAULT;
+
+    /** SBOM, packages, and two Grype runs at the highest Syft and Grype time limits: one candidate scan at most. */
+    public const MAX_SCANNER_STEPS_SECONDS = self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
+        + self::TIMEOUT_PACKAGES + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
+
+    /** lockTtl() at the highest Syft and Grype time limits: for job timeouts and marks that do not know the server. */
+    public const MAX_LOCK_TTL = self::LOCK_TTL_WITHOUT_SCANNERS
+        + self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
+        + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
 
     /**
      * One wait of a deploy gate for the server lock (spec 5); background scans never wait. The gate waits again while
      * the lock is busy, see `DeploymentImageScan::gateLockWaitSeconds()`.
      */
     public const GATE_LOCK_WAIT_SECONDS = 120;
-
-    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
-    public const GATE_SCAN_RESERVE_SECONDS = self::TIMEOUT_SBOM + self::TIMEOUT_GRYPE;
 
     public const LAST_ERROR_TTL_DAYS = 7;
 
@@ -75,9 +77,12 @@ class ScanImage
 
     private const TIMEOUT_DB_UPDATE = 960;
 
-    private const TIMEOUT_SBOM = 1260;
+    private const TIMEOUT_SAVE = 600;
 
-    private const TIMEOUT_GRYPE = 360;
+    private const TIMEOUT_PACKAGES = 360;
+
+    /** SSH time on top of the time limit of a scanner container. */
+    private const STEP_MARGIN = 60;
 
     private const TIMEOUT_PULL = 660;
 
@@ -92,6 +97,8 @@ class ScanImage
     private const EXIT_DOCKER_RUN = 125;
 
     private string $runId = '';
+
+    private int $lockTtl = self::MAX_LOCK_TTL;
 
     private CarbonImmutable $startedAt;
 
@@ -111,6 +118,7 @@ class ScanImage
     public function handle(Server $server, Model $resource, string $imageRef, ?ApplicationDeploymentQueue $deployment = null, int $lockWaitSeconds = 0, ?string $baseImageRef = null, bool $queueCandidateCheck = true, bool $retryWhenBusy = false, bool $pullWhenMissing = false): ImageScan
     {
         $this->runId = Str::lower(Str::random(24));
+        $this->lockTtl = self::lockTtl($server);
         $this->pullWhenMissing = $pullWhenMissing;
         $this->startedAt = CarbonImmutable::now();
         $policy = ImageScanPolicyResolver::for($resource, $server);
@@ -122,8 +130,11 @@ class ScanImage
 
         try {
             ImageRef::parse($imageRef);
-        } catch (InvalidArgumentException) {
-            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $context);
+        } catch (InvalidArgumentException $e) {
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference: {$e->getMessage()}");
+            $failure->log($server, $imageRef);
+
+            return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $failure->errorContext($context));
         }
 
         $lock = self::serverLock($server);
@@ -186,6 +197,7 @@ class ScanImage
     public function rescan(Server $server, string $imageId, array $targets, int $lockWaitSeconds = 0, bool $retryWhenBusy = false): array
     {
         $this->runId = Str::lower(Str::random(24));
+        $this->lockTtl = self::lockTtl($server);
         $this->startedAt = CarbonImmutable::now();
         $context = ['server' => (string) $server->name];
 
@@ -202,7 +214,10 @@ class ScanImage
         }
 
         if (preg_match('/\Asha256:[a-f0-9]{64}\z/', $imageId) !== 1) {
-            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $context), $targets);
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: 'invalid image ID');
+            $failure->log($server, $imageId);
+
+            return array_map(fn (array $target) => $this->failBeforeRow($server, $target[0], $target[1], null, ImageScanErrorCode::Unknown, $failure->errorContext($context)), $targets);
         }
 
         $lock = self::serverLock($server);
@@ -226,11 +241,39 @@ class ScanImage
     }
 
     /**
+     * The longest run of handle() under the lock: database status, update, and status again, inspect, pull, and
+     * inspect again, Grype on a stored SBOM that is gone, disk check, SBOM, packages, Grype, cleanup. The lock must
+     * not expire under a scan that still runs.
+     */
+    public static function lockTtl(Server $server): int
+    {
+        return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
+    }
+
+    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    public static function gateScanReserveSeconds(Server $server): int
+    {
+        return self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
+    }
+
+    /** SSH timeout of one SBOM step on the server: `docker save` of a local image, then Syft. */
+    public static function sbomStepTimeout(Server $server): int
+    {
+        return self::TIMEOUT_SAVE + ScannerCommands::syftTimeout($server) + self::STEP_MARGIN;
+    }
+
+    /** SSH timeout of one Grype run on the server. */
+    public static function grypeStepTimeout(Server $server): int
+    {
+        return ScannerCommands::grypeTimeout($server) + self::STEP_MARGIN;
+    }
+
+    /**
      * One scan or scan data change at a time per server (spec 4.1).
      */
     public static function serverLock(Server $server): Lock
     {
-        return Cache::lock("image-scan:{$server->id}", self::LOCK_TTL, Str::random(40));
+        return Cache::lock("image-scan:{$server->id}", self::lockTtl($server), Str::random(40));
     }
 
     /**
@@ -326,13 +369,16 @@ class ScanImage
 
             return $this->complete($server, $resource, $imageRef, $deployment, $policy, $sbom, $this->report($grype), $image, $databaseBuiltAt, $isBaseline, $baseImageRef);
         } catch (ScanFailed $e) {
-            $errorContext = [...$context, ...$e->context];
+            $e->log($server, $imageRef);
+            $errorContext = $e->errorContext($context);
 
             return $image === null
                 ? $this->failBeforeRow($server, $resource, $imageRef, null, $e->errorCode, $errorContext)
                 : $this->failAfterInspect($server, $resource, $imageRef, $deployment, $image, $e->errorCode, $errorContext);
         } catch (Throwable $e) {
-            $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: $e::class.': '.$e->getMessage());
+            $failure->log($server, $imageRef);
+            $this->rememberError($resource, ImageScanErrorCode::Unknown, $failure->errorContext($context));
 
             throw $e;
         } finally {
@@ -374,14 +420,17 @@ class ScanImage
                 array_keys($targets),
             );
         } catch (ScanFailed $e) {
-            $errorContext = [...$context, ...$e->context];
+            $e->log($server, $imageId);
+            $errorContext = $e->errorContext($context);
 
             return array_map(fn (array $target) => $image === null
                 ? $this->failBeforeRow($server, $target[0], $target[1], null, $e->errorCode, $errorContext)
                 : $this->failAfterInspect($server, $target[0], $target[1], null, $image, $e->errorCode, $errorContext), $targets);
         } catch (Throwable $e) {
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: $e::class.': '.$e->getMessage());
+            $failure->log($server, $imageId);
             foreach ($resources as $resource) {
-                $this->rememberError($resource, ImageScanErrorCode::Unknown, $context);
+                $this->rememberError($resource, ImageScanErrorCode::Unknown, $failure->errorContext($context));
             }
 
             throw $e;
@@ -409,7 +458,7 @@ class ScanImage
             'run_id' => $this->runId,
             'stage' => $stage,
             'started_at' => $this->startedAt->toIso8601String(),
-        ], self::LOCK_TTL);
+        ], $this->lockTtl);
         $this->broadcast($resource, $this->runId, final: false);
     }
 
@@ -432,7 +481,7 @@ class ScanImage
 
         if ($builtAt === null) {
             self::updateDatabase($commands);
-            $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing);
+            $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing, detail: 'no valid vulnerability database after the update');
         }
 
         if ($builtAt->lt(now()->subDays(self::DB_MAX_AGE_DAYS))) {
@@ -457,7 +506,7 @@ class ScanImage
     {
         $result = self::runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
         if (in_array($result['code'], self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout);
+            throw new ScanFailed(ImageScanErrorCode::Timeout, detail: "step db-status exited with code {$result['code']}");
         }
 
         $status = $result['code'] === 0 ? json_decode($result['payload'], true) : null;
@@ -489,7 +538,7 @@ class ScanImage
         $this->progress($resource, 'pull');
         $result = self::runStep($commands->server, $commands->pull($imageRef), 'pull', self::TIMEOUT_PULL);
         if ($result['code'] !== 0) {
-            throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed);
+            throw new ScanFailed(in_array($result['code'], self::EXIT_TIMEOUT, true) ? ImageScanErrorCode::Timeout : ImageScanErrorCode::PullFailed, detail: "step pull exited with code {$result['code']}");
         }
         $this->progress($resource, 'inspect');
 
@@ -503,7 +552,7 @@ class ScanImage
     {
         $result = self::runStep($commands->server, $commands->inspect($imageRef), 'inspect', self::TIMEOUT_DEFAULT);
         if ($result['code'] !== 0) {
-            throw new ScanFailed(ImageScanErrorCode::ImageMissing);
+            throw new ScanFailed(ImageScanErrorCode::ImageMissing, detail: "step inspect exited with code {$result['code']}");
         }
 
         $parts = explode('|', trim($result['payload']));
@@ -511,7 +560,7 @@ class ScanImage
             || preg_match('/\Asha256:([a-f0-9]{64})\z/', $parts[0], $id) !== 1
             || preg_match('#\A[a-z0-9]+/[a-z0-9_]+\z#', $parts[2]) !== 1
             || preg_match('/\A\d{1,18}\z/', $parts[3]) !== 1) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'unexpected docker image inspect output: '.ScanFailed::outputTail($result['payload']));
         }
 
         $repoDigest = Str::afterLast($parts[1], '@');
@@ -536,12 +585,12 @@ class ScanImage
     {
         $output = instant_remote_process($commands->diskFree(), $commands->server, throwError: false, timeout: self::TIMEOUT_DEFAULT);
         if (preg_match('/(\d+) +(\d+)\s*\z/', (string) $output, $free) !== 1) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'could not read the free disk space: '.ScanFailed::outputTail($output));
         }
 
         $needed = $imageSize * 2 + self::DISK_RESERVE_BYTES;
         if ((int) $free[1] < $needed || (int) $free[2] < $needed) {
-            throw new ScanFailed(ImageScanErrorCode::DiskSpace, ['n' => (int) ceil($needed / self::DISK_RESERVE_BYTES)]);
+            throw new ScanFailed(ImageScanErrorCode::DiskSpace, ['n' => (int) ceil($needed / self::DISK_RESERVE_BYTES)], "needed {$needed} bytes, free {$free[1]} and {$free[2]} bytes");
         }
     }
 
@@ -559,7 +608,7 @@ class ScanImage
 
         if ($sbom !== null) {
             $this->progressAll($resources, 'vulnerabilities');
-            $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+            $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::grypeStepTimeout($commands->server));
 
             if ($grype['code'] !== self::EXIT_DOCKER_RUN) {
                 $this->assertSucceeded($grype, 'grype');
@@ -573,7 +622,7 @@ class ScanImage
 
         $sbom = $this->createSbom($commands, $imageRef, $image, $sbom);
         $this->progressAll($resources, 'vulnerabilities');
-        $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::TIMEOUT_GRYPE);
+        $grype = self::runStep($commands->server, $commands->grype($image['hex']), 'grype', self::grypeStepTimeout($commands->server));
         $this->assertSucceeded($grype, 'grype');
 
         return [$sbom, $grype];
@@ -586,12 +635,12 @@ class ScanImage
     {
         self::checkDiskSpace($commands, $image['size']);
 
-        $result = self::runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::TIMEOUT_SBOM);
+        $result = self::runStep($commands->server, $commands->sbomFromLocal($imageRef, $image['hex']), 'save', self::sbomStepTimeout($commands->server));
         // `docker save` has no memory limit: its 137 is always a timeout kill.
         $this->assertSucceeded($result, 'save');
         $this->assertSucceeded($result, 'sbom');
 
-        $packages = self::runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_GRYPE);
+        $packages = self::runStep($commands->server, $commands->packages($image['hex']), 'packages', self::TIMEOUT_PACKAGES);
         $this->assertSucceeded($packages, 'packages');
         [$payload, $cut] = $this->readPayload($packages);
         $parsed = (new SyftPackageParser)->parse($payload);
@@ -712,7 +761,7 @@ class ScanImage
      */
     private function upsert(Model $resource, string $imageId, array $values): ImageScan
     {
-        $scan = $this->firstOrCreateScan($resource, $imageId, $values) ?? throw new ScanFailed(ImageScanErrorCode::Unknown);
+        $scan = $this->firstOrCreateScan($resource, $imageId, $values) ?? throw new ScanFailed(ImageScanErrorCode::Unknown, detail: "could not save the scan row of image {$imageId}");
 
         if (! $scan->wasRecentlyCreated) {
             $scan->forceFill($values)->save();
@@ -920,7 +969,7 @@ class ScanImage
         $parsed = ScannerCommands::parseOutput($output);
 
         if ($output === null || trim($output) === '' || ! array_key_exists($step, $parsed['exit_codes'])) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: "step {$step} did not report an exit code (the command did not run or the SSH connection failed), output: ".ScanFailed::outputTail($output));
         }
 
         return [
@@ -942,13 +991,15 @@ class ScanImage
     {
         $code = $result['exit_codes'][$step] ?? null;
         if ($code !== 0 && $step !== 'save' && in_array($step, $result['oom'], true)) {
-            throw new ScanFailed(ImageScanErrorCode::OutOfMemory);
+            throw new ScanFailed(ImageScanErrorCode::OutOfMemory, ['step' => $step], "step {$step} was killed because it ran out of memory");
         }
         if (in_array($code, self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout);
+            throw new ScanFailed(ImageScanErrorCode::Timeout, ['step' => $step], "step {$step} exited with code {$code} (timeout)");
         }
         if ($code !== 0) {
-            throw new ScanFailed(ImageScanErrorCode::Unknown);
+            $codes = json_encode($result['exit_codes']);
+
+            throw new ScanFailed(ImageScanErrorCode::Unknown, detail: 'step '.$step.' exited with code '.($code ?? 'none').", all exit codes: {$codes}");
         }
     }
 

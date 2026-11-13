@@ -118,18 +118,22 @@
             <span class="relative flex min-w-0 shrink items-center gap-2 px-1"
                 x-data="{ open: false, search: '', servers: @js($serverSwitcherOptions) }"
                 @click.outside="open = false" @keydown.escape.window="open = false">
-                <button type="button"
-                    class="flex h-8 max-w-56 min-w-0 items-center gap-1.5 rounded-md px-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05] xl:max-w-72"
-                    @click="open = !open" :aria-expanded="open" aria-label="Switch server">
-                    <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
-                        {{ $server->name }}
-                    </span>
-                    <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
-                        fill="none" aria-hidden="true">
-                        <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </button>
+                <div class="flex h-8 max-w-56 min-w-0 items-center rounded-md xl:max-w-72">
+                    <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }} title="Go to server"
+                        class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                        <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
+                            {{ $server->name }}
+                        </span>
+                    </a>
+                    <button type="button" class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]"
+                        @click="open = !open" :aria-expanded="open" aria-label="Switch server">
+                        <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
+                            fill="none" aria-hidden="true">
+                            <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </div>
                 <div x-cloak x-show="open" x-transition.origin.top.left
                     class="listbox-panel top-9! left-1! z-[90]! w-64! min-w-0!">
                     <div class="border-b border-neutral-200 p-1.5 dark:border-white/[0.08]">

@@ -1453,10 +1453,10 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, and the Coolify default variables switch', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, the Coolify default variables switch, and the production values in previews switch and copies', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
     $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
-    $this->application->settings->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
+    $this->application->settings->forceFill(['include_coolify_default_variables' => false, 'use_production_values_in_previews' => false])->saveQuietly();
     $this->database->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
     $this->server->forceFill(['proxy_error_page' => '<h1>Proxy error</h1>', 'swarm_cluster' => 7])->saveQuietly();
     EnvironmentVariable::withoutEvents(function () {
@@ -1471,6 +1471,17 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ]);
         $env->uuid = new_public_id();
         $env->save();
+        $copy = new EnvironmentVariable;
+        $copy->forceFill([
+            'key' => 'COPIED_SECRET',
+            'value' => 'old-secret',
+            'is_preview' => true,
+            'is_production_value_copy' => true,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+        ]);
+        $copy->uuid = new_public_id();
+        $copy->save();
     });
     $appUuid = $this->application->uuid;
     $serviceUuid = $this->service->uuid;
@@ -1499,7 +1510,9 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and($variable->preserve_compose_null)->toBeTrue()
         ->and($variable->value)->toBeNull()
         ->and($variable->version)->toBe('4.0.0-beta.400')
+        ->and($application->environment_variables_preview()->where('key', 'COPIED_SECRET')->sole()->is_production_value_copy)->toBeTrue()
         ->and($application->settings->include_coolify_default_variables)->toBeFalse()
+        ->and($application->settings->use_production_values_in_previews)->toBeFalse()
         ->and($service->include_coolify_default_variables)->toBeFalse()
         ->and($databaseClass::where('uuid', $databaseUuid)->sole()->include_coolify_default_variables)->toBeFalse();
 });
@@ -2404,4 +2417,27 @@ test('the pinned host key moves with the server', function () {
         ->is_ssh_host_key_check_disabled->toBeTrue()
         ->is_ssh_host_key_check_enforced->toBeTrue()
         ->and($settings->ssh_host_key_trusted_at->toDateTimeString())->toBe('2026-01-01 12:00:00');
+});
+
+test('the image scanner limits move with the server', function () {
+    $this->server->settings->forceFill([
+        'image_scan_syft_timeout' => 1800,
+        'image_scan_grype_timeout' => 1200,
+        'image_scan_cpus' => 2.0,
+        'image_scan_memory_mb' => 4096,
+    ])->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    $settings = Server::where('uuid', $result['server_uuid'])->first()->settings;
+    expect($settings->image_scan_syft_timeout)->toBe(1800)
+        ->and($settings->image_scan_grype_timeout)->toBe(1200)
+        ->and($settings->image_scan_cpus)->toBe(2.0)
+        ->and($settings->image_scan_memory_mb)->toBe(4096);
 });

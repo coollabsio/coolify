@@ -225,6 +225,17 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
+
+    // Pages that the user can star (components/starred-menu). A disabled page cannot be opened, so it is not starrable.
+    $starrableMenuItems = $serverMenuItems->reject(fn (array $item): bool => $item['disabled'] ?? false)
+        ->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $item['icon'],
+            'href' => route($item['route'], $serverRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->values()->all();
 @endphp
 
 @php
@@ -290,6 +301,7 @@
 @endif
     <nav aria-label="Server configuration sections"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="server" :items="$starrableMenuItems" />
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -304,6 +316,7 @@
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     </span>
                 @else
+                    <div class="starred-menu-row">
                     <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
                         @class([
                             'menu-item',
@@ -327,6 +340,8 @@
                             <x-beta-badge class="ml-auto shrink-0" />
                         @endif
                     </a>
+                    <x-starred-menu.toggle menu="server" :page="$menuItem['route']" :label="$menuItem['label']" />
+                    </div>
                     @if ($menuItem['active'] && isset($menuItem['children']))
                         <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
                             @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)

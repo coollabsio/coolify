@@ -497,7 +497,7 @@ it('says that the scanner ran out of memory only when Docker reports that the me
 
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::OutOfMemory)
-        ->and(ImageScanErrorCode::OutOfMemory->message())->toBe('The scanner ran out of memory and was stopped. It can use up to 1 GB, and the server must have that much free memory.');
+        ->and(ImageScanErrorCode::OutOfMemory->message())->toBe('The scanner ran out of memory and was stopped. Raise the scanner memory limit on the Vulnerabilities page of the server, and make sure that the server has that much free memory.');
 })->with([
     'syft' => ['sbom', "coolify-scan-exit save 0\ncoolify-scan-oom sbom\ncoolify-scan-exit sbom 137"],
     'packages' => ['packages', "coolify-scan-oom packages\n".scanImageTestPayload('packages', '', 0, 137)],

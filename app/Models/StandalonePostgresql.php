@@ -283,6 +283,10 @@ class StandalonePostgresql extends BaseModel
 
     public function link()
     {
+        if ($this->isInstanceDatabase()) {
+            return route('settings.backup');
+        }
+
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
@@ -318,6 +322,11 @@ class StandalonePostgresql extends BaseModel
 
     public function team()
     {
+        // The instance database (coolify-db) has no environment and belongs to the root team.
+        if ($this->isInstanceDatabase()) {
+            return Team::find(0);
+        }
+
         return data_get($this, 'environment.project.team');
     }
 
