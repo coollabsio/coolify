@@ -97,17 +97,7 @@ it('rejects an invalid trust bundle and version independently', function () {
 });
 
 it('does not use ssh while the host agent feature is disabled', function () {
-    config()->set('constants.sentinel.host_enabled', false);
-    Process::fake();
-
-    expect(InstallSentinel::run(new Node))->toBeNull();
-
-    Process::assertNothingRan();
-});
-
-it('does not use ssh outside development', function () {
-    config()->set('app.env', 'production');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(false);
     Process::fake();
 
     expect(InstallSentinel::run(new Node))->toBeNull();
@@ -117,7 +107,7 @@ it('does not use ssh outside development', function () {
 
 it('does not install host-native Sentinel on legacy servers', function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     Process::fake();
 
     expect(fn () => InstallSentinel::run(new Server))->toThrow(TypeError::class);
@@ -177,9 +167,8 @@ it('elevates the encoded rollback for a non-root server user', function () {
         ->toContain(base64_encode(RollbackSentinel::rollbackScript()));
 });
 
-it('does not use ssh for a rollback outside development', function () {
-    config()->set('app.env', 'production');
-    config()->set('constants.sentinel.host_enabled', true);
+it('does not use ssh for a rollback while Nodes are off', function () {
+    setNodesEnabled(false);
     Process::fake();
 
     expect(RollbackSentinel::run(new Node))->toBeNull();

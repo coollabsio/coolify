@@ -23,7 +23,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $user = User::factory()->create();
     $this->actingAs($user);
     $team = $user->teams()->firstOrFail();
@@ -42,8 +42,9 @@ it('shows and runs node Sentinel controls in development', function () {
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
         ->assertSet('section', 'general')
         ->assertDontSee($this->node->user.'@'.$this->node->ip.':'.$this->node->port)
-        ->assertSee('Show public ip')
-        ->assertSeeHtml('x-show="shown"')
+        // The address is only in the masked connection field.
+        ->assertSeeHtml('name="connection.ip"')
+        ->assertSeeHtml('input-with-password-toggle')
         ->assertDontSee('{{ $node->ip }}', escape: false)
         ->assertDontSee('Update Sentinel');
 
@@ -83,7 +84,7 @@ it('refreshes the node Flux connection state from cache', function () {
         ->assertDispatched('info', 'Flux connection state refreshed.');
 });
 
-it('shows current Node capacity and resource pressure', function () {
+it('shows the Node capacity in the overview and leaves usage to the Metrics page', function () {
     $this->node->update(['metadata' => [
         'cpu_usage_percent' => 96.25,
         'memory_bytes' => 8_000_000_000,
@@ -94,14 +95,12 @@ it('shows current Node capacity and resource pressure', function () {
     ]]);
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->assertSee('CPU usage')
-        ->assertSee('96.3%')
-        ->assertSee('Memory usage')
-        ->assertSee('50%')
-        ->assertSee('Disk usage')
-        ->assertSee('75%')
-        ->assertSee('1.25 / 1.00 / 0.75')
-        ->assertSee('Server pressure');
+        ->assertSee('CPU cores')
+        ->assertSee('Memory')
+        ->assertSee('7.5 GB')
+        ->assertDontSee('CPU usage')
+        ->assertDontSee('96.3%')
+        ->assertDontSee('Server pressure');
 });
 
 it('does not expose node controls on a legacy server', function () {
@@ -113,7 +112,7 @@ it('does not expose node controls on a legacy server', function () {
         ->assertSee('Development overrides');
 });
 
-it('blocks node pages outside development or for another team', function () {
+it('blocks node pages while Nodes are off or for another team', function () {
     $otherUser = User::factory()->create();
     $otherNode = Node::factory()->create([
         'team_id' => $otherUser->teams()->firstOrFail()->id,
@@ -124,6 +123,9 @@ it('blocks node pages outside development or for another team', function () {
         ->toThrow(ModelNotFoundException::class);
 
     config()->set('app.env', 'production');
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])->assertSuccessful();
+
+    setNodesEnabled(false);
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])->assertNotFound();
 });
 
@@ -136,9 +138,8 @@ it('wraps Sentinel actions on narrow screens and keeps them text-only', function
 
 it('hides raw revision and discovery state from the Node overview', function () {
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->assertSee('Overview')
+        ->assertSee('Server overview')
         ->assertSee('Not assigned')
-        ->assertSee('Resource usage')
         ->assertDontSee('Revision')
         ->assertDontSee('Discovery')
         ->assertDontSee('Coolify endpoint');

@@ -3,23 +3,22 @@
 use App\Actions\Sentinel\IssueFluxCertificate;
 use App\Actions\Sentinel\MaterializeFluxCertificate;
 use App\Actions\Sentinel\RenewFluxCertificate;
+use App\Actions\Sentinel\RestartFlux;
 use App\Models\FluxCertificate;
 use App\Models\InstanceSettings;
-use App\Models\PrivateKey;
-use App\Models\Server;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $this->directory = sys_get_temp_dir().'/coolify-flux-'.bin2hex(random_bytes(8));
-    config(['constants.coolify.base_config_path' => $this->directory, 'constants.sentinel.host_enabled' => true]);
+    config(['constants.coolify.base_config_path' => $this->directory]);
+    setNodesEnabled(true);
 });
 
 afterEach(function () {
@@ -169,7 +168,7 @@ it('keeps renewal disabled until host Sentinel is enabled', function () {
     $previous = IssueFluxCertificate::run(['flux.example.test']);
     MaterializeFluxCertificate::run($previous);
     $previous->update(['valid_until' => now()->addDays(10)]);
-    config(['constants.sentinel.host_enabled' => false]);
+    setNodesEnabled(false);
 
     $this->artisan('flux:renew-certificate')->assertSuccessful();
     expect(FluxCertificate::query()->count())->toBe(1);
@@ -190,36 +189,18 @@ it('schedules one daily renewal behind the host Sentinel flag', function () {
         ->and($event->onOneServer)->toBeTrue()
         ->and($event->withoutOverlapping)->toBeTrue()
         ->and($event->filtersPass(app()))->toBeTrue();
-    config(['constants.sentinel.host_enabled' => false]);
+    setNodesEnabled(false);
     expect($event->filtersPass(app()))->toBeFalse();
 });
 
-it('validates the served leaf after restart for root and non-root SSH users', function (string $user, string $identity, string $verification) {
-    config(['constants.ssh.mux_enabled' => false, 'constants.flux.port' => 7443]);
-    Storage::fake('ssh-keys');
-    $key = PrivateKey::factory()->create();
-    Server::factory()->create(['id' => 0, 'private_key_id' => $key->id, 'team_id' => $key->team_id, 'user' => $user]);
-    $previous = IssueFluxCertificate::run([$identity]);
-    MaterializeFluxCertificate::run($previous);
-    $previous->update(['valid_until' => now()->addDays(10)]);
-    $commands = [];
-    Process::fake(function ($process) use (&$commands) {
-        $commands[] = remoteProcessScript($process);
-        $output = str_contains(remoteProcessScript($process), 'openssl s_client')
-            ? file_get_contents($this->directory.'/flux/pki/server.pem') : 'coolify-flux';
+it('restarts Flux only as the s6 service of the Coolify container, without SSH', function () {
+    Process::fake();
 
-        return Process::result(output: $output);
-    });
-
-    expect(RenewFluxCertificate::run())->toBeTrue()
-        ->and($commands)->toHaveCount(2)
-        ->and($commands[0])->toContain(($user === 'root' ? '' : 'sudo ').'docker restart coolify-flux')
-        ->and($commands[1])->toContain("-connect '127.0.0.1:7443'", '-showcerts', '-verify_return_error', $verification." '".$identity."'");
-})->with([
-    ['root', 'flux.example.test', '-verify_hostname'],
-    ['deploy', '192.0.2.1', '-verify_ip'],
-    ['deploy', '2001:db8::1', '-verify_ip'],
-]);
+    // The test host has no s6 service directory for Flux.
+    expect(is_dir(RestartFlux::SERVICE_DIRECTORY))->toBeFalse()
+        ->and(fn () => RestartFlux::run())->toThrow(RuntimeException::class, 'Flux does not run as a service in this container.');
+    Process::assertNothingRan();
+});
 
 it('restores the prior files even when database promotion and status writes fail', function () {
     $previous = IssueFluxCertificate::run(['flux.example.test']);
@@ -248,17 +229,22 @@ it('restores the prior files even when database promotion and status writes fail
 });
 
 it('rolls back when Flux serves the old leaf instead of the replacement', function () {
-    config(['constants.ssh.mux_enabled' => false]);
-    Storage::fake('ssh-keys');
-    $key = PrivateKey::factory()->create();
-    Server::factory()->create(['id' => 0, 'private_key_id' => $key->id, 'team_id' => $key->team_id]);
     $previous = IssueFluxCertificate::run(['flux.example.test']);
     MaterializeFluxCertificate::run($previous);
     $previous->update(['valid_until' => now()->addDays(10)]);
-    Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'openssl s_client') ? $previous->certificate_pem : 'coolify-flux'));
+    $validated = [];
+    // Flux keeps serving the old leaf: the check fails for the replacement and passes for the previous leaf.
+    $restartAndValidate = function (FluxCertificate $certificate) use ($previous, &$validated): void {
+        $validated[] = $certificate->id;
+        if ($certificate->id !== $previous->id) {
+            throw new RuntimeException('Flux did not serve the expected TLS certificate.');
+        }
+    };
 
-    expect(fn () => RenewFluxCertificate::run())->toThrow(RuntimeException::class, 'Flux did not serve the expected TLS certificate.');
-    expect($previous->fresh()->state)->toBe('active')
+    expect(fn () => RenewFluxCertificate::run($restartAndValidate))->toThrow(RuntimeException::class, 'Flux did not serve the expected TLS certificate.');
+    expect($validated)->toHaveCount(2)
+        ->and($validated[1])->toBe($previous->id)
+        ->and($previous->fresh()->state)->toBe('active')
         ->and(file_get_contents($this->directory.'/flux/pki/server.pem'))->toBe($previous->certificate_pem)
         ->and(FluxCertificate::query()->where('state', 'failed')->count())->toBe(1);
 });

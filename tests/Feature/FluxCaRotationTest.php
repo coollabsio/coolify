@@ -36,7 +36,7 @@ beforeEach(function () {
     $this->directory = sys_get_temp_dir().'/coolify-flux-rotation-'.bin2hex(random_bytes(8));
     config()->set('app.env', 'local');
     config()->set('constants.coolify.base_config_path', $this->directory);
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_url', 'http://flux:7444');
     config()->set('constants.flux.internal_token', 'internal-secret');
     config()->set('constants.flux.public_url', 'http://flux:7443');
@@ -488,7 +488,7 @@ describe('rotation command', function () {
     });
 
     it('does nothing while host-native Sentinel is disabled', function () {
-        config()->set('constants.sentinel.host_enabled', false);
+        setNodesEnabled(false);
 
         $this->artisan('flux:rotate-ca')->assertFailed();
         expect(FluxCaRotation::query()->count())->toBe(0);
@@ -541,10 +541,14 @@ describe('rotation settings page', function () {
         expect(FluxCaRotation::query()->count())->toBe(0);
     });
 
-    it('is not available outside development', function () {
+    it('follows the Nodes setting, also in production', function () {
         config()->set('app.env', 'production');
         $this->actingAs(instanceUserWithRole('owner'));
         session(['currentTeam' => ['id' => 0]]);
+
+        Livewire::test(FluxTrust::class)->assertSuccessful();
+
+        setNodesEnabled(false);
 
         Livewire::test(FluxTrust::class)->assertNotFound();
     });

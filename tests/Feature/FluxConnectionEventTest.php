@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\RefreshNodeContainersJob;
+use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\Server;
 use App\Models\User;
@@ -13,7 +14,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     config()->set('constants.flux.internal_token', 'internal-secret');
     config()->set('constants.flux.public_url', 'http://flux:7443');
     config()->set('constants.flux.development_allow_plaintext', true);
@@ -108,7 +109,8 @@ it('ignores a runtime change from an old connection', function () {
 it('uses the derived TLS endpoint in connection observations', function () {
     config()->set('constants.flux.public_url', null);
     config()->set('constants.flux.port', 7443);
-    config()->set('app.url', 'https://coolify.example.com');
+    // Without the Flux URL setting, the host comes from the instance domain (decision 0021).
+    InstanceSettings::query()->whereKey(0)->update(['fqdn' => 'https://coolify.example.com']);
 
     $this->postJson('/api/v1/internal/sentinel/control/events', [
         'event' => 'connected',

@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
+    setNodesEnabled(true);
     $keyPair = sodium_crypto_sign_seed_keypair(str_repeat('C', 32));
     config()->set('constants.flux.public_url', 'http://flux:7443');
     config()->set('constants.flux.development_allow_plaintext', true);
@@ -133,18 +133,45 @@ it('allows a valid sentinel to reconnect while the node is marked unreachable', 
         ->assertJsonPath('server_id', $this->node->uuid);
 });
 
-it('derives the direct Flux URL from the Coolify URL and configured port', function () {
+it('derives the Flux URL from the instance domain and the Flux port', function () {
     config()->set('constants.flux.public_url', null);
     config()->set('constants.flux.port', 8443);
-    config()->set('app.url', 'http://192.0.2.10:8000');
+    InstanceSettings::query()->whereKey(0)->update(['fqdn' => 'https://coolify.example.com', 'public_ipv4' => '192.0.2.10']);
 
     requestSentinelAssignment($this->token)
         ->assertOk()
-        ->assertJsonPath('flux_url', 'http://192.0.2.10:8443');
+        ->assertJsonPath('flux_url', 'https://coolify.example.com:8443');
 });
 
-it('is unavailable when the development gate is disabled', function () {
-    config()->set('constants.sentinel.host_enabled', false);
+it('uses the Flux URL setting over the instance domain', function () {
+    config()->set('constants.flux.public_url', null);
+    InstanceSettings::query()->whereKey(0)->update(['fqdn' => 'https://coolify.example.com', 'flux_host' => '2001:db8::10', 'flux_port' => 9443]);
+
+    requestSentinelAssignment($this->token)
+        ->assertOk()
+        ->assertJsonPath('flux_url', 'https://[2001:db8::10]:9443');
+});
+
+it('fails without a host for the Flux URL', function () {
+    config()->set('constants.flux.public_url', null);
+
+    $this->withoutExceptionHandling();
+
+    expect(fn () => requestSentinelAssignment($this->token))
+        ->toThrow(RuntimeException::class, 'Flux URL configuration is invalid. Set the Flux URL in Settings > Advanced.');
+});
+
+it('keeps serving existing Nodes when the Nodes setting is off', function () {
+    setNodesEnabled(false);
+
+    requestSentinelAssignment($this->token)
+        ->assertOk()
+        ->assertJsonPath('server_id', $this->node->uuid);
+});
+
+it('is unavailable when the Nodes setting is off and no Node exists', function () {
+    setNodesEnabled(false);
+    $this->node->delete();
 
     requestSentinelAssignment($this->token)->assertNotFound();
 });
@@ -155,10 +182,13 @@ it('does not accept a legacy server token for node assignment', function () {
     requestSentinelAssignment($server->settings->sentinel_token)->assertUnauthorized();
 });
 
-it('is unavailable outside development even when the gate is enabled', function () {
+it('serves assignments in production over TLS', function () {
     config()->set('app.env', 'production');
+    config()->set('constants.flux.public_url', 'https://flux.example.com:7443');
 
-    requestSentinelAssignment($this->token)->assertNotFound();
+    requestSentinelAssignment($this->token)
+        ->assertOk()
+        ->assertJsonPath('flux_url', 'https://flux.example.com:7443');
 });
 
 it('validates the Sentinel protocol request', function (array $payload, string $field) {
