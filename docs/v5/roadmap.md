@@ -32,11 +32,11 @@ stable need.
 
 | # | Work | Decision |
 | --- | --- | --- |
-| S1 | Databases on Nodes | [0010](decisions/0010-node-databases.md). Create and deploy done (Postgres verified). Left: deploy test of the other 7 engines, `database.dump.v1` backups and restore. |
-| S2 | Offline Node notifications and recovery | [0014](decisions/0014-node-placement-and-failure.md) |
+| S1 | ~~Databases on Nodes~~ | [0010](decisions/0010-node-databases.md). Done: 8 engines deploy healthy; dump backups and imports for 7 engines (`database.dump.v1`, `database.restore.v1`). ClickHouse dumps left out (its `BACKUP` needs the S3 key on the Node). |
+| S2 | ~~Offline Node notifications and recovery~~ | [0014](decisions/0014-node-placement-and-failure.md). Done: "Server offline" state, affected apps in the notification, recovery move from backups, fencing when the Node returns. Recovery from the Node page is not built. |
 | S3 | Revision rollback | [0017](decisions/0017-node-revision-rollback.md) |
-| S4 | Exec and terminal | [0018](decisions/0018-node-exec-and-terminal.md) |
-| S5 | Deploy without downtime on one Node (v4 rolling update) | No decision. `podman run --replace` stops the old container before the new one starts. |
+| S4 | ~~Exec and terminal~~ | [0018](decisions/0018-node-exec-and-terminal.md). Done: scheduled tasks and a container terminal through Flux. |
+| S5 | ~~Deploy without downtime on one Node~~ | [0022](decisions/0022-node-rolling-deploys.md). Done: two container slots, make-before-break without a writable volume, stop-then-start with one. |
 
 ## Build when there is time
 
