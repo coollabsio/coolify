@@ -1,10 +1,12 @@
 <?php
 
 use App\Actions\Node\CreateClusterDockerImageWorkload;
+use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Enums\NodeContainerManagementState;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Project\ClusterApplication\Show as ClusterApplicationShow;
@@ -19,6 +21,7 @@ use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
+use App\Models\NodeWorkloadRevision;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -36,6 +39,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
+    setNodesEnabled(true);
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
     $this->team->update(['show_boarding' => false]);
@@ -76,7 +80,9 @@ it('creates a project and environment linked workload for a cluster Docker image
         ->and($workload->environment_id)->toBe($this->environment->id)
         ->and($workload->nodes()->sole()->is($this->node))->toBeTrue()
         ->and($deployment['revision']->image)->toBe('docker.io/library/nginx:stable')
-        ->and($deployment['operation']->node_id)->toBe($this->node->id);
+        ->and($deployment)->not->toHaveKey('operation')
+        ->and($workload->desired_state)->toBe(NodeWorkloadDesiredState::STOPPED)
+        ->and($workload->operations()->exists())->toBeFalse();
 });
 
 it('deploys a cluster Docker image to the selected Node', function () {
@@ -221,7 +227,23 @@ function healthyNodeResourceMetadata(): array
     ];
 }
 
-it('creates and queues a cluster Docker image from the environment resource flow', function () {
+/**
+ * Creates a cluster Docker image application and queues its first deployment like the Deploy button.
+ * Creating does not deploy; the Deploy button prepares the revision and calls CreateDeploymentOperation.
+ *
+ * @param  'missing'|'newer'  $pullPolicy
+ * @return array{workload: NodeWorkload, revision: NodeWorkloadRevision, operation: NodeOperation}
+ */
+function createDeployedClusterDockerImage(Project $project, Environment $environment, NodeCluster $cluster, string $image, User $user, string $pullPolicy = 'newer'): array
+{
+    $workload = CreateClusterDockerImageWorkload::run($project, $environment, $cluster, $image, $user)['workload'];
+    $revision = PrepareNodeWorkloadRevision::run($workload);
+    $deployment = CreateDeploymentOperation::run($workload->nodes()->sole(), $revision, $user, $pullPolicy);
+
+    return ['workload' => $workload, 'revision' => $revision, 'operation' => $deployment['operation']];
+}
+
+it('creates a stopped cluster Docker image from the environment resource flow without deploying it', function () {
     Queue::fake();
     $routeParameters = [
         'project_uuid' => $this->project->uuid,
@@ -234,17 +256,18 @@ it('creates and queues a cluster Docker image from the environment resource flow
         ->set('imageName', 'nginx')
         ->set('imageTag', 'stable')
         ->call('submit')
-        ->assertRedirect(route('project.cluster-application.deployment.show', [
+        ->assertRedirect(route('project.cluster-application.show', [
             ...$routeParameters,
             'workload_uuid' => NodeWorkload::query()->sole()->uuid,
-            'deployment_uuid' => NodeOperation::query()->where('command_type', 'workload.deploy.v1')->sole()->uuid,
         ]));
 
     $workload = NodeWorkload::query()->sole();
     expect($workload->project_id)->toBe($this->project->id)
         ->and($workload->environment_id)->toBe($this->environment->id)
-        ->and($workload->revisions()->sole()->image)->toBe('docker.io/library/nginx:stable');
-    Queue::assertPushed(DeployNodeWorkloadJob::class);
+        ->and($workload->revisions()->sole()->image)->toBe('docker.io/library/nginx:stable')
+        ->and($workload->desired_state)->toBe(NodeWorkloadDesiredState::STOPPED)
+        ->and(NodeOperation::query()->exists())->toBeFalse();
+    Queue::assertNotPushed(DeployNodeWorkloadJob::class);
 });
 
 it('shows the cluster application in its project and environment', function () {
@@ -258,9 +281,8 @@ it('shows the cluster application in its project and environment', function () {
         'workload_uuid' => $deployment['workload']->uuid,
     ])
         ->assertSee($deployment['workload']->name)
-        ->assertSee('nginx:latest')
-        ->assertSee($this->cluster->name)
-        ->assertSee($this->node->name)
+        ->assertSet('imageName', 'docker.io/library/nginx')
+        ->assertSet('imageTag', 'latest')
         ->assertSee('General')
         ->assertSee('Deployment Logs')
         ->assertSee('Internal mesh')
@@ -284,6 +306,15 @@ it('shows the cluster application in its project and environment', function () {
             'environment_uuid' => $this->environment->uuid,
             'workload_uuid' => $deployment['workload']->uuid,
         ]), false);
+
+    $this->get(route('project.cluster-application.servers', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee($this->cluster->name)
+        ->assertSee($this->node->name);
 });
 
 it('lets an administrator create a new revision with resource settings', function () {
@@ -358,7 +389,7 @@ it('forbids members from changing application resource settings', function () {
 
 it('offers the legacy application lifecycle actions for cluster applications', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
@@ -470,13 +501,13 @@ it('always shows cluster selection on the Docker image form after a server short
         ->call('submit');
 
     $workload = NodeWorkload::query()->sole();
-    $component->assertRedirect(route('project.cluster-application.deployment.show', [
+    $component->assertRedirect(route('project.cluster-application.show', [
         ...$routeParameters,
         'workload_uuid' => $workload->uuid,
-        'deployment_uuid' => $workload->operations()->where('command_type', 'workload.deploy.v1')->sole()->uuid,
     ]));
-    expect($workload->nodes()->sole()->is($this->node))->toBeTrue();
-    Queue::assertPushed(DeployNodeWorkloadJob::class);
+    expect($workload->nodes()->sole()->is($this->node))->toBeTrue()
+        ->and($workload->operations()->exists())->toBeFalse();
+    Queue::assertNotPushed(DeployNodeWorkloadJob::class);
 });
 
 it('shows individual Nodes as Docker image deployment targets', function () {
@@ -575,7 +606,7 @@ it('saves a start command and keeps the environment of the current revision', fu
 
 it('records resolved runtime environment variables in a new encrypted revision on deploy', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
@@ -593,6 +624,7 @@ it('records resolved runtime environment variables in a new encrypted revision o
         ['key' => 'DATABASE_HOST', 'value' => '{{project.DB_HOST}}'],
         ['key' => 'BUILD_ONLY', 'value' => 'not-at-runtime', 'is_runtime' => false],
     ]);
+    $revisionCount = $workload->revisions()->count();
 
     Livewire::test(ClusterApplicationShow::class, [
         'project_uuid' => $this->project->uuid,
@@ -602,9 +634,12 @@ it('records resolved runtime environment variables in a new encrypted revision o
 
     $latest = $workload->revisions()->latest('id')->firstOrFail();
     $rawEnvironment = DB::table('node_workload_revisions')->where('id', $latest->id)->value('environment');
-    expect($workload->revisions()->count())->toBe(2)
+    expect($workload->revisions()->count())->toBe($revisionCount + 1)
         ->and($latest->environment)->toBe([
             'APP_ENV' => 'production',
+            'COOLIFY_APP_NAME' => $workload->name,
+            'COOLIFY_ENVIRONMENT_NAME' => $this->environment->name,
+            'COOLIFY_PROJECT_NAME' => $this->project->name,
             'DATABASE_HOST' => 'db.internal',
             'SECRET' => 's3cret value',
         ])
@@ -617,12 +652,12 @@ it('records resolved runtime environment variables in a new encrypted revision o
         'environment_uuid' => $this->environment->uuid,
         'workload_uuid' => $workload->uuid,
     ])->call('deploy');
-    expect($workload->revisions()->count())->toBe(2);
+    expect($workload->revisions()->count())->toBe($revisionCount + 1);
 });
 
 it('deploys any environment variable that Podman accepts', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
@@ -642,18 +677,20 @@ it('deploys any environment variable that Podman accepts', function () {
         ->assertNotDispatched('error');
 
     $latest = $workload->revisions()->latest('id')->firstOrFail();
-    expect($latest->environment)->toHaveCount(301)
+    // 301 variables plus COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, and COOLIFY_ENVIRONMENT_NAME.
+    expect($latest->environment)->toHaveCount(304)
         ->and($latest->environment['app.name'])->toBe($longValue);
     Queue::assertPushed(DeployNodeWorkloadJob::class);
 });
 
 it('does not deploy environment variable values that contain a null byte', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
     $deployment['workload']->environment_variables()->create(['key' => 'APP_NAME', 'value' => "demo\0value"]);
+    $revisionCount = $deployment['workload']->revisions()->count();
 
     Livewire::test(ClusterApplicationShow::class, [
         'project_uuid' => $this->project->uuid,
@@ -665,12 +702,12 @@ it('does not deploy environment variable values that contain a null byte', funct
         ->assertNoRedirect();
 
     expect($deployment['workload']->operations()->count())->toBe(1)
-        ->and($deployment['workload']->revisions()->count())->toBe(1);
+        ->and($deployment['workload']->revisions()->count())->toBe($revisionCount);
     Queue::assertNotPushed(DeployNodeWorkloadJob::class);
 });
 
 it('warns about pending changes until the latest configuration is deployed', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $workload = $deployment['workload'];
@@ -721,7 +758,13 @@ it('copies environment variables from the latest revision when migrating', funct
 
     expect($deployment['workload']->environment_variables()->orderBy('order')->pluck('value', 'key')->all())
         ->toBe(['APP_ENV' => 'production', 'SECRET' => 'value'])
-        ->and($deployment['workload']->fresh()->runtimeEnvironment())->toBe(['APP_ENV' => 'production', 'SECRET' => 'value']);
+        ->and($deployment['workload']->fresh()->runtimeEnvironment())->toBe([
+            'APP_ENV' => 'production',
+            'COOLIFY_APP_NAME' => $deployment['workload']->name,
+            'COOLIFY_ENVIRONMENT_NAME' => $this->environment->name,
+            'COOLIFY_PROJECT_NAME' => $this->project->name,
+            'SECRET' => 'value',
+        ]);
 });
 
 it('drops host ports from an older revision when the configuration is saved', function () {
@@ -789,8 +832,8 @@ it('forbids members from changing the configuration or managing environment vari
 
 it('asks Sentinel for a newer image when an administrator redeploys', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
-        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    $deployment = createDeployedClusterDockerImage(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user, 'missing',
     );
     expect(data_get($deployment['operation']->request, 'pull_policy'))->toBe('missing');
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
@@ -815,7 +858,7 @@ it('asks Sentinel for a newer image when an administrator redeploys', function (
 
 it('opens the logs of the active deployment instead of queueing another one', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $routeParameters = [
@@ -837,7 +880,7 @@ it('opens the logs of the active deployment instead of queueing another one', fu
 
 it('stays on the page when a lifecycle action blocks a new deployment', function () {
     Queue::fake();
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
@@ -859,7 +902,7 @@ it('stays on the page when a lifecycle action blocks a new deployment', function
 });
 
 it('renders every cluster application section as its own page', function (string $routeName, string $section, array $expectedText) {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     UpdateNodeWorkloadConfiguration::run($deployment['workload'], ['nginx', '-g', 'daemon off;'], ['APP_ENV' => 'production']);
@@ -903,10 +946,10 @@ it('renders every cluster application section as its own page', function (string
         ->and(ClusterApplicationShow::SECTIONS)->toContain($section);
 })->with([
     'general' => ['project.cluster-application.show', 'general', ['Access', 'Internal hostname', 'Build &amp; deploy', 'Container', 'Start command']],
-    'domains' => ['project.cluster-application.domains', 'domains', ['Domains', 'HTTPS is not available yet.']],
+    'domains' => ['project.cluster-application.domains', 'domains', ['Domains', 'HTTPS is not available for this cluster']],
     'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'Developer view']],
     'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
-    'deployments' => ['project.cluster-application.deployments', 'deployments', ['A build that deployed nothing', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
+    'deployments' => ['project.cluster-application.deployments', 'deployments', ['Open a deploy to see its build and deploy logs.', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
     'logs' => ['project.cluster-application.logs', 'logs', ['Runtime Logs', 'Find in logs']],
     'servers' => ['project.cluster-application.servers', 'servers', ['Open cluster', 'Open server']],
     'danger' => ['project.cluster-application.danger', 'danger', ['Danger zone', 'Delete application']],
@@ -927,7 +970,7 @@ it('only renders the form that belongs to the current section', function () {
         ->assertSee('Start command')
         ->assertSee('wire:poll.10000ms="refresh"', false)
         ->assertDontSee('CPU limit (cores)')
-        ->assertDontSee('A build that deployed nothing');
+        ->assertDontSee('Open a deploy to see its build and deploy logs.');
 
     $this->get(route('project.cluster-application.resource-limits', $routeParameters))
         ->assertOk()
@@ -936,7 +979,7 @@ it('only renders the form that belongs to the current section', function () {
 });
 
 it('lists only deployments in the deployment history with links to their logs', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()]);
@@ -961,7 +1004,7 @@ it('lists only deployments in the deployment history with links to their logs', 
 });
 
 it('paginates the deployment history', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     NodeOperation::factory()->count(ClusterApplicationShow::DEPLOYMENTS_PER_PAGE)->create([
@@ -983,7 +1026,7 @@ it('paginates the deployment history', function () {
 });
 
 it('shows deployment logs built from the recorded operation', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $this->user->update(['name' => '']);
@@ -1003,7 +1046,7 @@ it('shows deployment logs built from the recorded operation', function () {
 
     $response = $this->get(route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $operation->uuid]))
         ->assertOk()
-        ->assertSee('A build that deployed nothing')
+        ->assertSee('Open a deploy to see its build and deploy logs.')
         ->assertSee('data-table-row-active', false)
         ->assertSee('Find in logs')
         ->assertSee('Deployment queued by '.$this->user->email.'.')
@@ -1020,7 +1063,7 @@ it('shows deployment logs built from the recorded operation', function () {
 });
 
 it('polls quickly while a deployment is in progress', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $deployment['operation']->update(['status' => NodeOperationStatus::RUNNING]);
@@ -1037,10 +1080,10 @@ it('polls quickly while a deployment is in progress', function () {
 });
 
 it('does not open logs for operations that are not deployments of this application', function () {
-    $first = CreateClusterDockerImageWorkload::run(
+    $first = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
-    $second = CreateClusterDockerImageWorkload::run(
+    $second = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'redis:latest', $this->user,
     );
     $restart = NodeOperation::factory()->create([
@@ -1147,7 +1190,7 @@ it('does not expose any cluster application section to another team', function (
 ]);
 
 it('does not expose deployment logs to another team', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
+    $deployment = createDeployedClusterDockerImage(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
     $outsider = User::factory()->create();

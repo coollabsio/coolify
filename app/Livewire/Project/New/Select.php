@@ -552,7 +552,7 @@ class Select extends Component
      */
     private function createOnCluster(array $target)
     {
-        if ($this->type === NodeDatabaseType::POSTGRESQL->value) {
+        if (($this->type ?? null) === NodeDatabaseType::POSTGRESQL->value) {
             $this->clusterTarget = $target;
             $this->current_step = 'select-postgresql-type';
 
@@ -570,8 +570,9 @@ class Select extends Component
     /** The resource type that a cluster target creates: a Git build, a database, or a Docker image. */
     private function clusterResourceType(): string
     {
-        if (in_array($this->type ?? null, self::CLUSTER_BUILD_TYPES, true) || NodeDatabaseType::tryFrom((string) $this->type) !== null) {
-            return $this->type;
+        $type = $this->type ?? '';
+        if (in_array($type, self::CLUSTER_BUILD_TYPES, true) || NodeDatabaseType::tryFrom($type) !== null) {
+            return $type;
         }
 
         return 'docker-image';
