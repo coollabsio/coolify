@@ -48,7 +48,7 @@ it('shows the link and the waiting plan', function () {
         ->assertSee('worker')
         ->assertSee('env.TOKEN')
         ->assertSee('STRIPE_KEY')
-        ->assertSee('is not managed by coolify.json');
+        ->assertSee('handmade');
 });
 
 it('approves with the selected data deletion', function () {

@@ -159,6 +159,49 @@ class ProjectConfigController extends Controller
         return $link instanceof JsonResponse ? $link : response()->json(self::serializeLink($link));
     }
 
+    #[OA\Patch(summary: 'Update a coolify.json link', path: '/config/links/{uuid}', operationId: 'update-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [new OA\Property(property: 'auto_apply', type: 'boolean')], type: 'object')),
+        responses: [new OA\Response(response: 200, description: 'The link.'), new OA\Response(response: 403, description: 'Team admins only.')]
+    )]
+    public function updateLink(Request $request, string $uuid, ConfigLinks $links): JsonResponse
+    {
+        $link = $this->findLink($uuid);
+        if ($link instanceof JsonResponse) {
+            return $link;
+        }
+        $validator = Validator::make($request->all(), ['auto_apply' => 'required|boolean']);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+        try {
+            $links->setAutoApply($link, $request->user(), $request->boolean('auto_apply'));
+        } catch (AuthorizationException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json(self::serializeLink($link->fresh()));
+    }
+
+    #[OA\Delete(summary: 'Disconnect coolify.json', description: 'Removes the link. The resources stay and can be edited in Coolify again.', path: '/config/links/{uuid}', operationId: 'delete-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [new OA\Response(response: 200, description: 'Disconnected.'), new OA\Response(response: 403, description: 'Team admins only.')]
+    )]
+    public function deleteLink(Request $request, string $uuid, ConfigLinks $links): JsonResponse
+    {
+        $link = $this->findLink($uuid);
+        if ($link instanceof JsonResponse) {
+            return $link;
+        }
+        try {
+            $links->disconnect($link, $request->user());
+        } catch (AuthorizationException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json(['message' => 'Disconnected.']);
+    }
+
     #[OA\Get(summary: 'List revisions', path: '/config/links/{uuid}/revisions', operationId: 'list-config-revisions', security: [['bearerAuth' => []]], tags: ['Project config'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
         responses: [new OA\Response(response: 200, description: 'Revisions, newest first.'), new OA\Response(response: 404, ref: '#/components/responses/404')]

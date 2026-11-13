@@ -70,7 +70,7 @@ class ConfigLinks
      *
      * @throws ValidationException
      */
-    private function gitAttributes(User $user, int $teamId, array $data): array
+    public function gitAttributes(User $user, int $teamId, array $data): array
     {
         $server = Server::query()->where('team_id', $teamId)->where('uuid', $data['read_server_uuid'] ?? '')->first();
         if ($server === null || ! Gate::forUser($user)->allows('placeResource', $server)) {
@@ -152,6 +152,32 @@ class ConfigLinks
         ApplyEnvironmentConfigJob::dispatch($revision->fresh());
 
         return $revision->fresh();
+    }
+
+    /**
+     * Removes the link. The resources stay and can be edited in Coolify again; their keys stay for a later link.
+     */
+    public function disconnect(EnvironmentConfigLink $link, User $user): void
+    {
+        $this->authorizeTeamAdmin($link, $user);
+        auditLog('system.project_config.disconnected', ['team_id' => $link->teamId(), 'environment_uuid' => $link->environment->uuid, 'actor_id' => $user->id]);
+        $link->delete();
+    }
+
+    public function setAutoApply(EnvironmentConfigLink $link, User $user, bool $autoApply): void
+    {
+        $this->authorizeTeamAdmin($link, $user);
+        $link->update(['auto_apply' => $autoApply]);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function authorizeTeamAdmin(EnvironmentConfigLink $link, User $user): void
+    {
+        if (! $user->isAdminOfTeam($link->teamId())) {
+            throw new AuthorizationException('Only a team admin can change the coolify.json link.');
+        }
     }
 
     public function suspend(EnvironmentConfigLink $link, User $user): void
