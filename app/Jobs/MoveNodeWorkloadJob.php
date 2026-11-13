@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\ApplyNodeClusterNetworkRevision;
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
@@ -11,20 +12,19 @@ use App\Actions\Node\EnsureNodeWorkloadAddress;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReceiveNodeVolumes;
-use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\RestoreNodeVolume;
 use App\Actions\Node\ServeNodeVolumes;
 use App\Actions\Node\TransitionOperation;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
+use App\Exceptions\NodeClusterNetworkNotAppliedException;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
 use App\Models\User;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -50,7 +50,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
     use Queueable, SerializesModels;
 
     /** How long the reachable Nodes may take to apply the network revision that allows the target. */
-    public const NETWORK_WAIT_SECONDS = 120;
+    public const NETWORK_WAIT_SECONDS = ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
 
     /** Longest wait for a target deployment that another worker runs. */
     public const DEPLOYMENT_WAIT_SECONDS = 660;
@@ -587,43 +587,15 @@ class MoveNodeWorkloadJob implements ShouldQueue
      */
     private function waitForNetworkRevision(NodeCluster $cluster, ?User $user): void
     {
-        $nodes = $cluster->nodes()->orderBy('id')->get()
-            ->filter(fn (Node $node): bool => $node->canReceiveNetworkCommands());
-        $attempts = $nodes->pluck('network_attempts', 'id');
-        if (! QueueNodeClusterNetworkRevision::run($cluster, $user)) {
-            // The network does not converge automatically: no run would apply the revision.
-            return;
+        try {
+            ApplyNodeClusterNetworkRevision::run($cluster, $user);
+        } catch (NodeClusterNetworkNotAppliedException $exception) {
+            $failed = $exception->failedNode;
+            throw new RuntimeException($failed !== null
+                ? "Server {$failed->name} could not apply the network for the target: {$failed->network_error} The source remains active."
+                : 'The cluster network did not allow the target within '.self::NETWORK_WAIT_SECONDS.' seconds. Waiting for: '
+                    .implode(', ', $exception->pendingNames).'. The source remains active.');
         }
-        $revision = $cluster->desired_revision;
-        // Apply the revision in this worker. The queued run can wait behind this job when Horizon
-        // has one worker; it then finds the Nodes converged. Another run holding the lock is
-        // waited for below.
-        $operator = $user !== null && $user->can('update', $cluster) ? $user : $cluster->networkOperator();
-        if ($operator !== null) {
-            try {
-                ReconcileNodeClusterNetwork::run($cluster, $operator, $nodes->pluck('id')->values()->all());
-            } catch (LockTimeoutException) {
-            }
-        }
-
-        for ($poll = 0; $poll <= self::NETWORK_WAIT_SECONDS; $poll++) {
-            $pending = Node::query()->whereKey($nodes->pluck('id'))->orderBy('id')->get()
-                ->filter(fn (Node $node): bool => $node->canReceiveNetworkCommands() && ! $node->hasAppliedNetworkRevision($revision));
-            $failed = $pending->first(fn (Node $node): bool => $node->network_status === 'error'
-                && $node->network_attempts > (int) $attempts->get($node->id));
-            if ($failed !== null) {
-                throw new RuntimeException("Server {$failed->name} could not apply the network for the target: {$failed->network_error} The source remains active.");
-            }
-            if ($pending->isEmpty()) {
-                return;
-            }
-            if ($poll < self::NETWORK_WAIT_SECONDS) {
-                Sleep::for(1)->second();
-            }
-        }
-
-        throw new RuntimeException('The cluster network did not allow the target within '.self::NETWORK_WAIT_SECONDS.' seconds. Waiting for: '
-            .$pending->pluck('name')->implode(', ').'. The source remains active.');
     }
 
     /**

@@ -2,17 +2,19 @@
 
 namespace App\Actions\Node;
 
+use App\Exceptions\NodeClusterNetworkNotAppliedException;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
-use RuntimeException;
 
 /**
  * Publishes a network revision, applies it in this worker, and waits until every reachable Node
  * applied it up to the ingress step. Nodes that go offline meanwhile are no longer waited for.
+ *
+ * @throws NodeClusterNetworkNotAppliedException
  */
 class ApplyNodeClusterNetworkRevision
 {
@@ -46,7 +48,7 @@ class ApplyNodeClusterNetworkRevision
             $failed = $pending->first(fn (Node $node): bool => $node->network_status === 'error'
                 && $node->network_attempts > (int) $attempts->get($node->id));
             if ($failed !== null) {
-                throw new RuntimeException("Server {$failed->name} could not apply the cluster network: {$failed->network_error}");
+                throw new NodeClusterNetworkNotAppliedException("Server {$failed->name} could not apply the cluster network: {$failed->network_error}", $failed);
             }
             if ($pending->isEmpty()) {
                 return;
@@ -56,6 +58,9 @@ class ApplyNodeClusterNetworkRevision
             }
         }
 
-        throw new RuntimeException('The cluster network did not apply within '.self::WAIT_SECONDS.' seconds. Waiting for: '.$pending->pluck('name')->implode(', ').'.');
+        throw new NodeClusterNetworkNotAppliedException(
+            'The cluster network did not apply within '.self::WAIT_SECONDS.' seconds. Waiting for: '.$pending->pluck('name')->implode(', ').'.',
+            pendingNames: $pending->pluck('name')->values()->all(),
+        );
     }
 }
