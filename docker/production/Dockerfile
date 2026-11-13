@@ -75,13 +75,18 @@ RUN aube run --no-install build
 # =================================================================
 FROM peakimages/aube:${AUBE_VERSION} AS terminal-dependencies
 
-RUN apk add --no-cache make g++ python3
+RUN apk add --no-cache make g++ python3 && \
+    strip /usr/local/bin/node
 WORKDIR /terminal
 COPY package.json aube-lock.yaml aube-workspace.yaml .npmrc ./
 RUN --mount=type=cache,target=/root/.local/share/aube \
     aube install --prod --frozen-lockfile && \
-    rm -rf node_modules/node-pty/prebuilds/darwin-* \
-        node_modules/node-pty/prebuilds/win32-*
+    rm -rf node_modules/.aube/node-addon-api@* \
+        node_modules/.aube/node_modules/node-addon-api \
+        node_modules/.aube/node-pty@*/node_modules/node-addon-api && \
+    cd node_modules/node-pty && \
+    rm -rf binding.gyp deps prebuilds scripts src third_party typings && \
+    find build -type f ! -name pty.node -delete
 COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 

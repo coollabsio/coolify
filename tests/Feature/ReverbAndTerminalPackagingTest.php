@@ -99,7 +99,7 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
         ->not->toContain('PUSHER_ENABLED')
         ->not->toContain('Reverb is disabled')
         ->and(file_get_contents(base_path(dirname($dockerfile).'/etc/s6-overlay/s6-rc.d/terminal-server/run')))
-        ->toContain('exec node /terminal/terminal-server.js')
+        ->toContain('exec node --env-file-if-exists=.env /terminal/terminal-server.js')
         ->and(file_exists(base_path(dirname($dockerfile)."/etc/s6-overlay/s6-rc.d/reverb/dependencies.d/{$dependencyService}")))->toBeTrue()
         ->and(file_exists(base_path(dirname($dockerfile)."/etc/s6-overlay/s6-rc.d/terminal-server/dependencies.d/{$dependencyService}")))->toBeTrue()
         ->and(file_exists(base_path(dirname($dockerfile).'/etc/s6-overlay/user-bundles.d/user/contents.d/reverb')))->toBeTrue()

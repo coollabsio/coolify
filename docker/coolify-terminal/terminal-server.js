@@ -1,7 +1,6 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import 'dotenv/config';
 import {
     TERMINAL_CLOSE_CODES,
     TERMINAL_IDLE_TIMEOUT_SECONDS,

@@ -14,9 +14,6 @@ importers:
       cookie:
         specifier: ^2.0.2
         version: 2.0.2
-      dotenv:
-        specifier: ^18.0.10
-        version: 18.0.10
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
@@ -380,11 +377,6 @@ packages:
 
   devalue@5.9.4:
     resolution: {integrity: sha512-sPAT4pztbu6586/hrhOnMKS17IJrvg12mXiSPSS3W5qDeN2RGgvZ0diZCm31dBbnevfVmujNO3IM2wrS4Y2Rhg==}
-
-  dotenv@18.0.10:
-    resolution: {integrity: sha512-89FAA1xchzK2mxVWdr5F/0rldwiueXs6zJM86rO66EzekR1iBdiXRthyG+m5GvkJaFH3C2LESzamTkgndmLT2A==}
-    engines: {node: '>=12'}
-    hasBin: true
 
   enhanced-resolve@5.26.1:
     resolution: {integrity: sha512-PPnnSJq3azKOIewXR/uppBV/6h98dprBJ/WaQ9Qgj10xX1lJLNfg+XShpbsrSqcDSy2yYYyhfXM1wWhftqgyzw==}
@@ -890,8 +882,6 @@ snapshots:
   detect-libc@2.1.2: {}
 
   devalue@5.9.4: {}
-
-  dotenv@18.0.10: {}
 
   enhanced-resolve@5.26.1:
     dependencies:
