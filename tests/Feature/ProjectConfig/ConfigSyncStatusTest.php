@@ -1,10 +1,13 @@
 <?php
 
 use App\Enums\ConfigRevisionStatus;
+use App\Livewire\Project\Show;
+use App\Models\Environment;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use App\Services\ProjectConfig\ConfigSyncStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -70,4 +73,20 @@ it('explains what needs attention in one sentence', function () {
 
     syncStatusRevision($this, ConfigRevisionStatus::Failed, ['error' => 'resources.api.server: No server is named "x" in this team.']);
     expect(ConfigSyncStatus::forLink($this->link->fresh())['message'])->toBe('The last sync failed: resources.api.server: No server is named "x" in this team.');
+});
+
+it('shows the sync state of linked environments on the project page', function () {
+    syncStatusRevision($this, ConfigRevisionStatus::WaitingApproval, ['plan' => ['changes' => [['kind' => 'remove']]]]);
+    Environment::create(['project_id' => $this->fx['project']->id, 'name' => 'staging']);
+    $this->actingAs($this->fx['user']);
+
+    Livewire::test(Show::class, ['project_uuid' => $this->fx['project']->uuid])
+        ->assertViewHas('environmentsJs', function ($environments) {
+            $config = collect($environments)->pluck('config', 'name');
+
+            return $config['production']['label'] === 'Needs approval'
+                && $config['production']['title'] === 'coolify.json: 1 change needs approval'
+                && $config['production']['dotClass'] === 'bg-warning'
+                && $config['staging'] === null;
+        });
 });

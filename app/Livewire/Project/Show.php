@@ -6,6 +6,7 @@ use App\Livewire\Concerns\CreatesEnvironments;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\ProjectConfig\ConfigSyncStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -39,6 +40,7 @@ class Show extends Component
                             'sqlites',
                         ])
                         ->orderBy('created_at'),
+                    'environments.configLink',
                 ])
                 ->firstOrFail();
 
@@ -56,6 +58,40 @@ class Show extends Component
             'project_uuid' => $projectUuid,
             'environment_uuid' => $environmentUuid,
         ]);
+    }
+
+    /**
+     * @return array{label: string, title: string, dotClass: string, href: string}|null
+     */
+    private function configSyncSummary(Environment $environment): ?array
+    {
+        $status = ConfigSyncStatus::forEnvironment($environment);
+        if ($status === null) {
+            return null;
+        }
+
+        return [
+            'label' => match ($status['state']) {
+                'synced' => 'Synced',
+                'applying' => 'Applying',
+                'waiting' => 'Needs approval',
+                'failed' => 'Sync failed',
+                'paused' => 'Sync paused',
+                default => 'Not synced yet',
+            },
+            'title' => "coolify.json: {$status['label']}",
+            'href' => route('project.environment.configuration', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $environment->uuid,
+            ]),
+            'dotClass' => match ($status['tone']) {
+                'success' => 'bg-emerald-500',
+                'warning' => 'bg-warning',
+                'error' => 'bg-red-500',
+                'progress' => 'bg-coollabs dark:bg-brand-light animate-pulse',
+                default => 'bg-neutral-400 dark:bg-neutral-500',
+            },
+        ];
     }
 
     public function render(): View
@@ -83,6 +119,7 @@ class Show extends Component
                     'name' => $environment->name,
                     'description' => $environment->description,
                     'resourceCount' => $resourceCount,
+                    'config' => $this->configSyncSummary($environment),
                     'href' => route('project.resource.index', [
                         'project_uuid' => $this->project->uuid,
                         'environment_uuid' => $environment->uuid,
