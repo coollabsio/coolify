@@ -87,6 +87,29 @@
                                     <span class="shrink-0 font-mono text-xs text-neutral-950 dark:text-fg">{{ $deployment['revision'] }}</span>
                                     <span class="truncate text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white"
                                         title="{{ $deployment['imageTitle'] }}">{{ $deployment['image'] }}</span>
+                                    @if ($deployment['rollbackRevisionUuid'] ?? null)
+                                        @can('update', $workload)
+                                            <span class="relative z-10 ml-auto shrink-0">
+                                                <x-modal-confirmation canGate="update" :canResource="$workload"
+                                                    title="Roll back to this revision?" buttonTitle="Rollback"
+                                                    submitAction="rollback('{{ $deployment['rollbackRevisionUuid'] }}')"
+                                                    :actions="[
+                                                        'A new revision with the image of this deployment ('.$deployment['revision'].') deploys on every server of the application.',
+                                                        'Environment variables, secrets, the start command, resource limits, volumes, and the health check keep their current values.',
+                                                        'Volume data is not rolled back.',
+                                                        'When the cluster registry no longer has the image, Coolify builds the same commit again before it deploys.',
+                                                    ]"
+                                                    :confirmWithText="false" :confirmWithPassword="false"
+                                                    step2ButtonText="Roll back">
+                                                    <x-slot:trigger>
+                                                        <button type="button" class="icon-button" title="Roll back to this revision" aria-label="Roll back to this revision">
+                                                            <x-reicon name="time-back" class="size-3.5" />
+                                                        </button>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
+                                            </span>
+                                        @endcan
+                                    @endif
                                 </span>
                             @else
                                 <span class="text-neutral-400 dark:text-fg-faint">-</span>

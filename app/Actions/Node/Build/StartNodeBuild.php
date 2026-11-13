@@ -16,16 +16,28 @@ use RuntimeException;
 /**
  * Queues a build of the workload's Git source or inline Dockerfile. A workload has at most one
  * active build; asking again returns it. A webhook passes the pushed commit;
- * without one, the build resolves the head of the branch.
+ * without one, the build resolves the head of the branch. A rollback passes an earlier build,
+ * whose source and commit the new build copies.
  */
 class StartNodeBuild
 {
     use AsAction;
 
-    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null): NodeBuild
+    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null, ?NodeBuild $rebuildOf = null): NodeBuild
     {
-        $build = DB::transaction(function () use ($workload, $user, $commitSha): NodeBuild {
+        $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf): NodeBuild {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
+            if ($rebuildOf !== null) {
+                if ($workload->builds()->active()->exists()) {
+                    throw new RuntimeException('A build of this application is running. Wait for it or cancel it, then roll back again.');
+                }
+
+                return $workload->builds()->create([
+                    'requested_by_user_id' => $user?->id,
+                    ...$rebuildOf->only(['source_type', 'git_repository', 'git_branch', 'commit_sha', 'base_directory', 'dockerfile_location', 'dockerfile']),
+                    'status' => NodeBuildStatus::QUEUED,
+                ]);
+            }
             if (! $workload->buildsFromSource()) {
                 throw new RuntimeException('This application has no source to build.');
             }

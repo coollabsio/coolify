@@ -14,11 +14,12 @@ class PrepareNodeWorkloadRevision
 
     /**
      * Return the revision to deploy. Environment variables, volumes, and the health check are
-     * edited on the workload, so a new revision records them when they changed.
+     * edited on the workload, so a new revision records them when they changed. A rollback passes
+     * the image of an earlier revision; everything else comes from the workload as for a deploy.
      */
-    public function handle(NodeWorkload $workload): NodeWorkloadRevision
+    public function handle(NodeWorkload $workload, ?string $image = null): NodeWorkloadRevision
     {
-        return DB::transaction(function () use ($workload): NodeWorkloadRevision {
+        return DB::transaction(function () use ($workload, $image): NodeWorkloadRevision {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             $current = $workload->revisions()->latest('id')->lockForUpdate()->firstOrFail();
             $environment = $workload->runtimeEnvironment();
@@ -48,11 +49,12 @@ class PrepareNodeWorkloadRevision
             }
 
             $configuration = $workload->withWorkloadSettings($current->configuration ?? []);
-            if ($environment === ($current->environment ?? []) && $secrets === ($current->secrets ?? []) && $configuration === ($current->configuration ?? [])) {
+            $image ??= $current->image;
+            if ($image === $current->image && $environment === ($current->environment ?? []) && $secrets === ($current->secrets ?? []) && $configuration === ($current->configuration ?? [])) {
                 return $current;
             }
 
-            return $workload->createRevision($current->image, $configuration, $environment, $secrets);
+            return $workload->createRevision($image, $configuration, $environment, $secrets);
         });
     }
 }

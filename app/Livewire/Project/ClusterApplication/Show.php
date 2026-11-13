@@ -17,6 +17,7 @@ use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\NotifyNodeReachability;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\RemoveNodeVolume;
+use App\Actions\Node\RollbackNodeWorkload;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
@@ -263,6 +264,35 @@ class Show extends Component
             'workload_uuid' => $this->workload->uuid,
             'deployment_uuid' => $operation->uuid,
         ]);
+    }
+
+    /**
+     * Rolls back to the image of an earlier revision of this application (decision 0017) and opens
+     * its deployment log, or the log of the build when the image must be built again.
+     */
+    public function rollback(string $revisionUuid): void
+    {
+        $this->authorize('update', $this->workload);
+        $revision = $this->workload->revisions()->where('uuid', $revisionUuid)->firstOrFail();
+        try {
+            $rollback = RollbackNodeWorkload::run($this->workload, $revision, auth()->user());
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+            $this->loadData();
+
+            return;
+        }
+        $parameters = [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'workload_uuid' => $this->workload->uuid,
+        ];
+        if ($rollback['build'] !== null) {
+            redirectRoute($this, 'project.cluster-application.build.show', [...$parameters, 'build_uuid' => $rollback['build']->uuid]);
+
+            return;
+        }
+        redirectRoute($this, 'project.cluster-application.deployment.show', [...$parameters, 'deployment_uuid' => $rollback['operation']->uuid]);
     }
 
     public function cancelBuild(): void
@@ -1022,10 +1052,11 @@ class Show extends Component
             ->findMany($page->where('kind', 'deployment')->pluck('id'))->keyBy('id');
         $buildRows = NodeBuild::query()
             ->findMany($page->where('kind', 'build')->pluck('id'))->keyBy('id');
+        $latestImage = $this->workload->revisions()->latest('id')->value('image');
         $rows = $page
             ->map(fn (object $row): array => $row->kind === 'build'
                 ? $this->buildTimelineRow($buildRows[$row->id])
-                : $this->deploymentTimelineRow($operations[$row->id]))
+                : $this->deploymentTimelineRow($operations[$row->id], $latestImage))
             ->values()
             ->all();
 
@@ -1210,9 +1241,15 @@ class Show extends Component
     }
 
     /** @return array<string, mixed> */
-    private function deploymentTimelineRow(NodeOperation $operation): array
+    private function deploymentTimelineRow(NodeOperation $operation, ?string $latestImage): array
     {
         $build = $operation->revision?->build;
+        // A rollback target: an earlier image that deployed successfully. A database is not rolled back.
+        $canRollBack = $operation->command_type === 'workload.deploy.v1'
+            && $operation->status === NodeOperationStatus::SUCCEEDED
+            && $operation->revision !== null
+            && $operation->revision->image !== $latestImage
+            && ! $this->workload->isDatabase();
 
         return [
             'kind' => 'deployment',
@@ -1242,6 +1279,7 @@ class Show extends Component
                 default => $operation->completed_at ? calculateDuration($operation->created_at, $operation->completed_at) : '-',
             },
             'node' => $operation->node?->name,
+            'rollbackRevisionUuid' => $canRollBack ? $operation->revision->uuid : null,
         ];
     }
 
