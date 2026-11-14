@@ -85,3 +85,41 @@ templates can run on Nodes when every Node reports
 - Sharing a volume between stacks, or between a stack and a single
   application.
 - Spreading the services of a volume group over several Nodes.
+
+## Implementation (2026-11-14)
+
+Built: `node_volumes.node_stack_id` (a stack volume has no `node_workload_id` and no
+`mount_path`), `node_volume_mounts` (one row for each service: path and read-only flag),
+`NodeWorkload::volumeGroup()`, the group move in `MoveNodeWorkloadJob`, and the
+**Shared volumes** list on the stack page. These points differ from the decision above or
+add to it:
+
+- **Templates on Nodes.** 316 of the 392 templates (`.yaml` and `.yml`) run with
+  `discovery.names.underscore.v1`, 307 without, not 314: 22 templates had a shared volume
+  or `volumes_from` as their first reason, not 20. appwrite and trigger still mount the
+  Docker socket, so 20 are added.
+- **What is shared.** A named volume or a relative bind (`./x` and `./x/` are the same) that
+  two or more services mount is one stack volume. A volume that one service mounts stays a
+  volume of that service. `volumes_from` also copies the `content:` files of the other
+  service, and resolves `volumes_from` of that service first. `volumes_from` of a container
+  (`container:<name>`) or of a service that the stack does not have makes the stack "Not
+  available on Nodes".
+- **Read-only.** A read-only mount of a stack volume is read-only in the container. A
+  read-only volume of one service stays read-write, with a note, as before.
+- **Deploy.** A read-only stack mount does not block a rolling deploy: only a read-write
+  mount makes the deploy stop-then-start.
+- **Move.** The move operation of the selected service lists the other services of the
+  group in `request.group`, with the revision that each one deploys. The group counts as
+  moving for each of them, so it blocks their deploys, lifecycle actions, other moves, and
+  the reconciler. The move copies the stack volumes and the own volumes of every service in
+  one transfer, stops every running service of the group before the final pass, deploys
+  them on the target in `depends_on` order, then removes them on the source. Services of the
+  stack that share no volume stay where they are. A rollback removes every target
+  container, switches the volumes back, and starts the stopped services again.
+- **Backups.** The S3 key of a stack volume backup has the stack UUID instead of the
+  workload UUID. `stop_during_backup` is refused for a stack volume, because Sentinel stops
+  one container for a backup: the backup is crash-consistent. The backup schedule and its
+  restore are on the **Backups** page of each service that mounts the volume.
+- **Delete.** **Remove** on a service removes its mount only; the volume stays for the
+  other services. A stack volume that no service mounts can be deleted on the stack page.
+
