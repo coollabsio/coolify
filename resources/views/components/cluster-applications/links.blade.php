@@ -53,6 +53,25 @@
                 <span class="text-neutral-500 dark:text-fg-dim">Pending</span>
             </div>
         @endif
+        @if ($workload->node_stack_id !== null && $workload->stack !== null)
+            @php
+                $stackHostname = strtolower((string) $workload->stack_service).'.'.$workload->stack->searchDomain();
+            @endphp
+            <div class="{{ $linkItemClasses }} cursor-default!">
+                <span class="shrink-0 rounded-md bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success ring-1 ring-success/20">
+                    Stack
+                </span>
+                <span class="min-w-0 truncate">{{ $stackHostname }}</span>
+            </div>
+            @if ($workload->stack->link())
+                <a class="{{ $linkItemClasses }}" href="{{ $workload->stack->link() }}" {{ wireNavigate() }}>
+                    <span class="shrink-0 rounded-md bg-neutral-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 ring-1 ring-neutral-500/20">
+                        Stack
+                    </span>
+                    <span class="min-w-0 truncate">Open {{ $workload->stack->name }}</span>
+                </a>
+            @endif
+        @endif
         @php
             $domainCertificates ??= $workload->domainCertificates();
         @endphp

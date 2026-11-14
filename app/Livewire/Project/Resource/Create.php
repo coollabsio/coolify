@@ -3,13 +3,17 @@
 namespace App\Livewire\Project\Resource;
 
 use App\Actions\Node\CreateClusterDatabaseWorkload;
+use App\Actions\Node\CreateClusterStack;
 use App\Enums\NodeDatabaseType;
 use App\Livewire\Project\New\DockerImage;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Rules\DockerImageFormat;
+use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -33,6 +37,10 @@ class Create extends Component
 
     #[Locked]
     public ?string $databaseImage = null;
+
+    /** Why a stack from a one-click service could not be created on a cluster (decision 0023). */
+    #[Locked]
+    public ?string $stackError = null;
 
     public function mount()
     {
@@ -80,6 +88,30 @@ class Create extends Component
                 'project_uuid' => $project->uuid,
                 'environment_uuid' => $environment->uuid,
                 'workload_uuid' => $workload->uuid,
+            ]);
+        }
+        if ($type->startsWith('one-click-service-') && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
+            $this->authorize('create', NodeStack::class);
+            $templates = get_service_templates();
+            $template = resolve_service_template_key($type->after('one-click-service-')->value(), $templates);
+            $compose = NodeStackCompose::templateCompose((string) $template, $templates);
+            abort_if($compose === null, 404);
+            [$cluster, $targetNode] = request()->filled('server')
+                ? DockerImage::resolveClusterTarget($project, 'node', (string) request()->query('server'))
+                : DockerImage::resolveClusterTarget($project, 'cluster', (string) request()->query('cluster'));
+            try {
+                $stack = CreateClusterStack::run($project, $environment, $cluster, $compose, auth()->user(), $targetNode, template: $template);
+            } catch (\RuntimeException|ValidationException $exception) {
+                // The picker renders below the reason.
+                $this->stackError = $exception->getMessage();
+
+                return;
+            }
+
+            return redirect()->route('project.cluster-stack.show', [
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $environment->uuid,
+                'stack_uuid' => $stack->uuid,
             ]);
         }
         if (isset($type) && isset($destination_uuid)) {

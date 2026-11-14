@@ -352,6 +352,8 @@
                                                 <span x-text="service.templateLastUpdated || 'Template ready'"></span>
                                             </p>
                                         </div>
+                                        <span x-show="service.nodesUnavailableReason" :title="service.nodesUnavailableReason"
+                                            class="shrink-0 rounded-md border border-neutral-300/60 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">Not available on Nodes</span>
                                         <span x-show="service.amd_only || service.arm_only"
                                             class="shrink-0 rounded-md border border-amber-300/50 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-warning/20 dark:bg-warning/10 dark:text-warning"
                                             x-text="service.arm_only ? 'ARM only' : 'AMD only'"></span>
@@ -696,10 +698,16 @@
             description="{{ match (true) {
                 in_array($type, ['public', 'private-gh-app', 'private-deploy-key'], true) => 'Build this Git repository on a cluster, or deploy it to a Docker server.',
                 \App\Enums\NodeDatabaseType::tryFrom((string) $type) !== null => 'Run this database on a cluster server, or on a Docker server.',
+                str_starts_with((string) $type, 'one-click-service-') => 'Run this service as a stack on a cluster server, or on a Docker server.',
                 default => 'Deploy this Docker image to a cluster or a Docker server.',
             } }}" flush>
             <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
-                @foreach($clusters ?? [] as $cluster)
+                @if ($nodesUnavailableReason !== null)
+                    <x-callout type="warning" title="Not available on Nodes" class="m-4">
+                        {{ $nodesUnavailableReason }} This service runs on Docker servers.
+                    </x-callout>
+                @endif
+                @foreach($nodesUnavailableReason === null ? ($clusters ?? []) : [] as $cluster)
                     <button type="button" wire:click="setCluster('{{ $cluster->uuid }}')"
                         class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">

@@ -2,6 +2,9 @@
     <x-slot:title>
         {{ data_get_str($project, 'name')->limit(10) }} > New | Coolify
     </x-slot>
+    @if ($stackError)
+        <x-callout type="danger" title="The stack could not be created" class="mb-4">{{ $stackError }}</x-callout>
+    @endif
     @if ($pendingType)
         <div wire:init="createResource" class="mx-auto flex max-w-md flex-col items-center pt-24 text-center">
             @if ($pendingLogo)

@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Resource;
 use App\Actions\Node\NotifyNodeReachability;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
+use App\Models\NodeStack;
 use App\Models\Project;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\VulnerabilityMarkers;
@@ -272,7 +273,7 @@ class Index extends Component
                 'uuid' => $workload->uuid,
                 'name' => $workload->name,
                 'type' => 'application',
-                'typeLabel' => 'Cluster application',
+                'typeLabel' => $workload->node_stack_id === null ? 'Cluster application' : 'Stack service',
                 'fqdn' => null,
                 'description' => $workload->revisions->first()?->image,
                 'status' => $status,
@@ -292,6 +293,42 @@ class Index extends Component
                 ],
                 'tags' => [],
             ];
-        })->values()->all();
+        })->concat($this->stacksToSearchableArray())->values()->all();
+    }
+
+    /** Stacks of Compose services on a cluster (decision 0023). Each service is listed as well. */
+    private function stacksToSearchableArray(): array
+    {
+        return NodeStack::query()
+            ->where('environment_id', $this->environment->id)
+            ->with('cluster:id,name')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (NodeStack $stack): array => [
+                'uuid' => $stack->uuid,
+                'name' => $stack->name,
+                'type' => 'service',
+                'typeLabel' => 'Cluster stack',
+                'fqdn' => null,
+                'description' => $stack->template,
+                'status' => match ($stack->deploy_status) {
+                    'deployed' => 'running',
+                    'queued', 'deploying' => 'starting',
+                    'failed' => 'failed',
+                    default => 'exited',
+                },
+                'restartLimitReached' => false,
+                'restartCount' => 0,
+                'maxRestartCount' => 0,
+                'server_status' => null,
+                'hrefLink' => route('project.cluster-stack.show', [
+                    'project_uuid' => $this->project->uuid,
+                    'environment_uuid' => $this->environment->uuid,
+                    'stack_uuid' => $stack->uuid,
+                ]),
+                'destination' => ['server' => ['name' => $stack->cluster?->name ?? 'Unknown']],
+                'tags' => [],
+            ])
+            ->all();
     }
 }

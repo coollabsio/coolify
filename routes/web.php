@@ -67,6 +67,7 @@ use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
 use App\Livewire\Project\ClusterApplication\Show as ClusterApplicationShow;
+use App\Livewire\Project\ClusterStack\Show as ClusterStackShow;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
@@ -441,6 +442,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
+        Route::get('cluster-stack/{stack_uuid}', ClusterStackShow::class)->name('project.cluster-stack.show');
         Route::prefix('cluster-application/{workload_uuid}')->group(function () {
             Route::get('/', ClusterApplicationShow::class)->name('project.cluster-application.show');
             Route::get('/domains', ClusterApplicationShow::class)->name('project.cluster-application.domains');

@@ -7,6 +7,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\Project;
 use App\Models\Server;
+use App\Services\NodeStack\NodeStackCompose;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -72,6 +73,10 @@ class Select extends Component
     /** The cluster query parameters of a PostgreSQL database while the user picks its image. */
     #[Locked]
     public array $clusterTarget = [];
+
+    /** Why the selected one-click service cannot run on a cluster, or null when it can (decision 0023). */
+    #[Locked]
+    public ?string $nodesUnavailableReason = null;
 
     public ?string $existingPostgresqlUrl = null;
 
@@ -139,12 +144,15 @@ class Select extends Component
     {
         $services = get_service_templates();
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
+        // Shown only when a cluster can be the destination (decision 0023).
+        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services) : [];
 
-        $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
+        $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap, $nodeReasons) {
             $serviceKey = (string) $key;
 
             return [
                 'id' => $serviceKey,
+                'nodesUnavailableReason' => $nodeReasons[$serviceKey] ?? null,
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
                 'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
@@ -462,8 +470,12 @@ class Select extends Component
 
             return;
         }
-        // Clusters run Docker images, build Git repositories, and run databases; Docker servers keep their flow.
-        if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null) && $this->clusters?->isNotEmpty()) {
+        if (str_starts_with($type, 'one-click-service-') && $this->clusters?->isNotEmpty()) {
+            $template = resolve_service_template_key(str($type)->after('one-click-service-')->value());
+            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons()[$template] ?? null;
+        }
+        // Clusters run Docker images, build Git repositories, databases, and one-click services; Docker servers keep their flow.
+        if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) && $this->clusters?->isNotEmpty()) {
             $this->current_step = 'targets';
 
             return;
@@ -552,6 +564,11 @@ class Select extends Component
      */
     private function createOnCluster(array $target)
     {
+        if (str_starts_with((string) $this->type, 'one-click-service-') && $this->nodesUnavailableReason !== null) {
+            $this->dispatch('error', 'Not available on Nodes. '.$this->nodesUnavailableReason);
+
+            return null;
+        }
         if (($this->type ?? null) === NodeDatabaseType::POSTGRESQL->value) {
             $this->clusterTarget = $target;
             $this->current_step = 'select-postgresql-type';
@@ -571,7 +588,7 @@ class Select extends Component
     private function clusterResourceType(): string
     {
         $type = $this->type ?? '';
-        if (in_array($type, self::CLUSTER_BUILD_TYPES, true) || NodeDatabaseType::tryFrom($type) !== null) {
+        if (in_array($type, self::CLUSTER_BUILD_TYPES, true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) {
             return $type;
         }
 

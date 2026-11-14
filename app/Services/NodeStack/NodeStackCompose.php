@@ -2,6 +2,8 @@
 
 namespace App\Services\NodeStack;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -73,6 +75,43 @@ class NodeStackCompose
         }
 
         return null;
+    }
+
+    /** The Compose file of a one-click service template, or null when it has none. */
+    public static function templateCompose(string $template, ?Collection $templates = null): ?string
+    {
+        $encoded = data_get(($templates ?? get_service_templates())->get($template), 'compose');
+        $compose = is_string($encoded) ? base64_decode($encoded, true) : false;
+
+        return $compose === false || $compose === '' ? null : $compose;
+    }
+
+    /**
+     * Why each one-click service template cannot run on Nodes, keyed by template. A template that
+     * can run is absent. Cached for the current template set.
+     *
+     * @return array<string, string>
+     */
+    public static function templateUnavailableReasons(?Collection $templates = null): array
+    {
+        $templates ??= get_service_templates();
+        $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
+
+        return Cache::remember('node-stack-template-availability:'.md5($composes->toJson()), now()->addDay(), function () use ($composes): array {
+            $reasons = [];
+            foreach ($composes as $key => $encoded) {
+                try {
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)));
+                } catch (RuntimeException $exception) {
+                    $reason = $exception->getMessage();
+                }
+                if ($reason !== null) {
+                    $reasons[(string) $key] = $reason;
+                }
+            }
+
+            return $reasons;
+        });
     }
 
     /** @param  array<string, mixed>  $service */
