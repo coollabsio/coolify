@@ -164,7 +164,10 @@ differ from the decision above:
   created.
 - **Health check.** The Compose health check is kept in
   `node_workloads.stack_health_check`. It applies until the user turns on the
-  Coolify health check of the application.
+  Coolify health check of the application. A `CMD` test is sent as a JSON
+  array, which Podman runs without a shell, so images without `/bin/sh` keep
+  their check. It needs `workload.healthcheck.exec.v1` (Sentinel `46b61ce`);
+  `CMD-SHELL` stays a shell command.
 - **One-time services.** A service that another service waits for with
   `service_completed_successfully` gets restart policy `no`. The reconciler
   does not start a one-time container again after it ran.
