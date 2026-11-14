@@ -49,6 +49,12 @@ class RollbackNodeWorkload
         if ($nodes->isEmpty()) {
             throw new RuntimeException('This application has no server. Move it to a server first.');
         }
+        // The rollback revision becomes the latest revision, which reconciliation deploys later anyway. Check every
+        // server first, so a rollback that reports an error does not run afterwards. The rollback keeps the
+        // current settings, so the current revision has its resource reservations.
+        foreach ($nodes as $node) {
+            EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $current);
+        }
 
         if ($this->registryHasImage($workload, $nodes->first(), $revision->image) === false) {
             return ['operation' => null, 'build' => StartNodeBuild::run($workload, $user, rebuildOf: $this->buildOf($workload, $revision))];
