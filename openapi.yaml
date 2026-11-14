@@ -4962,6 +4962,87 @@ paths:
       security:
         -
           bearerAuth: []
+  '/cluster-applications/{uuid}/revisions':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: 'List Revisions'
+      description: 'List the latest 50 revisions of a cluster application, newest first. Environment variables and secrets are not returned.'
+      operationId: list-cluster-application-revisions
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The revisions of the cluster application.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { uuid: { type: string }, image: { type: string }, commit_sha: { type: [string, 'null'] }, created_at: { type: string, format: date-time }, current: { description: 'The latest revision, which deploys next.', type: boolean }, last_deployment: { properties: { uuid: { type: string }, status: { type: string }, server: { type: [string, 'null'] }, finished_at: { type: [string, 'null'], format: date-time } }, type: [object, 'null'] }, can_roll_back: { description: 'An earlier image that deployed successfully.', type: boolean } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/rollback':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Roll Back'
+      description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When the cluster registry no longer has the image, Coolify builds the same commit again and deploys the result.'
+      operationId: rollback-cluster-application
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - revision_uuid
+              properties:
+                revision_uuid:
+                  description: 'UUID of the revision to roll back to, from List Revisions.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The rollback is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  deployment_uuid: { type: [string, 'null'] }
+                  build_uuid: { description: 'Set when Coolify builds the image again.', type: [string, 'null'] }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/databases/{uuid}/imports/uploads':
     post:
       tags:
@@ -19469,6 +19550,9 @@ tags:
   -
     name: 'Cloud Tokens'
     description: 'Cloud Tokens'
+  -
+    name: 'Cluster Applications'
+    description: 'Cluster Applications'
   -
     name: Databases
     description: Databases
