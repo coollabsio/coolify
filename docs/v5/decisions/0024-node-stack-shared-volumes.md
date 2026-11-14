@@ -1,6 +1,6 @@
 # Decision 0024: Share a volume between the services of one stack
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-14**
 
