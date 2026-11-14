@@ -1,13 +1,27 @@
 <?php
 
+use App\Actions\Node\ApplyNodeClusterNetworkRevision;
+use App\Actions\Node\BackupNodeVolume;
 use App\Actions\Node\BuildNodeClusterIngressRoutes;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateClusterStack;
+use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\CreateMoveOperation;
+use App\Actions\Node\DeleteNodeVolumeData;
 use App\Actions\Node\DispatchWorkloadDeployment;
+use App\Actions\Node\FetchContainers as FetchContainersAction;
+use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\ReconcileNodeWorkloads;
+use App\Actions\Node\RemoveNodeVolume;
+use App\Actions\Node\RestoreNodeVolume;
+use App\Enums\NodeOperationStatus;
 use App\Jobs\DeleteNodeStackJob;
+use App\Jobs\DeleteNodeWorkloadJob;
 use App\Jobs\DeployNodeStackJob;
+use App\Jobs\MoveNodeWorkloadJob;
+use App\Livewire\Project\ClusterApplication\Show as ClusterApplicationShow;
 use App\Livewire\Project\ClusterStack\Show as ClusterStackShow;
 use App\Livewire\Project\New\Select;
 use App\Models\Environment;
@@ -17,9 +31,11 @@ use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeStack;
+use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
@@ -611,5 +627,412 @@ describe('authorization', function () {
 
         expect(NodeStack::query()->count())->toBe(0)
             ->and(NodeWorkload::query()->count())->toBe(0);
+    });
+});
+
+/** A stack whose services share a volume (decision 0024): init writes, app uses, reader reads only. */
+function sharedVolumeCompose(): string
+{
+    return <<<'YAML'
+services:
+  init:
+    image: busybox
+    command: ["sh", "-c", "echo ok > /data/ready"]
+    volumes:
+      - data:/data
+  reader:
+    image: nginx
+    volumes:
+      - data:/usr/share/nginx/html:ro
+  app:
+    image: nginx
+    volumes:
+      - data:/data
+      - app-cache:/cache
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      reader:
+        condition: service_started
+  web:
+    image: nginx
+    volumes:
+      - web-data:/data
+YAML;
+}
+
+/** @return list<string> */
+function sharedVolumeCapabilities(): array
+{
+    return stackNodeCapabilities([
+        'volume.delete.v1', 'volume.serve.v1', 'volume.receive.v1', 'volume.transfer.v1', 'volume.verify.v1',
+        'workload.stop_timeout.v1', 'volume.backup.v1', 'volume.restore.v1',
+    ]);
+}
+
+/**
+ * Deploys the stack revisions (with their mounts) on the Node, pins the volumes there, and records a
+ * running container for each service except init, which ran once. Fakes Flux with fakeSharedVolumeFlux().
+ *
+ * @return ArrayObject<string, array<string, array<string, mixed>>> Containers by server UUID and name.
+ */
+function deploySharedStack(NodeStack $stack, Node $node, ?ArrayObject $log = null): ArrayObject
+{
+    $containers = new ArrayObject;
+    foreach ($stack->workloads()->get() as $index => $workload) {
+        $revision = PrepareNodeWorkloadRevision::run($workload);
+        $workload->update(['desired_state' => 'running']);
+        $workload->nodes()->updateExistingPivot($node->id, ['container_ip' => '10.250.1.'.($index + 2)]);
+        $name = 'coolify-'.$workload->uuid.'-main';
+        $containers[$node->uuid] = [...($containers[$node->uuid] ?? []), $name => [
+            'runtime_id' => 'runtime-'.$workload->stack_service,
+            'name' => $name,
+            'image' => $revision->image,
+            'state' => $workload->stack_service === 'init' ? 'exited' : 'running',
+            'exit_code' => $workload->stack_service === 'init' ? 0 : null,
+            'health_status' => null,
+            'restart_count' => 0,
+            'ports' => [],
+            'labels' => [
+                'coolify.managed' => 'true',
+                'coolify.instance' => 'instance-test',
+                'coolify.workload' => $workload->uuid,
+                'coolify.revision' => $revision->uuid,
+                'coolify.component' => 'main',
+            ],
+        ]];
+    }
+    NodeVolume::query()->where('team_id', $stack->team_id)->update(['node_id' => $node->id]);
+    fakeSharedVolumeFlux($stack, $containers, $log ?? new ArrayObject);
+    FetchContainersAction::run($node);
+
+    return $containers;
+}
+
+/**
+ * Fakes Flux for moves and restores of shared volumes: containers per server, lifecycle actions,
+ * the volume transfer, the restore steps, and volume deletion. Each command goes to $log.
+ *
+ * @param  ArrayObject<string, array<string, array<string, mixed>>>  $containers
+ */
+function fakeSharedVolumeFlux(NodeStack $stack, ArrayObject $containers, ArrayObject $log): void
+{
+    Http::fake(function (Request $request) use ($stack, $containers, $log) {
+        $data = $request->data();
+        $command = Str::afterLast($request->url(), '/');
+        $server = $data['server_id'] ?? '';
+        $service = fn (string $name): ?string => NodeWorkload::query()->where('node_stack_id', $stack->id)->get()
+            ->first(fn (NodeWorkload $workload): bool => str_starts_with($name, 'coolify-'.$workload->uuid))?->stack_service;
+        $now = 1_700_000_000_000 + count($log);
+        switch ($command) {
+            case 'workload.deploy':
+                $log[] = "deploy {$service($data['name'])} on {$server}";
+                $exits = $service($data['name']) === 'init';
+                $containers[$server] = [...($containers[$server] ?? []), $data['name'] => [
+                    'runtime_id' => 'runtime-'.Str::random(6), 'name' => $data['name'], 'image' => $data['image'],
+                    'state' => $exits ? 'exited' : 'running', 'exit_code' => $exits ? 0 : null, 'health_status' => null,
+                    'restart_count' => 0, 'ports' => [], 'labels' => $data['labels'],
+                ]];
+
+                return Http::response(['command_id' => $data['command_id'], 'observed_at_unix_ms' => $now, 'runtime_id' => $containers[$server][$data['name']]['runtime_id'], 'name' => $data['name'], 'image' => $data['image']]);
+            case 'workload.lifecycle':
+                $log[] = "{$data['action']} {$service($data['name'])} on {$server}";
+                $current = $containers[$server] ?? [];
+                if ($data['action'] === 'remove') {
+                    unset($current[$data['name']]);
+                } elseif (isset($current[$data['name']])) {
+                    $current[$data['name']]['state'] = $data['action'] === 'stop' ? 'exited' : 'running';
+                }
+                $containers[$server] = $current;
+
+                return Http::response(['command_id' => $data['command_id'], 'observed_at_unix_ms' => $now, 'name' => $data['name'], 'action' => $data['action']]);
+            case 'container.list':
+                return Http::response(['command_id' => 'inventory', 'observed_at_unix_ms' => $now, 'containers' => array_values($containers[$server] ?? [])]);
+            case 'volume.serve':
+                if (! ($data['stop'] ?? false)) {
+                    $log[] = 'serve '.implode(',', $data['names']);
+                }
+
+                return Http::response(['command_id' => $data['command_id'], 'observed_at_unix_ms' => $now, 'address' => '10.240.0.1', 'port' => 8730, 'volumes' => array_map(fn (string $name): array => ['name' => $name, 'used_bytes' => 10], $data['names'] ?? [])]);
+            case 'volume.receive':
+                $log[] = "receive {$data['pass']}";
+
+                return Http::response(['command_id' => $data['command_id'], 'observed_at_unix_ms' => $now, 'state' => 'succeeded', 'bytes_total' => 10, 'bytes_done' => 10]);
+            case 'volume.restore':
+                $log[] = "restore {$data['step']}";
+
+                return Http::response(['command_id' => $data['command_id'], 'state' => 'succeeded', 'bytes_total' => 10, 'bytes_done' => 10]);
+            case 'volume.delete':
+                $log[] = 'delete '.implode(',', $data['names']);
+
+                return Http::response(['command_id' => $data['command_id'], 'observed_at_unix_ms' => $now, 'deleted' => $data['names'], 'missing' => []]);
+        }
+        $log[] = "unexpected {$command}";
+
+        return Http::response('unexpected', 500);
+    });
+}
+
+describe('shared volumes', function () {
+    beforeEach(function () {
+        Sleep::fake(syncWithCarbon: true);
+        Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => sharedVolumeCapabilities()]);
+    });
+
+    it('maps a volume that two services mount to one stack volume with the mode of each service', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        $data = $stack->volumes()->sole();
+
+        expect($data->name)->toBe('data')
+            ->and($data->node_workload_id)->toBeNull()
+            ->and($data->mounts()->get()->mapWithKeys(fn ($mount): array => [$services->firstWhere('id', $mount->node_workload_id)->stack_service => [$mount->mount_path, $mount->read_only]])->sortKeys()->all())
+            ->toBe(['app' => ['/data', false], 'init' => ['/data', false], 'reader' => ['/usr/share/nginx/html', true]])
+            ->and($services['app']->volumes()->pluck('mount_path', 'name')->all())->toBe(['app-cache' => '/cache'])
+            ->and($services['web']->volumes()->pluck('mount_path', 'name')->all())->toBe(['web-data' => '/data'])
+            ->and($services['web']->stackVolumes()->exists())->toBeFalse()
+            ->and(collect($services['app']->volumeMounts())->map(fn (array $mount): array => [$mount['container_path'], $mount['read_only']])->all())
+            ->toBe([['/cache', false], ['/data', false]])
+            ->and($services['reader']->volumeMounts())->toBe([[
+                'volume_uuid' => $data->uuid,
+                'volume_name' => 'coolify-vol-'.$data->uuid,
+                'container_path' => '/usr/share/nginx/html',
+                'read_only' => true,
+            ]])
+            ->and($services['reader']->description)->toBeNull()
+            ->and($services['app']->volumeGroup()->pluck('stack_service')->all())->toBe(['app', 'init', 'reader'])
+            ->and($services['web']->volumeGroup()->pluck('stack_service')->all())->toBe(['web']);
+    });
+
+    it('mounts the volumes of another service with volumes_from, read-only with :ro', function () {
+        $stack = createStack($this, <<<'YAML'
+services:
+  app:
+    image: nginx
+    volumes:
+      - ./uploads:/app/uploads
+      - cache:/cache
+  worker:
+    image: nginx
+    volumes:
+      - ./uploads/:/srv/uploads:ro
+  reader:
+    image: nginx
+    volumes_from:
+      - app:ro
+  peer:
+    image: nginx
+    volumes_from: [worker]
+YAML);
+        $mounts = fn (string $service): array => collect($stack->workloads()->where('stack_service', $service)->sole()->volumeMounts())
+            ->map(fn (array $mount): string => $mount['container_path'].($mount['read_only'] ? ':ro' : ''))->all();
+
+        // The relative bind ./uploads is one volume for app and worker (`./uploads/` is the same directory).
+        expect($stack->volumes()->pluck('name')->all())->toBe(['uploads', 'cache'])
+            ->and($mounts('app'))->toBe(['/app/uploads', '/cache'])
+            ->and($mounts('worker'))->toBe(['/srv/uploads:ro'])
+            ->and($mounts('reader'))->toBe(['/app/uploads:ro', '/cache:ro'])
+            ->and($mounts('peer'))->toBe(['/srv/uploads:ro'])
+            ->and(NodeVolume::query()->whereNotNull('node_workload_id')->count())->toBe(0);
+    });
+
+    it('rejects volumes_from of a container or of a service that the stack does not have', function (string $entry, string $reason) {
+        $yaml = NodeStackCompose::parse("services:\n  web:\n    image: nginx\n    volumes_from: ['{$entry}']\n");
+
+        expect(NodeStackCompose::unavailableReason($yaml))->toBe($reason);
+    })->with([
+        'container' => ['container:other', 'The service web mounts the volumes of the container other (volumes_from), which is not a service of this stack.'],
+        'missing service' => ['db:ro', 'The service web mounts the volumes of db (volumes_from), which is not a service of this stack.'],
+    ]);
+
+    it('pins every service of a stack volume to its server and blocks a deploy on another server', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $other = stackNode($this->team, $this->cluster, 'node-b', '203.0.113.20', sharedVolumeCapabilities());
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        $stack->volumes()->sole()->update(['node_id' => $this->node->id]);
+        $services['reader']->nodes()->sync([$other->id]);
+        $revision = PrepareNodeWorkloadRevision::run($services['reader']);
+
+        expect(fn () => CreateDeploymentOperation::run($other, $revision, $this->user))
+            ->toThrow(RuntimeException::class, 'The service reader shares the volume data with init, app on server node-a, so it runs only there. Move the service to move all of them.');
+        expect(NodeOperation::query()->where('node_workload_id', $services['reader']->id)->exists())->toBeFalse();
+    });
+
+    it('deploys a service with a writable stack volume stop-then-start, and a read-only one rolling', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => [...sharedVolumeCapabilities(), DispatchWorkloadDeployment::ROLLING_CAPABILITY]]);
+        deploySharedStack($stack, $this->node);
+        $plan = function (string $service) use ($stack): array {
+            $workload = $stack->workloads()->where('stack_service', $service)->sole();
+            $operation = NodeOperation::factory()->create([
+                'node_id' => $this->node->id,
+                'node_workload_id' => $workload->id,
+                'node_workload_revision_id' => $workload->revisions()->latest('id')->first()->id,
+                'command_type' => 'workload.deploy.v1',
+                'request' => [],
+            ]);
+
+            return DispatchWorkloadDeployment::containerPlan($operation, $workload->volumeMounts());
+        };
+
+        expect($plan('app')['replaces'])->toBeNull()
+            ->and($plan('reader')['replaces'])->not->toBeNull();
+    });
+
+    it('moves the whole volume group with one copy of each volume and starts it in depends_on order', function () {
+        ApplyNodeClusterNetworkRevision::shouldRun()->andReturnNull();
+        QueueNodeClusterNetworkRevision::shouldRun()->andReturn(true);
+        $stack = createStack($this, sharedVolumeCompose());
+        $target = stackNode($this->team, $this->cluster, 'node-b', '203.0.113.20', sharedVolumeCapabilities());
+        $log = new ArrayObject;
+        deploySharedStack($stack, $this->node, $log);
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        $volumes = NodeVolume::query()->where('team_id', $this->team->id)->get()->keyBy('name');
+
+        $operation = CreateMoveOperation::run($this->node, $target, $services['reader']->revisions()->latest('id')->first(), $this->user);
+        (new MoveNodeWorkloadJob($operation->id))->handle();
+
+        $a = $this->node->uuid;
+        $b = $target->uuid;
+        expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
+            ->and(collect($operation->request['group'])->pluck('workload_uuid')->all())->toBe([$services['init']->uuid, $services['app']->uuid])
+            ->and($log->getArrayCopy())->toBe([
+                'serve coolify-vol-'.$volumes['app-cache']->uuid.',coolify-vol-'.$volumes['data']->uuid,
+                'receive warm',
+                "stop reader on {$a}",
+                "stop app on {$a}",
+                'receive final',
+                'receive verify',
+                "deploy init on {$b}",
+                "deploy reader on {$b}",
+                "deploy app on {$b}",
+                "remove reader on {$a}",
+                "remove init on {$a}",
+                "remove app on {$a}",
+            ])
+            ->and($volumes['data']->refresh()->node_id)->toBe($target->id)
+            ->and($volumes['app-cache']->refresh()->node_id)->toBe($target->id)
+            ->and($volumes['web-data']->refresh()->node_id)->toBe($this->node->id)
+            ->and($services->only(['init', 'reader', 'app'])->every(fn (NodeWorkload $workload): bool => $workload->nodes()->pluck('nodes.id')->all() === [$target->id]))->toBeTrue()
+            ->and($services['web']->nodes()->pluck('nodes.id')->all())->toBe([$this->node->id]);
+    });
+
+    it('blocks deploys of every service of the group while the group moves', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $target = stackNode($this->team, $this->cluster, 'node-b', '203.0.113.20', sharedVolumeCapabilities());
+        deploySharedStack($stack, $this->node);
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        CreateMoveOperation::run($this->node, $target, $services['app']->revisions()->latest('id')->first(), $this->user);
+
+        expect($services['reader']->hasActiveMove())->toBeTrue()
+            ->and($services['web']->hasActiveMove())->toBeFalse()
+            ->and(fn () => CreateDeploymentOperation::run($this->node, $services['init']->revisions()->latest('id')->first(), $this->user))
+            ->toThrow(RuntimeException::class, 'moving with its volumes')
+            ->and(fn () => CreateMoveOperation::run($this->node, $target, $services['reader']->revisions()->latest('id')->first(), $this->user))
+            ->toThrow(RuntimeException::class, 'A service of this volume group already has an active move.');
+    });
+
+    it('restores a stack volume by stopping every service that mounts it and starting them in depends_on order', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $log = new ArrayObject;
+        deploySharedStack($stack, $this->node, $log);
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        $data = $stack->volumes()->sole();
+        $s3 = S3Storage::query()->create(['team_id' => $this->team->id, 'name' => 'Backups', 'region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret', 'bucket' => 'backups', 'endpoint' => 'https://8.8.8.8', 'is_usable' => true]);
+        $backup = $data->scheduledBackups()->create(['team_id' => $this->team->id, 's3_storage_id' => $s3->id, 'frequency' => '0 0 * * *', 'enabled' => true, 'save_s3' => true, 'disable_local_backup' => true]);
+        $execution = $backup->executions()->create(['status' => 'success', 'filename' => 'volume-backups/x.tar.zst', 'sha256' => str_repeat('a', 64), 'size' => 10, 's3_storage_id' => $s3->id]);
+
+        $operation = RestoreNodeVolume::queue($data, $execution, $this->node, $this->user, $services['app']);
+        (new MoveNodeWorkloadJob($operation->id))->handle();
+
+        $a = $this->node->uuid;
+        expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
+            ->and($log->getArrayCopy())->toBe([
+                'restore download',
+                "stop app on {$a}",
+                "stop reader on {$a}",
+                'restore switch',
+                "start reader on {$a}",
+                "start app on {$a}",
+            ]);
+    });
+
+    it('keeps a backup of a shared volume from stopping a container', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $data = $stack->volumes()->sole();
+        $backup = $data->scheduledBackups()->create(['team_id' => $this->team->id, 'frequency' => '0 0 * * *', 'stop_during_backup' => true]);
+
+        expect(fn () => BackupNodeVolume::ensureCanStopDuringBackup($backup, $data))->toThrow(RuntimeException::class, BackupNodeVolume::SHARED_STOP_ERROR);
+    });
+
+    it('keeps a stack volume while a service mounts it, and deletes it with the stack', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $log = new ArrayObject;
+        deploySharedStack($stack, $this->node, $log);
+        $services = $stack->workloads()->get()->keyBy('stack_service');
+        $data = $stack->volumes()->sole();
+
+        (new DeleteNodeWorkloadJob($services['reader']->id, $this->user->id))->handle();
+
+        expect($data->refresh()->mountingWorkloads()->pluck('stack_service')->all())->toBe(['init', 'app'])
+            ->and(fn () => DeleteNodeVolumeData::run($data))->toThrow(RuntimeException::class, 'The services init, app still mount this volume.')
+            ->and(RemoveNodeVolume::run($data, $services['init']))->toBe('detached')
+            ->and($data->mountingWorkloads()->pluck('stack_service')->all())->toBe(['app']);
+
+        $log->exchangeArray([]);
+        (new DeleteNodeStackJob($stack->id, $this->user->id))->handle();
+
+        expect(NodeStack::query()->count())->toBe(0)
+            ->and(NodeVolume::query()->count())->toBe(0)
+            ->and($log->getArrayCopy())->toContain('delete coolify-vol-'.$data->uuid);
+    });
+
+    it('deletes an unmounted stack volume from the stack page, which a member cannot do', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $data = $stack->volumes()->sole();
+        $data->mounts()->delete();
+        $parameters = ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid];
+        $member = User::factory()->create();
+        $this->team->members()->attach($member, ['role' => 'member']);
+
+        $this->actingAs($member);
+        Cache::flush();
+        Livewire::test(ClusterStackShow::class, $parameters)->call('deleteVolume', $data->uuid)->assertForbidden();
+        expect($data->fresh())->not->toBeNull();
+
+        $this->actingAs($this->user);
+        Cache::flush();
+        $this->get(route('project.cluster-stack.show', $parameters))->assertSuccessful()->assertSee('Shared volumes')->assertSee('No service mounts this volume.');
+        Livewire::test(ClusterStackShow::class, $parameters)->call('deleteVolume', $data->uuid)->assertDispatched('success');
+        expect($data->fresh())->toBeNull();
+    });
+
+    it('shows Shared with on the storage page of a service and keeps members from removing it', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $app = $stack->workloads()->where('stack_service', 'app')->sole();
+        $data = $stack->volumes()->sole();
+        $parameters = ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'workload_uuid' => $app->uuid];
+
+        $this->get(route('project.cluster-application.storage', $parameters))->assertSuccessful()->assertSee('Shared with: init, reader');
+
+        $member = User::factory()->create();
+        $this->team->members()->attach($member, ['role' => 'member']);
+        $this->actingAs($member);
+        Cache::flush();
+        Livewire::test(ClusterApplicationShow::class, $parameters)->call('removeVolume', $data->uuid)->assertNotDispatched('success');
+        expect($data->mounts()->count())->toBe(3);
+    });
+
+    it('hides the stack volumes of another team', function () {
+        $stack = createStack($this, sharedVolumeCompose());
+        $other = User::factory()->create();
+        $otherTeam = $other->teams()->firstOrFail();
+        $otherTeam->update(['show_boarding' => false]);
+        $this->actingAs($other);
+        session(['currentTeam' => $otherTeam]);
+        Cache::flush();
+
+        $this->get(route('project.cluster-stack.show', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid]))
+            ->assertNotFound();
     });
 });

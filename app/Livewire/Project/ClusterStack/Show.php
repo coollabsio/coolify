@@ -73,8 +73,8 @@ class Show extends Component
     /** Deletes a shared volume that no service of the stack mounts anymore (decision 0024). */
     public function deleteVolume(string $volumeUuid): void
     {
+        $this->authorize('update', $this->stack);
         try {
-            $this->authorize('update', $this->stack);
             $volume = NodeVolume::query()
                 ->where('node_stack_id', $this->stack->id)
                 ->where('team_id', $this->stack->team_id)

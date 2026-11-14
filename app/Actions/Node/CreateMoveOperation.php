@@ -107,7 +107,7 @@ class CreateMoveOperation
     {
         $members = $workload->volumeGroup();
         if ($members->count() > 1) {
-            NodeWorkload::query()->withoutGlobalScopes()->whereKey($members->modelKeys())->lockForUpdate()->get();
+            NodeWorkload::query()->withoutGlobalScopes()->whereKey($members->pluck('id')->all())->lockForUpdate()->get();
         }
 
         return $members->map(function (NodeWorkload $member) use ($workload, $source, $revision): array {
