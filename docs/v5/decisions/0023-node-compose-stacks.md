@@ -120,3 +120,53 @@ port publishing.
   created.
 - Rollback of a whole stack to one point in time.
 - Conversion of a v4 service on a legacy server to a stack.
+
+## Implementation (step 1, 2026-11-14)
+
+Step 1 is built: `NodeStack`, `NodeStackCompose` (availability),
+`NodeStackComposeMapper` (services to workloads), `CreateClusterStack`,
+`DeployNodeStackJob`, `DeleteNodeStackJob`, and the stack page. These points
+differ from the decision above:
+
+- **Parser.** The v4 service parser writes the records of a v4 service, so a
+  stack does not call it. `NodeStackComposeMapper` reuses its helpers
+  (`parseServiceEnvironmentVariable`, `parseCommandFromMagicEnvVariable`,
+  `generateEnvValue`, `generateDockerComposeServiceName`) and keeps their
+  meaning. It also resolves the Compose interpolation (`${VAR:-default}`,
+  `$$`) itself, because a workload has no `.env` file. The generated
+  `SERVICE_*` values are stored once, encrypted, in `node_stacks.variables`.
+  Each service gets its values as environment variables of its own
+  application. A change to a value in one service does not change it in the
+  other services.
+- **Templates on Nodes.** 291 of the 388 templates run on Nodes, not 316:
+  - 20 templates share a volume between two services, or use `volumes_from`.
+    A Node volume belongs to one workload (decision 0007).
+  - 5 more templates have a service name with `_`, for example `rallly_db`.
+    Sentinel rejects the whole name table for one name with `_`.
+  - The decision counts `.yaml` files only. `templates/compose` also has 4
+    `.yml` templates.
+- **Traffic.** Sentinel firewall rules need a port, and no all-ports rule
+  exists. Coolify sends `stack_rules` (`source_ip`, `destination_ip`) in
+  `network.firewall.reconcile` only to Nodes that report
+  `network.firewall.stack_rules.v1`. Sentinel does not have that capability
+  yet, so the services of a stack reach each other only through firewall
+  rules that the user adds.
+- **Entrypoint.** A workload has no entrypoint field. The Compose
+  `entrypoint` becomes the first words of the command, after the entrypoint
+  of the image. A note on the service says this.
+- **Ignored keys.** `user`, `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`,
+  `deploy`, `tty`, and `stdin_open` are ignored, with a note on the service.
+  Read-only volumes are mounted read-write. A service with `profiles` is not
+  created.
+- **Health check.** The Compose health check is kept in
+  `node_workloads.stack_health_check`. It applies until the user turns on the
+  Coolify health check of the application.
+- **One-time services.** A service that another service waits for with
+  `service_completed_successfully` gets restart policy `no`. The reconciler
+  does not start a one-time container again after it ran.
+- **Deploy order.** A stack deploy deploys one service after another, in
+  `depends_on` order, through the normal deployment of each application. The
+  first failure stops the deploy and names the services that were not
+  deployed. A dependency cycle fails when the stack is created.
+- **Images.** An image without a tag gets `:latest`, as the container
+  inventory reports it.
