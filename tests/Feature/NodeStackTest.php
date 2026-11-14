@@ -281,6 +281,15 @@ describe('mapping', function () {
         ['100$', '100$'],
     ]);
 
+    it('tags an image without a tag as latest, as the inventory reports it', function (string $image, string $expected) {
+        expect(NodeStackComposeMapper::taggedImage($image))->toBe($expected);
+    })->with([
+        ['docker.io/searxng/searxng', 'docker.io/searxng/searxng:latest'],
+        ['localhost:5000/app', 'localhost:5000/app:latest'],
+        ['docker.io/library/redis:7', 'docker.io/library/redis:7'],
+        ['ghcr.io/acme/app@sha256:abc', 'ghcr.io/acme/app@sha256:abc'],
+    ]);
+
     it('gives each stack of a cluster its own DNS label and never a reserved one', function () {
         $first = createStack($this, "services:\n  web:\n    image: nginx\n", 'default');
         $second = createStack($this, "services:\n  web:\n    image: nginx\n", 'default');

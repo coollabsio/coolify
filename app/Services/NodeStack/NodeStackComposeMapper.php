@@ -161,7 +161,7 @@ class NodeStackComposeMapper
 
             $services[] = [
                 'service' => $name,
-                'image' => CreateClusterDockerImageWorkload::qualifiedImage(self::interpolate((string) $service['image'], $variables)),
+                'image' => self::taggedImage(CreateClusterDockerImageWorkload::qualifiedImage(self::interpolate((string) $service['image'], $variables))),
                 'command' => $command,
                 'environment' => $environment,
                 'routes' => self::routes($service, $variables),
@@ -178,6 +178,21 @@ class NodeStackComposeMapper
         }
 
         return $services;
+    }
+
+    /**
+     * Adds `:latest` to an image without a tag or digest, as Podman reports it in the inventory, so
+     * the deployment can match the running container to the revision.
+     */
+    public static function taggedImage(string $image): string
+    {
+        if (str_contains($image, '@')) {
+            return $image;
+        }
+        $lastSlash = strrpos($image, '/');
+        $lastColon = strrpos($image, ':');
+
+        return $lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash) ? $image : $image.':latest';
     }
 
     /**
