@@ -2,7 +2,6 @@
 
 namespace App\Actions\Node;
 
-use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeRegistry;
@@ -61,26 +60,23 @@ class CreateMoveOperation
             if (NodeRegistry::isLocalImage($revision->image)) {
                 throw new RuntimeException('The image of this application is only on '.$source->name.'. Deploy the application again, so that it is stored in the cluster registry, then move it.');
             }
-            $hasActiveMove = NodeOperation::query()
-                ->where('node_workload_id', $workload->id)
-                ->where('command_type', 'workload.move.v1')
-                ->whereIn('status', [
-                    NodeOperationStatus::QUEUED,
-                    NodeOperationStatus::DISPATCHED,
-                    NodeOperationStatus::RUNNING,
-                    NodeOperationStatus::VERIFYING,
-                    NodeOperationStatus::UNCERTAIN,
-                ])
-                ->exists();
-            if ($hasActiveMove) {
-                throw new RuntimeException('This workload already has an active move.');
+            // The services that share stack volumes with this one move with it (decision 0024).
+            $group = self::group($workload, $source, $revision);
+            if (NodeOperation::movingWorkloadIds($group->pluck('workload.id')->all()) !== []) {
+                throw new RuntimeException($group->count() > 1 ? 'A service of this volume group already has an active move.' : 'This workload already has an active move.');
             }
+            $workloads = $group->pluck('workload');
             $recoveryBackups = null;
             if ($recovery) {
-                $recoveryBackups = array_map(fn (ScheduledVolumeBackupExecution $execution): string => $execution->uuid, self::recoveryBackups($workload, $source, $target, $restore));
+                $recoveryBackups = array_map(fn (ScheduledVolumeBackupExecution $execution): string => $execution->uuid, self::recoveryBackups($workloads, $source, $target, $restore));
             } elseif ($source->id !== $target->id) {
-                self::volumesToTransfer($workload, $source, $target);
+                self::volumesToTransfer($workloads, $source, $target);
             }
+            $members = $group->slice(1)->map(fn (array $member): array => [
+                'workload_id' => $member['workload']->id,
+                'workload_uuid' => $member['workload']->uuid,
+                'revision_id' => $member['revision']->id,
+            ])->values()->all();
 
             return CreateOperation::run(
                 $source,
@@ -93,6 +89,7 @@ class CreateMoveOperation
                     'target_node_uuid' => $target->uuid,
                     ...($restore === null ? [] : ['restore' => $restore]),
                     ...($recoveryBackups === null ? [] : ['recovery' => $recoveryBackups]),
+                    ...($members === [] ? [] : ['group' => $members]),
                 ],
                 $requestedBy,
             );
@@ -100,14 +97,49 @@ class CreateMoveOperation
     }
 
     /**
-     * The volumes that a stateful move copies from the source: every volume with data on the
-     * source. Throws when a volume is on another Node or a Node cannot take part in the copy.
+     * The workload and the other services of its volume group (decision 0024), each with the
+     * revision that the move deploys on the target: its latest one. The workload is first. Every
+     * service of the group must run on the source, because its stack volumes are there.
      *
+     * @return Collection<int, array{workload: NodeWorkload, revision: NodeWorkloadRevision}>
+     */
+    public static function group(NodeWorkload $workload, Node $source, ?NodeWorkloadRevision $revision = null): Collection
+    {
+        $members = $workload->volumeGroup();
+        if ($members->count() > 1) {
+            NodeWorkload::query()->withoutGlobalScopes()->whereKey($members->modelKeys())->lockForUpdate()->get();
+        }
+
+        return $members->map(function (NodeWorkload $member) use ($workload, $source, $revision): array {
+            if ($member->is($workload)) {
+                return ['workload' => $workload, 'revision' => $revision ?? $workload->revisions()->latest('id')->firstOrFail()];
+            }
+            if (! $member->nodes()->whereKey($source->id)->exists()) {
+                throw new RuntimeException("The service {$member->stack_service} shares a volume with {$workload->stack_service}, but it does not run on {$source->name}. Deploy it there first.");
+            }
+            $memberRevision = $member->revisions()->latest('id')->first();
+            if ($memberRevision === null) {
+                throw new RuntimeException("Deploy the service {$member->stack_service} first. It shares a volume with {$workload->stack_service}, so it moves with it.");
+            }
+            if (NodeRegistry::isLocalImage($memberRevision->image)) {
+                throw new RuntimeException("The image of the service {$member->stack_service} is only on {$source->name}. Deploy it again, then move.");
+            }
+
+            return ['workload' => $member, 'revision' => $memberRevision];
+        })->values();
+    }
+
+    /**
+     * The volumes that a stateful move copies from the source: every volume with data on the
+     * source of every workload that moves. Throws when a volume is on another Node or a Node
+     * cannot take part in the copy.
+     *
+     * @param  NodeWorkload|Collection<int, NodeWorkload>  $workloads
      * @return Collection<int, NodeVolume>
      */
-    public static function volumesToTransfer(NodeWorkload $workload, Node $source, Node $target): Collection
+    public static function volumesToTransfer(NodeWorkload|Collection $workloads, Node $source, Node $target): Collection
     {
-        $volumes = self::volumesOn($workload, $source);
+        $volumes = self::volumesOn($workloads, $source);
         if ($volumes->isEmpty()) {
             return $volumes;
         }
@@ -129,12 +161,13 @@ class CreateMoveOperation
      * the latest successful one, or the one that the user selected for `$restore`. Throws when a
      * volume has no backup, because the data on the offline server cannot be copied.
      *
+     * @param  NodeWorkload|Collection<int, NodeWorkload>  $workloads
      * @param  array{volume_uuid: string, execution_uuid: string}|null  $restore
      * @return array<string, ScheduledVolumeBackupExecution>
      */
-    public static function recoveryBackups(NodeWorkload $workload, Node $source, Node $target, ?array $restore = null): array
+    public static function recoveryBackups(NodeWorkload|Collection $workloads, Node $source, Node $target, ?array $restore = null): array
     {
-        $volumes = self::volumesOn($workload, $source);
+        $volumes = self::volumesOn($workloads, $source);
         if ($volumes->isEmpty()) {
             return [];
         }
@@ -150,7 +183,7 @@ class CreateMoveOperation
             if ($execution === null) {
                 throw new RuntimeException("The volume {$volume->name} has no successful backup, so Coolify cannot restore it while server {$source->name} is offline. Bring {$source->name} back online, then move the application.");
             }
-            BackupNodeVolume::storage($execution->scheduledVolumeBackup, $workload);
+            BackupNodeVolume::storage($execution->scheduledVolumeBackup, $volume->backupWorkload() ?? self::workloads($workloads)->first());
             $backups[$volume->uuid] = $execution;
         }
 
@@ -158,18 +191,29 @@ class CreateMoveOperation
     }
 
     /**
-     * Every volume of the workload with data. Throws when one is on another server than the source.
+     * Every volume with data of the workloads, each once. Throws when one is on another server than the source.
      *
+     * @param  NodeWorkload|Collection<int, NodeWorkload>  $workloads
      * @return Collection<int, NodeVolume>
      */
-    private static function volumesOn(NodeWorkload $workload, Node $source): Collection
+    public static function volumesOn(NodeWorkload|Collection $workloads, Node $source): Collection
     {
-        $volumes = $workload->volumes()->with('node')->whereNotNull('node_id')->orderBy('id')->get();
+        $ids = self::workloads($workloads)->flatMap(fn (NodeWorkload $workload) => $workload->allVolumes()->modelKeys())->unique()->all();
+        $volumes = NodeVolume::query()->whereKey($ids)->whereNotNull('node_id')->with('node')->orderBy('id')->get();
         $elsewhere = $volumes->first(fn (NodeVolume $volume): bool => $volume->node_id !== $source->id);
         if ($elsewhere !== null) {
             throw new RuntimeException("The volume {$elsewhere->name} is on server ".($elsewhere->node?->name ?? 'another server').", not on {$source->name}.");
         }
 
         return $volumes;
+    }
+
+    /**
+     * @param  NodeWorkload|Collection<int, NodeWorkload>  $workloads
+     * @return Collection<int, NodeWorkload>
+     */
+    private static function workloads(NodeWorkload|Collection $workloads): Collection
+    {
+        return $workloads instanceof NodeWorkload ? collect([$workloads]) : $workloads->values();
     }
 }

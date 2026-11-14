@@ -49,6 +49,11 @@ class CreateDeploymentOperation
             if (! $partOfMove) {
                 $workload->ensureNotMovingVolumes();
             }
+            // A stack volume pins every service that mounts it to its Node (decision 0024).
+            $elsewhere = $workload->stackVolumes()->with('node')->whereNotNull('node_volumes.node_id')->where('node_volumes.node_id', '!=', $node->id)->first();
+            if ($elsewhere !== null) {
+                throw new RuntimeException(DispatchWorkloadDeployment::volumeElsewhereMessage($elsewhere, $workload));
+            }
             $active = NodeOperation::query()
                 ->where('node_id', $node->id)
                 ->where('node_workload_id', $workload->id)

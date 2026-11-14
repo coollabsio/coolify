@@ -24,6 +24,8 @@ use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
+use App\Models\NodeWorkload;
+use App\Models\NodeWorkloadRevision;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -92,8 +94,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
     public function __construct(public int $operationId)
     {
         // A stateful move touches its operation while it copies, so the stale operation limit does not apply.
-        $operation = NodeOperation::query()->find($operationId);
-        if ($operation?->node_workload_id !== null && NodeVolume::query()->where('node_workload_id', $operation->node_workload_id)->whereNotNull('node_id')->exists()) {
+        $operation = NodeOperation::query()->with('workload')->find($operationId);
+        $workloadIds = $operation === null ? [] : array_filter([$operation->node_workload_id, ...$operation->groupWorkloadIds()]);
+        if ($workloadIds !== [] && NodeWorkload::query()->withoutGlobalScopes()->whereKey($workloadIds)->get()->contains(fn (NodeWorkload $workload): bool => $workload->hasVolumesWithData())) {
             $this->timeout = self::STATEFUL_TIMEOUT;
         }
     }
@@ -118,9 +121,14 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 return;
             }
             $recovery = self::recoveryBackups($operation);
+            $group = self::movingGroup($operation);
+            if ($group->count() !== count($operation->groupWorkloadIds()) + 1) {
+                throw new RuntimeException('A service of the volume group was deleted after the move was queued. Start the move again.');
+            }
+            $workloads = $group->pluck('workload');
             $volumes = $recovery === null
-                ? CreateMoveOperation::volumesToTransfer($operation->workload, $operation->node, $target)
-                : $operation->workload->volumes()->whereNotNull('node_id')->orderBy('id')->get();
+                ? CreateMoveOperation::volumesToTransfer($workloads, $operation->node, $target)
+                : CreateMoveOperation::volumesOn($workloads, $operation->node);
             if (($volumes->isNotEmpty() && $this->timeout < self::STATEFUL_TIMEOUT)
                 || ($recovery !== null && $volumes->pluck('uuid')->diff(array_keys($recovery))->isNotEmpty())) {
                 throw new RuntimeException('The application got a volume after the move was queued. Start the move again.');
@@ -137,17 +145,23 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 self::checkpoint($operation, ['stateful' => true, 'volume_uuids' => $volumes->pluck('uuid')->all()]);
             }
 
-            if (! $target->workloads()->whereKey($operation->workload->id)->exists()) {
-                // Recorded first, so cleanup after a killed worker knows that the move owns this placement.
-                $operation->update(['result' => [...($operation->result ?? []), 'target_attached' => true]]);
-                $target->workloads()->attach($operation->workload);
+            foreach ($workloads as $workload) {
+                if (! $target->workloads()->whereKey($workload->id)->exists()) {
+                    // Recorded first, so cleanup after a killed worker knows that the move owns this placement.
+                    self::checkpoint($operation, [
+                        'target_attached' => true,
+                        'target_attached_ids' => array_values(array_unique([...(data_get($operation->refresh()->result, 'target_attached_ids') ?? []), $workload->id])),
+                    ]);
+                    $target->workloads()->attach($workload);
+                }
             }
             $cluster = $target->cluster;
-            $routed = $operation->workload->receivesClusterTraffic() && $cluster !== null;
+            $routed = $cluster !== null && $workloads->contains(fn (NodeWorkload $workload): bool => $workload->receivesClusterTraffic());
             if ($routed) {
                 // Every ingress Node and every peer of its stack must reach the target address before the target serves traffic.
                 // DispatchWorkloadDeployment then finds the address and queues no second revision.
-                EnsureNodeWorkloadAddress::run($target, $operation->workload);
+                $workloads->filter(fn (NodeWorkload $workload): bool => $workload->receivesClusterTraffic())
+                    ->each(fn (NodeWorkload $workload) => EnsureNodeWorkloadAddress::run($target, $workload));
                 $this->waitForNetworkRevision($cluster, $operation->requestedBy);
             }
             if ($volumes->isNotEmpty()) {
@@ -155,21 +169,31 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 $this->copyVolumes($operation, $target, $volumes, now()->addSeconds($this->timeout - self::STATEFUL_RESERVE_SECONDS));
             }
 
-            $deployment = CreateDeploymentOperation::run($target, $operation->revision, $operation->requestedBy, partOfMove: true);
-            if ($deployment['created']) {
-                // The deployment waits until the target is healthy, so the source serves until then.
-                (new DeployNodeWorkloadJob($deployment['operation']->id, $deadline))->handle();
-            }
-            $deploymentOperation = $this->waitForDeployment($deployment['operation'], $deadline);
-            if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
-                $verification = data_get($deploymentOperation->result, 'verification', []);
-                $targetStarted = data_get($verification, 'state') === 'running';
-                if ($volumes->isEmpty() || ! $targetStarted) {
-                    throw new RuntimeException('The workload did not become ready on the target server. The source remains active. '.($deploymentOperation->error ?? ''));
+            // The services of a volume group start in depends_on order (decision 0024).
+            $deployments = [];
+            foreach (self::inDeployOrder($group) as ['workload' => $workload, 'revision' => $revision]) {
+                $deployment = CreateDeploymentOperation::run($target, $revision, $operation->requestedBy, partOfMove: true);
+                if ($deployment['created']) {
+                    // The deployment waits until the target is healthy, so the source serves until then.
+                    (new DeployNodeWorkloadJob($deployment['operation']->id, $deadline))->handle();
                 }
-                // The volumes are on the target and its container started: going back would lose its writes.
-                self::checkpoint($operation, ['target_health' => data_get($verification, 'health') ?? 'not healthy']);
+                $deploymentOperation = $this->waitForDeployment($deployment['operation'], $deadline);
+                $deployments[$workload->id] = $deploymentOperation;
+                if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
+                    $verification = data_get($deploymentOperation->result, 'verification', []);
+                    $targetStarted = data_get($verification, 'state') === 'running' || data_get($verification, 'state') === 'exited';
+                    $name = $group->count() > 1 ? "The service {$workload->stack_service}" : 'The workload';
+                    if ($volumes->isEmpty() || ! $targetStarted) {
+                        throw new RuntimeException("{$name} did not become ready on the target server. The source remains active. ".($deploymentOperation->error ?? ''));
+                    }
+                    // The volumes are on the target and its container started: going back would lose its writes.
+                    self::checkpoint($operation, ['target_health' => [
+                        ...(array) (data_get($operation->refresh()->result, 'target_health') ?? []),
+                        $workload->uuid => data_get($verification, 'health') ?? 'not healthy',
+                    ]]);
+                }
             }
+            $deploymentOperation = $deployments[$operation->workload->id];
             // The target runs the workload now: cleanup keeps its placement.
             $operation->update(['result' => [...($operation->refresh()->result ?? []), 'target_ready' => true]]);
 
@@ -178,29 +202,33 @@ class MoveNodeWorkloadJob implements ShouldQueue
             }
 
             // An offline source gets no command: FenceRecoveredNodeWorkloads removes its container when it comes back.
-            $removalOperation = $recovery !== null ? null : CreateLifecycleOperation::run(
-                $operation->node,
-                $operation->revision,
-                NodeWorkloadAction::REMOVE,
-                $operation->requestedBy,
-                updateDesiredState: false,
-                partOfMove: true,
-            );
-            if ($removalOperation !== null) {
-                (new ManageNodeWorkloadJob($removalOperation->id))->handle();
-                $removalOperation->refresh();
-            }
-            if ($removalOperation !== null && $removalOperation->status !== NodeOperationStatus::SUCCEEDED) {
-                if ($volumes->isEmpty()) {
-                    throw new RuntimeException('The source workload could not be removed after the target became ready.');
+            $removalOperation = null;
+            foreach ($recovery !== null ? [] : $group as ['workload' => $workload, 'revision' => $revision]) {
+                $removal = CreateLifecycleOperation::run(
+                    $operation->node,
+                    $revision,
+                    NodeWorkloadAction::REMOVE,
+                    $operation->requestedBy,
+                    updateDesiredState: false,
+                    partOfMove: true,
+                );
+                (new ManageNodeWorkloadJob($removal->id))->handle();
+                $removal->refresh();
+                $removalOperation ??= $removal;
+                if ($removal->status !== NodeOperationStatus::SUCCEEDED) {
+                    if ($volumes->isEmpty()) {
+                        throw new RuntimeException('The source workload could not be removed after the target became ready.');
+                    }
+                    // The data is on the target now, so the source placement must go anyway. The stopped
+                    // container stays on the source; the START guard keeps it from running on the old copy.
+                    self::checkpoint($operation, ['source_removal' => 'failed: '.mb_substr((string) $removal->error, 0, 500)]);
                 }
-                // The data is on the target now, so the source placement must go anyway. The stopped
-                // container stays on the source; the START guard keeps it from running on the old copy.
-                self::checkpoint($operation, ['source_removal' => 'failed: '.mb_substr((string) $removalOperation->error, 0, 500)]);
             }
 
-            $operation->node->workloads()->detach($operation->workload);
-            if ($operation->workload->receivesClusterTraffic() && $operation->node->cluster !== null) {
+            foreach ($workloads as $workload) {
+                $operation->node->workloads()->detach($workload);
+            }
+            if ($operation->node->cluster !== null && $workloads->contains(fn (NodeWorkload $workload): bool => $workload->receivesClusterTraffic())) {
                 // The source container IP is gone: drop its firewall allow on every Node.
                 QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
             }
@@ -295,20 +323,27 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
         // Downtime starts. A fresh inventory decides whether a container runs; a stale one could miss writes.
         // The offline source of a recovery gets no command; fencing removes its container later.
+        // Every service of a volume group stops, so nothing writes a shared volume during the final pass.
         if ($recovery === null) {
             FetchContainers::run($source);
-        }
-        $sourceRunning = $recovery === null && $source->containers()
-            ->where('node_workload_id', $operation->workload->id)
-            ->where('is_managed', true)
-            ->whereNotIn('state', ['exited', 'stopped', 'created', 'configured', 'dead'])
-            ->exists();
-        if ($sourceRunning) {
-            self::checkpoint($operation, ['source_stopped' => true]);
-            $stop = CreateLifecycleOperation::run($source, $operation->revision, NodeWorkloadAction::STOP, $operation->requestedBy, updateDesiredState: false, partOfMove: true, stopTimeoutSeconds: self::SOURCE_STOP_TIMEOUT_SECONDS);
-            (new ManageNodeWorkloadJob($stop->id))->handle();
-            if ($stop->refresh()->status !== NodeOperationStatus::SUCCEEDED) {
-                throw new RuntimeException('The source workload could not be stopped for the final copy. '.($stop->error ?? ''));
+            foreach (self::movingGroup($operation) as ['workload' => $workload, 'revision' => $revision]) {
+                $running = $source->containers()
+                    ->where('node_workload_id', $workload->id)
+                    ->where('is_managed', true)
+                    ->whereNotIn('state', ['exited', 'stopped', 'created', 'configured', 'dead'])
+                    ->exists();
+                if (! $running) {
+                    continue;
+                }
+                self::checkpoint($operation, [
+                    'source_stopped' => true,
+                    'source_stopped_ids' => array_values(array_unique([...(data_get($operation->refresh()->result, 'source_stopped_ids') ?? []), $workload->id])),
+                ]);
+                $stop = CreateLifecycleOperation::run($source, $revision, NodeWorkloadAction::STOP, $operation->requestedBy, updateDesiredState: false, partOfMove: true, stopTimeoutSeconds: self::SOURCE_STOP_TIMEOUT_SECONDS);
+                (new ManageNodeWorkloadJob($stop->id))->handle();
+                if ($stop->refresh()->status !== NodeOperationStatus::SUCCEEDED) {
+                    throw new RuntimeException('The source workload could not be stopped for the final copy. '.($stop->error ?? ''));
+                }
             }
         }
 
@@ -430,8 +465,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
         if (data_get($operation->refresh()->result, 'target_ready')) {
             // The target runs on the data already: nothing to roll back. The source placement goes,
             // so no reconciler starts the old container on the retained copy.
-            if ($operation->workload !== null && $operation->node->workloads()->detach($operation->workload) > 0
-                && $operation->workload->receivesClusterTraffic() && $operation->node->cluster !== null) {
+            $detached = self::movingGroup($operation)->pluck('workload')
+                ->filter(fn (NodeWorkload $workload): bool => $operation->node->workloads()->detach($workload) > 0);
+            if ($operation->node->cluster !== null && $detached->contains(fn (NodeWorkload $workload): bool => $workload->receivesClusterTraffic())) {
                 QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
             }
             self::checkpoint($operation, ['cleaned_up' => true]);
@@ -445,8 +481,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
             ->where('uuid', data_get($operation->request, 'target_node_uuid'))
             ->where('team_id', $source->team_id)
             ->first();
+        $group = self::movingGroup($operation);
         $volumeIds = NodeVolume::query()
-            ->where('node_workload_id', $operation->node_workload_id)
+            ->where('team_id', $source->team_id)
             ->whereIn('uuid', data_get($result, 'volume_uuids', []))
             ->pluck('id')
             ->all();
@@ -455,18 +492,26 @@ class MoveNodeWorkloadJob implements ShouldQueue
 
         // 1. The target container must be gone before its volumes can be deleted.
         $targetClean = true;
-        if ($target !== null && $operation->workload !== null && $operation->revision !== null
-            && data_get($result, 'target_attached') && self::targetDeployed($operation, $target)
-            && $target->workloads()->whereKey($operation->workload->id)->exists()) {
-            try {
-                $removal = CreateLifecycleOperation::run($target, $operation->revision, NodeWorkloadAction::REMOVE, $operation->requestedBy, updateDesiredState: false, partOfMove: true);
-                (new ManageNodeWorkloadJob($removal->id))->handle();
-                $targetClean = $removal->refresh()->status === NodeOperationStatus::SUCCEEDED;
-                $notes['target_removal'] = $targetClean ? 'removed' : 'failed: '.mb_substr((string) $removal->error, 0, 500);
-            } catch (Throwable $exception) {
-                $targetClean = false;
-                $notes['target_removal'] = 'failed: '.mb_substr($exception->getMessage(), 0, 500);
+        $removedAny = false;
+        foreach ($group as ['workload' => $workload, 'revision' => $revision]) {
+            if ($target === null || ! data_get($result, 'target_attached') || ! self::targetDeployed($operation, $target, $workload)
+                || ! $target->workloads()->whereKey($workload->id)->exists()) {
+                continue;
             }
+            $removedAny = true;
+            try {
+                $removal = CreateLifecycleOperation::run($target, $revision, NodeWorkloadAction::REMOVE, $operation->requestedBy, updateDesiredState: false, partOfMove: true);
+                (new ManageNodeWorkloadJob($removal->id))->handle();
+                $removed = $removal->refresh()->status === NodeOperationStatus::SUCCEEDED;
+                $note = $removed ? 'removed' : 'failed: '.mb_substr((string) $removal->error, 0, 500);
+            } catch (Throwable $exception) {
+                $removed = false;
+                $note = 'failed: '.mb_substr($exception->getMessage(), 0, 500);
+            }
+            $targetClean = $targetClean && $removed;
+            $notes['target_removal'] = $group->count() > 1 ? [...(array) ($notes['target_removal'] ?? []), $workload->uuid => $note] : $note;
+        }
+        if ($removedAny) {
             self::checkpoint($operation, ['target_removed' => $targetClean]);
         }
 
@@ -504,13 +549,21 @@ class MoveNodeWorkloadJob implements ShouldQueue
         }
 
         // 4. Start the source again if the move stopped it.
-        if (data_get($result, 'source_stopped') && $operation->workload !== null && $operation->revision !== null) {
+        $stoppedIds = data_get($result, 'source_stopped_ids') ?? (data_get($result, 'source_stopped') ? [$operation->node_workload_id] : []);
+        foreach (self::inDeployOrder($group) as ['workload' => $workload, 'revision' => $revision]) {
+            if (! in_array($workload->id, $stoppedIds, true)) {
+                continue;
+            }
             try {
-                $start = CreateLifecycleOperation::run($source, $operation->revision, NodeWorkloadAction::START, $operation->requestedBy, updateDesiredState: false, partOfMove: true);
+                $start = CreateLifecycleOperation::run($source, $revision, NodeWorkloadAction::START, $operation->requestedBy, updateDesiredState: false, partOfMove: true);
                 (new ManageNodeWorkloadJob($start->id))->handle();
-                $notes['source_start'] = $start->refresh()->status->value;
+                $state = $start->refresh()->status->value;
             } catch (Throwable $exception) {
-                $notes['source_start'] = 'failed: '.mb_substr($exception->getMessage(), 0, 500);
+                $state = 'failed: '.mb_substr($exception->getMessage(), 0, 500);
+            }
+            // The first service that did not start is the summary of the group.
+            if (($notes['source_start'] ?? 'succeeded') === 'succeeded') {
+                $notes['source_start'] = $state;
             }
         }
 
@@ -635,13 +688,20 @@ class MoveNodeWorkloadJob implements ShouldQueue
         if ($target === null) {
             return;
         }
-        if (! data_get($operation->result, 'target_removed') && $target->workloads()->whereKey($operation->workload->id)->exists()) {
-            self::queueTargetRemoval($operation, $target);
+        $attached = data_get($operation->result, 'target_attached_ids') ?? [$operation->workload->id];
+        $released = false;
+        foreach (self::movingGroup($operation) as ['workload' => $workload, 'revision' => $revision]) {
+            if (! in_array($workload->id, $attached, true)) {
+                continue;
+            }
+            if (! data_get($operation->result, 'target_removed') && $target->workloads()->whereKey($workload->id)->exists()) {
+                self::queueTargetRemoval($operation, $target, $workload, $revision);
+            }
+            if ($target->workloads()->detach($workload) > 0 && $workload->receivesClusterTraffic()) {
+                $released = true;
+            }
         }
-        if ($target->workloads()->detach($operation->workload) === 0) {
-            return;
-        }
-        if ($operation->workload->receivesClusterTraffic() && $target->cluster !== null) {
+        if ($released && $target->cluster !== null) {
             // Withdraw the firewall allow for the address that the target no longer uses.
             QueueNodeClusterNetworkRevision::run($target->cluster, $operation->requestedBy);
         }
@@ -654,9 +714,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
      * still runs after the detach. When the Node is offline or rejects the operation, the
      * target is detached anyway and the outcome is recorded on the move.
      */
-    private static function queueTargetRemoval(NodeOperation $operation, Node $target): void
+    private static function queueTargetRemoval(NodeOperation $operation, Node $target, NodeWorkload $workload, ?NodeWorkloadRevision $revision): void
     {
-        if (! self::targetDeployed($operation, $target) || $operation->revision === null) {
+        if (! self::targetDeployed($operation, $target, $workload) || $revision === null) {
             return;
         }
 
@@ -665,7 +725,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             try {
                 $removal = CreateLifecycleOperation::run(
                     $target,
-                    $operation->revision,
+                    $revision,
                     NodeWorkloadAction::REMOVE,
                     $operation->requestedBy,
                     updateDesiredState: false,
@@ -681,15 +741,58 @@ class MoveNodeWorkloadJob implements ShouldQueue
     }
 
     /** Whether the move may have created a target container: a deploy since the move started, or a container in the inventory. */
-    private static function targetDeployed(NodeOperation $operation, Node $target): bool
+    private static function targetDeployed(NodeOperation $operation, Node $target, NodeWorkload $workload): bool
     {
         return NodeOperation::query()
             ->where('node_id', $target->id)
-            ->where('node_workload_id', $operation->workload->id)
+            ->where('node_workload_id', $workload->id)
             ->where('command_type', 'workload.deploy.v1')
             ->where('created_at', '>=', $operation->created_at)
             ->exists()
-            || $target->containers()->where('node_workload_id', $operation->workload->id)->where('is_managed', true)->exists();
+            || $target->containers()->where('node_workload_id', $workload->id)->where('is_managed', true)->exists();
+    }
+
+    /**
+     * The workloads that the move moves, each with the revision that it deploys on the target:
+     * the workload of the operation first, then the other services of its volume group
+     * (decision 0024). A deleted service is left out.
+     *
+     * @return Collection<int, array{workload: NodeWorkload, revision: ?NodeWorkloadRevision}>
+     */
+    public static function movingGroup(NodeOperation $operation): Collection
+    {
+        $operation->loadMissing(['workload', 'revision', 'node']);
+        $group = collect($operation->workload === null ? [] : [['workload' => $operation->workload, 'revision' => $operation->revision]]);
+        foreach ((array) data_get($operation->request, 'group', []) as $member) {
+            $workload = NodeWorkload::query()->withoutGlobalScopes()->where('team_id', $operation->node->team_id)->find((int) data_get($member, 'workload_id'));
+            if ($workload !== null) {
+                $group->push(['workload' => $workload, 'revision' => $workload->revisions()->whereKey((int) data_get($member, 'revision_id'))->first()]);
+            }
+        }
+
+        return $group->values();
+    }
+
+    /**
+     * The members of a volume group in the `depends_on` order of their stack, so a service starts
+     * after the services that it waits for.
+     *
+     * @param  Collection<int, array{workload: NodeWorkload, revision: ?NodeWorkloadRevision}>  $group
+     * @return Collection<int, array{workload: NodeWorkload, revision: ?NodeWorkloadRevision}>
+     */
+    public static function inDeployOrder(Collection $group): Collection
+    {
+        $stack = $group->count() > 1 ? $group->first()['workload']->stack()->withoutGlobalScopes()->first() : null;
+        if ($stack === null) {
+            return $group;
+        }
+        try {
+            $order = array_flip($stack->deployOrder());
+        } catch (RuntimeException) {
+            return $group;
+        }
+
+        return $group->sortBy(fn (array $member): int => $order[$member['workload']->stack_service] ?? PHP_INT_MAX)->values();
     }
 
     public function failed(?Throwable $exception): void

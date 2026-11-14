@@ -53,43 +53,59 @@ class FenceRecoveredNodeWorkloads
         if (! $move->status->isFinal()) {
             return;
         }
-        $workload = $move->workload;
-        // A later move or placement can bring the application back here; its container has the same name.
-        if ($workload === null || $move->revision === null || ! data_get($move->result, 'target_ready')
-            || $node->workloads()->whereKey($workload->id)->exists()) {
+        // A recovery move of a volume group (decision 0024) fences every service of the group.
+        $group = MoveNodeWorkloadJob::movingGroup($move)->filter(fn (array $member): bool => $member['revision'] !== null)
+            // A later move or placement can bring the application back here; its container has the same name.
+            ->reject(fn (array $member): bool => $node->workloads()->whereKey($member['workload']->id)->exists());
+        if ($move->workload === null || $move->revision === null || ! data_get($move->result, 'target_ready') || $group->isEmpty()) {
             $this->record($move, ['fence' => 'not needed']);
 
             return;
         }
 
-        $names = array_map(fn (NodeContainerSlot $slot): string => $slot->containerName($workload), NodeContainerSlot::cases());
-        if (! $node->containers()->whereIn('name', $names)->exists()) {
+        $running = $group->filter(fn (array $member): bool => $node->containers()
+            ->whereIn('name', array_map(fn (NodeContainerSlot $slot): string => $slot->containerName($member['workload']), NodeContainerSlot::cases()))
+            ->exists());
+        if ($running->isEmpty()) {
+            $ids = $group->pluck('workload.id')->all();
             NodeVolumeCopy::query()
                 ->where('node_id', $node->id)
                 ->whereNull('podman_name')
                 ->where('state', NodeVolumeCopyState::RETAINED)
-                ->whereHas('volume', fn ($volumes) => $volumes->where('node_workload_id', $workload->id))
+                ->whereHas('volume', fn ($volumes) => $volumes->where(fn ($query) => $query
+                    ->whereIn('node_workload_id', $ids)
+                    ->orWhereHas('mounts', fn ($mounts) => $mounts->whereIn('node_workload_id', $ids))))
                 ->update(['delete_after' => now()->addDays(MoveNodeWorkloadJob::RETAIN_SOURCE_DAYS)]);
             $this->record($move, ['fence' => 'done', 'fenced_at' => now()->toIso8601String()]);
 
             return;
         }
 
-        $removal = NodeOperation::query()->where('uuid', data_get($move->result, 'fence_removal_operation_uuid'))->first();
-        if ($removal !== null && ! $removal->status->isFinal()) {
+        $previous = data_get($move->result, 'fence_removal_operation_uuids') ?? array_filter([data_get($move->result, 'fence_removal_operation_uuid')]);
+        if (NodeOperation::query()->whereIn('uuid', $previous)->get()->contains(fn (NodeOperation $removal): bool => ! $removal->status->isFinal())) {
             return;
         }
-        // CreateLifecycleOperation needs a placement on this server, which the move removed.
-        $removal = CreateOperation::run(
-            $node,
-            'workload.lifecycle.v1',
-            "fence:{$node->uuid}:{$workload->uuid}:".Str::uuid(),
-            $workload,
-            $move->revision,
-            ['revision_uuid' => $move->revision->uuid, 'action' => NodeWorkloadAction::REMOVE->value, 'container_name' => $workload->containerNameOn($node)],
-        );
-        $this->record($move, ['fence' => 'removing', 'fence_removal_operation_uuid' => $removal->uuid]);
-        ManageNodeWorkloadJob::dispatch($removal->id);
+        $removals = [];
+        foreach ($running as ['workload' => $workload, 'revision' => $revision]) {
+            // CreateLifecycleOperation needs a placement on this server, which the move removed.
+            $removal = CreateOperation::run(
+                $node,
+                'workload.lifecycle.v1',
+                "fence:{$node->uuid}:{$workload->uuid}:".Str::uuid(),
+                $workload,
+                $revision,
+                ['revision_uuid' => $revision->uuid, 'action' => NodeWorkloadAction::REMOVE->value, 'container_name' => $workload->containerNameOn($node)],
+            );
+            $removals[] = $removal;
+        }
+        $this->record($move, [
+            'fence' => 'removing',
+            'fence_removal_operation_uuid' => $removals[0]->uuid,
+            'fence_removal_operation_uuids' => array_map(fn (NodeOperation $removal): string => $removal->uuid, $removals),
+        ]);
+        foreach ($removals as $removal) {
+            ManageNodeWorkloadJob::dispatch($removal->id);
+        }
     }
 
     /** @param array<string, mixed> $values */

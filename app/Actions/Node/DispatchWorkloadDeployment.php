@@ -6,6 +6,7 @@ use App\Enums\NodeContainerSlot;
 use App\Enums\NodeWorkloadAction;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
+use App\Models\NodeWorkload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -212,7 +213,9 @@ class DispatchWorkloadDeployment
         DB::transaction(function () use ($operation, $mounts): void {
             $volumes = NodeVolume::query()
                 ->with('node')
-                ->where('node_workload_id', $operation->workload->id)
+                ->where(fn ($query) => $query
+                    ->where('node_workload_id', $operation->workload->id)
+                    ->orWhereHas('mounts', fn ($mounts) => $mounts->where('node_workload_id', $operation->workload->id)))
                 ->whereIn('uuid', array_column($mounts, 'volume_uuid'))
                 ->lockForUpdate()
                 ->get()
@@ -225,8 +228,7 @@ class DispatchWorkloadDeployment
                 if ($volume->node_id === null) {
                     $volume->update(['node_id' => $operation->node->id]);
                 } elseif ($volume->node_id !== $operation->node->id) {
-                    $server = $volume->node?->name ?? 'another server';
-                    throw new RuntimeException("The volume {$volume->name} is on server {$server}. Move the application instead.");
+                    throw new RuntimeException(self::volumeElsewhereMessage($volume, $operation->workload));
                 }
             }
         });
@@ -236,6 +238,22 @@ class DispatchWorkloadDeployment
             'container_path' => $mount['container_path'],
             'read_only' => (bool) $mount['read_only'],
         ], $mounts);
+    }
+
+    /**
+     * Why a workload cannot run on another Node than its volume. A stack volume pins every service
+     * that mounts it to its Node (decision 0024).
+     */
+    public static function volumeElsewhereMessage(NodeVolume $volume, NodeWorkload $workload): string
+    {
+        $server = $volume->node?->name ?? 'another server';
+        if (! $volume->isStackVolume()) {
+            return "The volume {$volume->name} is on server {$server}. Move the application instead.";
+        }
+        $others = $volume->mountingWorkloads()->withoutGlobalScopes()->whereKeyNot($workload->id)->pluck('stack_service')->filter()->implode(', ');
+
+        return "The service {$workload->stack_service} shares the volume {$volume->name}".($others === '' ? '' : " with {$others}")
+            ." on server {$server}, so it runs only there. Move the service to move all of them.";
     }
 
     /** @param array<string, mixed> $configuration

@@ -70,9 +70,9 @@ class CreateLifecycleOperation
             }
             if (in_array($action, [NodeWorkloadAction::START, NodeWorkloadAction::RESTART], true)) {
                 // After a stateful move the old container must not start on the retained copy.
-                $elsewhere = $workload->volumes()->with('node')->whereNotNull('node_id')->where('node_id', '!=', $node->id)->first();
+                $elsewhere = $workload->allVolumes()->first(fn ($volume): bool => $volume->node_id !== null && $volume->node_id !== $node->id);
                 if ($elsewhere !== null) {
-                    throw new RuntimeException("The volume {$elsewhere->name} is on server ".($elsewhere->node?->name ?? 'another server').'. Move the application instead.');
+                    throw new RuntimeException(DispatchWorkloadDeployment::volumeElsewhereMessage($elsewhere->load('node'), $workload));
                 }
             }
 

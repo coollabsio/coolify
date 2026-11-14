@@ -51,18 +51,8 @@ class ReconcileNodeWorkloads
             ->pluck('node_workload_id')
             // A move assigns its target before it deploys there. The move is stored on the source
             // Node, so it blocks the workload on every Node until it finishes.
-            ->merge(NodeOperation::query()
-                ->whereIn('node_workload_id', $workloads->modelKeys())
-                ->where('command_type', 'workload.move.v1')
-                ->whereIn('status', [
-                    NodeOperationStatus::QUEUED,
-                    NodeOperationStatus::DISPATCHED,
-                    NodeOperationStatus::RUNNING,
-                    NodeOperationStatus::VERIFYING,
-                    NodeOperationStatus::UNCERTAIN,
-                ])
-                ->distinct()
-                ->pluck('node_workload_id'))
+            // A move of a volume group (decision 0024) blocks every service of the group.
+            ->merge(NodeOperation::movingWorkloadIds($workloads->modelKeys()))
             // Sentinel stops the container for a backup with `stop_during_backup` and starts it after.
             ->merge(NodeVolume::query()
                 ->whereIn('node_workload_id', $workloads->modelKeys())
