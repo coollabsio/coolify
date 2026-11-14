@@ -58,6 +58,7 @@ class NodeWorkload extends BaseModel
             'registry_credential_id' => 'integer',
             'domains' => 'array',
             'domain_routes' => 'array',
+            'stack_health_check' => 'array',
             'force_https' => 'boolean',
             'permanent_redirect' => 'boolean',
             'is_env_sorting_enabled' => 'boolean',
@@ -131,6 +132,21 @@ class NodeWorkload extends BaseModel
     public function hasIngressRoutes(): bool
     {
         return is_array($this->domain_routes) && $this->domain_routes !== [];
+    }
+
+    /**
+     * Whether other containers call this workload through the cluster firewall, so a new address
+     * must be allowed on every Node before it takes traffic: ingress, or the peers of its stack.
+     */
+    public function receivesClusterTraffic(): bool
+    {
+        return $this->hasIngressRoutes() || $this->node_stack_id !== null;
+    }
+
+    /** The stack that this workload is a service of (decision 0023). */
+    public function stack(): BelongsTo
+    {
+        return $this->belongsTo(NodeStack::class, 'node_stack_id');
     }
 
     /** @return list<int> The distinct container ports that the domains of this workload route to. */
@@ -476,7 +492,8 @@ class NodeWorkload extends BaseModel
     public function healthCheck(): ?array
     {
         if ($this->health_check_enabled !== true) {
-            return null;
+            // A stack service keeps the health check of its Compose file until the user sets one.
+            return $this->stack_health_check ?: null;
         }
         $command = $this->health_check_type === 'cmd' ? HealthCheckCommand::command($this->health_check_command) : null;
         if ($command !== null) {

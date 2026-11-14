@@ -21,6 +21,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -67,6 +68,7 @@ use App\Policies\NodeClusterPolicy;
 use App\Policies\NodeContainerPolicy;
 use App\Policies\NodeOperationPolicy;
 use App\Policies\NodePolicy;
+use App\Policies\NodeStackPolicy;
 use App\Policies\NodeWorkloadPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
@@ -100,6 +102,7 @@ class AuthServiceProvider extends ServiceProvider
         Node::class => NodePolicy::class,
         NodeCluster::class => NodeClusterPolicy::class,
         NodeWorkload::class => NodeWorkloadPolicy::class,
+        NodeStack::class => NodeStackPolicy::class,
         NodeContainer::class => NodeContainerPolicy::class,
         NodeOperation::class => NodeOperationPolicy::class,
         PrivateKey::class => PrivateKeyPolicy::class,
