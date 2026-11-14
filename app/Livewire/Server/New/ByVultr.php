@@ -3,6 +3,8 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -15,12 +17,14 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ByVultr extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     public int $current_step = 1;
 
@@ -145,7 +149,7 @@ class ByVultr extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -162,7 +166,7 @@ class ByVultr extends Component
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
-                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
+                'selected_cloud_init_script_id' => ['nullable', 'integer', Rule::exists('cloud_init_scripts', 'id')->where('team_id', currentTeam()->id)],
             ]);
         }
 
@@ -203,7 +207,7 @@ class ByVultr extends Component
     public function nextStep(): mixed
     {
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {
@@ -469,6 +473,7 @@ class ByVultr extends Component
                 $server->proxy->set('status', 'exited');
                 $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
                 $server->save();
+                $this->applyImageScanning($server);
 
                 return $server;
             });
@@ -486,6 +491,8 @@ class ByVultr extends Component
                 // Non-fatal: the server page polling backfills the IP later.
                 report($e);
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update([

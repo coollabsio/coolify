@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Server;
+use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
@@ -11,14 +12,14 @@ trait HasMetrics
     /**
      * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins"; each is read once.
      *
-     * @var array<string, string>
+     * @var array<string, string|null>
      */
     protected array $prefetchedMetricResponses = [];
 
     /**
      * Fetch several metric types in one SSH round-trip instead of one per type. The
-     * get*Metrics() getters then read these responses. On a failure nothing is stored,
-     * so each getter fetches on its own as before.
+     * get*Metrics() getters then read these responses. Failed prefetches are remembered
+     * for this request so the getters do not retry the same unavailable server.
      *
      * @param  array<int, string>  $types
      */
@@ -29,23 +30,26 @@ trait HasMetrics
             return;
         }
 
+        foreach ($types as $type) {
+            $this->prefetchedMetricResponses["{$type}:{$mins}"] = null;
+        }
+
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
         $token = $this->metricsToken($server);
         // The token reaches curl on stdin (`-H @-`), so it is not a process argument. The token
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
         $script = implode("\nprintf '\\036'\n", array_map(
-            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            fn (string $type) => 'curl -sS --connect-timeout 2 --max-time 3 -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
-        try {
-            $output = instant_remote_process(
-                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
-                $server,
-                maxAttempts: 1
-            );
-        } catch (\Throwable) {
+        $output = SentinelMetricsClient::fetchOverSsh(
+            $server,
+            ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+            static::class.':'.$this->uuid.':'.implode(',', $types).':'.$mins
+        );
+        if ($output === null) {
             return;
         }
 
@@ -80,7 +84,7 @@ trait HasMetrics
 
     /**
      * Root filesystem usage percentage over time. Disk history interleaves every
-     * mount, so we keep only the root mount before mapping.
+     * mount, so we keep only the root mount (see SentinelMetricsClient::rootMountName()).
      */
     public function getDiskMetrics(int $mins = 5): ?array
     {
@@ -90,7 +94,8 @@ trait HasMetrics
         }
 
         if (array_any($rows, fn ($row) => array_key_exists('mount', $row))) {
-            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === '/'));
+            $mount = SentinelMetricsClient::rootMountName($rows);
+            $rows = array_values(array_filter($rows, fn ($row) => ($row['mount'] ?? null) === $mount));
         }
 
         return $this->mapRows($rows, 'usedPercent', $mins);
@@ -147,14 +152,19 @@ trait HasMetrics
             unset($this->prefetchedMetricResponses[$key]);
         } else {
             $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $endpoint = $this->getMetricsEndpoint($type, $from);
+            $endpoint = $this->getMetricsEndpoint($type, $from, $mins);
             $token = $this->metricsToken($server);
 
-            $response = instant_remote_process(
-                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$endpoint}'"],
+            $command = "curl -sS --connect-timeout 2 --max-time 3 -H @- \"{$endpoint}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
+            $response = SentinelMetricsClient::fetchOverSsh(
                 $server,
-                false
+                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+                static::class.':'.$this->uuid.':'.$type.':'.$mins
             );
+        }
+
+        if ($response === null) {
+            return null;
         }
 
         if (str($response)->contains('error')) {
@@ -248,13 +258,23 @@ trait HasMetrics
         return $this->isServerMetrics() ? $this : $this->destination->server;
     }
 
-    private function getMetricsEndpoint(string $type, string $from): string
+    /**
+     * Ranges over an hour ask Sentinel to average rows into whole-minute windows, at most
+     * 1000 per range, so it sends far fewer rows. Older Sentinels ignore `bucket_ms`;
+     * mapRows() still downsamples their raw rows.
+     */
+    private function getMetricsEndpoint(string $type, string $from, int $mins): string
     {
         $base = 'http://localhost:8888/api';
-        if ($this->isServerMetrics()) {
-            return "{$base}/{$type}/history?from={$from}";
+        $query = "from={$from}";
+        if ($mins > 60) {
+            $query .= '&bucket_ms='.((int) ceil($mins / 1000) * 60_000);
         }
 
-        return "{$base}/container/{$this->uuid}/{$type}/history?from={$from}";
+        if ($this->isServerMetrics()) {
+            return "{$base}/{$type}/history?{$query}";
+        }
+
+        return "{$base}/container/{$this->uuid}/{$type}/history?{$query}";
     }
 }

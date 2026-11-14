@@ -95,7 +95,7 @@ it('deletes the entry of a volume that the Compose file no longer declares', fun
     $name = staleVolume('third')->name;
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });

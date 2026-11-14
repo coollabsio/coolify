@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Application\Rollback;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -13,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -105,4 +108,79 @@ test('deployment uuid strings are not converted as objects in API and webhook co
             ->not->toContain('$deployment_uuid->toString()')
             ->not->toContain('$deployment_uuid?->toString()');
     }
+});
+
+describe('application rollback API', function () {
+    beforeEach(function () {
+        $this->application = makeDeploymentActionApplication($this->environment, $this->destination);
+        $this->deployedCommit = str_repeat('a', 40);
+        ApplicationDeploymentQueue::create([
+            'application_id' => $this->application->id,
+            'deployment_uuid' => 'deployed-commit',
+            'commit' => $this->deployedCommit,
+            'status' => ApplicationDeploymentStatus::FINISHED->value,
+            'pull_request_id' => 0,
+        ]);
+    });
+
+    test('queues a rollback to the commit of a successful deployment', function () {
+        $response = $this->withHeaders(deploymentActionHeaders($this->token))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/rollback", ['commit' => $this->deployedCommit]);
+
+        $response->assertSuccessful()->assertJsonPath('message', 'Rollback deployment queued.');
+
+        expect(ApplicationDeploymentQueue::query()->where('deployment_uuid', $response->json('deployment_uuid'))->value('rollback'))->toBeTruthy();
+    });
+
+    test('rejects a commit that the application never deployed to production', function (array $deployment) {
+        $commit = str_repeat('b', 40);
+        if ($deployment !== []) {
+            ApplicationDeploymentQueue::create([
+                'application_id' => $this->application->id,
+                'deployment_uuid' => 'other-deployment',
+                'commit' => $commit,
+                'status' => ApplicationDeploymentStatus::FINISHED->value,
+                'pull_request_id' => 0,
+                ...$deployment,
+            ]);
+        }
+
+        $this->withHeaders(deploymentActionHeaders($this->token))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/rollback", ['commit' => $commit])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('commit');
+
+        expect(ApplicationDeploymentQueue::query()->where('rollback', true)->where('deployment_uuid', '!=', 'other-deployment')->exists())->toBeFalse();
+    })->with([
+        'unknown commit' => [[]],
+        'failed deployment' => [['status' => ApplicationDeploymentStatus::FAILED->value]],
+        'preview deployment' => [['pull_request_id' => 7]],
+        'earlier rollback' => [['rollback' => true]],
+    ]);
+
+    test('rejects a commit that another application deployed', function () {
+        $other = makeDeploymentActionApplication($this->environment, $this->destination);
+        $commit = str_repeat('c', 40);
+        ApplicationDeploymentQueue::create([
+            'application_id' => $other->id,
+            'deployment_uuid' => 'other-application',
+            'commit' => $commit,
+            'status' => ApplicationDeploymentStatus::FINISHED->value,
+            'pull_request_id' => 0,
+        ]);
+
+        $this->withHeaders(deploymentActionHeaders($this->token))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/rollback", ['commit' => $commit])
+            ->assertUnprocessable();
+    });
+
+    test('the rollback page rejects a commit that the application never deployed', function () {
+        $this->actingAs($this->user);
+
+        Livewire::test(Rollback::class, ['application' => $this->application])
+            ->call('rollbackImage', str_repeat('b', 40))
+            ->assertDispatched('error');
+
+        expect(ApplicationDeploymentQueue::query()->where('rollback', true)->exists())->toBeFalse();
+    });
 });

@@ -47,6 +47,21 @@ it('compresses and stores an uploaded profile picture on the configured local st
         ->and(Storage::disk('images')->size($user->avatar_path))->toBeLessThan(100_000);
 })->skip(! extension_loaded('gd'), 'Requires the GD extension to generate and compress the test image.');
 
+it('changes the profile picture URL when an existing picture is replaced', function () {
+    Storage::fake('images');
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $upload = fn () => UploadedFile::fake()->createWithContent('avatar.jpg', file_get_contents(base_path('tests/Fixtures/project-icon.jpg')));
+
+    app(AvatarStorageService::class)->store($user, $upload());
+    $oldUrl = profile_avatar_url($user->fresh());
+
+    $this->travel(1)->minutes();
+    app(AvatarStorageService::class)->store($user->fresh(), $upload());
+
+    expect(profile_avatar_url($user->fresh()))->not->toBe($oldUrl);
+});
+
 it('stores an already compressed browser JPEG without server image extensions', function () {
     Storage::fake('images');
     $user = User::factory()->create(['name' => 'Test User']);

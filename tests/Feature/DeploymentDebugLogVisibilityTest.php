@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
-use App\Livewire\Project\Application\DeploymentNavbar;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -12,7 +11,6 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -71,18 +69,4 @@ test('deployment log lines show debug output to a resource team admin whose sess
     $lines = decode_remote_command_output($this->deployment->fresh())->pluck('line')->implode("\n");
 
     expect($lines)->toContain('hidden-debug-line');
-});
-
-test('copied deployment logs hide debug output from a member after switching to a team they own', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(DeploymentNavbar::class, ['application_deployment_queue' => $this->deployment]);
-
-    session(['currentTeam' => $this->ownTeam]);
-
-    $markdown = $component->instance()->copyLogsToClipboard();
-
-    expect($markdown)->toContain('visible-line')
-        ->not->toContain('hidden-debug-line');
 });

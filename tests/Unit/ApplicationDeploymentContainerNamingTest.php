@@ -83,3 +83,35 @@ it('uses the container name prefix for generated container names only', function
         ->and(generateApplicationContainerName(applicationWithContainerNamePrefix(consistent: true)))->toBe('application-uuid')
         ->and(generateApplicationContainerName(applicationWithContainerNamePrefix(), 42))->toBe('application-uuid-pr-42');
 });
+
+it('removes all old generated containers but not the new one', function () {
+    $application = applicationWithContainerNaming();
+    $application->settings->is_consistent_container_name_enabled = false;
+    [$job, $reflection] = containerNamingJob($application);
+    $reflection->getProperty('container_name')->setValue($job, 'application-uuid-20260908T141530');
+
+    $containers = new Collection([
+        ['Names' => 'application-uuid-20260101T000000'],
+        ['Names' => 'application-uuid-20260908T141530'],
+    ]);
+
+    expect($reflection->getMethod('oldGeneratedContainerNames')->invoke($job, $containers)->all())
+        ->toBe(['application-uuid-20260101T000000']);
+});
+
+it('keeps a container that another deployment started during the rolling update', function () {
+    $application = applicationWithContainerNaming();
+    $application->settings->is_consistent_container_name_enabled = false;
+    [$job, $reflection] = containerNamingJob($application);
+    $reflection->getProperty('container_name')->setValue($job, 'application-uuid-20260908T141530');
+    $reflection->getProperty('containerNamesBeforeRollingUpdate')->setValue($job, ['application-uuid-20260101T000000']);
+
+    $containers = new Collection([
+        ['Names' => 'application-uuid-20260101T000000'],
+        ['Names' => 'application-uuid-20260908T141530'],
+        ['Names' => 'application-uuid-20260908T141548'],
+    ]);
+
+    expect($reflection->getMethod('oldGeneratedContainerNames')->invoke($job, $containers)->all())
+        ->toBe(['application-uuid-20260101T000000']);
+});

@@ -12,9 +12,7 @@ function composeTemplateFiles(): array
 }
 
 test('every service template passes the Compose injection validator', function (string $file) {
-    validateDockerComposeForInjection(file_get_contents($file));
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection(file_get_contents($file)))->not->toThrow(Exception::class);
 })->with(composeTemplateFiles());
 
 test('the service template corpus is not empty', function () {
@@ -22,9 +20,7 @@ test('the service template corpus is not empty', function () {
 });
 
 test('realistic application Compose files pass the injection validator', function (string $compose) {
-    validateDockerComposeForInjection($compose);
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
 })->with([
     'long syntax volumes, bind mounts and named volumes' => <<<'YAML'
 services:

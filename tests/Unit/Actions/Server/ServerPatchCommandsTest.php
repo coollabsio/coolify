@@ -44,7 +44,7 @@ it('allows only a full system upgrade on Arch Linux', function () {
     $server = Mockery::mock(Server::class)->makePartial();
     $server->shouldReceive('serverStatus')->andReturn(true);
 
-    expect(UpdatePackage::run($server, 'arch', 'curl', 'pacman'))
+    expect(UpdatePackage::run($server, 'arch', ['curl'], 'pacman'))
         ->toHaveKey('error', 'This operating system supports only a full system upgrade. Use "Update all packages".');
 });
 
@@ -305,4 +305,53 @@ it('reads the reboot status and runs its check as one sudo shell script', functi
     foreach ([CheckUpdates::REBOOT_CHECK_COMMAND, CheckUpdates::DNF_SECURITY_COMMAND, CheckUpdates::ZYPPER_SECURITY_COMMAND] as $command) {
         expect(parseCommandsByLineForSudo(collect([$command]), $server))->toBe(['sudo '.$command]);
     }
+});
+
+it('finds the packages of kernels that the server does not run', function (string $package, string $version, string $running, bool $other) {
+    expect(CheckUpdates::isOtherKernelPackage($package, $version, $running))->toBe($other);
+})->with([
+    'running debian kernel' => ['linux-modules-6.8.0-139-generic', '6.8.0-139.149', '6.8.0-139-generic', false],
+    'old debian kernel' => ['linux-modules-6.8.0-130-generic', '6.8.0-130.140', '6.8.0-139-generic', true],
+    'running rhel kernel' => ['kernel-core', '5.14.0-427.13.1.el9_4', '5.14.0-427.13.1.el9_4.x86_64', false],
+    'old rhel kernel' => ['kernel-core', '5.14.0-362.8.1.el9_3', '5.14.0-427.13.1.el9_4.x86_64', true],
+    'rhel kernel-tools' => ['kernel-tools', '5.14.0-362.8.1.el9_3', '5.14.0-427.13.1.el9_4.x86_64', false],
+    'rhel kernel-headers' => ['kernel-headers', '5.14.0-362.8.1.el9_3', '5.14.0-427.13.1.el9_4.x86_64', false],
+    'running sles kernel' => ['kernel-default', '6.4.0-150600.23.17.1', '6.4.0-150600.23.17-default', false],
+    'old sles kernel' => ['kernel-default', '6.4.0-150600.23.14.1', '6.4.0-150600.23.17-default', true],
+    'running tumbleweed kernel' => ['kernel-default', '6.11.8-1.1', '6.11.8-1-default', false],
+]);
+
+it('claims a kernel fix after a reboot only when the boot kernel has it', function (string $bootLine, ?string $runningStatus, ?string $newStatus) {
+    $patchResult = ['kernels' => (new CheckUpdates)->parseKernels(implode("\n", [
+        'RUNNING|6.8.0-130-generic',
+        'KERNEL|linux-image-6.8.0-130-generic|6.8.0-130.140',
+        'KERNEL|linux-image-6.8.0-139-generic|6.8.0-139.149',
+        $bootLine,
+    ]))];
+
+    expect(CheckUpdates::kernelStatus('linux-modules-6.8.0-130-generic', '6.8.0-130.140', '6.8.0-135.1', $patchResult))->toBe($runningStatus)
+        ->and(CheckUpdates::kernelStatus('linux-modules-6.8.0-139-generic', '6.8.0-139.149', null, $patchResult))->toBe($newStatus);
+})->with([
+    'grub boots the newest kernel' => ['BOOT|newest', 'fixed_after_reboot', 'runs_after_reboot'],
+    'grub boots the newer kernel by name' => ['BOOT|6.8.0-139-generic', 'fixed_after_reboot', 'runs_after_reboot'],
+    'grub keeps the running kernel' => ['BOOT|6.8.0-130-generic', null, null],
+    'boot kernel unknown' => ['', null, null],
+]);
+
+it('claims a fix after a reboot only when the rhel boot kernel has it', function () {
+    $patchResult = ['kernels' => (new CheckUpdates)->parseKernels(implode("\n", [
+        'RUNNING|5.14.0-427.13.1.el9_4.x86_64',
+        'KERNEL|kernel-core|5.14.0-427.13.1.el9_4|x86_64',
+        'KERNEL|kernel-core|5.14.0-503.11.1.el9_5|x86_64',
+        'KERNEL|kernel-core|5.14.0-570.1.1.el9_6|x86_64',
+        'BOOT|5.14.0-503.11.1.el9_5.x86_64',
+    ]))];
+
+    expect(CheckUpdates::kernelStatus('kernel-core', '5.14.0-427.13.1.el9_4', '5.14.0-503.1.1.el9_5', $patchResult))->toBe('fixed_after_reboot')
+        ->and(CheckUpdates::kernelStatus('kernel-core', '5.14.0-427.13.1.el9_4', '5.14.0-570.1.1.el9_6', $patchResult))->toBeNull()
+        ->and(CheckUpdates::kernelStatus('kernel-core', '5.14.0-570.1.1.el9_6', null, $patchResult))->toBeNull();
+});
+
+it('runs the kernel check as one sudo shell script', function () {
+    expect(parseCommandsByLineForSudo(collect([CheckUpdates::KERNELS_COMMAND]), patchCommandsNonRootServer()))->toBe(['sudo '.CheckUpdates::KERNELS_COMMAND]);
 });

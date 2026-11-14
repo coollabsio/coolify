@@ -216,16 +216,20 @@ it('ends the proxy restart when the proxy status listener runs', function () {
     $server->markProxyTransitionStarted();
     Process::fake();
 
-    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged($server->id));
+    (new ProxyStatusChangedNotification)->handle(new ProxyStatusChanged(ProxyStatusChanged::dataFor($server)));
 
     expect($server->isProxyTransitionInProgress())->toBeFalse();
 });
 
-it('uses default queue for PushServerUpdateJob', function () {
+it('runs PushServerUpdateJob on the sentinel queue on cloud and on the default queue on self-hosted', function (bool $selfHosted, ?string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
     $job = new PushServerUpdateJob($server, ['containers' => []]);
 
-    expect($job->queue)->toBeNull();
-});
+    expect($job->queue)->toBe($queue);
+})->with([
+    'cloud' => [false, 'sentinel'],
+    'self-hosted' => [true, null],
+]);

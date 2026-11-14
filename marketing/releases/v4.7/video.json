@@ -1,0 +1,44 @@
+{
+  "version": "v4.7",
+  "baseUrl": "https://devserver.tail661ee3.ts.net:8000",
+  "notes": "Recorded on the main dev instance on 2026-11-09. The UUIDs in the URLs belong to that dev database, find new ones for another instance.",
+  "shots": [
+    { "name": "dash", "url": "/" },
+    { "name": "appvuln", "url": "/project/project/environment/obkbiox1b9slwsahokdyir74/application/jnsixakmgsxrp87a9duoqesx/vulnerabilities", "steps": [{ "click": "All findings" }] },
+    { "name": "fleet", "url": "/vulnerabilities" },
+    { "name": "srvscan", "url": "/server/localhost/security/image-scanning" },
+    { "name": "storage", "url": "/storages", "steps": [{ "click": "New Storage" }, { "click": "S3" }, { "click": "SFTP" }] },
+    { "name": "advanced", "url": "/project/project/environment/obkbiox1b9slwsahokdyir74/application/rust-rocket/advanced", "steps": [{ "scrollTo": "Queued webhook deployments" }] },
+    { "name": "newlist", "url": "/project/project/environment/obkbiox1b9slwsahokdyir74/new" },
+    { "name": "valkey", "url": "/project/project/environment/obkbiox1b9slwsahokdyir74/new", "steps": [{ "fill": ["input[placeholder=\"Search resources\"]", "redis"] }] },
+    { "name": "task", "url": "/project/project/environment/obkbiox1b9slwsahokdyir74/application/jnsixakmgsxrp87a9duoqesx/scheduled-tasks", "steps": [{ "click": "Add Task" }] },
+    { "name": "email", "url": "/settings/email" },
+    { "name": "appear", "url": "/profile/appearance" }
+  ],
+  "slides": [
+    { "type": "title", "subtitle": "Image scanning, more backup targets, smarter deploys, and a lot more." },
+    { "tag": "Dashboard", "title": "Star what you use most", "shot": "dash", "box": [300, 80, 1190, 140] },
+    { "tag": "Security", "title": "Container image vulnerability scanning", "shot": "appvuln", "box": [318, 90, 1556, 460] },
+    { "tag": "Security", "title": "One security view for your team", "shot": "fleet", "box": [300, 80, 1580, 510] },
+    { "tag": "Security", "title": "Rules for each server", "shot": "srvscan", "box": [316, 88, 1556, 420] },
+    { "tag": "Backups", "title": "SFTP, FTPS and WebDAV backup storages", "shot": "storage", "box": [440, 290, 1040, 470] },
+    { "tag": "Deployments", "title": "Only the latest commit is built", "shot": "advanced", "box": [316, 360, 1556, 200], "shiftDown": 60 },
+    { "tag": "New resource", "title": "A clean list view, now with Forgejo and Codeberg", "shot": "newlist", "box": [316, 736, 1556, 70] },
+    { "tag": "Databases", "title": "Valkey for the Redis database type", "shot": "valkey", "box": [316, 318, 1556, 72] },
+    { "tag": "Scheduled tasks", "title": "Run tasks without a shell", "shot": "task", "box": [574, 528, 770, 64] },
+    { "tag": "Email", "title": "More than one SMTP server, plus Resend", "shot": "email", "box": [316, 92, 1556, 160] },
+    { "tag": "Appearance", "title": "UI scale", "shot": "appear", "box": [316, 440, 1556, 280] },
+    { "type": "list", "tag": "Also in v4.7", "items": [
+      "<b>Rotate key</b> replaces a private key on every server that uses it",
+      "GitHub Deployments sync for deployments and previews",
+      "<b>Delete unused</b> TLS certificates on the Traefik proxy page",
+      "Notifications when an automatic update starts, fails or finishes",
+      "<b>Skip TLS certificate verification</b> for S3 storages with a private CA",
+      "Gitea App endpoints in the API and MCP tools, and image scanning in the API"
+    ] },
+    { "type": "outro", "title": "Update to v4.7 today", "lines": [
+      "Read the full changelog in the release notes.",
+      "<span style=\"color:#a78bfa\">Note: older queued webhook deployments are now cancelled by default.</span>"
+    ] }
+  ]
+}

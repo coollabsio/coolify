@@ -27,6 +27,9 @@
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
     'temporaryDisableTwoStepConfirmation' => false,
+    // Accepted so that callers' canGate/canResource are not rendered as HTML attributes (the model would leak as JSON).
+    'canGate' => null,
+    'canResource' => null,
 ])
 
 @php
@@ -48,7 +51,7 @@
     $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
-<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
+<div {{ $attributes }} {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -173,11 +176,11 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button class="w-full" :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
@@ -239,8 +242,7 @@
                         <x-reicon name="x" class="size-4" />
                     </button>
                 </header>
-                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                    style="-webkit-overflow-scrolling: touch;">
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -369,13 +371,17 @@
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Your Password
                                 </label>
-                                <form @submit.prevent="false" @keydown.enter.prevent>
-                                    <input type="text" name="username" autocomplete="username"
-                                        value="{{ auth()->user()->email }}" style="display: none;">
-                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}"
-                                        x-model="password" class="w-full input" placeholder="Enter your password"
-                                        autocomplete="current-password">
-                                </form>
+                                {{-- Add the field when this step shows: password managers do not detect a hidden field that becomes visible. --}}
+                                <template x-if="step === 3">
+                                    <form @submit.prevent="false" @keydown.enter.prevent>
+                                        <input type="text" name="username" autocomplete="username"
+                                            value="{{ auth()->user()->email }}" style="display: none;">
+                                        <input type="password" id="password-confirm-{{ $passwordConfirm }}"
+                                            x-model="password" x-init="$nextTick(() => $el.focus())"
+                                            class="w-full input" placeholder="Enter your password"
+                                            autocomplete="current-password">
+                                    </form>
+                                </template>
                                 <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
                                 </p>
                                 @error('password')

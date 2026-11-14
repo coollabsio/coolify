@@ -2,6 +2,8 @@
     'model',
     'livewire' => false,
     'options' => [10, 25, 50, 100],
+    // The page size shown before a saved one is read; the first option when null.
+    'selected' => null,
     'storageKey' => null,
     'canGate' => null,
     'canResource' => null,
@@ -14,8 +16,8 @@
 
 <div class="mb-0! flex h-7 items-center gap-1.5 text-[11px] text-neutral-500 dark:text-fg-dim"
     x-data="{
-        selectedPageSize: @js((int) $options[0]),
-        customPageSize: @js((int) $options[0]),
+        selectedPageSize: @js((int) ($selected ?? $options[0])),
+        customPageSize: @js((int) ($selected ?? $options[0])),
         customizingPageSize: false,
         applyPageSize(value) {
             if (value === '' || value === null) {

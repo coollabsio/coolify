@@ -1,11 +1,14 @@
 {{--
     Live refresh toggle. Entangles the `live` bool of the host Livewire component, so it works
     with any time range. The button shows "Live" with a pulsing dot when refresh is on and
-    "Paused" with a play icon when it is off. `storageKey` keeps the choice per browser.
+    "Paused" with a play icon when it is off. `storageKey` keeps the last choice the user clicked per
+    browser; changes made by the component (for example a range that starts paused) are not stored.
+    A stored "off" always applies on page load; a stored "on" applies only when `restoreLive` is true.
 --}}
 @props([
     'active' => false,
     'storageKey' => null,
+    'restoreLive' => true,
     'title' => 'Turn live refresh on or off',
 ])
 
@@ -13,10 +16,9 @@
     @if ($storageKey) x-init="
         const stored = localStorage.getItem(@js($storageKey));
         if (stored === '0') { live = false; }
-        if (stored === '1') { live = true; }
-        $watch('live', value => localStorage.setItem(@js($storageKey), value ? '1' : '0'));
+        if (stored === '1' && @js((bool) $restoreLive)) { live = true; }
     " @endif>
-    <button type="button" @click="live = !live" :aria-pressed="live ? 'true' : 'false'"
+    <button type="button" @click="live = !live; @if ($storageKey) localStorage.setItem(@js($storageKey), live ? '1' : '0'); @endif" :aria-pressed="live ? 'true' : 'false'"
         aria-pressed="{{ $active ? 'true' : 'false' }}" title="{{ $title }}"
         class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium ring-1 ring-neutral-200 transition-colors dark:ring-white/[0.08]"
         :class="live

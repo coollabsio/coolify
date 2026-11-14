@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
@@ -18,6 +19,7 @@ use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
+use App\Notifications\Server\HostKeyChanged;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\DigitalOceanService;
@@ -29,9 +31,13 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasStars;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
@@ -122,7 +128,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, HasStars, SchemalessAttributesTrait, SoftDeletes;
 
     /**
      * Sentinel IP for servers that do not have a real address yet
@@ -179,10 +185,10 @@ class Server extends BaseModel
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
-                $payload['user'] = str($server->user)->trim();
+                $payload['user'] = trim($server->user);
             }
             if ($server->ip) {
-                $payload['ip'] = str($server->ip)->trim();
+                $payload['ip'] = trim($server->ip);
 
                 // Update ip_previous when ip is being changed
                 if ($server->isDirty('ip') && $server->getOriginal('ip')) {
@@ -192,6 +198,9 @@ class Server extends BaseModel
             $server->fill($payload);
         });
         static::saved(function ($server) {
+            if ($server->wasChanged(['ip', 'port'])) {
+                $server->settings?->forgetSshHostKey('address_changed');
+            }
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
             } elseif ($server->wasChanged(['user', 'ip', 'port'])) {
@@ -269,8 +278,10 @@ class Server extends BaseModel
             }
             $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($server->uuid, null);
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
+            ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->delete();
         });
 
         static::deleted(function (Server $server) {
@@ -336,8 +347,6 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
         'server_metadata' => 'array',
-        'logdrain_axiom_api_key' => 'encrypted',
-        'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
@@ -351,8 +360,6 @@ class Server extends BaseModel
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
-        'logdrain_axiom_api_key',
-        'logdrain_newrelic_license_key',
         'proxy_error_page',
     ];
 
@@ -441,6 +448,8 @@ class Server extends BaseModel
         $this->forceFill(['ip' => $ip]);
         $this->syncOriginalAttribute('ip');
         static::flushIdentityMap();
+        // The query update skips the saved hook, which forgets the host key of the old address.
+        $this->settings?->forgetSshHostKey('address_changed');
 
         return true;
     }
@@ -460,6 +469,20 @@ class Server extends BaseModel
         $this->forceFill($updates);
         $this->syncOriginalAttributes(array_keys($updates));
         static::flushIdentityMap();
+    }
+
+    /**
+     * Refresh the status of the linked cloud server from its provider.
+     */
+    public function refreshCloudProviderState(): ?string
+    {
+        return match ($this->cloudProviderToken?->provider) {
+            'hetzner' => $this->hetzner_server_id ? $this->refreshHetznerState() : null,
+            'vultr' => $this->vultr_instance_id ? $this->refreshVultrState() : null,
+            'digitalocean' => $this->digitalocean_droplet_id ? $this->refreshDigitalOceanState() : null,
+            'hostinger' => $this->hostinger_virtual_machine_id ? $this->refreshHostingerState() : null,
+            default => null,
+        };
     }
 
     public function refreshHetznerState(): ?string
@@ -687,6 +710,21 @@ class Server extends BaseModel
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
+    }
+
+    public function imageScans(): HasMany
+    {
+        return $this->hasMany(ImageScan::class);
+    }
+
+    public function imageSboms(): HasMany
+    {
+        return $this->hasMany(ImageSbom::class);
+    }
+
+    public function hostScan(): HasOne
+    {
+        return $this->hasOne(ServerHostScan::class);
     }
 
     public function dockerCleanupExecutions()
@@ -977,9 +1015,9 @@ class Server extends BaseModel
     }
 
     /**
-     * Traefik routers that use the same rule as the resource routers, with a priority one
-     * higher. Traefik uses the rule length as the default priority, so a resource on a longer
-     * path of the same host keeps its own router.
+     * Traefik routers that use the same rule as the resource routers (from the domains, or
+     * from custom labels), with a priority one higher. Traefik uses the rule length as the
+     * default priority, so a resource on a longer path of the same host keeps its own router.
      *
      * @param  Collection<int, Application|Service>  $resources
      */
@@ -988,7 +1026,7 @@ class Server extends BaseModel
         $routers = [];
         $middlewares = [];
         foreach ($resources as $resource) {
-            $routes = $resource->maintenanceRoutes();
+            $routes = $resource->maintenanceTraefikRouters();
             if ($routes->isEmpty()) {
                 continue;
             }
@@ -1000,22 +1038,15 @@ class Server extends BaseModel
                     'query' => '/'.$resource->maintenancePageFile(),
                 ],
             ];
-            foreach ($routes as $index => $route) {
-                $rule = "Host(`{$route['host']}`) && PathPrefix(`{$route['path']}`)";
-                $router = [
-                    'entryPoints' => ['http'],
-                    'rule' => $rule,
+            foreach ($routes as $route) {
+                $routers["coolify-maintenance-{$resource->uuid}-{$route['name']}"] = array_filter([
+                    'entryPoints' => $route['entryPoints'],
+                    'rule' => $route['rule'],
                     'service' => 'coolify-maintenance-noop',
                     'middlewares' => ['coolify-maintenance-headers', $middleware],
-                    'priority' => strlen($rule) + 1,
-                ];
-                $routers["coolify-maintenance-{$resource->uuid}-{$index}-http"] = $router;
-                if ($route['scheme'] === 'https') {
-                    $routers["coolify-maintenance-{$resource->uuid}-{$index}-https"] = array_merge($router, [
-                        'entryPoints' => ['https'],
-                        'tls' => ['certResolver' => 'letsencrypt'],
-                    ]);
-                }
+                    'priority' => $route['priority'],
+                    'tls' => $route['tls'],
+                ], fn ($value) => $value !== null);
             }
         }
 
@@ -1054,11 +1085,10 @@ class Server extends BaseModel
         $resources ??= $this->maintenanceResources();
         $sites = [];
         foreach ($resources as $resource) {
-            foreach ($resource->maintenanceRoutes() as $index => $route) {
-                $address = caddySiteAddress($route['scheme'], $route['host'], $route['force_https']);
+            foreach ($resource->maintenanceCaddySites() as $index => $site) {
                 $matcher = "@coolify-maintenance-{$resource->uuid}-{$index}";
-                $sites[$address][] = implode("\n", [
-                    "\t{$matcher} path {$route['path']}*",
+                $sites[$site['address']][] = implode("\n", [
+                    "\t{$matcher} path {$site['path']}",
                     "\thandle {$matcher} {",
                     "\t\treverse_proxy ".self::PROXY_ERROR_PAGE_CONTAINER.':80 {',
                     "\t\t\trewrite /{$resource->maintenancePageFile()}",
@@ -1122,14 +1152,7 @@ class Server extends BaseModel
                                     0 => 'http',
                                 ],
                                 'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                            ],
-                            'coolify-reverb-api' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                ],
-                                'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                             ],
                             'coolify-terminal-ws' => [
                                 'entryPoints' => [
@@ -1192,15 +1215,7 @@ class Server extends BaseModel
                             0 => 'https',
                         ],
                         'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        'tls' => $tls,
-                    ];
-                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
-                        'entryPoints' => [
-                            0 => 'https',
-                        ],
-                        'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                         'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
@@ -1240,16 +1255,17 @@ class Server extends BaseModel
 $siteAddress {
     encode zstd gzip
     handle /app/* {
-        reverse_proxy coolify:6001
-    }
-    handle /apps* {
-        reverse_proxy coolify:6001
+        reverse_proxy coolify:6001 {
+            stream_close_delay ".CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     handle /terminal/ws {
-        reverse_proxy coolify:6002
+        reverse_proxy coolify:6002 {
+            stream_close_delay '.CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     reverse_proxy coolify:8080
-}";
+}';
                 $base64 = base64_encode($caddy_file);
                 instant_remote_process([
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
@@ -1414,6 +1430,15 @@ $siteAddress {
     public function isForceDisabled()
     {
         return $this->settings->force_disabled;
+    }
+
+    /**
+     * On self-hosted, only the unreachable cleanup disables a server, so a working connection can enable it again.
+     * On Cloud the flag enforces the plan server limit, and a transferred server stays an archive.
+     */
+    public function canBeReEnabled(): bool
+    {
+        return $this->settings->force_disabled === true && ! isCloud() && ! $this->isTransferredAway();
     }
 
     /**
@@ -1755,6 +1780,47 @@ $siteAddress {
         return $applications->concat($databases)->concat($services->get());
     }
 
+    /**
+     * The resources that deleting this server with "Delete all resources" deletes. An application that has this server
+     * only as an additional destination runs on another server, so it is detached instead.
+     *
+     * @return Collection<int, Model>
+     */
+    public function primaryResources(): Collection
+    {
+        return $this->primaryApplications()
+            ->concat($this->databases())
+            ->concat($this->services()->get());
+    }
+
+    /**
+     * Remove this server from the applications that use it only as an additional destination.
+     * The applications keep running on their other servers.
+     *
+     * @param  bool  $stopContainers  stop and remove the containers of the applications on this server (best effort)
+     */
+    public function detachAdditionalApplications(bool $stopContainers = true): void
+    {
+        $applications = $this->additionalApplications();
+        if ($stopContainers) {
+            foreach ($applications as $application) {
+                try {
+                    StopApplicationOneServer::run($application, $this);
+                } catch (\Throwable $e) {
+                    logger()->warning('Could not stop the containers of an application on a deleted server.', [
+                        'application_id' => $application->id,
+                        'server_id' => $this->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+        DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->delete();
+    }
+
     public function stopUnmanaged($id)
     {
         return instant_remote_process([dockerStopCommand(0, escapeshellarg($id), $this)], $this);
@@ -1845,18 +1911,6 @@ $siteAddress {
         }
     }
 
-    public function hasDefinedResources()
-    {
-        $applications = $this->applications()->count() > 0;
-        $databases = $this->databases()->count() > 0;
-        $services = $this->services()->count() > 0;
-        if ($applications || $databases || $services) {
-            return true;
-        }
-
-        return false;
-    }
-
     public function databases()
     {
         // Get destination IDs for this server in two efficient queries
@@ -1896,22 +1950,13 @@ $siteAddress {
             ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
 
+    /**
+     * The applications whose primary destination is on this server, plus the applications that use this server as an
+     * additional destination.
+     */
     public function applications()
     {
-        // Get destination IDs for this server in two efficient queries
-        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
-        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
-
-        // Query all applications in a single query using polymorphic conditions
-        $applications = Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
-            $query->where(function ($q) use ($standaloneDockerIds) {
-                $q->where('destination_type', StandaloneDocker::class)
-                    ->whereIn('destination_id', $standaloneDockerIds);
-            })->orWhere(function ($q) use ($swarmDockerIds) {
-                $q->where('destination_type', SwarmDocker::class)
-                    ->whereIn('destination_id', $swarmDockerIds);
-            });
-        })->get();
+        $applications = $this->primaryApplications();
 
         // Get additional server applications
         $additionalApplicationIds = DB::table('additional_destinations')
@@ -1924,6 +1969,45 @@ $siteAddress {
         }
 
         return $applications;
+    }
+
+    /**
+     * The applications whose primary destination is on this server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function primaryApplications(): Collection
+    {
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
+
+        // Query all applications in a single query using polymorphic conditions
+        return Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        })->get();
+    }
+
+    /**
+     * The applications that use this server only as an additional destination. Their primary destination is on
+     * another server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function additionalApplications(): Collection
+    {
+        $applicationIds = DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereNotIn('application_id', $this->primaryApplications()->pluck('id'))
+            ->pluck('application_id');
+
+        return Application::query()->with('destination.server')->whereIn('id', $applicationIds)->get();
     }
 
     public function dockerComposeBasedApplications()
@@ -1992,6 +2076,19 @@ $siteAddress {
     public static function normalizeIp(?string $value): string
     {
         return normalizeIpAddress(preg_replace('/[^0-9a-zA-Z.:%-]/', '', (string) $value));
+    }
+
+    /**
+     * Whether a server of any team already uses this SSH endpoint. The port is part of the endpoint,
+     * so servers behind one NAT address with different forwarded SSH ports are different servers.
+     */
+    public static function sshEndpointInUse(?string $ip, int|string|null $port, ?int $exceptServerId = null): bool
+    {
+        return self::query()
+            ->where('ip', self::normalizeIp($ip))
+            ->where('port', (int) ($port ?? 22))
+            ->when($exceptServerId !== null, fn ($query) => $query->whereKeyNot($exceptServerId))
+            ->exists();
     }
 
     public function getIp(): Attribute
@@ -2184,15 +2281,15 @@ $siteAddress {
             return false;
         }
 
-        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        (new ServerConnectionCheckJob($this))->handle();
         $this->settings->refresh();
 
         return $this->isFunctional();
     }
 
-    public function isLogDrainEnabled()
+    public function isLogDrainEnabled(): bool
     {
-        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
+        return $this->settings->logdrain_type !== null;
     }
 
     /**
@@ -2200,7 +2297,7 @@ $siteAddress {
      */
     public function isFluentBitLogDrainEnabled(): bool
     {
-        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+        return $this->settings->logdrain_type?->usesFluentBit() ?? false;
     }
 
     public function validateOS(): bool|Stringable
@@ -2450,12 +2547,22 @@ $siteAddress {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
+        // A validation enables a disabled self-hosted server again, but only when the connection works.
+        $isReEnabling = $this->canBeReEnabled() && ! $this->hasPlaceholderIp();
+        if ($isReEnabling) {
+            $this->forceEnableServer();
+        }
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
+            // Enforce mode cannot connect without the key, so it reads the key first. Warn mode learns it after the connection.
+            if (SshMultiplexingHelper::hostKeyCheckingMode($this) === 'enforce') {
+                SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
+            }
             // One attempt only: retries would repeat failed logins on a host that may not belong to the user.
             instant_remote_process(['ls /'], $this, disableMultiplexing: true, maxAttempts: 1);
+            SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
             $this->refundValidationAttempt();
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
@@ -2465,17 +2572,73 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            if ($justCheckingNewKey) {
-                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            if ($isReEnabling) {
+                $this->forceDisableServer();
             }
-            if ($this->settings->is_reachable === true) {
+            $error = $e->getMessage();
+            if ($error === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE && ! $this->recordHostKeyMismatch()) {
+                $error = 'SSH host key verification failed, but the server still sends the trusted host key.';
+            }
+            if (! $justCheckingNewKey && $this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
                 ServerReachabilityChanged::dispatch($this);
             }
 
-            return ['uptime' => false, 'error' => $e->getMessage()];
+            return ['uptime' => false, 'error' => $error];
         }
+    }
+
+    /**
+     * ssh reported a host key problem. Returns true when the server sends a host key that is not pinned, and
+     * saves that key as pending, so that an admin can compare and trust it. Returns false when the server
+     * still sends the pinned key or the key cannot be read: then it is a normal connection error.
+     * A key is reported once a day, and the team gets at most one notification an hour, because a load
+     * balancer in front of several hosts can switch between keys on every connection. While a key is
+     * pending, the server is scanned at most every ten minutes.
+     *
+     * @param  string|null  $sshErrorOutput  The stderr of ssh. When it shows the fingerprint of the pending key, no scan is needed.
+     */
+    public function recordHostKeyMismatch(?string $sshErrorOutput = null): bool
+    {
+        $settings = $this->settings;
+        if (filled($settings->ssh_host_key_pending) && preg_match_all('/SHA256:[A-Za-z0-9+\/]+/', (string) $sshErrorOutput, $matches) > 0) {
+            $pendingFingerprints = array_map(fn (string $fingerprint) => strtok($fingerprint, ' '), ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
+            if (array_diff($matches[0], $pendingFingerprints) === []) {
+                return true;
+            }
+        }
+        // Each scan is a failed login on the server (fail2ban), so a pending key is scanned again at most every ten minutes.
+        $scannedCacheKey = 'ssh_host_key_mismatch_scanned_'.$this->uuid.'_'.hash('sha256', (string) $settings->ssh_host_key);
+        if (filled($settings->ssh_host_key_pending) && Cache::has($scannedCacheKey)) {
+            return true;
+        }
+
+        $newKey = SshMultiplexingHelper::scanHostKey($this);
+        Cache::put($scannedCacheKey, true, now()->addMinutes(10));
+        if ($newKey === null || array_diff(explode("\n", $newKey), explode("\n", (string) $settings->ssh_host_key)) === []) {
+            return false;
+        }
+        if ($newKey === $settings->ssh_host_key_pending) {
+            return true;
+        }
+
+        $settings->forceFill(['ssh_host_key_pending' => $newKey])->save();
+        if (! Cache::add('ssh_host_key_reported_'.$this->uuid.'_'.hash('sha256', $newKey), true, now()->addDay())) {
+            return true;
+        }
+        Log::warning('SSH host key of server changed', ['server_uuid' => $this->uuid, 'mode' => SshMultiplexingHelper::hostKeyCheckingMode($this)]);
+        auditLog('server.ssh_host_key_changed', [
+            'team_id' => $this->team_id,
+            'server_uuid' => $this->uuid,
+            'server_name' => $this->name,
+            'fingerprints' => ServerSetting::sshHostKeyFingerprints($newKey),
+        ], 'warning');
+        if (Cache::add('ssh_host_key_changed_notified_'.$this->uuid, true, now()->addHour())) {
+            $this->team?->notify(new HostKeyChanged($this));
+        }
+
+        return true;
     }
 
     public function installDocker()

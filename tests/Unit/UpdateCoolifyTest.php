@@ -99,7 +99,7 @@ function updateCoolifyTestPrepareUpgrade(): void
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 }
@@ -123,7 +123,7 @@ it('validates cache against running version before fallback', function () {
 
     // Mock cache returning older version
     Cache::shouldReceive('remember')
-        ->andReturn(['coolify' => ['v4' => ['version' => '4.0.5']]]);
+        ->andReturn(['coolify' => ['version' => '4.0.5']]);
 
     config(['constants.coolify.version' => '4.0.10']);
 
@@ -150,7 +150,7 @@ it('uses validated cache when CDN fails and cache is newer', function () {
 
     // Cache has newer version than current
     Cache::shouldReceive('remember')
-        ->andReturn(['coolify' => ['v4' => ['version' => '4.0.10']]]);
+        ->andReturn(['coolify' => ['version' => '4.0.10']]);
 
     config(['constants.coolify.version' => '4.0.5']);
 
@@ -183,7 +183,7 @@ it('passes the saved registry URL to the upgrade script command', function () {
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 
@@ -212,7 +212,7 @@ it('falls back to docker io for the upgrade script command when no registry is s
 
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
+            'stable' => ['coolify' => ['version' => '4.0.10']],
         ], 200),
     ]);
 
@@ -364,7 +364,7 @@ it('prevents downgrade even with manual update', function () {
     // CDN returns older version
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0']],
+            'stable' => ['coolify' => ['version' => '4.0.0']],
         ], 200),
     ]);
 
@@ -396,7 +396,7 @@ it('does not start a second upgrade while a recent upgrade status is in progress
         'constants.ssh.mux_enabled' => false,
     ]);
     updateCoolifyTestCreateRootServerAndSettings();
-    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.10']]], 200)]);
     $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
 
     expect(fn () => $action->handle(manual_update: true))
@@ -414,7 +414,7 @@ it('starts an upgrade when the previous upgrade status is older than the lock ex
         'constants.ssh.mux_enabled' => false,
     ]);
     updateCoolifyTestCreateRootServerAndSettings();
-    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.10']]], 200)]);
     updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(16)->toIso8601String())
         ->handle(manual_update: true);
 
@@ -424,11 +424,11 @@ it('starts an upgrade when the previous upgrade status is older than the lock ex
 
 it('backs up the instance database before the update', function () {
     updateCoolifyTestPrepareUpdate();
-    Process::fake(['*du -b*' => '128', '*' => '']);
+    fakeRemoteProcesses(['*du -b*' => '128', '*' => '']);
 
     (new UpdateCoolify)->handle(manual_update: true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'pg_dump'));
     expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))
         ->toContain("bash /data/coolify/source/upgrade.sh '4.0.10'");
 });
@@ -439,15 +439,38 @@ it('skips the backup before the update when it is disabled', function () {
 
     (new UpdateCoolify)->handle(manual_update: true);
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'pg_dump'));
     expect(Activity::query()->count())->toBe(1);
 });
 
 it('does not start the update when the instance backup fails', function () {
     updateCoolifyTestPrepareUpdate();
-    Process::fake(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
+    fakeRemoteProcesses(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
 
     expect(fn () => (new UpdateCoolify)->handle(manual_update: true))
         ->toThrow(Exception::class, 'The database backup failed, so the update was not started.')
         ->and(Activity::query()->count())->toBe(0);
+});
+
+it('saves the automatic update attempt before it queues the upgrade script', function () {
+    Notification::fake();
+    updateCoolifyTestPrepareUpgrade();
+    $savedTargetVersion = null;
+    Activity::created(function () use (&$savedTargetVersion) {
+        $savedTargetVersion = InstanceSettings::findOrFail(0)->auto_update_target_version;
+    });
+
+    updateCoolifyTestActionWithStatus('')->handle();
+
+    expect($savedTargetVersion)->toBe('4.0.10');
+});
+
+it('keeps the saved attempt of a running upgrade when an automatic update is skipped', function () {
+    updateCoolifyTestPrepareUpgrade();
+    InstanceSettings::findOrFail(0)->update(['auto_update_target_version' => '4.0.8', 'auto_update_started_at' => now()->subMinutes(5)]);
+    $action = updateCoolifyTestActionWithStatus('3|Pulling Docker images|'.now()->subMinutes(2)->toIso8601String());
+
+    expect(fn () => $action->handle())->toThrow(Exception::class, 'Another Coolify upgrade is already running');
+
+    expect(InstanceSettings::findOrFail(0)->auto_update_target_version)->toBe('4.0.8');
 });

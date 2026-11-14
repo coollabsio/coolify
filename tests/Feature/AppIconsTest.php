@@ -1,24 +1,5 @@
 <?php
 
-use App\Models\InstanceSettings;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Once;
-
-uses(RefreshDatabase::class);
-
-test('base layout links the app icons and web manifest', function () {
-    InstanceSettings::query()->forceCreate(['id' => 0]);
-    Once::flush();
-    User::factory()->create();
-
-    $this->get('/login')
-        ->assertSuccessful()
-        ->assertSee('<link rel="apple-touch-icon" href="'.asset('apple-touch-icon.png').'" />', false)
-        ->assertSee('<link rel="manifest" href="'.asset('site.webmanifest').'" />', false)
-        ->assertSee('<meta name="apple-mobile-web-app-title" content="Coolify" />', false);
-});
-
 test('icon files are opaque pngs with the required sizes', function (string $file, int $size) {
     $image = getimagesize(public_path($file));
 

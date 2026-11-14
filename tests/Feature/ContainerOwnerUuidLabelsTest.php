@@ -87,7 +87,7 @@ describe('container lookups for services and databases', function () {
         ]);
         $commands = collect();
         Process::fake(function ($process) use ($commands) {
-            $commands->push($process->command);
+            $commands->push(remoteProcessScript($process));
 
             return Process::result(output: '');
         });

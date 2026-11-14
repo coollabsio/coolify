@@ -36,13 +36,14 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Disk usage notification | threshold 70, check frequency `*/30 * * * *`, interval 12 h |
 | ✅ | Security > Patches | check frequency `daily`, automatic security updates on at `04:30` (the last check result is not moved; the target shows "never" until its first check) |
 | ✅ | Terminal | terminal access off |
+| ➕ | Security > SSH host key | a trusted host key (shown by fingerprint), "host key check" disabled on one server, and "Enforce" on another server. Expected: the target shows the same fingerprint with source `transfer`, keeps both per-server settings, and connects without a new trust step |
 | ✅ | Image retention | "disable application image retention" on |
 | ✅ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
 | ✅ | Backup compression | CPU percentage 50 |
 | ✅ | Metrics / Sentinel | metrics on, refresh rate 10 s, history 14 days, push interval 30 s |
 | ✅ | Traffic analytics | on, top N 20, sample threshold, retention 1h=3 / 1d=60 days, IP mode `anonymized` |
 | ✅ | GeoIP | on, MaxMind license key, refresh 14 days |
-| ✅ | Log drains | New Relic (key + base URI), Highlight (project ID), Axiom (dataset + key), custom (config + parser), one of them enabled |
+| ✅ | Log drains | New Relic (key + base URI), Axiom (dataset, key + edge domain), custom (config + parser), one of them enabled |
 | ✅ | Cloudflare tunnel | tunnel on, tunnel ID, account ID, Cloudflare integration token selected, and the DNS record of the SSH hostname. Expected: the record moves with the server; the source keeps it only for a take back (not owned) |
 | ➕ | Jump server flag | on (on a server that is only a jump host) |
 
@@ -54,6 +55,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Second standalone destination | extra Docker network, one resource on it |
 | ✅ | Server shared variables | 2 variables, one multiline, one literal, one with a comment |
 | ✅ | SSL certificates | CA certificate (created automatically) + a database with SSL on (creates a server certificate) |
+| ✅ | Image vulnerability scanning | server opt-in on, server scan rules (block deploys `strict`, count medium problems: yes), application scan rules (if the scan cannot run: block, count medium problems: no), one ignore of a vulnerability on an application, one team-wide ignore (stays on the source, the export warns), application scan switch off and "images built by team" on, scanner limits that are not the defaults (Syft time limit 20 minutes, Grype time limit 30 minutes, scanner CPU limit 2, scanner memory limit 2 GB). A scan, its SBOM, and the daily candidate scan counter are not moved: the next rescan rebuilds them |
 | ✅ | GitHub runner config | labels, max runners 2, docker mode `dind`, image, CPU/memory limits, 3 timeouts, PR jobs off, dedicated on, uses the team GitHub App (see 4). Expected: on the target it is **disabled** and the checklist says to enable it |
 
 ## 4. Team credentials the server uses
@@ -65,6 +67,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | GitHub App (team, not system-wide) | with runner fields (`organization_self_hosted_runners`, `actions`, `webhook_events`, `runner_group_id`). Expected: checklist step for Webhook/Setup/Callback URL |
 | ✅ | GitLab App (team) | used by one application. Expected: checklist step for the webhook URL |
 | ✅ | S3 storage | the dev MinIO service (the VM must reach it), used by a database backup and a volume backup |
+| ➕ | SFTP, FTPS, or WebDAV storage | a storage of another type (`type` column), used by a backup; an SFTP storage that logs in with a private key (`private_key_id`), with a saved host key (`sftp_host_key`) |
 | ✅ | Cloudflare integration token | for DNS zones and the tunnel |
 | ✅ | Secret manager token | Infisical, Doppler, or Vault |
 | ⚠️ | Cloud provider token | only with a real cloud server |
@@ -90,20 +93,22 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Nixpacks app, public GitHub repo | Expected: checklist step for manual webhooks |
 | ✅ | Static app (`is_static`, `is_spa`) | |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
+| ➕ | Docker Compose app with a security update | an image override from the Security page (`docker_compose_image_overrides`); the target deploys the new image |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
+| ➕ | Saved SSH host keys | app with a deploy key on a self-hosted Git host, deployed once, so Source → SSH host keys has a line. Expected: the same line on the target |
 | ✅ | Domains | 2 domains, noindex domains, domain port overrides, preview URL template |
 | ✅ | Health check | custom path, port, method, return code, interval, retries, start period |
 | ✅ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |
 | ➕ | Advanced | custom labels, custom docker run options, pre/post deployment command + container, manual webhook secrets |
 | ✅ | Maintenance | maintenance mode on + custom maintenance page |
-| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, fork PR approval not required, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, Traefik certificate resolver |
+| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, fork PR approval not required, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, use production values in previews off, Traefik certificate resolver, auto-cancel queued webhook deployments off, auto-cancel building webhook deployments on |
 | ✅ | Environment variables | normal, multiline, literal, shown once, build time only, runtime only, required, with comment, preview-only, and references to `{{team.*}}`, `{{project.*}}`, `{{environment.*}}`, `{{server.*}}` |
 | ✅ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on |
 | ✅ | File mount + directory mount | content, chown, chmod |
 | ✅ | Volume backup | on the persistent volume: S3 on, stop during backup, all retention values, timeout, missing-backup days |
-| ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout |
+| ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout + "Run in a shell" off; an auto-disabled task keeps its disabled reason |
 | ✅ | Tag | |
-| ✅ | Preview deployment | PR preview with domain port overrides + max restart count (needs the GitHub App, or create it in the database) |
+| ✅ | Preview deployment | PR preview with domain port overrides + max restart count + keeps production values (previews from before v4.5.1) (needs the GitHub App, or create it in the database) |
 | ✅ | Fork PR preview approval | a fork PR preview with an approved commit and a newer commit that waits for approval (`is_fork_pull_request`, `approved_commit`, `approved_at`, `pending_approval_commit`); after the transfer the approved commit still deploys and the pending one still waits |
 | ✅ | Secret manager link | the app loads variables from the secret manager token |
 | ✅ | Managed DNS record | owned record in the Cloudflare zone for the app domain. Expected: the target takes ownership (provider comment changes) |

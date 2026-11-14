@@ -99,6 +99,30 @@ it('creates a service database backup without S3 and opens its configuration', f
         ->and($backup->s3_storage_id)->toBeNull();
 });
 
+it('backs up all databases by default for an Odoo service database', function (string $serviceType, bool $expectedDumpAll) {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+        'service_type' => $serviceType,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgresql',
+        'image' => 'postgres:16-alpine',
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    expect((bool) ScheduledDatabaseBackup::query()->sole()->dump_all)->toBe($expectedDumpAll);
+})->with([
+    'odoo' => ['odoo', true],
+    'other service' => ['drupal-with-postgresql', false],
+]);
+
 it('rejects an unsupported service database name during backup', function () {
     $service = Service::factory()->create([
         'server_id' => $this->server->id,
@@ -226,7 +250,7 @@ it('backs up sqlite files added to the database after the backup was scheduled',
 
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push(is_array($process->command) ? implode(' ', $process->command) : $process->command);
+        $commands->push(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process));
 
         return Process::result(output: '');
     });

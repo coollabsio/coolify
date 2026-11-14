@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -62,7 +63,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 $commands,
                 $this->server,
                 callEventOnFinish: 'ProxyStatusChanged',
-                callEventData: $this->server->id,
+                callEventData: ProxyStatusChanged::dataFor($this->server),
                 queue: deployment_queue(),
             );
 

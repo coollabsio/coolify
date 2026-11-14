@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\Service;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
@@ -12,5 +13,16 @@ class ServiceStartFinished
 {
     use Dispatchable;
 
-    public function __construct(public int $serviceId) {}
+    /**
+     * @param  array{service_id: int, team_id: int}  $data  Build it with dataFor(); the listener ignores a service of another team.
+     */
+    public function __construct(public array $data) {}
+
+    /**
+     * @return array{service_id: int, team_id: int}
+     */
+    public static function dataFor(Service $service): array
+    {
+        return ['service_id' => $service->id, 'team_id' => $service->team()?->id];
+    }
 }

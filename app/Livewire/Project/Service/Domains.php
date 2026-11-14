@@ -10,6 +10,7 @@ use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
@@ -110,6 +111,8 @@ class Domains extends Component
     public bool $forceRemovePort = false;
 
     public ?int $requiredPort = null;
+
+    public ?int $requestedPort = null;
 
     public bool $isCheckingDns = false;
 
@@ -269,22 +272,10 @@ class Domains extends Component
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
 
-        $server = $this->service->server;
-        if ($server) {
-            if ($server->id === 0) {
-                $configured = data_get($settings, 'public_ipv4')
-                    ?: data_get($settings, 'public_ipv6')
-                    ?: $server->ip;
-            } else {
-                $configured = $server->ip;
-            }
-            $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
-            $this->serverIpConfigured = $resolved['configured'];
-            $this->serverIp = $resolved['ip'] ?? $resolved['configured'];
-        } else {
-            $this->serverIp = null;
-            $this->serverIpConfigured = null;
-        }
+        $addresses = ServerDnsAddresses::forServer($this->service->server);
+        $this->serverIpConfigured = $addresses->configured;
+        // Prefer the real IP so users know what DNS record to set when the server address is a hostname.
+        $this->serverIp = $addresses->address;
 
         $this->forceHttpsRedirects = $this->service->applications
             ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isForceHttpsEnabled()])
@@ -1376,6 +1367,7 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
+            $urlsToCheck = $this->configureDnsAfterDomainEdit($urlsToCheck, $previousDnsHostnames);
             if ($urlsToCheck !== []) {
                 $this->queueUrlsDns($urlsToCheck, $app);
             }
@@ -1613,10 +1605,10 @@ class Domains extends Component
         if ($checkPorts && ! $this->forceRemovePort) {
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null && $domainString) {
-                $previousFqdn = $app->getOriginal('fqdn');
                 foreach ($this->splitDomains($domainString) as $fqdn) {
-                    if ($app->portRequiresConfirmation($fqdn, $requiredPort, is_string($previousFqdn) ? $previousFqdn : null)) {
+                    if ($app->portRequiresConfirmation($fqdn, $requiredPort)) {
                         $this->requiredPort = $requiredPort;
+                        $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                         $this->showPortWarningModal = true;
                         $app->refresh();
 

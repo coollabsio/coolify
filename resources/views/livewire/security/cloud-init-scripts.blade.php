@@ -28,10 +28,10 @@
                     icon-name="file-content" size="sm" />
             @else
                 <div>
-                    <div class="grid grid-cols-[minmax(0,1fr)_12rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    <div class="grid grid-cols-[minmax(0,1fr)_12rem_4.5rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                         <div class="pl-11">Script</div>
                         <div>Last updated</div>
-                        <div class="w-7"></div>
+                        <div class="text-right">Actions</div>
                     </div>
                     @foreach ($scripts as $script)
                         @can('view', $script)
@@ -40,7 +40,7 @@
                                 class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                                 <x-slot:content>
                             <div
-                                class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_12rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]"
+                                class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_12rem_4.5rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]"
                             >
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
@@ -59,10 +59,12 @@
                                         Updated {{ $script->updated_at->diffForHumans() }}
                                     </span>
                                 </div>
-                                <button type="button" class="icon-button" title="Edit cloud-init script"
-                                    aria-label="Edit {{ $script->name }}" @click="modalOpen=true">
-                                    <x-reicon name="settings" class="size-3.5" />
-                                </button>
+                                <div class="flex justify-end">
+                                    <button type="button" class="icon-button" title="Edit cloud-init script"
+                                        aria-label="Edit {{ $script->name }}" @click="modalOpen=true">
+                                        <x-reicon name="settings" class="size-3.5" />
+                                    </button>
+                                </div>
                             </div>
                                 </x-slot:content>
                                 <livewire:security.cloud-init-script.show :cloud_init_script_uuid="$script->uuid"

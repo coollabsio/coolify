@@ -16,12 +16,17 @@ class CloudflareTunnelChangedNotification
     public function handle(CloudflareTunnelChanged $event): void
     {
         $server_id = data_get($event, 'data.server_id');
+        $team_id = data_get($event, 'data.team_id');
         $ssh_domain = data_get($event, 'data.ssh_domain');
-
-        $this->server = Server::where('id', $server_id)->firstOrFail();
-        if ($this->server->isTransferredAway()) {
+        if (is_null($server_id) || is_null($team_id)) {
             return;
         }
+
+        $server = Server::where('id', $server_id)->where('team_id', $team_id)->first();
+        if (is_null($server) || $server->isTransferredAway()) {
+            return;
+        }
+        $this->server = $server;
 
         // Check if cloudflare tunnel is running (container is healthy) - try 3 times with 5 second intervals
         $cloudflareHealthy = false;

@@ -15,6 +15,10 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+afterEach(function () {
+    @unlink(storage_path('app/versions.json'));
+});
+
 beforeEach(function () {
     Queue::fake([CheckTraefikVersionJob::class]);
     config()->set('constants.coolify.version', '4.4.6');
@@ -32,7 +36,7 @@ beforeEach(function () {
 
 it('reports a failed CDN request instead of "No new version available"', function () {
     Http::fake(['*' => Http::response('error code: 1200', 503)]);
-    File::partialMock()->shouldReceive('put')->with(base_path('versions.json'), Mockery::any())->never();
+    File::partialMock()->shouldReceive('replace')->with(storage_path('app/versions.json'), Mockery::any())->never();
 
     Livewire::test(Updates::class)
         ->call('checkManually')
@@ -41,8 +45,7 @@ it('reports a failed CDN request instead of "No new version available"', functio
 });
 
 it('reports a new version when the CDN has a newer version', function () {
-    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.4.7']]])]);
-    File::partialMock()->shouldReceive('put')->with(base_path('versions.json'), Mockery::any())->once();
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.4.7']]])]);
 
     Livewire::test(Updates::class)
         ->call('checkManually')

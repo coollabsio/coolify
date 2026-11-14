@@ -16,7 +16,8 @@
     'cursor-pointer hover:bg-neutral-100/80 dark:hover:bg-white/[0.035]' => !$disabled,
     'opacity-55' => $disabled,
 ])>
-    <label @class([
+    {{-- explicit "for": otherwise the label forwards clicks to its first labelable child, the helper button --}}
+    <label for="{{ $htmlId }}" @class([
         'label flex w-full max-w-full min-w-0 items-center gap-3 px-0',
         'cursor-pointer' => !$disabled,
         'cursor-not-allowed' => $disabled,

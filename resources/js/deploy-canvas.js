@@ -104,7 +104,7 @@ const POSTGRES_IMAGES = [
   ['pgvector/pgvector:pg18', 'PGVector 18'],
   ['pgvector/pgvector:pg17', 'PGVector 17'],
 ];
-const DATABASES = [['postgresql', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['mongodb', 'MongoDB'], ['redis', 'Redis'], ['keydb', 'KeyDB'], ['dragonfly', 'Dragonfly'], ['clickhouse', 'ClickHouse']];
+const DATABASES = [['postgresql', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['mongodb', 'MongoDB'], ['redis', 'Redis'], ['keydb', 'KeyDB'], ['dragonfly', 'Dragonfly'], ['clickhouse', 'ClickHouse'], ['sqlite', 'SQLite']];
 // One-click service templates ([key, name]), from the page (deploy-canvas.blade.php).
 let serviceTemplates = null;
 const templateOptions = () => {

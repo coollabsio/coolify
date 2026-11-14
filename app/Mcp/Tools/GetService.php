@@ -46,7 +46,7 @@ class GetService extends Tool
         }
 
         $service->setRelations([]);
-        $service->makeHidden(['destination', 'source', 'environment', 'applications', 'databases', 'serviceApplications', 'serviceDatabases']);
+        $service->makeHidden(['server', 'destination', 'source', 'environment', 'applications', 'databases', 'serviceApplications', 'serviceDatabases']);
 
         return $this->mcpSuccess($request, $this->respond(
             $this->scrubSensitive($service->toArray()),

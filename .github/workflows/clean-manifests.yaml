@@ -1,0 +1,60 @@
+name: Clean manifests
+
+on:
+  schedule:
+    - cron: "20 */3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: clean-manifests
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  clean:
+    name: Clean manifests
+    if: ${{ github.repository == 'coollabsio/coolify' }}
+    permissions:
+      contents: read
+      actions: write # to disable this workflow after a failure
+    environment:
+      name: cleanup
+      deployment: false
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Delete the unused manifests
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CLEANUP_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CLEANUP_TOKEN }}
+        run: scripts/clean-manifests.sh --delete 200
+
+      - name: Upload the lists of manifests
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: manifests
+          path: |
+            scripts/manifests-to-delete.tsv
+            scripts/deleted-manifests.tsv
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Disable this workflow after a failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable clean-manifests.yaml --repo "$GITHUB_REPOSITORY"

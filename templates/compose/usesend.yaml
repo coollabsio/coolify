@@ -35,7 +35,7 @@ services:
       retries: 20
 
   usesend:
-    image: usesend/usesend:latest
+    image: usesend/usesend:v1.10.0
     expose:
       - 3000
     environment:

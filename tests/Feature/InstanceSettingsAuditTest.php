@@ -150,8 +150,8 @@ test('resend settings save is audited without the api key', function () {
     Livewire::test(SettingsEmail::class)
         ->set('resendEnabled', true)
         ->set('resendApiKey', 're_secret_api_key')
-        ->set('smtpFromAddress', 'from@example.com')
-        ->set('smtpFromName', 'Coolify')
+        ->set('resendFromAddress', 'from@example.com')
+        ->set('resendFromName', 'Coolify')
         ->call('submitResend');
 
     $event = instanceSettingsAuditEvents('ui.settings.email.updated')->sole();
@@ -163,7 +163,7 @@ test('resend settings save is audited without the api key', function () {
 test('manual instance upgrade is audited', function () {
     Bus::fake();
     config()->set('constants.coolify.version', '4.0.0');
-    Cache::put('coolify:versions:all', ['coolify' => ['v4' => ['version' => '4.0.1']]], 3600);
+    Cache::put('coolify:versions', ['coolify' => ['version' => '4.0.1']], 3600);
 
     Livewire::test(Upgrade::class)->call('upgrade');
 

@@ -51,6 +51,13 @@
                 ['value' => true, 'label' => 'Available in the container'],
                 ['value' => false, 'label' => 'Not available in the container'],
             ]" helper="Make this variable available in the running container at runtime." />
+            @if ($canLeavePreviewValueEmpty)
+                <x-forms.listbox id="copy_value_to_preview" label="Preview value" :options="[
+                    ['value' => true, 'label' => 'Copy production value'],
+                    ['value' => false, 'label' => 'Leave empty'],
+                ]"
+                    helper="Coolify also adds this variable to Preview Deployments. Copy production value gives the preview the same value. Leave empty adds only the name, so previews do not get this production value and you can give them their own value." />
+            @endif
         @endif
     </div>
 

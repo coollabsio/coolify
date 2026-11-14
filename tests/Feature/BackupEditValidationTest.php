@@ -678,3 +678,39 @@ it('toggles the schedule from the form and notifies the page header', function (
 
     expect((bool) $backup->fresh()->enabled)->toBeFalse();
 });
+
+it('lets a service database backup choose the databases to back up', function (string $image, bool $showsSelection) {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $database = ServiceDatabase::create(['service_id' => $service->id, 'name' => 'db', 'image' => $image]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'database_type' => $database->getMorphClass(),
+        'database_id' => $database->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    $component = Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => collect()]);
+
+    $showsSelection
+        ? $component->assertSee('Database selection')->assertSee('Databases to back up')
+        : $component->assertDontSee('Database selection');
+
+    if ($showsSelection) {
+        $component->set('databasesToBackup', 'shop')->call('submit')->assertHasNoErrors();
+        expect($backup->fresh()->databases_to_backup)->toBe('shop');
+    }
+})->with([
+    'mariadb' => ['mariadb:11', true],
+    'mysql' => ['mysql:8', true],
+    'postgres' => ['postgres:16-alpine', true],
+    'mongodb' => ['mongo:7', false],
+]);

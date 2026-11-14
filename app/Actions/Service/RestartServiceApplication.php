@@ -2,6 +2,7 @@
 
 namespace App\Actions\Service;
 
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -21,6 +22,7 @@ class RestartServiceApplication
         $service = $serviceApplication->service;
         $server = $service->destination->server;
         $containerName = escapeshellarg($serviceApplication->name.'-'.$service->uuid);
+        NotifyResourceStoppedJob::expectStop($serviceApplication);
 
         instant_remote_process([
             "docker restart {$containerName}",

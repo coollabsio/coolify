@@ -189,7 +189,7 @@ it('removes service containers before its volumes and local metadata', function 
     $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result(output: '');
     });
@@ -227,7 +227,7 @@ it('targets a service subresource container by its Docker labels', function () {
     $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result(output: '');
     });
@@ -260,7 +260,7 @@ it('removes only the database container when an application of the same service 
     $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result(output: '');
     });
@@ -347,7 +347,7 @@ it('removes service containers with a command that works for non-root SSH users'
     $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+        $commands->push(remoteProcessScript($process));
 
         return Process::result(output: '');
     });

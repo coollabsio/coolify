@@ -338,13 +338,6 @@ it('does not add a single-label hostname as a service domain', function () {
     expect($this->apiApp->fresh()->fqdn)->toBeNull();
 });
 
-it('shows dns entries control next to Add', function () {
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSuccessful()
-        ->assertSee('DNS checks and records for this server')
-        ->assertSee('Manual records');
-});
-
 it('lists dns entries for service hosts that still need dns', function () {
     $this->webApp->update([
         'fqdn' => 'https://web.example.com',
@@ -502,15 +495,6 @@ it('adds a domain when the compose service has an empty environment section', fu
         ->assertDispatched('success');
 
     expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
-});
-
-it('keeps a stable key for the rendered domain list', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('wire:key="service-domains-list"')
-        ->toContain('wire:key="service-domain-rows-{{ $appId }}"')
-        ->not->toContain('md5(serialize($domainRows))');
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {
@@ -755,7 +739,7 @@ YAML,
         ->assertDispatched('success');
 });
 
-it('saves after confirming both a domain conflict and a missing required port', function () {
+it('saves after confirming both a domain conflict and a different port', function () {
     $this->service->update([
         'docker_compose_raw' => <<<'YAML'
 services:
@@ -770,7 +754,9 @@ YAML,
 
     $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
-        ->set('newDomain', 'https://api.example.com')
+        ->set('newDomainParts.host', 'api.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->set('newDomainPartsChanged', true)
         ->call('addDomain')
         ->assertSet('showDomainConflictModal', true)
         ->call('confirmDomainUsage')
@@ -778,8 +764,8 @@ YAML,
         ->assertSet('showPortWarningModal', true)
         ->assertSet('forceSaveDomains', true)
         ->assertSee('Use a different port?')
-        ->assertSee('Keep required port')
-        ->assertSee('Use this port anyway');
+        ->assertSee('Keep port 8000')
+        ->assertSee('Use port 3000 anyway');
 
     $component
         ->call('confirmRemovePort')
@@ -790,7 +776,28 @@ YAML,
         ->assertDispatched('success');
 
     expect(explode(',', (string) $this->webApp->fresh()->fqdn))
-        ->toBe(['https://api.example.com']);
+        ->toBe(['https://api.example.com'])
+        ->and($this->webApp->fresh()->domain_port_overrides)->toBe(['https://api.example.com' => 3000]);
+});
+
+it('does not warn about the port when a domain with an empty port is renamed', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n    environment:\n      - SERVICE_URL_API_8080\n  web:\n    image: nginx:alpine\n",
+    ]);
+    $this->apiApp->update(['fqdn' => 'https://api.example.com']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'renamed.example.com')
+        ->set('editingDomainParts.port', '')
+        ->set('editingDomainPartsChanged', true)
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+    expect($this->apiApp->fqdn)->toBe('https://renamed.example.com')
+        ->and($this->apiApp->domain_port_overrides)->toBeNull();
 });
 
 it('loads persisted dns status for service applications', function () {

@@ -35,7 +35,7 @@ beforeEach(function () {
 function fakeComposeLoadServer(?string $failingStep, string $errorOutput): void
 {
     Process::fake(function ($process) use ($failingStep, $errorOutput) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if ($failingStep !== null && str_contains($command, $failingStep)) {
             return Process::result(errorOutput: $errorOutput, exitCode: 128);
         }
@@ -85,4 +85,22 @@ it('tells the user that a symlinked Compose file is not loaded', function () {
     expect(fn () => $this->application->loadComposeFile())
         ->toThrow(RuntimeException::class, 'Docker Compose file at /docker-compose.yml (branch: main) is a symbolic link.');
     expect($this->application->fresh()->docker_compose_raw)->toBe("services:\n  web:\n    image: nginx\n");
+});
+
+it('tells the user that the Compose file is empty, not that it is missing', function () {
+    fakeComposeLoadServer(null, '');
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(function (RuntimeException $exception) {
+            expect($exception->getMessage())
+                ->toContain('Docker Compose file at /docker-compose.yml (branch: main) is empty.')
+                ->not->toContain('not found');
+        });
+});
+
+it('tells the user that the Compose file is missing', function () {
+    fakeComposeLoadServer('git ls-tree', 'No such file');
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(RuntimeException::class, 'Docker Compose file not found at: /docker-compose.yml (branch: main)');
 });

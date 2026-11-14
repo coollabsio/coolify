@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Events\ServiceStatusChanged;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\User;
@@ -12,13 +13,27 @@ use Spatie\Activitylog\Models\Activity;
 
 class ActivityMonitor extends Component
 {
+    /**
+     * Events that may be dispatched when an activity finishes. The event name comes from the
+     * client, so application events must be listed here explicitly.
+     */
+    private const ALLOWED_EVENTS = [
+        'activityFinished',
+        'init',
+        'prerequisitesInstalled',
+        'sysboxInstalled',
+        ServiceStatusChanged::class,
+    ];
+
     public ?string $header = null;
 
     #[Locked]
     public $activityId = null;
 
+    #[Locked]
     public $eventToDispatch = 'activityFinished';
 
+    #[Locked]
     public $eventData = null;
 
     public $isPollingActive = false;
@@ -42,7 +57,7 @@ class ActivityMonitor extends Component
         self::$eventDispatched = false;
 
         $this->activityId = $activityId;
-        $this->eventToDispatch = $eventToDispatch;
+        $this->eventToDispatch = in_array($eventToDispatch, self::ALLOWED_EVENTS, true) ? $eventToDispatch : null;
         $this->eventData = $eventData;
 
         // Update header if provided
@@ -130,11 +145,7 @@ class ActivityMonitor extends Component
                                 ?? $user->currentTeam()?->id
                                 ?? $user->teams->first()?->id;
                             if ($teamId && ! self::$eventDispatched) {
-                                if (filled($this->eventData)) {
-                                    $this->eventToDispatch::dispatch($teamId, $this->eventData);
-                                } else {
-                                    $this->eventToDispatch::dispatch($teamId);
-                                }
+                                $this->eventToDispatch::dispatch($teamId);
                                 self::$eventDispatched = true;
                             }
                         }

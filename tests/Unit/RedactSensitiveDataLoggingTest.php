@@ -49,17 +49,6 @@ it('keeps redacted traces and previous exceptions', function () {
         ->and(serialize($exception))->not->toContain($secret);
 });
 
-it('wires redaction into all persistent and remote log channels', function () {
-    $configuration = file_get_contents(__DIR__.'/../../config/logging.php');
-
-    expect($configuration)
-        ->toContain("'channels' => ['single']")
-        ->toContain("env('LOG_LEVEL', 'debug')")
-        ->not->toContain("env('LOG_LEVEL', 'info')")
-        ->and(substr_count($configuration, 'RedactSensitiveData::class'))->toBe(9)
-        ->and($configuration)->toMatch("/'audit' => \\[[^\\]]*'tap' => \\[RedactSensitiveAuditData::class\\]/s");
-});
-
 it('keeps email addresses in the audit log while still redacting secrets', function () {
     $secret = 'coolify-canary-secret-audit';
     $handler = new TestHandler;

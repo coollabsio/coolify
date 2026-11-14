@@ -13,6 +13,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -82,6 +83,8 @@ class Index extends Component
     public $forceRemovePort = false;
 
     public $requiredPort = null;
+
+    public ?int $requestedPort = null;
 
     public ?string $fqdn = null;
 
@@ -168,8 +171,6 @@ class Index extends Component
                 return;
             }
             $this->parameters = get_route_parameters();
-            $this->query = request()->query();
-            $this->currentRoute = request()->route()->getName();
             $project = currentTeam()
                 ->projects()
                 ->select('id', 'uuid', 'team_id')
@@ -181,32 +182,12 @@ class Index extends Component
                 ->firstOrFail();
             $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
-            if (in_array($this->currentRoute, ['project.service.index', 'project.service.index.advanced'], true)) {
-                return redirect()->route(
-                    'project.service.configuration',
-                    collect($this->parameters)->except('stack_service_uuid')->all(),
-                );
-            }
-            $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
-            if ($service) {
-                $this->serviceApplication = $service;
-                $this->resourceType = 'application';
-                $this->serviceApplication->getFilesFromServer();
-                $this->initializeApplicationProperties();
-            } else {
-                $this->serviceDatabase = $this->service->databases()->whereUuid($this->parameters['stack_service_uuid'])->first();
-                if (! $this->serviceDatabase) {
-                    return redirect()->route('project.service.configuration', [
-                        'project_uuid' => $this->parameters['project_uuid'],
-                        'environment_uuid' => $this->parameters['environment_uuid'],
-                        'service_uuid' => $this->parameters['service_uuid'],
-                    ]);
-                }
-                $this->resourceType = 'database';
-                $this->serviceDatabase->getFilesFromServer();
-                $this->initializeDatabaseProperties();
-            }
-            $this->s3s = $this->serviceTeamS3Storages();
+
+            // The settings of a stack service open in a modal on the configuration page.
+            return redirect()->route(
+                'project.service.configuration',
+                collect($this->parameters)->except('stack_service_uuid')->all(),
+            );
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -650,7 +631,7 @@ class Index extends Component
         try {
             $persistedApplication = $this->serviceApplication->fresh();
             $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
-            $previousEditableUrls = $persistedApplication->url;
+            $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($this->service));
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
@@ -689,8 +670,9 @@ class Index extends Component
                             continue;
                         }
 
-                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort)) {
                             $this->requiredPort = $requiredPort;
+                            $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                             $this->showPortWarningModal = true;
                             $this->serviceApplication->fqdn = $previousFqdn;
                             $this->serviceApplication->domain_port_overrides = $previousPortOverrides;
@@ -709,6 +691,7 @@ class Index extends Component
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
             app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($this->service, $previousServiceDnsHostnames);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {

@@ -8,6 +8,7 @@ use App\Jobs\ProvisionGithubRunnerJob;
 use App\Livewire\Server\GithubRunnerExecutions;
 use App\Livewire\Server\GithubRunners;
 use App\Livewire\Server\Show;
+use App\Livewire\Server\SysboxStatus;
 use App\Livewire\Source\Github\Change;
 use App\Livewire\Source\Github\Create;
 use App\Models\GithubApp;
@@ -98,7 +99,6 @@ function unreadyRunnerApp(): array
 function fakeRunnerGroupApi(GithubApp $githubApp, int $createStatus = 201): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runner-groups' => fn ($request) => $request->method() === 'POST'
             ? Http::response($createStatus === 201 ? ['id' => 55, 'default' => false] : ['message' => 'Upgrade to create runner groups'], $createStatus)
@@ -136,7 +136,6 @@ describe('runner settings page', function () {
     it('keeps the restrictions an organization admin set on an existing runner group', function () {
         $this->githubApp->update(['runner_group_id' => 77]);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runner-groups/77' => Http::response(['id' => 77, 'default' => false, 'visibility' => 'selected', 'allows_public_repositories' => false]),
         ]);
@@ -446,8 +445,7 @@ describe('isolated Docker with Sysbox', function () {
             ->set('githubAppId', $this->githubApp->id)
             ->set('dockerMode', 'sysbox')
             ->call('submit')
-            ->assertHasErrors('dockerMode')
-            ->assertSet('isSysboxInstalled', false);
+            ->assertHasErrors('dockerMode');
 
         expect(GithubRunnerConfig::count())->toBe(0);
     });
@@ -469,44 +467,45 @@ describe('isolated Docker with Sysbox', function () {
     it('checks that Sysbox can mount its FUSE file system', function () {
         Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
-            ->call('checkSysbox');
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server]);
 
-        Process::assertRan(fn ($process) => str_contains($process->command, 'test -x /usr/bin/fusermount3'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'test -x /usr/bin/fusermount3'));
     });
 
     it('shows the install button when Sysbox is missing', function () {
         Process::fake(['*' => Process::result(output: '')]);
-        GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify']]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
-            ->call('checkSysbox')
-            ->assertSet('isSysboxInstalled', false)
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server])
+            ->assertSet('isInstalled', false)
             ->assertSee('Install Sysbox');
     });
 
     it('stops before the installation on servers without apt', function () {
         Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->owner)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->owner)
+            ->test(SysboxStatus::class, ['server' => $this->server])
             ->call('installSysbox')
             ->assertNotDispatched('activityMonitor');
 
-        Process::assertRanTimes(fn ($process) => str_contains($process->command, 'apt-get'), 1);
+        Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'apt-get'), 1);
     });
 
     it('does not let members install Sysbox', function () {
-        Process::fake();
+        Process::fake(['*' => Process::result(output: '')]);
 
-        Livewire::actingAs($this->member)
-            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+        Livewire::withoutLazyLoading()
+            ->actingAs($this->member)
+            ->test(SysboxStatus::class, ['server' => $this->server])
             ->call('installSysbox')
             ->assertForbidden();
 
-        Process::assertNothingRan();
+        Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'apt-get'));
     });
 });
 
@@ -624,11 +623,11 @@ describe('build server role', function () {
 describe('GitHub App runner permissions', function () {
     it('stores runner permissions and webhook events from GitHub', function () {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app' => Http::response([
                 'permissions' => ['contents' => 'read', 'metadata' => 'read', 'organization_self_hosted_runners' => 'write', 'actions' => 'read'],
                 'events' => ['push', 'workflow_job'],
             ]),
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}" => Http::response(['permissions' => []]),
         ]);
 
         GithubAppPermissionJob::dispatchSync($this->githubApp);

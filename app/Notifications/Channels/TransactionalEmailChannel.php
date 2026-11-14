@@ -13,7 +13,7 @@ class TransactionalEmailChannel
     public function send(User $notifiable, Notification $notification): void
     {
         $settings = instanceSettings();
-        if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
+        if (blank(enabled_email_provider($settings))) {
             return;
         }
 

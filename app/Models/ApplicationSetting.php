@@ -48,10 +48,12 @@ use Symfony\Component\Yaml\Yaml;
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'description' => 'Fork pull request previews wait for an admin to approve each commit.'],
+        'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'],
         'use_build_secrets' => ['type' => 'boolean'],
         'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'inject_build_args_to_dockerfile' => ['type' => 'boolean'],
         'include_source_commit_in_build' => ['type' => 'boolean'],
+        'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts (--add-host). Turn off to keep the build cache when resources on the network change.'],
         'docker_images_to_keep' => ['type' => 'integer'],
         'stop_grace_period' => ['type' => 'integer', 'nullable' => true],
         'rolling_update_drain_seconds' => ['type' => 'integer', 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off.'],
@@ -67,6 +69,10 @@ class ApplicationSetting extends Model
 
     public const GPU_COUNT_PATTERN = '/^(all|\d+)$/';
 
+    protected $attributes = [
+        'is_image_scan_enabled' => true,
+    ];
+
     protected $casts = [
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
@@ -77,12 +83,14 @@ class ApplicationSetting extends Model
         'use_build_secrets' => 'boolean',
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
+        'include_network_hosts_in_build' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
         'is_debug_enabled' => 'boolean',
         'is_preview_deployments_enabled' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
         'is_pr_deployments_public_approval_required' => 'boolean',
+        'use_production_values_in_previews' => 'boolean',
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
@@ -103,10 +111,16 @@ class ApplicationSetting extends Model
         'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'disable_build_cache' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
+        'image_builds_by_team' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
     ];
 
     protected $fillable = [
         'application_id',
+        'is_image_scan_enabled',
+        'image_builds_by_team',
         'is_static',
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',
@@ -142,13 +156,17 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled',
         'is_pr_deployments_public_enabled',
         'is_pr_deployments_public_approval_required',
+        'use_production_values_in_previews',
         'use_build_secrets',
         'redact_all_env_values_in_logs',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
+        'include_network_hosts_in_build',
         'docker_images_to_keep',
         'stop_grace_period',
         'rolling_update_drain_seconds',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
     ];
 
     /**

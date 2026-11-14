@@ -87,7 +87,7 @@ function runMultiS3BackupJob(array $failingStorages): array
     $backup = createMultiS3Backup();
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
 
         return Process::result(output: str_contains($command, 'du -b') ? '128' : '');
@@ -321,15 +321,50 @@ describe('backup job', function () {
         $sshDisk = Storage::disk('ssh-keys');
         Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
         Storage::shouldReceive('build')->andReturn($disk);
-        Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'du -b') ? '128' : ''));
+        $commands = collect();
+        Process::fake(function ($process) use ($commands) {
+            $commands->push(remoteProcessScript($process));
+
+            return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? '128' : '');
+        });
 
         (new DatabaseBackupJob($backup))->handle();
 
         expect(ScheduledDatabaseBackupExecution::query()->sole()->s3_uploaded)->toBeTrue();
-        Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
-            && str_contains($process->command, 'temporary/first-bucket/'));
-        Process::assertRan(fn ($process) => str_contains($process->command, "-e 'MC_REGION=us-east-1'")
-            && str_contains($process->command, 'temporary/second-bucket/'));
+        $regionOfBucket = [];
+        $region = null;
+        foreach ($commands as $command) {
+            if (preg_match("/-e 'MC_REGION=([^']+)'/", $command, $match)) {
+                $region = $match[1];
+            }
+            if (preg_match("#mc cp .*'temporary/([^/']+)/#", $command, $match)) {
+                $regionOfBucket[$match[1]] = $region;
+            }
+        }
+        expect($regionOfBucket)->toBe(['first-bucket' => 'ru-central-1', 'second-bucket' => 'us-east-1']);
+    });
+
+    it('sizes the upload parts of a large dump for providers that allow only 1000 parts', function () {
+        $backup = createMultiS3Backup();
+        S3Storage::query()->update(['endpoint' => 'https://8.8.8.8']);
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('files')->andReturn([]);
+        $sshDisk = Storage::disk('ssh-keys');
+        Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+        Storage::shouldReceive('build')->andReturn($disk);
+        $commands = collect();
+        Process::fake(function ($process) use ($commands) {
+            $commands->push(remoteProcessScript($process));
+
+            return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? (string) (19 * 1024 * 1024 * 1024) : '');
+        });
+
+        (new DatabaseBackupJob($backup))->handle();
+
+        $uploads = $commands->filter(fn (string $command) => str_contains($command, ' mc cp '));
+        expect(ScheduledDatabaseBackupExecution::query()->sole()->s3_uploaded)->toBeTrue()
+            ->and($uploads)->toHaveCount(2)
+            ->and($uploads->every(fn (string $command) => str_contains($command, 'docker exec -e MC_UPLOAD_MULTIPART_SIZE='.(20 * 1024 * 1024).' backup-of-')))->toBeTrue();
     });
 
     it('keeps the local file and names the failed destination when one upload fails', function () {
@@ -442,7 +477,7 @@ it('requires a live S3 copy for local retention only when local backups are disa
     }
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push(is_array($process->command) ? implode(' ', $process->command) : $process->command);
+        $commands->push(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process));
 
         return Process::result();
     });

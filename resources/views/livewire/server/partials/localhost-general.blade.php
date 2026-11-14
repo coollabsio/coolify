@@ -16,6 +16,8 @@
                             </x-forms.button>
                         </x-slot:actions>
 
+                        @include('livewire.server.partials.force-disabled-callout')
+
                         @if ($this->limaStartCommand)
                             <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
                                 <code

@@ -31,7 +31,7 @@
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
-                $isReady => 'Ready',
+                $isReady => 'Operational',
                 default => 'Validation required',
             };
 
@@ -61,6 +61,7 @@
                 'name' => $server->name,
                 'description' => $server->description,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
+                'patchesHref' => route('server.security.patches', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
                 'resourceCount' => $server->definedResources()->count(),
@@ -90,6 +91,9 @@
                 [server.name, server.description, server.status, ...server.patchBadges.map(badge => badge.label)]
                     .some(value => String(value || '').toLowerCase().includes(query))
             );
+        },
+        openPatches(url) {
+            window.Livewire.navigate(url);
         },
         setViewMode(mode) {
             this.viewMode = mode;
@@ -167,7 +171,10 @@
                             $cardPatchBadges = array_filter($serverRow['patchBadges'], fn ($badge) => $badge['type'] !== 'success');
                         @endphp
                         @if ($cardPatchBadges !== [])
-                            <div class="relative z-10 mt-auto flex flex-wrap gap-1.5 pt-3"
+                            <div class="relative z-10 mt-auto flex cursor-pointer flex-wrap gap-1.5 pt-3"
+                                role="link" tabindex="0" aria-label="Open patches"
+                                @click.prevent.stop="openPatches(@js($serverRow['patchesHref']))"
+                                @keydown.enter.prevent.stop="openPatches(@js($serverRow['patchesHref']))"
                                 data-tooltip="{{ $serverRow['patchCheckedAt'] }}">
                                 @foreach ($cardPatchBadges as $badge)
                                     <x-status-badge :status="$badge['label']" :type="$badge['type']" />
@@ -222,7 +229,10 @@
                             </span>
                         </div>
                         @if ($showPatches)
-                            <div class="hidden flex-wrap gap-1 lg:flex" :data-tooltip="server.patchCheckedAt">
+                            <div class="hidden cursor-pointer flex-wrap gap-1 lg:flex" :data-tooltip="server.patchCheckedAt"
+                                role="link" tabindex="0" aria-label="Open patches"
+                                @click.prevent.stop="openPatches(server.patchesHref)"
+                                @keydown.enter.prevent.stop="openPatches(server.patchesHref)">
                                 <template x-for="badge in server.patchBadges" :key="badge.label">
                                     <x-status-badge :dynamic="true">
                                         <span class="relative inline-flex size-1.5 shrink-0 rounded-full"
@@ -236,12 +246,9 @@
                                 </template>
                             </div>
                         @endif
-                        <div class="flex items-center gap-2 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
-                            <span x-show="server.statusType !== 'success'"
-                                class="hidden size-2 shrink-0 rounded-full md:inline-block"
-                                :class="server.statusType === 'warning' ? 'bg-orange-500 dark:bg-warning' : 'bg-red-500 dark:bg-red-400'"></span>
-                            <span x-show="server.statusType === 'success'"
-                                class="hidden size-2 shrink-0 rounded-full bg-green-500 md:inline-block dark:bg-green-400"></span>
+                        <div class="flex items-center gap-1.5 text-[13px] text-neutral-700 dark:text-fg">
+                            <span class="hidden size-1.5 shrink-0 rounded-full md:inline-block"
+                                :class="{ 'bg-emerald-500': server.statusType === 'success', 'bg-warning': server.statusType === 'warning', 'bg-red-500': server.statusType !== 'success' && server.statusType !== 'warning' }"></span>
                             <span x-text="server.status"></span>
                         </div>
                     </a>

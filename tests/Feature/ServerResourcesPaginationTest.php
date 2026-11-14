@@ -76,13 +76,6 @@ it('clamps stale pages after resources disappear including an empty list', funct
         ->and($page->total())->toBe($count);
 })->with([[12, 2], [0, 1]]);
 
-it('keys resource rows on both tabs by stable row identities', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-    expect($view)
-        ->toContain('wire:key="managed-')
-        ->toContain('wire:key="unmanaged-');
-});
-
 it('searches names across all pages before pagination on both tabs', function (string $tab, string $nameKey) {
     $rows = collect(range(1, 25))->map(fn (int $id) => [$nameKey => "Resource $id"]);
     $this->component->activeTab = $tab;

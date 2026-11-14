@@ -1,10 +1,11 @@
 <div class="flex flex-col gap-6">
-    @if ($application->git_based())
+    @if ($application->git_based() || $application->build_pack === 'dockerimage')
         @php
             $canUpdate = auth()->user()->can('update', $application);
         @endphp
         <x-application.settings-section id="preview-settings-section" title="Preview settings"
-            helper="Automatic pull request deployments and who can trigger them.">
+            helper="{{ $application->git_based() ? 'Automatic pull request deployments, who can trigger them, and preview variables.' : 'Values of new preview variables.' }}">
+            @if ($application->git_based())
             <x-slot:actions>
                 @can('update', $application)
                     @if ($application->isGithubAppSource())
@@ -83,14 +84,23 @@
                     @endif
                 @endcan
             </x-slot:actions>
+            @endif
 
-            <div class="w-full">
+            <div class="grid w-full gap-4 md:grid-cols-2">
+                @if ($application->git_based())
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that still have the production value. Give previews their own values, and do not use production secrets in them."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that have the production value (marked 'Production value'), also after the production value changes, and shared variables are resolved only in preview variables, not in the compose file of the PR. This is not full isolation: the preview runs on the same server as production, and with the Docker Compose build pack Coolify deploys the compose file of the PR, which can, for example, mount host paths. Give previews their own values, and do not use production secrets in them."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
                     ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+                @endif
+                <x-forms.listbox id="useProductionValuesInPreviews" label="New preview variables" onChange="savePreviewSettings"
+                    helper="Coolify adds a preview copy of each new production variable.<br><br><span class='font-bold'>Copy production value:</span> the copy gets the production value.<br><span class='font-bold'>Leave empty:</span> the copy gets only the name, and previews do not get preview variables that have the production value (marked 'Production value'). Use this when untrusted code can run in previews (for example, branches that cannot be merged, or bot PRs), or when production secrets must not reach previews.<br><br>Existing preview values do not change."
+                    :options="[
+                        ['value' => true, 'label' => 'Copy production value'],
+                        ['value' => false, 'label' => 'Leave empty'],
+                    ]" :disabled="! $canUpdate" />
             </div>
             @if ($isPrDeploymentsPublicEnabled)
                 <div class="w-full">
@@ -242,9 +252,12 @@
                                     <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                     {{ $previewIsStopped ? 'Deploy' : 'Redeploy' }}
                                 </button>
+                                @if (!$previewIsStopped || auth()->user()->can('delete', $application))
+                                    <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                                @endif
                                 @if (!$previewIsStopped)
                                     <button type="button"
-                                        class="listbox-option justify-start! gap-2.5! text-error!"
+                                        class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                         @click="open = false; document.getElementById('preview-stop-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                         role="menuitem">
                                         <x-reicon name="stop" class="size-3.5" />
@@ -254,7 +267,7 @@
                             @endcan
                             @can('delete', $application)
                                 <button type="button"
-                                    class="listbox-option justify-start! gap-2.5! text-error!"
+                                    class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                     @click="open = false; document.getElementById('preview-delete-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                     role="menuitem">
                                     <x-reicon name="trash" class="size-3.5" />

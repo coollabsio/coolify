@@ -68,7 +68,7 @@ class ConnectApplication extends Component
      */
     public function connect()
     {
-        $this->authorize('view', $this->database);
+        $this->authorize('update', $this->database);
         $this->composeSnippet = null;
         $this->composeApplicationName = null;
 

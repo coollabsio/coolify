@@ -40,13 +40,11 @@ IMAGE_DIR=${IMAGE_DIR:-/var/lib/libvirt/images/coolify-restore-test}
 NAT_NETWORK=${NAT_NETWORK:-default}
 OFFLINE_NETWORK=${OFFLINE_NETWORK:-coolify-restore-offline}
 OFFLINE_SUBNET=${OFFLINE_SUBNET:-192.168.241}
-# Both VMs use the same MAC address: the guest network config matches the NIC by MAC.
-VM_MAC=52:54:00:c0:1f:01
 UBUNTU_IMAGE_URL=https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
 UBUNTU_IMAGE="$IMAGE_DIR/ubuntu-noble-amd64.qcow2"
 SSH_KEY="$IMAGE_DIR/ssh_key"
 VIRSH=(virsh --connect qemu:///system)
-SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5)
+SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 die() {
@@ -68,32 +66,44 @@ delete_vm() {
     rm -f "$IMAGE_DIR/$1.qcow2" "$IMAGE_DIR/$1-seed.iso"
 }
 
+# vm_ip <name>: the DHCP lease of the VM. Each VM has a new random MAC address,
+# so a lease of a deleted VM cannot match.
 vm_ip() {
     "${VIRSH[@]}" domifaddr "$1" --source lease 2>/dev/null |
         awk '$3 == "ipv4" { sub(/\/.*/, "", $4); print $4; exit }'
 }
 
+# wait_for_ip <name>: prints the IP address on stdout and the progress on stderr.
 wait_for_ip() {
     local ip=""
+    printf 'Waiting for the IP address of %s (up to 3 minutes)' "$1" >&2
     for _ in $(seq 1 90); do
         ip=$(vm_ip "$1")
         [ -n "$ip" ] && break
+        printf '.' >&2
         sleep 2
     done
-    [ -n "$ip" ] || die "VM $1 did not get an IP address from DHCP."
+    echo >&2
+    [ -n "$ip" ] || die "VM $1 did not get an IP address from DHCP. Boot log: virsh --connect qemu:///system console $1"
     echo "$ip"
 }
 
-# wait_for_ssh <ip>: waits for SSH and for cloud-init to finish.
+# wait_for_ssh <ip> <name>: waits for SSH and for cloud-init to finish.
 wait_for_ssh() {
-    for _ in $(seq 1 90); do
+    printf 'Waiting for SSH on %s (up to 5 minutes)' "$1"
+    for _ in $(seq 1 60); do
         if ssh "${SSH_OPTS[@]}" "root@$1" true 2>/dev/null; then
-            ssh "${SSH_OPTS[@]}" "root@$1" 'cloud-init status --wait >/dev/null || true'
+            echo
+            echo "Waiting for cloud-init in the VM (up to 10 minutes)..."
+            ssh "${SSH_OPTS[@]}" "root@$1" 'timeout 600 cloud-init status --wait >/dev/null' ||
+                echo "cloud-init did not finish cleanly; continuing. Log: /var/log/cloud-init-output.log in the VM"
             return 0
         fi
-        sleep 2
+        printf '.'
+        sleep 3
     done
-    die "SSH to root@$1 does not respond."
+    echo
+    die "SSH to root@$1 does not respond. Boot log: virsh --connect qemu:///system console $2"
 }
 
 vm_ssh() { ssh "${SSH_OPTS[@]}" "root@$VM_IP" "$@"; }
@@ -145,12 +155,22 @@ runcmd:
   - systemctl restart ssh
 EOF
     printf 'instance-id: %s-%s\nlocal-hostname: %s\n' "$name" "$(date +%s)" "$name" >"$seed_dir/meta-data"
+    # Match the NIC by name, not by MAC: the restore VM boots from the disk of the builder VM
+    # with a different MAC address. A new instance-id makes cloud-init apply this on each VM.
+    cat >"$seed_dir/network-config" <<EOF
+version: 2
+ethernets:
+  nic:
+    match:
+      name: "en*"
+    dhcp4: true
+EOF
     if command -v xorriso >/dev/null; then
-        xorriso -as mkisofs -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" 2>/dev/null
+        xorriso -as mkisofs -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" "$seed_dir/network-config" 2>/dev/null
     elif command -v cloud-localds >/dev/null; then
-        cloud-localds "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
+        cloud-localds --network-config="$seed_dir/network-config" "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
     else
-        genisoimage -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data"
+        genisoimage -quiet -V cidata -J -r -o "$IMAGE_DIR/$name-seed.iso" "$seed_dir/user-data" "$seed_dir/meta-data" "$seed_dir/network-config"
     fi
     rm -rf "$seed_dir"
 
@@ -158,7 +178,7 @@ EOF
         --import --os-variant ubuntu24.04 \
         --disk "path=$IMAGE_DIR/$name.qcow2,format=qcow2,bus=virtio" \
         --disk "path=$IMAGE_DIR/$name-seed.iso,device=cdrom" \
-        --network "network=$network,model=virtio,mac=$VM_MAC" \
+        --network "network=$network,model=virtio" \
         --graphics none --noautoconsole >/dev/null
 }
 
@@ -174,11 +194,16 @@ build_base_image() {
     delete_vm "$BUILDER_NAME"
     create_vm "$BUILDER_NAME" "$UBUNTU_IMAGE" "$NAT_NETWORK"
     VM_IP=$(wait_for_ip "$BUILDER_NAME")
-    wait_for_ssh "$VM_IP"
+    wait_for_ssh "$VM_IP" "$BUILDER_NAME"
 
     log "Installing Coolify $VERSION in the builder VM (no backup data in this VM)"
-    vm_ssh "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- $VERSION"
+    vm_ssh "set -o pipefail; curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- $VERSION" ||
+        die "The Coolify install failed in the builder VM. No base image was saved."
+    # A broken base image would be reused by every later run, so check it before it is saved.
+    vm_ssh 'docker inspect coolify coolify-db coolify-redis >/dev/null && [ -f /data/coolify/source/.env ]' ||
+        die "Coolify is not installed in the builder VM. No base image was saved."
 
+    echo "Shutting down the builder VM (up to 2 minutes)..."
     vm_ssh 'shutdown -h now' || true
     for _ in $(seq 1 60); do
         [ "$("${VIRSH[@]}" domstate "$BUILDER_NAME")" = "shut off" ] && break
@@ -241,6 +266,18 @@ fi
 delete_vm "$VM_NAME"
 
 mkdir -p "$IMAGE_DIR"
+# The VM disks grow on the host disk. When the host disk is full, QEMU pauses the VM without a
+# message. The restore VM holds the backup and the restored database (about 3 times the backup),
+# a new base image needs about 6 GiB. pg_dump compresses a custom-format dump by default, and a
+# .gz backup is compressed too, so each backup is counted as 5 times its size.
+BACKUP_MIB=$(($(stat -c %s "$BACKUP_FILE") / 1024 / 1024 * 5))
+FREE_MIB=$(($(df --output=avail -k "$IMAGE_DIR" | tail -n 1) / 1024))
+NEEDED_MIB=$((BACKUP_MIB * 3 + 2048))
+[ -f "$BASE_IMAGE" ] || NEEDED_MIB=$((NEEDED_MIB + 6144))
+if [ "$FREE_MIB" -lt "$NEEDED_MIB" ]; then
+    die "Not enough free disk space in $IMAGE_DIR: ${FREE_MIB} MiB free, about ${NEEDED_MIB} MiB needed.
+Free disk space, or set IMAGE_DIR to a larger disk."
+fi
 if [ ! -f "$SSH_KEY" ]; then
     # Do not use the comment "coolify": install.sh removes authorized_keys lines with exactly that comment.
     ssh-keygen -q -t ed25519 -N '' -C restore-test-vm -f "$SSH_KEY"
@@ -256,7 +293,7 @@ ensure_offline_network
 create_vm "$VM_NAME" "$BASE_IMAGE" "$OFFLINE_NETWORK"
 VM_IP=$(wait_for_ip "$VM_NAME")
 log "VM IP address on the offline network: $VM_IP"
-wait_for_ssh "$VM_IP"
+wait_for_ssh "$VM_IP" "$VM_NAME"
 
 log "Confirming that the VM has no internet access"
 if vm_ssh 'timeout 5 bash -c "echo >/dev/tcp/1.1.1.1/443" 2>/dev/null || timeout 5 bash -c "echo >/dev/tcp/8.8.8.8/53" 2>/dev/null'; then
@@ -266,7 +303,7 @@ if vm_ssh 'getent hosts cdn.coollabs.io >/dev/null'; then
     die "The VM can resolve internet host names. Stopped before the backup was copied."
 fi
 
-log "Copying the backup into the VM"
+log "Copying the backup into the VM ($(du -h "$BACKUP_FILE" | cut -f1))"
 if gzip -t "$BACKUP_FILE" 2>/dev/null; then
     gzip -dc "$BACKUP_FILE" | vm_ssh 'cat >/root/coolify-backup.dmp'
 else
@@ -282,10 +319,15 @@ log "Restoring the backup and starting Coolify (migrations run on start)"
 set -euo pipefail
 cd /data/coolify/source
 
+echo "Waiting for coolify-db (up to 2 minutes)..."
 for _ in $(seq 1 60); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' coolify-db 2>/dev/null)" = healthy ] && break
     sleep 2
 done
+[ "$(docker inspect -f '{{.State.Health.Status}}' coolify-db 2>/dev/null)" = healthy ] || {
+    echo "ERROR: coolify-db is not healthy. Logs: docker logs coolify-db" >&2
+    exit 1
+}
 
 # Start the same image tag again after the restore.
 LATEST_IMAGE=$(docker inspect -f '{{.Config.Image}}' coolify | sed 's/.*://')
@@ -307,8 +349,28 @@ echo "SELF_HOSTED=${SELF_HOSTED}" >>.env
 # Recreate the database: tables from a newer fresh install must not remain.
 docker exec coolify-db psql -q -U coolify -d postgres -v ON_ERROR_STOP=1 \
     -c 'DROP DATABASE coolify WITH (FORCE)' -c 'CREATE DATABASE coolify OWNER coolify'
-echo "Running pg_restore..."
-docker exec -i coolify-db pg_restore --exit-on-error --no-acl --no-owner -U coolify -d coolify </root/coolify-backup.dmp
+echo "Running pg_restore of $(du -h /root/coolify-backup.dmp | cut -f1) (a large backup takes several minutes)..."
+restore_section() {
+    docker exec -i coolify-db pg_restore --exit-on-error --no-acl --no-owner --section="$1" -U coolify -d coolify </root/coolify-backup.dmp
+}
+restore_section pre-data
+restore_section data
+# Coolify Cloud backups leave out the rows of log and execution tables, such as
+# scheduled_database_backup_executions. Rows that point to them must go before
+# post-data adds the foreign keys.
+docker exec coolify-db psql -q -U coolify -d coolify -v ON_ERROR_STOP=1 -c "
+DO \$\$
+DECLARE deleted bigint;
+BEGIN
+    IF to_regclass('public.database_backup_s3_replicas') IS NOT NULL THEN
+        DELETE FROM database_backup_s3_replicas r
+        WHERE NOT EXISTS (SELECT 1 FROM scheduled_database_backup_executions e WHERE e.id = r.execution_id);
+        GET DIAGNOSTICS deleted = ROW_COUNT;
+        RAISE NOTICE 'Deleted % database_backup_s3_replicas rows without an execution', deleted;
+    END IF;
+END
+\$\$;"
+restore_section post-data
 
 # Drop cached data of the fresh installation.
 REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' .env | cut -d= -f2-)
@@ -324,9 +386,15 @@ LATEST_IMAGE=$LATEST_IMAGE docker compose --env-file .env $COMPOSE_FILES up -d -
 
 # The container reports healthy while migrations still run on a large database.
 # Seeders continue in the background; with many servers they can run for a long time.
-echo "Waiting for migrations to finish..."
+echo "Waiting for migrations to finish (progress: docker logs -f coolify in the VM)..."
+started=$SECONDS
+next_report=$((SECONDS + 60))
 while docker exec coolify sh -c "ps aux | grep -q '[a]rtisan start:migration'"; do
     sleep 5
+    if [ "$SECONDS" -ge "$next_report" ]; then
+        echo "  migrations still running ($(((SECONDS - started) / 60)) min)"
+        next_report=$((next_report + 60))
+    fi
 done
 
 echo

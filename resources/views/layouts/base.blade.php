@@ -14,27 +14,38 @@
             if (/^[a-f\d]{3}$/.test(hex)) return `#${hex.replace(/./g, '$&$&')}`;
             return '#6b16ed';
         };
-        window.hexToOklch = (hex) => {
+        const hexToOklab = (hex) => {
             const [r, g, b] = window.normalizeThemeColor(hex).match(/[a-f\d]{2}/gi).map((channel) => srgbToLinear(parseInt(channel, 16) / 255));
             const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
             const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
             const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-            const okL = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
-            const okA = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
-            const okB = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+            return [
+                0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+                1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+                0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+            ];
+        };
+        // OKLab -> sRGB hex. Out-of-gamut channels are clipped.
+        const oklabToHex = (okL, okA, okB) => {
+            const l = (okL + 0.3963377774 * okA + 0.2158037573 * okB) ** 3;
+            const m = (okL - 0.1055613458 * okA - 0.0638541728 * okB) ** 3;
+            const s = (okL - 0.0894841775 * okA - 1.2914855480 * okB) ** 3;
+            return `#${[
+                4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+            ].map((c) => {
+                const linear = Math.min(1, Math.max(0, c));
+                const encoded = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
+                return Math.round(encoded * 255).toString(16).padStart(2, '0');
+            }).join('')}`;
+        };
+        window.hexToOklch = (hex) => {
+            const [okL, okA, okB] = hexToOklab(hex);
             const chroma = Math.sqrt(okA * okA + okB * okB);
             let hue = Math.atan2(okB, okA) * 180 / Math.PI;
             if (hue < 0) hue += 360;
             return `oklch(${(okL * 100).toFixed(2)}% ${chroma.toFixed(4)} ${hue.toFixed(2)})`;
-        };
-        window.themeAccentForeground = (color) => {
-            const channels = window.normalizeThemeColor(color).match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
-            const luminance = channels
-                .map(channel => channel / 255)
-                .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-                .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
-
-            return luminance > 0.179 ? 'oklch(0% 0 0)' : 'oklch(100% 0 0)';
         };
         // Custom theme: four colors. Its share code is "#sidebar,#selected,#accent,#background".
         // Every text color is derived from the color under it, so text stays readable.
@@ -52,12 +63,40 @@
             const end = parseInt(to.slice(offset, offset + 2), 16);
             return Math.round(start + (end - start) * amount).toString(16).padStart(2, '0');
         }).join('')}`;
+        // The color of accent fills: the accent with 15% white, like --theme-bright-color in app.css.
+        window.themeAccentFill = (color) => mixHex(window.normalizeThemeColor(color), '#ffffff', 0.15);
+        // Black or white, whichever has more contrast on the accent fill (WCAG ratios).
+        window.themeAccentForeground = (color) => {
+            const luminance = relativeLuminance(window.themeAccentFill(color));
+            return 1.05 / (luminance + 0.05) > (luminance + 0.05) / 0.05 ? 'oklch(100% 0 0)' : 'oklch(0% 0 0)';
+        };
         // True when light text has more contrast on this color than dark text (WCAG ratios).
         window.isDarkColor = (hex) => {
             const luminance = relativeLuminance(window.normalizeThemeColor(hex));
             return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / (relativeLuminance('#18181b') + 0.05);
         };
         window.readableTextOn = (hex) => window.isDarkColor(hex) ? '#f4f4f5' : '#18181b';
+        const contrast = (first, second) => {
+            const [dark, light] = [relativeLuminance(first), relativeLuminance(second)].sort((a, b) => a - b);
+            return (light + 0.05) / (dark + 0.05);
+        };
+        // Accent text and icons on a surface: the accent, moved toward white on a dark
+        // surface or toward black on a light one until it reaches 4.5:1 (WCAG AA). It is
+        // checked on the surface with 12% of its text color, the strongest tint that the
+        // surface ladder in app.css puts under text (fills, selected rows).
+        window.themeAccentTextOn = (accent, surface) => {
+            const [okL, okA, okB] = hexToOklab(accent);
+            const chromaScale = Math.min(1, 0.16 / (Math.hypot(okA, okB) || 1));
+            const target = window.isDarkColor(surface) ? 1 : 0;
+            const tintedSurface = mixHex(window.normalizeThemeColor(surface), window.readableTextOn(surface), 0.12);
+            let color;
+            for (let step = 0; step <= 50; step++) {
+                const fade = chromaScale * (1 - step / 50);
+                color = oklabToHex(okL + (target - okL) * step / 50, okA * fade, okB * fade);
+                if (contrast(color, tintedSurface) >= 4.5) break;
+            }
+            return color;
+        };
         window.customThemeKeys = ['sidebar', 'selected', 'accent', 'background'];
         window.serializeCustomTheme = (theme) => window.customThemeKeys.map((key) => theme[key]).join(',');
         // A theme from a share code, or null when the text is not four hex colors.
@@ -108,6 +147,8 @@
                 '--theme-selected-text': window.readableTextOn(theme.selected),
                 '--theme-base-color': window.hexToOklch(theme.accent),
                 '--theme-accent-foreground': window.themeAccentForeground(theme.accent),
+                '--theme-accent-text': window.themeAccentTextOn(theme.accent, theme.background),
+                '--theme-sidebar-accent-text': window.themeAccentTextOn(theme.accent, theme.sidebar),
             }).forEach(([name, value]) => root.style.setProperty(name, value));
             root.dataset.theme = 'custom';
             root.classList.toggle('dark', isDark);
@@ -118,11 +159,13 @@
             }
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme.background);
         };
+        window.storedUiScale = () => ['80', '90', '100'].includes(localStorage.uiScale) ? localStorage.uiScale : '100';
         window.applyStoredTheme = () => {
             const root = document.documentElement;
             const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
             root.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
             root.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
+            root.dataset.uiScale = window.storedUiScale();
             localStorage.theme = theme;
             if (localStorage.themeColor) localStorage.themeColor = window.normalizeThemeColor(localStorage.themeColor);
             if (theme === 'custom') {
@@ -212,6 +255,7 @@
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
             chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
+            uiScale: window.storedUiScale(),
             presets: window.customThemePresets,
             // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
@@ -267,6 +311,9 @@
             textOn(color) {
                 return window.readableTextOn(color);
             },
+            accentFill(color) {
+                return window.themeAccentFill(color);
+            },
             accentTextOn(color) {
                 return window.themeAccentForeground(color);
             },
@@ -297,19 +344,34 @@
                 localStorage.setItem('navItems', style);
                 document.documentElement.dataset.navItems = style;
             },
+            setUiScale(scale) {
+                this.uiScale = scale;
+                localStorage.setItem('uiScale', scale);
+                document.documentElement.dataset.uiScale = scale;
+            },
             setChartTimes(value) {
                 this.chartTimes = value;
                 localStorage.setItem('chartTimes', value);
             },
         });
 
-        document.addEventListener('livewire:navigated', window.applyStoredTheme);
+        // wire:navigate copies the server <html> attributes over the live ones, which removes
+        // the theme class and colors. Apply them again in the same task as the swap, before
+        // the browser can paint the new page (livewire:navigated can run after a paint).
+        document.addEventListener('livewire:navigating', (event) => event.detail.onSwap(window.applyStoredTheme));
         window.applyStoredTheme();
     })();
 </script>
 
 <head>
     <meta charset="utf-8">
+    <style>
+        /* The page background in the saved theme before app.css loads, so a full page load does not
+           paint the browser default (white with a light OS theme). :where() keeps app.css in charge after it loads. */
+        :where(html) { background-color: oklch(98.5% 0 0); }
+        :where(html.dark) { background-color: oklch(14.48% 0 0); }
+        :where(html[data-theme="custom"]) { background-color: var(--theme-bg); }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#101010" id="theme-color-meta" />
@@ -373,6 +435,7 @@
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/purify.min.js') }}"></script>
+        <script type="application/json" id="starred-menu-items">@json((object) (auth()->user()->starred_menu_items ?? []))</script>
     @endauth
 </head>
 @section('body')

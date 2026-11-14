@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -45,7 +46,7 @@ class DigitalOceanService
                 );
             }
 
-            throw new \Exception('DigitalOcean API error: '.$response->json('message', 'Unknown error'), $response->status());
+            throw new CloudProviderApiException('DigitalOcean', $response->json('message', 'Unknown error'), $response->status(), $response->json('id'));
         }
 
         return $response->json() ?? [];

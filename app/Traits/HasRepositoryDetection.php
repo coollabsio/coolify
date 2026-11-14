@@ -5,7 +5,6 @@ namespace App\Traits;
 use App\Data\RepositoryDetectionResult;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
-use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -144,8 +143,8 @@ trait HasRepositoryDetection
                 if (! preg_match('/^[A-Z_][A-Z0-9_]*$/i', (string) $key)) {
                     continue;
                 }
-                EnvironmentVariable::create([
-                    'key' => $key,
+                // The created hook of the application can already have added a default for this key.
+                $application->environment_variables()->updateOrCreate(['key' => $key], [
                     'value' => $value,
                     'resourceable_type' => $application->getMorphClass(),
                     'resourceable_id' => $application->id,

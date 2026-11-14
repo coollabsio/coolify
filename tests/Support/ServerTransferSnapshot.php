@@ -32,7 +32,7 @@ final class ServerTransferSnapshot
     ];
 
     /** Polymorphic relations: `<name>_type` + `<name>_id`. */
-    public const MORPHS = ['destination', 'source', 'resourceable', 'resource', 'database', 'backupable', 'taggable', 'target'];
+    public const MORPHS = ['destination', 'source', 'resourceable', 'resource', 'database', 'backupable', 'taggable', 'target', 'scope'];
 
     /** The instance sets these itself; they never match between two instances. */
     private const IGNORED_COLUMNS = ['id', 'created_at', 'updated_at', 'team_id', 'created_by'];
@@ -126,6 +126,8 @@ final class ServerTransferSnapshot
             'swarm_dockers' => ['server_id' => ['servers']],
             'ssl_certificates' => ['server_id' => ['servers']],
             'github_runner_configs' => ['server_id' => ['servers']],
+            'image_scan_policies' => ['scope' => ['servers', 'applications']],
+            'image_scan_ignores' => ['resource' => self::RESOURCE_TABLES],
             'applications' => ['destination' => ['standalone_dockers', 'swarm_dockers']],
             'services' => ['destination' => ['standalone_dockers', 'swarm_dockers'], 'server_id' => ['servers']],
             'application_settings' => ['application_id' => ['applications']],
@@ -290,6 +292,8 @@ final class ServerTransferSnapshot
         $morph = fn (string $name) => $this->morphTable($row["{$name}_type"] ?? null).':'.$this->identity((string) $this->morphTable($row["{$name}_type"] ?? null), $row["{$name}_id"] ?? null);
 
         return $this->identities[$table][$id] = match (true) {
+            $table === 'image_scan_policies' => 'scan rules of '.$morph('scope'),
+            $table === 'image_scan_ignores' => 'ignore of '.$morph('resource').'|'.$row['vulnerability_id'].'|'.$row['package'],
             ! empty($row['uuid']) => $row['uuid'],
             $table === 'server_settings' => 'settings of '.$this->identity('servers', $row['server_id']),
             $table === 'application_settings' => 'settings of '.$this->identity('applications', $row['application_id']),

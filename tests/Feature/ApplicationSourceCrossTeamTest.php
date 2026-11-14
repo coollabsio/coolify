@@ -287,3 +287,150 @@ test('changeSource rejects a GiteaApp owned by another team', function () {
     expect($this->applicationA->source_type)->not->toBe(GiteaApp::class);
     Http::assertNothingSent();
 });
+
+test('submit reports invalid SSH known hosts as a field error without saving', function () {
+    $originalKnownHosts = $this->applicationA->git_ssh_known_hosts;
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitSshKnownHosts', 'invalid-host-key')
+        ->call('submit')
+        ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertDispatched('known-hosts-invalid')
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($originalKnownHosts);
+});
+
+test('submit reports manual host keys of a pinned Git provider as a field error without saving', function (string $line) {
+    $this->applicationA->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitSshKnownHosts', "git.example.com ssh-ed25519 AAAA\n{$line}")
+        ->call('submit')
+        ->assertHasErrors(['gitSshKnownHosts'])
+        ->assertDispatched('known-hosts-invalid')
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('git.example.com ssh-ed25519 AAAA');
+})->with([
+    'github.com' => 'github.com ssh-ed25519 BBBB',
+    'bitbucket.org with a port' => '[altssh.bitbucket.org]:443 ssh-ed25519 BBBB',
+    'ssh.github.com on port 443' => '[ssh.github.com]:443 ssh-rsa BBBB',
+    'bitbucket.org in a host list' => 'git.example.com,BITBUCKET.ORG ssh-ed25519 BBBB',
+]);
+
+test('saving the source form does not reject pinned provider host keys that were already saved', function () {
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => "git.example.com ssh-ed25519 AAAA\ngithub.com ssh-ed25519 BBBB"]);
+    $this->applicationA->refresh();
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->set('gitBranch', 'other-branch')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($this->applicationA->fresh()->git_branch)->toBe('other-branch');
+});
+
+test('saving the source form keeps host keys that a deployment saved after the page opened', function () {
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    $component->set('gitBranch', 'other-branch')->call('submit')->assertHasNoErrors();
+
+    expect($this->applicationA->fresh())
+        ->git_branch->toBe('other-branch')
+        ->git_ssh_known_hosts->toBe('git.example.com ssh-ed25519 AAAA');
+});
+
+test('saving the source form stores host keys that the user edited', function () {
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    Application::query()->whereKey($this->applicationA->id)->update(['git_ssh_known_hosts' => 'git.example.com ssh-ed25519 AAAA']);
+
+    $component->set('gitSshKnownHosts', 'other.example.com ssh-ed25519 BBBB')->call('submit')->assertHasNoErrors();
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('other.example.com ssh-ed25519 BBBB');
+});
+
+test('removing a host key keeps another host that has the same key', function () {
+    $this->applicationA->update(['git_ssh_known_hosts' => "git.example.com ssh-ed25519 AAAA\n[git.example.com]:2222 ssh-ed25519 AAAA"]);
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    $keys = $component->instance()->knownHostFingerprints();
+
+    expect(array_unique(array_column($keys, 'id')))->toHaveCount(2);
+
+    $component->call('removeHostKey', $keys[1]['id']);
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe('git.example.com ssh-ed25519 AAAA');
+});
+
+test('a member or a user of another team cannot fetch, accept, or remove host keys', function (string $role) {
+    $saved = 'git.example.com ssh-ed25519 AAAA';
+    $this->applicationA->update(['git_repository' => 'git@git.example.com:org/repo.git', 'git_ssh_known_hosts' => $saved]);
+    $user = User::factory()->create();
+    $team = $role === 'member' ? $this->teamA : $this->teamB;
+    $team->members()->attach($user->id, ['role' => $role === 'member' ? 'member' : 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+    $component->call('fetchHostKeys')->assertDispatched('error')->assertSet('fetchedHostKeys', []);
+    $component->call('acceptFetchedHostKeys')->assertDispatched('error');
+    $component->call('removeHostKey', sha1($saved))->assertDispatched('error');
+
+    expect($this->applicationA->fresh()->git_ssh_known_hosts)->toBe($saved);
+})->with(['member', 'other team owner']);
+
+test('the ssh host keys section shows only when git uses ssh or keys are saved', function (string $repository, ?string $saved, bool $shown) {
+    $this->applicationA->update(['git_repository' => $repository, 'git_ssh_known_hosts' => $saved]);
+
+    $component = Livewire::test(Source::class, ['application' => $this->applicationA]);
+
+    $shown ? $component->assertSee('SSH host keys') : $component->assertDontSee('SSH host keys');
+})->with([
+    'https repository' => ['https://github.com/coollabsio/coolify-examples', null, false],
+    'ssh repository' => ['git@git.example.com:org/repo.git', null, true],
+    'https repository with saved submodule keys' => ['https://github.com/coollabsio/coolify-examples', 'git.example.com ssh-ed25519 AAAA', true],
+]);
+
+test('fetch reads the published host keys of GitHub and Bitbucket for deployments', function () {
+    $this->applicationA->update(['git_repository' => 'git@github.com:org/repo.git']);
+    Http::fake([
+        'api.github.com/meta' => Http::response(['ssh_keys' => ['ssh-ed25519 AAAANEWGITHUB']]),
+    ]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('fetchHostKeys')
+        ->assertDispatched('success')
+        ->assertSet('fetchedHostKeys', []);
+
+    $keys = gitProviderHostKeys();
+    expect($keys)->toContain('github.com,ssh.github.com,[ssh.github.com]:443 ssh-ed25519 AAAANEWGITHUB')
+        ->and(collect($keys)->filter(fn (string $line) => str_starts_with($line, 'github.com,')))->toHaveCount(1)
+        ->and(collect($keys)->filter(fn (string $line) => str_starts_with($line, 'bitbucket.org,')))->toHaveCount(3)
+        ->and(gitSshSetupCommand('app'))->toContain(base64_encode(implode("\n", $keys)."\n"));
+});
+
+test('fetch keeps the built-in host keys when the provider sends no valid keys', function (mixed $response) {
+    $this->applicationA->update(['git_repository' => 'git@bitbucket.org:org/repo.git']);
+    Http::fake(['bitbucket.org/site/ssh' => $response]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->call('fetchHostKeys')
+        ->assertDispatched('error');
+
+    expect(gitProviderHostKeys())->toBe(GIT_PINNED_HOST_KEYS);
+})->with([
+    'server error' => fn () => Http::response('', 500),
+    'only other hosts' => fn () => Http::response("ssh.bitbucket.org ssh-ed25519 AAAAOTHER\n"),
+]);
+
+test('the ssh host keys section lists the published keys of a GitHub repository without a remove button', function () {
+    $this->applicationA->update(['git_repository' => 'git@github.com:org/repo.git', 'git_ssh_known_hosts' => null]);
+    $published = gitKnownHostFingerprint(GIT_PINNED_HOST_KEYS[0]);
+
+    Livewire::test(Source::class, ['application' => $this->applicationA])
+        ->assertSee('Published by the provider, used for every deployment')
+        ->assertSee($published['fingerprint'])
+        ->assertDontSee('No saved host keys')
+        ->assertDontSee('Remove host key of github.com');
+});

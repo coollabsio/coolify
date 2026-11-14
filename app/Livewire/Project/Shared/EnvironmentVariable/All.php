@@ -356,8 +356,10 @@ class All extends Component
 
         foreach ($this->environmentVariableSegments() as $segment) {
             if ($segment['kind'] === 'managed') {
-                foreach ($this->fetchManagedEnvironmentVariables($segment['is_preview'], null, null) as $environmentVariable) {
-                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable));
+                $variables = $this->fetchManagedEnvironmentVariables($segment['is_preview'], null, null);
+                $sameAsProductionIds = $this->previewVariableIdsWithProductionValues($variables);
+                foreach ($variables as $environmentVariable) {
+                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable, $sameAsProductionIds));
                 }
 
                 continue;
@@ -407,8 +409,9 @@ class All extends Component
 
             if ($segment['kind'] === 'managed') {
                 $variables = $this->fetchManagedEnvironmentVariables($segment['is_preview'], $offset, $take);
+                $sameAsProductionIds = $this->previewVariableIdsWithProductionValues($variables);
                 foreach ($variables as $environmentVariable) {
-                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable));
+                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable, $sameAsProductionIds));
                 }
             } else {
                 $hardcoded = $segment['is_preview']
@@ -758,7 +761,8 @@ class All extends Component
             : $variables;
     }
 
-    private function managedEnvironmentVariableRow(EnvironmentVariable $environmentVariable): array
+    /** @param  array<int, int>  $sameAsProductionIds */
+    private function managedEnvironmentVariableRow(EnvironmentVariable $environmentVariable, array $sameAsProductionIds): array
     {
         return [
             'id' => 'environment-'.$environmentVariable->id,
@@ -766,7 +770,30 @@ class All extends Component
             'scope' => $environmentVariable->is_preview ? 'preview' : 'production',
             'environmentVariable' => $environmentVariable,
             'composeInfo' => $this->composeInfoFor($environmentVariable->key),
+            'sameAsProduction' => $environmentVariable->is_preview
+                && in_array($environmentVariable->id, $sameAsProductionIds, true),
         ];
+    }
+
+    /**
+     * Compared on the server, so the "Production value" badge sends no values to the browser.
+     * Only the given (visible) preview variables are compared.
+     *
+     * @return array<int, int>
+     */
+    private function previewVariableIdsWithProductionValues(Collection $variables): array
+    {
+        if (! $this->supportsPreviewEnvironmentVariables()) {
+            return [];
+        }
+
+        $previewIds = $variables
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_preview)
+            ->map(fn (EnvironmentVariable $environmentVariable): int => (int) $environmentVariable->id)
+            ->values()
+            ->all();
+
+        return $this->resource->previewEnvironmentVariableIdsWithProductionValues($previewIds);
     }
 
     private function hardcodedEnvironmentVariableRow(array $environmentVariable, bool $isPreview, int $index): array
@@ -986,23 +1013,29 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $hideValues = ! $this->canViewEnvironmentValues();
+        $canViewValues = $this->canViewEnvironmentValues();
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(function ($item) use ($hideValues) {
-                if ($hideValues) {
-                    return "$item->key=(Hidden, only admins can view)";
-                }
-                if ($item->is_shown_once) {
-                    return "$item->key=(Locked Secret, delete and add again to change)";
-                }
-                if ($item->is_multiline) {
-                    return "$item->key=(Multiline environment variable, edit in normal view)";
-                }
+            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues))
+            ->join("\n");
+    }
 
-                return "$item->key=$item->value";
-            })->join("\n");
+    /**
+     * An empty value makes the deployment use the Compose default, so show that default above the line.
+     */
+    private function composeDefaultHint(EnvironmentVariable $variable): string
+    {
+        if (filled($variable->value) || ! $this->showsHardcodedEnvironmentVariables()) {
+            return '';
+        }
+
+        $default = $this->composeInfoFor($variable->key)['default'] ?? null;
+        if (blank($default) || str_contains($default, "\n")) {
+            return '';
+        }
+
+        return "# Compose default: {$default}\n";
     }
 
     public function switch()
@@ -1017,11 +1050,28 @@ class All extends Component
 
     public function submit($data = null)
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $this->handleBulkSubmit();
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $previewVariables = [];
+                if ($this->showPreview) {
+                    try {
+                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                    } catch (\InvalidArgumentException $e) {
+                        throw new \InvalidArgumentException('Preview deployments: '.$e->getMessage(), previous: $e);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            if ($data === null) {
+                $this->handleBulkSubmit($variables, $previewVariables);
             } else {
                 $this->handleSingleSubmit($data);
             }
@@ -1071,9 +1121,8 @@ class All extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables, array $previewVariables)
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -1092,8 +1141,6 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
-
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
             if ($deletedPreviewCount > 0) {
@@ -1118,7 +1165,9 @@ class All extends Component
     private function handleSingleSubmit($data)
     {
         $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
-        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
+        $found = EnvironmentVariable::query()
+            ->forResourceKey($this->resource->getMorphClass(), $this->resource->id, (bool) ($data['is_preview'] ?? false), $data['key'])
+            ->exists();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
 
@@ -1146,6 +1195,7 @@ class All extends Component
         $environment->is_buildtime = $data['is_buildtime'] ?? true;
         $environment->is_preview = $data['is_preview'] ?? false;
         $environment->comment = $data['comment'] ?? null;
+        $environment->copyValueToPreview = isset($data['copy_value_to_preview']) ? (bool) $data['copy_value_to_preview'] : null;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
 
@@ -1220,10 +1270,12 @@ class All extends Component
             $comment = is_array($data) ? ($data['comment'] ?? null) : null;
 
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
-            $found = $this->resource->$method()->where('key', $key)->first();
+            // A key can have copies from earlier duplicate saves. Each copy gets the saved value,
+            // so that a deployment uses this value whichever copy it reads last.
+            $copies = $this->resource->$method()->where('key', $key)->get();
 
-            if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+            foreach ($copies as $found) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     $changed = false;
 
                     // Update value if it changed
@@ -1239,17 +1291,23 @@ class All extends Component
                         $changed = true;
                     }
 
-                    if ($changed) {
+                    // Flags change only when a "# coolify:" line sets them
+                    $found->fill($data['settings']);
+
+                    if ($changed || $found->isDirty()) {
                         $found->save();
                         $count++;
                     }
                 }
-            } else {
+            }
+
+            if ($copies->isEmpty()) {
                 $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $value;
                 $environment->comment = $comment; // Set comment from inline comment
                 $environment->is_multiline = false;
+                $environment->fill($data['settings']);
                 $environment->is_preview = $isPreview;
                 $environment->resourceable_id = $this->resource->id;
                 $environment->resourceable_type = $this->resource->getMorphClass();

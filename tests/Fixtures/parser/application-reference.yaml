@@ -54,6 +54,8 @@ services:
       SERVICE_FQDN_API: /api
       MAP_LITERAL: map-value
       MAP_NULL:
+      # Empty value: filled from the stored variable (the preview variable for a pull request).
+      MAP_EMPTY_FROM_DATABASE: ''
     ports:
       - "3001:3001"
       - target: 3002

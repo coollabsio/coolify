@@ -95,6 +95,53 @@ test('legacy service variables keep the old env file format', function () {
         ->and($this->service->composeEnvironmentFileLine($empty))->toBe('EMPTY=');
 });
 
+test('legacy service variables keep the value that the compose file got before exact escaping', function () {
+    $this->service->update(['docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: alpine
+    environment:
+      - WITH_DEFAULT=${WITH_DEFAULT:-x}
+      - OTHER_NAME=${RENAMED}
+      - NESTED=${NESTED:-${NESTED_DEFAULT}}
+      - PLAIN=${PLAIN}
+YAML]);
+    $variables = collect(['WITH_DEFAULT', 'RENAMED', 'NESTED_DEFAULT', 'PLAIN'])
+        ->mapWithKeys(fn (string $key) => [$key => legacyVariable($this->service, ['key' => $key, 'value' => 'a\\.b'])]);
+
+    expect($this->service->composeEnvironmentFileLine($variables['WITH_DEFAULT']))->toBe('WITH_DEFAULT="a\\\\.b"')
+        ->and($this->service->composeEnvironmentFileLine($variables['RENAMED']))->toBe('RENAMED="a\\\\.b"')
+        ->and($this->service->composeEnvironmentFileLine($variables['NESTED_DEFAULT']))->toBe('NESTED_DEFAULT="a\\\\.b"')
+        ->and($this->service->composeEnvironmentFileLine($variables['PLAIN']))->toBe('PLAIN=a\\\\.b')
+        ->and($this->service->legacyEscapingChangesValue($variables['WITH_DEFAULT']))->toBeFalse()
+        ->and($this->service->legacyEscapingChangesValue($variables['PLAIN']))->toBeTrue()
+        ->and($variables['WITH_DEFAULT']->fresh()->real_value)->toBe('a\\.b');
+});
+
+test('legacy literal and multiline variables with a single quote get a line that docker compose can read', function () {
+    $literal = legacyVariable($this->service, ['key' => 'LITERAL_QUOTE', 'value' => "it's", 'is_literal' => true]);
+    $multiline = legacyVariable($this->service, ['key' => 'MULTILINE_QUOTE', 'value' => "it's\n\"two\"", 'is_multiline' => true]);
+    $withoutQuote = legacyVariable($this->service, ['key' => 'LITERAL_PLAIN', 'value' => 'x$y', 'is_literal' => true]);
+
+    expect($this->service->composeEnvironmentFileLine($literal))->toBe('LITERAL_QUOTE="it\'s"')
+        ->and($this->service->composeEnvironmentFileLine($multiline))->toBe("MULTILINE_QUOTE=\"it's\n\\\"two\\\"\"")
+        ->and($this->service->composeEnvironmentFileLine($withoutQuote))->toBe("LITERAL_PLAIN='x\$y'")
+        ->and($this->service->legacyEscapingChangesValue($literal))->toBeFalse();
+});
+
+test('legacy multiline json variables get a line that docker compose can read', function (array $flags) {
+    $json = "{\n  \"type\": \"service_account\"\n}";
+    $multiline = legacyVariable($this->service, ['key' => 'GOOGLE_CREDENTIALS_JSON', 'value' => $json, ...$flags]);
+    $singleLine = legacyVariable($this->service, ['key' => 'SINGLE_LINE_JSON', 'value' => '{"a":"b"}', ...$flags]);
+
+    expect($this->service->composeEnvironmentFileLine($multiline))->toBe("GOOGLE_CREDENTIALS_JSON=\"{\n  \\\"type\\\": \\\"service_account\\\"\n}\"")
+        ->and($this->service->composeEnvironmentFileLine($singleLine))->toBe('SINGLE_LINE_JSON={"a":"b"}')
+        ->and($this->service->legacyEscapingChangesValue($multiline))->toBeFalse();
+})->with([
+    'multiline' => [['is_multiline' => true]],
+    'plain' => [[]],
+]);
+
 test('legacy database variables keep the old compose environment format', function () {
     $database = StandalonePostgresql::forceCreate([
         'uuid' => 'postgres-legacy-test',

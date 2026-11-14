@@ -215,7 +215,9 @@ it('shows secret values in the variable editor only with read-sensitive access',
     if ($expectedValue === null) {
         expect($component->get('isValueHidden'))->toBeTrue()
             ->and($component->get('value'))->toBeNull();
-        $component->call('loadValues')->assertForbidden();
+        $component->call('loadValues')->assertOk();
+        expect($component->get('value'))->toBeNull()
+            ->and($component->get('valuesLoaded'))->toBeFalse();
 
         return;
     }

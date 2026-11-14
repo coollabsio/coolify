@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Database\StartSqlite;
+use App\Enums\LogDrainType;
 use App\Livewire\Project\Database\Sqlite\General;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -40,7 +41,7 @@ function sqliteApiHeaders(): array
 }
 
 it('creates the data volume and restores into the first configured file', function () {
-    expect($this->database->image)->toBe('peakimages/sqlite:3.53.4-v0.1.0')
+    expect($this->database->image)->toBe('peakimages/sqlite:3.54.1-v0.2.0')
         ->and($this->database->databaseFilePath())->toBe('/var/lib/sqlite/app.db')
         ->and($this->database->persistentStorages()->first()->mount_path)->toBe('/var/lib/sqlite');
 });
@@ -87,9 +88,8 @@ it('uses the server log drain driver when log draining is enabled', function () 
     })->andReturn(new Activity);
     app()->instance(DatabaseStartCommandExecutor::class, $executor);
     $this->server->settings->update([
-        'is_logdrain_cloudwatch_enabled' => true,
-        'logdrain_cloudwatch_region' => 'us-east-1',
-        'logdrain_cloudwatch_group' => 'coolify',
+        'logdrain_type' => LogDrainType::Cloudwatch,
+        'logdrain_config' => ['cloudwatch' => ['region' => 'us-east-1', 'group' => 'coolify']],
     ]);
     $this->database->update(['is_log_drain_enabled' => true]);
     Server::flushIdentityMap();

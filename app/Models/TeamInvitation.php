@@ -13,10 +13,12 @@ class TeamInvitation extends Model
         'role',
         'link',
         'via',
+        'access',
     ];
 
     protected $casts = [
         'link' => 'encrypted',
+        'access' => 'array',
     ];
 
     /**
@@ -25,6 +27,19 @@ class TeamInvitation extends Model
     public function setEmailAttribute(string $value): void
     {
         $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Pivot attributes for the new `team_user` row. Grants apply only to the member role.
+     *
+     * @return array{role: string, access: string|null}
+     */
+    public function membershipAttributes(): array
+    {
+        return [
+            'role' => $this->role,
+            'access' => $this->role === 'member' && $this->access !== null ? json_encode($this->access) : null,
+        ];
     }
 
     public function team()

@@ -116,6 +116,28 @@ RUN mkdir -p /etc/nginx/conf.d && \
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
+ARG SERVERSIDEUP_PHP_VERSION
+ARG COOLIFY_VERSION
+ARG CREATED
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.title="Coolify Development" \
+    org.opencontainers.image.description="The development image of Coolify, it runs the checkout that Docker Compose mounts into it." \
+    org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.created="${CREATED}" \
+    org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.authors="coollabsio" \
+    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.url="https://coolify.io" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.documentation="https://github.com/coollabsio/coolify/blob/main/CONTRIBUTING.md" \
+    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    io.coolify.nginx.version="${NGINX_VERSION}" \
+    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
+    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
+    io.coolify.php-uv.version="${PHP_UV_VERSION}"
+
 # Stay as root for s6 init so bind-mounted workspaces work even when the host
 # tree is root-owned (CI, Jean, rootful Docker). PHP-FPM/nginx still run as
 # www-data via their service configs. Do NOT set USER www-data here — that

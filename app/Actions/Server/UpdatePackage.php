@@ -13,7 +13,10 @@ class UpdatePackage
 
     public string $jobQueue = 'high';
 
-    public function handle(Server $server, string $osId, ?string $package = null, ?string $packageManager = null, bool $all = false): Activity|array
+    /**
+     * @param  list<string>  $packages  Packages to update; ignored when $all is true.
+     */
+    public function handle(Server $server, string $osId, array $packages = [], ?string $packageManager = null, bool $all = false): Activity|array
     {
         try {
             if ($server->serverStatus() === false) {
@@ -22,25 +25,22 @@ class UpdatePackage
                 ];
             }
 
-            // Validate that package name is provided when not updating all packages
-            if (! $all && ($package === null || $package === '')) {
+            if (! $all && $packages === []) {
                 return [
                     'error' => "Package name required when 'all' is false.",
                 ];
             }
 
-            // Sanitize package name to prevent command injection
-            // Only allow alphanumeric characters, hyphens, underscores, periods, plus signs, and colons
-            // These are valid characters in package names across most package managers
-            $sanitizedPackage = '';
-            if ($package !== null && ! $all) {
-                if (! preg_match('/^[a-zA-Z0-9._+:-]+$/', $package)) {
+            // Only characters that are valid in package names of all supported package managers; no leading hyphen, so a name is never read as an option.
+            $packages = $all ? [] : array_values(array_unique($packages));
+            foreach ($packages as $package) {
+                if (! is_string($package) || ! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._+:-]*$/', $package)) {
                     return [
                         'error' => 'Invalid package name. Package names can only contain alphanumeric characters, hyphens, underscores, periods, plus signs, and colons.',
                     ];
                 }
-                $sanitizedPackage = escapeshellarg($package);
             }
+            $escapedPackages = implode(' ', array_map('escapeshellarg', $packages));
 
             if (! $all && in_array($packageManager, CheckUpdates::FULL_UPGRADE_ONLY, true)) {
                 return [
@@ -48,7 +48,7 @@ class UpdatePackage
                 ];
             }
 
-            $commands = self::commands($packageManager, $all ? null : $sanitizedPackage);
+            $commands = self::commands($packageManager, $all ? null : $escapedPackages);
             if ($commands === null) {
                 return [
                     'error' => 'OS not supported',
@@ -56,7 +56,6 @@ class UpdatePackage
             }
 
             $updateId = (string) Str::uuid();
-            $packages = $all ? [] : [$package];
             $user = auth()->user();
 
             return remote_process($commands, $server, type_uuid: $updateId, callEventOnFinish: 'ServerPackagesUpdateFinished', callEventData: [
@@ -77,7 +76,7 @@ class UpdatePackage
 
     /**
      * Update commands that never wait for input. apt keeps changed configuration files (confold) and uses the
-     * package default for unchanged ones (confdef). A null package updates all packages.
+     * package default for unchanged ones (confdef). A null package updates all packages. $escapedPackage can hold several escaped names, separated by spaces.
      *
      * @return array<int, string>|null
      */

@@ -33,7 +33,8 @@ class CleanupDatabase extends Command
         $this->line("Keep days: $keep_days");
         $this->cleanupTable('failed_jobs', 'failed_at', now()->subDays(1));
 
-        $this->cleanupTable('sessions', 'last_activity', now()->subDays($keep_days)->timestamp);
+        // A session older than its lifetime can no longer be used, so do not keep it for the retention days.
+        $this->cleanupTable('sessions', 'last_activity', now()->subMinutes((int) config('session.lifetime'))->timestamp);
 
         $this->cleanupTable('activity_log', 'created_at', now()->subDays($keep_days));
 
@@ -46,6 +47,12 @@ class CleanupDatabase extends Command
         $this->cleanupTable('application_deployment_queues', 'created_at', now()->subDays($keep_days));
 
         $this->cleanupTable('scheduled_task_executions', 'created_at', now()->subDays($keep_days));
+
+        // Backup retention removes only successful runs. Delete a failed run only when it has no file:
+        // a stale run marked failed keeps its filename, and its partial file or S3 copy can still exist.
+        $this->cleanupTable('scheduled_database_backup_executions', 'created_at', now()->subDays($keep_days), fn (Builder $query) => $query
+            ->where('status', 'failed')
+            ->whereNull('filename'));
 
         $this->cleanupTable('github_runner_executions', 'created_at', now()->subDays($keep_days), fn (Builder $query) => $query
             ->whereNotIn('status', array_map(fn (GithubRunnerStatus $status): string => $status->value, GithubRunnerStatus::active())));

@@ -1,0 +1,214 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Actions\ImageScan\SetServerImageScanning;
+use App\Http\Controllers\Controller;
+use App\Jobs\PrepareImageScannerJob;
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Services\ImageScan\ImageScanningRefused;
+use App\Services\ImageScan\ScannerCommands;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
+
+class ServerImageScanningController extends Controller
+{
+    /** Scanner limits that the API can change; each one has fixed options in ServerSetting. */
+    private const LIMIT_FIELDS = ['image_scan_memory_mb', 'image_scan_syft_timeout', 'image_scan_grype_timeout', 'image_scan_cpus'];
+
+    private const ALLOWED_FIELDS = ['is_image_scan_enabled', ...self::LIMIT_FIELDS];
+
+    /** Audit action of each scanner limit. */
+    private const LIMIT_AUDIT_ACTIONS = [
+        'image_scan_memory_mb' => 'api.server.image_scanner_memory_changed',
+        'image_scan_syft_timeout' => 'api.server.image_scanner_syft_timeout_changed',
+        'image_scan_grype_timeout' => 'api.server.image_scanner_grype_timeout_changed',
+        'image_scan_cpus' => 'api.server.image_scanner_cpus_changed',
+    ];
+
+    /**
+     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, image_scan_syft_timeout: int, image_scan_grype_timeout: int, image_scan_cpus: float, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
+     */
+    private function transform(Server $server): array
+    {
+        $state = Cache::get(PrepareImageScannerJob::stateCacheKey($server));
+        $failedStep = Cache::get(PrepareImageScannerJob::failedStepCacheKey($server));
+        $builtAt = Cache::get(PrepareImageScannerJob::builtAtCacheKey($server));
+
+        return [
+            'is_image_scan_enabled' => (bool) $server->settings->is_image_scan_enabled,
+            'image_scan_memory_mb' => (int) $server->settings->image_scan_memory_mb,
+            'image_scan_syft_timeout' => (int) $server->settings->image_scan_syft_timeout,
+            'image_scan_grype_timeout' => (int) $server->settings->image_scan_grype_timeout,
+            'image_scan_cpus' => (float) $server->settings->image_scan_cpus,
+            'scanner_state' => is_string($state) ? $state : null,
+            'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
+            'scanner_built_at' => is_string($builtAt) ? CarbonImmutable::parse($builtAt)->toIso8601String() : null,
+            'scanner_disk_used_bytes' => PrepareImageScannerJob::diskUsedBytes($server),
+        ];
+    }
+
+    private function findServer(Request $request): ?Server
+    {
+        $teamId = getTeamIdFromToken();
+
+        return is_null($teamId) ? null : Server::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
+    }
+
+    #[OA\Get(
+        summary: 'Get image scanning settings',
+        description: 'Get the image vulnerability scanning settings of a server owned by the authenticated team, and the state of the scanner on the server. Needs a team admin or owner.',
+        path: '/servers/{uuid}/image-scanning',
+        operationId: 'get-server-image-scanning',
+        security: [['bearerAuth' => []]],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Image scanning settings.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'is_image_scan_enabled', type: 'boolean', description: 'Whether the server scans the images of its resources.'),
+                        new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB.'),
+                        new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
+                        new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
+                        new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step.'),
+                        new OA\Property(property: 'scanner_state', type: 'string', nullable: true, enum: ['pulling', 'updating_database', 'ready', 'failed'], description: 'State of the scanner on the server. Null when unknown.'),
+                        new OA\Property(property: 'scanner_failed_step', type: 'string', nullable: true, description: 'The step that failed when scanner_state is failed.'),
+                        new OA\Property(property: 'scanner_built_at', type: 'string', format: 'date-time', nullable: true, description: 'Time of the vulnerability database on the server.'),
+                        new OA\Property(property: 'scanner_disk_used_bytes', type: 'integer', nullable: true, description: 'Disk space that the scanner uses on the server.'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Needs a team admin or owner.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    public function show(Request $request): JsonResponse
+    {
+        if (is_null(getTeamIdFromToken())) {
+            return invalidTokenResponse();
+        }
+
+        $server = $this->findServer($request);
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $this->authorize('viewSecurity', $server);
+
+        return response()->json($this->transform($server));
+    }
+
+    #[OA\Patch(
+        summary: 'Update image scanning settings',
+        description: 'Turn image vulnerability scanning of a server owned by the authenticated team on or off, or change the limits of the scanner (memory, CPUs, and the Syft and Grype time limits). Send at least one field. Turning it on gets the scanner on the server in the background. A new limit applies to the next scan.',
+        path: '/servers/{uuid}/image-scanning',
+        operationId: 'update-server-image-scanning',
+        security: [['bearerAuth' => []]],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'is_image_scan_enabled', type: 'boolean'),
+                    new OA\Property(property: 'image_scan_memory_mb', type: 'integer', enum: ServerSetting::IMAGE_SCAN_MEMORY_OPTIONS_MB, description: 'Memory limit of each scanner step, in MB. A value above the memory of the server is refused.'),
+                    new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
+                    new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
+                    new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'),
+                ],
+                type: 'object',
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated image scanning settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Needs a team admin or owner.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'The instance does not allow image scanning, or another Coolify instance manages the server.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $server = $this->findServer($request);
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        $this->authorize('update', $server);
+
+        $validator = customApiValidator($request->all(), [
+            'is_image_scan_enabled' => ['required_without_all:'.implode(',', self::LIMIT_FIELDS), 'boolean'],
+            'image_scan_memory_mb' => ['integer', Rule::in(ScannerCommands::memoryOptionsMb($server))],
+            'image_scan_syft_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
+            'image_scan_grype_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
+            'image_scan_cpus' => ['numeric', Rule::in(ScannerCommands::cpuOptions($server))],
+        ], [
+            'image_scan_memory_mb.in' => 'This server allows: '.implode(', ', ScannerCommands::memoryOptionsMb($server)).'. A higher limit is more than the memory of the server.',
+            'image_scan_cpus.in' => 'This server allows: '.implode(', ', ScannerCommands::cpuOptions($server)).'. A higher limit is more than the CPU count of the server.',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $audit = [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+        ];
+        try {
+            $limits = $request->only(self::LIMIT_FIELDS);
+            if ($limits !== []) {
+                SetServerImageScanning::ensureManagedHere($server);
+                $server->settings->update($limits);
+                foreach (array_keys($limits) as $field) {
+                    auditLog(self::LIMIT_AUDIT_ACTIONS[$field], $audit);
+                }
+            }
+            if ($request->has('is_image_scan_enabled')) {
+                $enabled = $request->boolean('is_image_scan_enabled');
+                SetServerImageScanning::run($server, $enabled);
+                auditLog($enabled ? 'api.server.image_scanning_enabled' : 'api.server.image_scanning_disabled', $audit);
+            }
+        } catch (ImageScanningRefused $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+
+        return response()->json($this->transform($server->refresh()));
+    }
+}

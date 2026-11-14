@@ -107,6 +107,18 @@ class GiteaApp extends BaseModel
         return ! empty($this->access_token) && ! empty($this->refresh_token);
     }
 
+    /**
+     * The organization field limits the source to repositories of these owners. Empty allows all owners.
+     */
+    public function allowsRepositoryOwner(?string $owner): bool
+    {
+        $organizations = collect(explode(',', (string) $this->organization))
+            ->map(fn ($organization) => strtolower(trim($organization)))
+            ->filter();
+
+        return $organizations->isEmpty() || $organizations->contains(strtolower((string) $owner));
+    }
+
     public function apiUrlBase(): string
     {
         $apiUrl = rtrim($this->api_url, '/');

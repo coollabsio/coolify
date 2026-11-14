@@ -51,7 +51,7 @@ class StopProxy
             ProxyDashboardCacheService::clearCache($server);
 
             if (! $restarting) {
-                ProxyStatusChanged::dispatch($server->id);
+                ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
             }
         }
     }

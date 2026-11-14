@@ -9,7 +9,10 @@ class SwitchTeam extends Component
 {
     public string $selectedTeamId = 'default';
 
-    protected $listeners = ['team-avatar-updated' => '$refresh'];
+    protected $listeners = [
+        'team-avatar-updated' => '$refresh',
+        'team-updated' => '$refresh',
+    ];
 
     public function mount()
     {

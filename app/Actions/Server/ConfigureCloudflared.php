@@ -54,6 +54,7 @@ class ConfigureCloudflared
 
             return remote_process($commands, $server, callEventOnFinish: 'CloudflareTunnelChanged', callEventData: [
                 'server_id' => $server->id,
+                'team_id' => $server->team_id,
                 'ssh_domain' => $ssh_domain,
             ]);
         } catch (\Throwable $e) {

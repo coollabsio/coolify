@@ -54,8 +54,8 @@ test('enabling Resend disables SMTP in storage', function () {
 
     Livewire::test(SettingsEmail::class)
         ->set('resendApiKey', 're_test_key')
-        ->set('smtpFromAddress', 'from@example.com')
-        ->set('smtpFromName', 'Coolify')
+        ->set('resendFromAddress', 'from@example.com')
+        ->set('resendFromName', 'Coolify')
         ->call('toggleResend');
 
     $this->settings->refresh();

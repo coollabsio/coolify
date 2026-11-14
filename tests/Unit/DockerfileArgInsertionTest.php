@@ -3,7 +3,7 @@
 use App\Jobs\ApplicationDeploymentJob;
 
 /**
- * Test the Dockerfile ARG insertion logic
+ * Test how the deployment job finds the FROM instructions where it inserts ARGs
  * This tests the fix for GitHub issue #7118
  */
 it('finds FROM instructions in simple dockerfile', function () {
@@ -128,78 +128,6 @@ it('uses the escape parser directive for continuation lines', function () {
     expect($job->findFromInstructionLines($dockerfile))->toBe([1, 4]);
 });
 
-it('inserts ARGs after FROM in simple dockerfile', function () {
-    $dockerfile = collect([
-        'FROM node:16',
-        'WORKDIR /app',
-        'COPY . .',
-    ]);
-
-    $fromLines = [0];
-    $argsToInsert = collect(['ARG MY_VAR=value', 'ARG ANOTHER_VAR']);
-
-    foreach (array_reverse($fromLines) as $fromLineIndex) {
-        foreach ($argsToInsert->reverse() as $arg) {
-            $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
-        }
-    }
-
-    expect($dockerfile[0])->toBe('FROM node:16');
-    expect($dockerfile[1])->toBe('ARG MY_VAR=value');
-    expect($dockerfile[2])->toBe('ARG ANOTHER_VAR');
-    expect($dockerfile[3])->toBe('WORKDIR /app');
-});
-
-it('inserts ARGs after each FROM in multi-stage dockerfile', function () {
-    $dockerfile = collect([
-        'FROM node:16 AS builder',
-        'WORKDIR /app',
-        '',
-        'FROM nginx:alpine',
-        'COPY --from=builder /app/dist /usr/share/nginx/html',
-    ]);
-
-    $fromLines = [0, 3];
-    $argsToInsert = collect(['ARG MY_VAR=value']);
-
-    foreach (array_reverse($fromLines) as $fromLineIndex) {
-        foreach ($argsToInsert->reverse() as $arg) {
-            $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
-        }
-    }
-
-    // First stage
-    expect($dockerfile[0])->toBe('FROM node:16 AS builder');
-    expect($dockerfile[1])->toBe('ARG MY_VAR=value');
-    expect($dockerfile[2])->toBe('WORKDIR /app');
-
-    // Second stage (index shifted by +1 due to inserted ARG)
-    expect($dockerfile[4])->toBe('FROM nginx:alpine');
-    expect($dockerfile[5])->toBe('ARG MY_VAR=value');
-});
-
-it('inserts ARGs after FROM when comments precede FROM', function () {
-    $dockerfile = collect([
-        '# Build stage comment',
-        'FROM node:16',
-        'WORKDIR /app',
-    ]);
-
-    $fromLines = [1];
-    $argsToInsert = collect(['ARG MY_VAR=value']);
-
-    foreach (array_reverse($fromLines) as $fromLineIndex) {
-        foreach ($argsToInsert->reverse() as $arg) {
-            $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
-        }
-    }
-
-    expect($dockerfile[0])->toBe('# Build stage comment');
-    expect($dockerfile[1])->toBe('FROM node:16');
-    expect($dockerfile[2])->toBe('ARG MY_VAR=value');
-    expect($dockerfile[3])->toBe('WORKDIR /app');
-});
-
 it('handles real-world nuxt multi-stage dockerfile with comments', function () {
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
 
@@ -240,27 +168,5 @@ it('handles real-world nuxt multi-stage dockerfile with comments', function () {
         'CMD ["node", "/app/server/index.mjs"]',
     ]);
 
-    // Find FROM instructions
-    $fromLines = $job->findFromInstructionLines($dockerfile);
-
-    expect($fromLines)->toBe([2, 21]);
-
-    // Simulate ARG insertion
-    $argsToInsert = collect(['ARG BUILD_VAR=production']);
-
-    foreach (array_reverse($fromLines) as $fromLineIndex) {
-        foreach ($argsToInsert->reverse() as $arg) {
-            $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
-        }
-    }
-
-    // Verify first stage
-    expect($dockerfile[2])->toBe('FROM node:22-alpine AS build');
-    expect($dockerfile[3])->toBe('ARG BUILD_VAR=production');
-    expect($dockerfile[4])->toBe('WORKDIR /app');
-
-    // Verify second stage (index shifted by +1 due to first ARG insertion)
-    expect($dockerfile[22])->toBe('FROM node:22-alpine');
-    expect($dockerfile[23])->toBe('ARG BUILD_VAR=production');
-    expect($dockerfile[24])->toBe('WORKDIR /app');
+    expect($job->findFromInstructionLines($dockerfile))->toBe([2, 21]);
 });

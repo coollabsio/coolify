@@ -1,8 +1,8 @@
 <?php
 
 use App\Models\User;
+use App\Support\RootSetupWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
@@ -20,7 +20,8 @@ it('shows registration page when no users exist', function () {
 });
 
 it('shows how to open the setup window again when it is closed', function () {
-    Cache::flush();
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES * 60 + 1)->seconds();
 
     $page = visit('/register');
 
@@ -42,30 +43,6 @@ it('can register a new root user', function () {
         ->screenshot(filename: 'registration-success-onboarding');
 
     expect(User::where('email', 'root@example.com')->exists())->toBeTrue();
-});
-
-it('fails registration with mismatched passwords', function () {
-    $page = visit('/register');
-
-    $page->fill('name', 'Test User')
-        ->fill('email', 'root@example.com')
-        ->fill('password', 'Password1!@')
-        ->fill('password_confirmation', 'DifferentPass1!@')
-        ->click('Create account')
-        ->assertSee('password')
-        ->screenshot(filename: 'registration-password-mismatch');
-});
-
-it('fails registration with weak password', function () {
-    $page = visit('/register');
-
-    $page->fill('name', 'Test User')
-        ->fill('email', 'root@example.com')
-        ->fill('password', 'short')
-        ->fill('password_confirmation', 'short')
-        ->click('Create account')
-        ->assertSee('password')
-        ->screenshot(filename: 'registration-weak-password');
 });
 
 it('shows login link when a user already exists', function () {

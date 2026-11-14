@@ -71,6 +71,40 @@
     <section class="application-settings-section">
         <div class="application-settings-section-header">
             <div>
+                <h2>UI scale</h2>
+                <p>Choose the size of text and controls. Phones always use 100%.</p>
+            </div>
+        </div>
+        <div class="application-settings-section-body grid gap-3 sm:grid-cols-3">
+            @foreach ([
+                ['value' => '80', 'label' => '80%', 'description' => 'Show more content on the screen.', 'size' => 'text-base'],
+                ['value' => '90', 'label' => '90%', 'description' => 'Smaller text and controls.', 'size' => 'text-lg'],
+                ['value' => '100', 'label' => '100%', 'description' => 'The default size.', 'size' => 'text-xl'],
+            ] as $option)
+                <button type="button" @click="setUiScale('{{ $option['value'] }}')"
+                    class="group overflow-hidden rounded-[10px] border border-neutral-200 bg-white text-left transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-white/[0.05] dark:hover:border-white/[0.12]"
+                    :class="uiScale === '{{ $option['value'] }}'
+                        ? 'border-coollabs! bg-coollabs/[0.06]! ring-2 ring-coollabs/25 dark:border-brand-light! dark:bg-brand-light/[0.08]! dark:ring-brand-light/25'
+                        : ''">
+                    <div class="flex h-20 items-center justify-center border-b border-neutral-200 bg-neutral-50 px-4 dark:border-white/[0.07] dark:bg-black/15">
+                        <span class="{{ $option['size'] }} font-semibold text-black dark:text-fg">Aa</span>
+                    </div>
+                    <div class="p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-sm font-semibold text-black dark:text-fg">{{ $option['label'] }}</span>
+                            <x-reicon name="check-circle" class="size-4 text-coollabs dark:text-brand-light"
+                                x-show="uiScale === '{{ $option['value'] }}'" x-cloak />
+                        </div>
+                        <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">{{ $option['description'] }}</p>
+                    </div>
+                </button>
+            @endforeach
+        </div>
+    </section>
+
+    <section class="application-settings-section">
+        <div class="application-settings-section-header">
+            <div>
                 <h2>Page width</h2>
                 <p>Choose how content uses the available browser width.</p>
             </div>
@@ -310,7 +344,7 @@
                                         <div class="flex items-center gap-2 rounded-md px-2 py-1.5 opacity-75">
                                             <x-reicon name="servers" class="size-3.5" /> Servers
                                             <span class="ml-auto rounded-full px-1.5 text-[10px] font-semibold"
-                                                :style="`background: ${draftColors.accent}; color: ${accentTextOn(draftColors.accent)}`">3</span>
+                                                :style="`background: ${accentFill(draftColors.accent)}; color: ${accentTextOn(draftColors.accent)}`">3</span>
                                         </div>
                                     </div>
                                     <div class="flex min-w-0 flex-1 flex-col gap-2 p-3"
@@ -318,7 +352,7 @@
                                         <div class="flex items-center justify-between gap-2">
                                             <span class="text-sm font-semibold">Projects</span>
                                             <span class="rounded-md px-2 py-1 text-[11px] font-medium"
-                                                :style="`background: ${draftColors.accent}; color: ${accentTextOn(draftColors.accent)}`">+ New</span>
+                                                :style="`background: ${accentFill(draftColors.accent)}; color: ${accentTextOn(draftColors.accent)}`">+ New</span>
                                         </div>
                                         <div class="rounded-md border p-2.5"
                                             :style="`background: color-mix(in oklab, ${textOn(draftColors.background)} 4%, ${draftColors.background}); border-color: color-mix(in oklab, ${textOn(draftColors.background)} 14%, ${draftColors.background})`">

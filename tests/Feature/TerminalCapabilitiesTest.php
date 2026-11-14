@@ -7,7 +7,7 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use phpseclib3\Crypt\RSA;
+use phpseclib3\Crypt\EC;
 
 uses(RefreshDatabase::class);
 
@@ -18,7 +18,7 @@ it('probes container capabilities with exactly one elevation layer', function (s
     $team = Team::factory()->create();
     $key = PrivateKey::create([
         'name' => 'Terminal test key',
-        'private_key' => RSA::createKey(1024)->toString('OpenSSH'),
+        'private_key' => EC::createKey('Ed25519')->toString('OpenSSH'),
         'team_id' => $team->id,
     ]);
     $server = Server::factory()->create([
@@ -33,20 +33,20 @@ it('probes container capabilities with exactly one elevation layer', function (s
     expect((new ReflectionMethod(Terminal::class, 'checkShellAvailability'))->invoke($terminal, $server, 'game-1'))->toBeTrue();
 
     Process::assertRan(function ($process) use ($sudo) {
-        if (! str_contains($process->command, 'docker inspect')) {
+        if (! str_contains(remoteProcessScript($process), 'docker inspect')) {
             return false;
         }
-        expect($process->command)
+        expect(remoteProcessScript($process))
             ->toContain("\n{$sudo}docker inspect --format '{{.Config.OpenStdin}}' 'game-1' 2>/dev/null\n")
             ->not->toContain('sudo sudo');
 
-        return str_contains($process->command, 'docker inspect');
+        return str_contains(remoteProcessScript($process), 'docker inspect');
     });
     Process::assertRan(function ($process) use ($sudo) {
-        if (! str_contains($process->command, 'docker exec')) {
+        if (! str_contains(remoteProcessScript($process), 'docker exec')) {
             return false;
         }
-        expect($process->command)
+        expect(remoteProcessScript($process))
             ->toContain("{$sudo}docker exec 'game-1' bash -c 'exit 0' 2>/dev/null || {$sudo}docker exec 'game-1' sh -c 'exit 0' 2>/dev/null")
             ->not->toContain('sudo sudo');
 

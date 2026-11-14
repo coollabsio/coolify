@@ -36,7 +36,7 @@ return [
             'options' => [
                 'tls' => [],
             ],
-            'max_request_size' => 10_000,
+            'max_request_size' => 64_000,
             'scaling' => [
                 'enabled' => false,
                 'channel' => 'reverb',
