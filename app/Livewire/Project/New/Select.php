@@ -564,7 +564,7 @@ class Select extends Component
      */
     private function createOnCluster(array $target)
     {
-        if (str_starts_with((string) $this->type, 'one-click-service-') && $this->nodesUnavailableReason !== null) {
+        if (str_starts_with($this->type ?? '', 'one-click-service-') && $this->nodesUnavailableReason !== null) {
             $this->dispatch('error', 'Not available on Nodes. '.$this->nodesUnavailableReason);
 
             return null;
