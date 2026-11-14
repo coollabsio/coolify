@@ -103,6 +103,7 @@
                                         'The current configuration stays in the history.',
                                         'Restart the proxy to apply it.',
                                     ]"
+                                    warningMessage="The proxy uses the restored configuration after the next restart. You can restore the current configuration again from this history."
                                     step2ButtonText="Restore Configuration" :confirmWithText="false"
                                     :confirmWithPassword="false">
                                     <x-slot:trigger>
