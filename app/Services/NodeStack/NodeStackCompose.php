@@ -118,7 +118,7 @@ class NodeStackCompose
     private static function serviceUnavailableReason(string $name, array $service): ?string
     {
         if (! self::validServiceName($name)) {
-            return 'has a name that is not a DNS label';
+            return 'has a name that is not a DNS label (letters, digits, and -)';
         }
         foreach (self::UNSUPPORTED_KEYS as $key => $reason) {
             $value = $service[$key] ?? null;
@@ -142,12 +142,12 @@ class NodeStackCompose
     }
 
     /**
-     * A service name becomes `<service>.<stack>.coolify.internal`, so it must be a DNS label. Compose
-     * names often have `_` (`rallly_db`), which a stack name may have (decision 0023).
+     * A service name becomes `<service>.<stack>.coolify.internal`, so it must be a DNS label.
+     * Sentinel rejects `_` in a name (`rallly_db`), so such a template does not run on Nodes yet.
      */
     public static function validServiceName(string $name): bool
     {
-        return preg_match('/\A(?![-_])[a-z0-9_-]{1,63}(?<![-_])\z/', strtolower($name)) === 1;
+        return preg_match('/\A(?!-)[a-z0-9-]{1,63}(?<!-)\z/', strtolower($name)) === 1;
     }
 
     /**

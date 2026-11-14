@@ -173,8 +173,7 @@ class BuildNodeClusterIngressRoutes
     }
 
     /**
-     * `<service>.<stack>.coolify.internal` for each service of a stack (decision 0023). A Compose
-     * name with `_` needs a Sentinel with `workload.dns_search.v1` on every Node of the cluster.
+     * `<service>.<stack>.coolify.internal` for each service of a stack (decision 0023).
      *
      * @param  Collection<int, NodeWorkload>  $workloads
      * @return list<array{name: string, workload_id: string, namespace: string}>
@@ -187,7 +186,6 @@ class BuildNodeClusterIngressRoutes
         if ($stackWorkloads->isEmpty()) {
             return [];
         }
-        $underscores = $cluster->nodes()->get()->every(fn ($node): bool => $node->supportsCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY) === true);
 
         return $stackWorkloads
             ->map(fn (NodeWorkload $workload): array => [
@@ -197,7 +195,7 @@ class BuildNodeClusterIngressRoutes
             ])
             ->filter(fn (array $name): bool => self::validLabel($name['namespace'])
                 && ! in_array($name['namespace'], NodeStack::RESERVED_LABELS, true)
-                && (self::validLabel($name['name']) || ($underscores && preg_match('/\A(?![-_])[a-z0-9_-]{1,63}(?<![-_])\z/', $name['name']) === 1)))
+                && self::validLabel($name['name']))
             ->unique(fn (array $name): string => $name['namespace'].'|'.$name['name'])
             ->values()
             ->all();

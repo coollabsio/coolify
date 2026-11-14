@@ -170,13 +170,14 @@ describe('availability', function () {
             ->mapWithKeys(fn (string $path): array => [pathinfo($path, PATHINFO_FILENAME) => NodeStackCompose::unavailableReason(NodeStackCompose::parse(file_get_contents($path)))]);
 
         // Decision 0023 counts 316 runnable templates. 20 more share a volume between two
-        // services (or use volumes_from), which a Node volume cannot do (decision 0007).
-        expect($reasons->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(296)
+        // services (or use volumes_from), which a Node volume cannot do (decision 0007), and 5
+        // more have a service name with `_`, which Sentinel cannot resolve yet.
+        expect($reasons->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(291)
             ->and($reasons['twenty'])->toBe('The services twenty and worker share the volume twenty-local-storage.')
             ->and($reasons['portainer'])->toBe('The service portainer mounts the Docker socket.')
             ->and($reasons['gitea'])->toContain('publishes ports')
             ->and($reasons['n8n-with-postgresql'])->toBeNull()
-            ->and($reasons['rallly'])->toBeNull();
+            ->and($reasons['rallly'])->toBe('The service rallly_db has a name that is not a DNS label (letters, digits, and -).');
     });
 
     it('rejects each feature that a workload does not have', function (string $service, string $reason) {
@@ -298,7 +299,7 @@ describe('mapping', function () {
 
 describe('names and traffic', function () {
     it('adds a name for each stack service in the namespace of the stack', function () {
-        $stack = createStack($this, "services:\n  web:\n    image: nginx\n  rallly_db:\n    image: postgres\n");
+        $stack = createStack($this, "services:\n  web:\n    image: nginx\n  db:\n    image: postgres\n");
         $services = $stack->workloads()->get()->keyBy('stack_service');
 
         $names = collect(BuildNodeClusterIngressRoutes::names($this->cluster));
@@ -306,13 +307,13 @@ describe('names and traffic', function () {
         expect($names->where('namespace', 'default')->pluck('workload_id')->sort()->values()->all())->toBe($services->pluck('uuid')->sort()->values()->all())
             ->and($names->where('namespace', 'shop')->values()->all())->toBe([
                 ['name' => 'web', 'workload_id' => $services['web']->uuid, 'namespace' => 'shop'],
-                ['name' => 'rallly_db', 'workload_id' => $services['rallly_db']->uuid, 'namespace' => 'shop'],
+                ['name' => 'db', 'workload_id' => $services['db']->uuid, 'namespace' => 'shop'],
             ]);
+    });
 
-        // A Node without stack names support would reject the whole table for a name with `_`.
-        Cache::put($this->node->cacheKey(), ['capabilities' => stackNodeCapabilities()]);
-        $old = stackNode($this->team, $this->cluster, 'old', '203.0.113.11', array_diff(stackNodeCapabilities(), ['workload.dns_search.v1']));
-        expect(collect(BuildNodeClusterIngressRoutes::names($this->cluster))->where('namespace', 'shop')->pluck('name')->all())->toBe(['web']);
+    it('rejects a service name with an underscore, because Sentinel would reject the whole name table', function () {
+        expect(fn () => createStack($this, "services:\n  web:\n    image: nginx\n  rallly_db:\n    image: postgres\n"))
+            ->toThrow(RuntimeException::class, 'The service rallly_db has a name that is not a DNS label');
     });
 
     it('allows all traffic between the services of a stack on Nodes that support it', function () {
