@@ -35,6 +35,7 @@ current v5 architecture.
 | [0021: Run Flux as a service in the Coolify container](0021-production-flux.md) | Accepted | Flux is an s6 service in the Coolify container with a pinned binary, Coolify-generated secrets in the database, a Flux URL setting, an internal API on 127.0.0.1, and a restart after each certificate renewal. |
 | [0022: Deploy without downtime on one Node](0022-node-rolling-deploys.md) | Accepted | Without a writable volume, a redeploy starts the new container in a second slot, waits until it is healthy, drains and removes the old one, and keeps the old one when the new one fails. |
 | [0023: Run Compose services on Nodes as stacks of workloads](0023-node-compose-stacks.md) | Accepted | A stack groups one workload for each Compose service, with names by service, traffic allowed inside the stack, `depends_on` order, and file mounts. 316 of 388 templates in the first step. |
+| [0024: Share a volume between the services of one stack](0024-node-stack-shared-volumes.md) | Proposed | A named volume that several services of one stack mount is a stack volume on one Node; the services that share it are placed, moved, and restored together. 18 more templates. |
 
 ## Adding a decision
 
