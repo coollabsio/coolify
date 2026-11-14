@@ -95,7 +95,7 @@ class VolumeBackups extends Component
 
             return;
         }
-        $volume = $this->workload->volumes()->whereNull('detached_at')->where('uuid', $this->newVolumeUuid)->first();
+        $volume = $this->volumes()->firstWhere('uuid', $this->newVolumeUuid);
         if ($volume === null || $volume->scheduledBackups()->exists()) {
             $this->addError('newVolumeUuid', 'Select a volume of this application without a backup schedule.');
 
@@ -149,6 +149,11 @@ class VolumeBackups extends Component
         ]);
         if (! validate_cron_expression($this->frequency)) {
             $this->addError('frequency', 'The frequency must be a valid cron or human expression.');
+
+            return;
+        }
+        if ($this->stopDuringBackup && $backup->backupable instanceof NodeVolume && $backup->backupable->isStackVolume()) {
+            $this->addError('stopDuringBackup', BackupNodeVolume::SHARED_STOP_ERROR);
 
             return;
         }
@@ -236,7 +241,7 @@ class VolumeBackups extends Component
             return;
         }
         try {
-            $operation = RestoreNodeVolume::queue($backup->backupable, $execution, $target, auth()->user());
+            $operation = RestoreNodeVolume::queue($backup->backupable, $execution, $target, auth()->user(), $this->workload);
         } catch (Throwable $exception) {
             $this->dispatch('error', $exception->getMessage());
 
@@ -304,7 +309,7 @@ class VolumeBackups extends Component
     public function render(): View
     {
         $backup = $this->backupUuid === null ? null : $this->backup();
-        $volumes = $this->workload->volumes()->with('node')->whereNull('detached_at')->orderBy('mount_path')->get();
+        $volumes = $this->volumes();
         $schedules = $this->schedules()->with(['backupable.node', 'latestExecution', 's3'])->withCount('executions')->latest()->get();
 
         return view('livewire.project.cluster-application.volume-backups', [
@@ -312,7 +317,7 @@ class VolumeBackups extends Component
             'schedules' => $schedules,
             'newVolumeOptions' => $volumes
                 ->reject(fn (NodeVolume $volume): bool => $schedules->contains('backupable_id', $volume->id))
-                ->map(fn (NodeVolume $volume): array => ['value' => $volume->uuid, 'label' => "{$volume->name} ({$volume->mount_path})"])
+                ->map(fn (NodeVolume $volume): array => ['value' => $volume->uuid, 'label' => "{$volume->name} ({$volume->mount_path})".($volume->isStackVolume() ? ', shared' : '')])
                 ->values()->all(),
             's3Options' => $this->storages($backup?->s3_storage_id)->orderBy('name')->get()
                 ->map(fn (S3Storage $s3): array => ['value' => (string) $s3->id, 'label' => $s3->name.($s3->is_usable ? '' : ' (unavailable)')])
@@ -338,7 +343,26 @@ class VolumeBackups extends Component
     {
         return ScheduledVolumeBackup::query()
             ->where('backupable_type', (new NodeVolume)->getMorphClass())
-            ->whereIn('backupable_id', NodeVolume::query()->where('node_workload_id', $this->workload->id)->select('id'));
+            ->whereIn('backupable_id', NodeVolume::query()
+                ->where('node_workload_id', $this->workload->id)
+                ->orWhereHas('mounts', fn (Builder $mounts) => $mounts->where('node_workload_id', $this->workload->id))
+                ->select('id'));
+    }
+
+    /**
+     * The volumes that the application mounts: its own ones that are not detached, and the stack
+     * volumes that it shares with other services (decision 0024), which have one schedule each.
+     * `mount_path` is the path in this application.
+     *
+     * @return Collection<int, NodeVolume>
+     */
+    private function volumes(): Collection
+    {
+        $own = $this->workload->volumes()->with('node')->whereNull('detached_at')->get();
+        $shared = $this->workload->stackVolumes()->with('node')->get()
+            ->each(fn (NodeVolume $volume) => $volume->setAttribute('mount_path', $volume->pivot->mount_path));
+
+        return $own->concat($shared)->sortBy('mount_path')->values();
     }
 
     /** Usable S3 storages of the team of the workload, plus the current one. */

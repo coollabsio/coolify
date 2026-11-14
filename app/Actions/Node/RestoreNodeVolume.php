@@ -11,11 +11,14 @@ use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
+use App\Models\NodeWorkload;
+use App\Models\NodeWorkloadRevision;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Sleep;
@@ -42,10 +45,16 @@ class RestoreNodeVolume
     /**
      * Validates the restore and queues it.
      */
-    public static function queue(NodeVolume $volume, ScheduledVolumeBackupExecution $execution, Node $target, ?User $requestedBy): NodeOperation
+    public static function queue(NodeVolume $volume, ScheduledVolumeBackupExecution $execution, Node $target, ?User $requestedBy, ?NodeWorkload $workload = null): NodeOperation
     {
         $volume->loadMissing(['workload', 'node']);
-        $workload = $volume->workload;
+        // A stack volume (decision 0024) is restored from the page of a service that mounts it.
+        $workload = $volume->isStackVolume()
+            ? $volume->mountingWorkloads()->withoutGlobalScopes()->whereKey($workload?->id ?? $volume->backupWorkload()?->id)->first()
+            : $volume->workload;
+        if ($workload === null) {
+            throw new RuntimeException('Only a volume that the application mounts can be restored.');
+        }
         $backup = $execution->scheduledVolumeBackup;
         if ($backup === null || ! $backup->isNodeVolume() || $backup->backupable_id !== $volume->id
             || $execution->status !== 'success' || blank($execution->filename) || blank($execution->sha256)
@@ -86,12 +95,23 @@ class RestoreNodeVolume
      */
     public static function target(NodeOperation $operation): array
     {
-        $volume = NodeVolume::query()
-            ->where('node_workload_id', $operation->node_workload_id)
+        $volume = self::volumesOf($operation)
             ->where('uuid', data_get($operation->request, 'restore.volume_uuid'))
             ->firstOrFail();
 
         return ['volume' => $volume, 'execution' => self::executions($volume)->where('uuid', data_get($operation->request, 'restore.execution_uuid'))->firstOrFail()];
+    }
+
+    /**
+     * The volumes that the workload of an operation owns or mounts as a stack volume.
+     *
+     * @return Builder<NodeVolume>
+     */
+    private static function volumesOf(NodeOperation $operation): Builder
+    {
+        return NodeVolume::query()->where(fn (Builder $query) => $query
+            ->where('node_workload_id', $operation->node_workload_id)
+            ->orWhereHas('mounts', fn (Builder $mounts) => $mounts->where('node_workload_id', $operation->node_workload_id)));
     }
 
     /** The newest successful backup of the volume that is still in S3, for a recovery move (decision 0014). */
@@ -141,16 +161,23 @@ class RestoreNodeVolume
         });
         self::download($node, $operation, $copy->podmanName(), $execution, $deadline);
 
-        // Downtime starts. A fresh inventory decides whether the container runs.
+        // Downtime starts. A fresh inventory decides whether the containers run. Every service that
+        // mounts a stack volume stops (decision 0024): Sentinel rejects a volume that a container uses.
         FetchContainers::run($node);
-        $running = $node->containers()
-            ->where('node_workload_id', $operation->workload->id)
-            ->where('is_managed', true)
-            ->whereNotIn('state', ['exited', 'stopped', 'created', 'configured', 'dead'])
-            ->exists();
-        if ($running) {
-            self::checkpoint($operation, ['source_stopped' => true]);
-            self::lifecycle($operation, NodeWorkloadAction::STOP, 'The application could not be stopped for the restore.');
+        $users = self::users($operation, $volume);
+        foreach ($users as ['workload' => $workload, 'revision' => $revision]) {
+            $running = $node->containers()
+                ->where('node_workload_id', $workload->id)
+                ->where('is_managed', true)
+                ->whereNotIn('state', ['exited', 'stopped', 'created', 'configured', 'dead'])
+                ->exists();
+            if ($running) {
+                self::checkpoint($operation, [
+                    'source_stopped' => true,
+                    'source_stopped_ids' => array_values(array_unique([...(data_get($operation->refresh()->result, 'source_stopped_ids') ?? []), $workload->id])),
+                ]);
+                self::lifecycle($operation, $workload, $revision, NodeWorkloadAction::STOP, self::name($workload, $users->count()).' could not be stopped for the restore.');
+            }
         }
 
         self::checkpoint($operation, ['switch_started' => true]);
@@ -158,8 +185,12 @@ class RestoreNodeVolume
         $copy->update(['state' => NodeVolumeCopyState::RETAINED, 'delete_after' => now()->addDays(MoveNodeWorkloadJob::RETAIN_SOURCE_DAYS)]);
         self::checkpoint($operation, ['switched' => true]);
 
-        if ($running) {
-            self::lifecycle($operation, NodeWorkloadAction::START, 'The application did not start with the restored volume.');
+        // The stopped services start again in depends_on order.
+        $stopped = data_get($operation->refresh()->result, 'source_stopped_ids') ?? [];
+        foreach (MoveNodeWorkloadJob::inDeployOrder($users) as ['workload' => $workload, 'revision' => $revision]) {
+            if (in_array($workload->id, $stopped, true)) {
+                self::lifecycle($operation, $workload, $revision, NodeWorkloadAction::START, self::name($workload, $users->count()).' did not start with the restored volume.');
+            }
         }
         self::checkpoint($operation, ['target_ready' => true]);
     }
@@ -175,7 +206,7 @@ class RestoreNodeVolume
             return;
         }
         $node = $operation->node;
-        $volume = NodeVolume::query()->where('node_workload_id', $operation->node_workload_id)->whereIn('uuid', data_get($result, 'volume_uuids', []))->first();
+        $volume = self::volumesOf($operation)->whereIn('uuid', data_get($result, 'volume_uuids', []))->first();
         $copy = NodeVolumeCopy::query()->where('uuid', data_get($result, 'staging_copy_uuid'))->first();
         $notes = [];
 
@@ -205,10 +236,15 @@ class RestoreNodeVolume
                 $notes['restored_volume'] = 'kept for the hourly cleanup: '.mb_substr($exception->getMessage(), 0, 500);
             }
         }
-        if (data_get($result, 'source_stopped')) {
+        $stopped = data_get($result, 'source_stopped_ids') ?? (data_get($result, 'source_stopped') ? [$operation->node_workload_id] : []);
+        $users = $volume === null ? MoveNodeWorkloadJob::movingGroup($operation) : self::users($operation, $volume);
+        foreach (MoveNodeWorkloadJob::inDeployOrder($users) as ['workload' => $workload, 'revision' => $revision]) {
+            if (! in_array($workload->id, $stopped, true)) {
+                continue;
+            }
             try {
-                self::lifecycle($operation, NodeWorkloadAction::START, 'The application could not be started again.');
-                $notes['source_start'] = 'succeeded';
+                self::lifecycle($operation, $workload, $revision, NodeWorkloadAction::START, self::name($workload, $users->count()).' could not be started again.');
+                $notes['source_start'] ??= 'succeeded';
             } catch (Throwable $exception) {
                 $notes['source_start'] = 'failed: '.mb_substr($exception->getMessage(), 0, 500);
             }
@@ -312,11 +348,31 @@ class RestoreNodeVolume
         ];
     }
 
-    private static function lifecycle(NodeOperation $operation, NodeWorkloadAction $action, string $error): void
+    /**
+     * The workloads of the restore that use the volume, each with its revision: the workload of the
+     * operation, or every service of its volume group that mounts a stack volume.
+     *
+     * @return Collection<int, array{workload: NodeWorkload, revision: ?NodeWorkloadRevision}>
+     */
+    private static function users(NodeOperation $operation, NodeVolume $volume): Collection
+    {
+        $ids = $volume->usedBy()->modelKeys();
+
+        return MoveNodeWorkloadJob::movingGroup($operation)
+            ->filter(fn (array $member): bool => in_array($member['workload']->id, $ids, true) && $member['revision'] !== null)
+            ->values();
+    }
+
+    private static function name(NodeWorkload $workload, int $users): string
+    {
+        return $users > 1 ? "The service {$workload->stack_service}" : 'The application';
+    }
+
+    private static function lifecycle(NodeOperation $operation, NodeWorkload $workload, NodeWorkloadRevision $revision, NodeWorkloadAction $action, string $error): void
     {
         $lifecycle = CreateLifecycleOperation::run(
             $operation->node,
-            $operation->revision,
+            $revision,
             $action,
             $operation->requestedBy,
             updateDesiredState: false,

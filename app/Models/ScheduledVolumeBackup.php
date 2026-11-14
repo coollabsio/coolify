@@ -155,7 +155,8 @@ class ScheduledVolumeBackup extends BaseModel
 
     public function targetResource(): ?Model
     {
-        return $this->backupable?->resource;
+        // A stack volume (decision 0024) has no owner; its first service links to its backups.
+        return $this->backupable instanceof NodeVolume ? $this->backupable->backupWorkload() : $this->backupable?->resource;
     }
 
     /** A cluster volume (decision 0009): Sentinel uploads it to S3, there is no server and no local archive. */

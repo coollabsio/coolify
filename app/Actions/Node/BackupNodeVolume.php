@@ -50,12 +50,13 @@ class BackupNodeVolume
         if (! $volume instanceof NodeVolume) {
             throw new RuntimeException('The backup target is not a cluster volume.');
         }
-        $workload = $volume->workload()->first();
+        $workload = $volume->backupWorkload();
         $node = $volume->node()->first();
         if ($workload === null || $node === null) {
             throw new RuntimeException('The volume has no data yet. Deploy the application first.');
         }
         self::ensureNodeSupportsBackups($node);
+        self::ensureCanStopDuringBackup($backup, $volume);
         $s3 = self::storage($backup, $workload);
 
         $request = [
@@ -148,6 +149,19 @@ class BackupNodeVolume
 
         return $s3;
     }
+
+    /**
+     * Sentinel stops one container for `stop_during_backup`. A volume that several services share
+     * (decision 0024) has a container for each of them, so its backup runs with them running.
+     */
+    public static function ensureCanStopDuringBackup(ScheduledVolumeBackup $backup, NodeVolume $volume): void
+    {
+        if ($backup->stop_during_backup && $volume->isStackVolume()) {
+            throw new RuntimeException(self::SHARED_STOP_ERROR);
+        }
+    }
+
+    public const string SHARED_STOP_ERROR = 'This volume is shared by several services of the stack, so the backup cannot stop a container. Turn off Stop during backup: the backup is crash-consistent.';
 
     public static function ensureNodeSupportsBackups(Node $node): void
     {
@@ -256,7 +270,7 @@ class BackupNodeVolume
     public static function abandon(ScheduledVolumeBackup $backup, ScheduledVolumeBackupExecution $execution): void
     {
         $volume = $backup->backupable;
-        $workload = $volume instanceof NodeVolume ? $volume->workload()->first() : null;
+        $workload = $volume instanceof NodeVolume ? $volume->backupWorkload() : null;
         if ($workload === null || blank($execution->filename)) {
             return;
         }
@@ -266,8 +280,8 @@ class BackupNodeVolume
                     'server_id' => $node->uuid,
                     'backup_id' => $execution->uuid,
                     'volume_name' => $volume->podmanName(),
-                    'stop_container' => $backup->stop_during_backup ? $workload->containerNameOn($node) : '',
-                    'stop_timeout_seconds' => $backup->stop_during_backup ? 120 : 0,
+                    'stop_container' => $backup->stop_during_backup && ! $volume->isStackVolume() ? $workload->containerNameOn($node) : '',
+                    'stop_timeout_seconds' => $backup->stop_during_backup && ! $volume->isStackVolume() ? 120 : 0,
                     'abort' => true,
                 ]);
             } catch (Throwable) {

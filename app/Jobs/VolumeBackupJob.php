@@ -608,18 +608,20 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function handleNodeVolume(): void
     {
-        $this->backup->loadMissing(['backupable.workload', 'team']);
+        $this->backup->loadMissing(['backupable', 'team']);
         $volume = $this->backup->backupable;
-        $workload = $volume?->workload;
+        $workload = $volume?->backupWorkload();
         $team = $this->backup->team;
         if (! $volume || ! $workload || ! $team) {
             throw new \RuntimeException('The storage backup volume or team no longer exists.');
         }
+        // A stack volume (decision 0024) belongs to the stack, not to one of its services.
+        $owner = $volume->isStackVolume() ? $volume->stack()->withoutGlobalScopes()->value('uuid') ?? $workload->uuid : $workload->uuid;
 
         $this->execution = $this->backup->executions()->create([
             's3_storage_id' => $this->backup->s3_storage_id,
             'local_storage_deleted' => true,
-            'filename' => 'volume-backups/'.$workload->team_id.'/'.$workload->uuid.'/'.$volume->uuid.'/'
+            'filename' => 'volume-backups/'.$workload->team_id.'/'.$owner.'/'.$volume->uuid.'/'
                 .str($volume->name)->slug().'-'.now()->format('Ymd-His').'.tar.zst',
         ]);
         $this->execution->s3Replicas()->create(['s3_storage_id' => $this->backup->s3_storage_id]);
