@@ -1,6 +1,7 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.3
+ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.10.3
 # https://www.postgresql.org/support/versioning/
@@ -214,27 +215,28 @@ RUN mkdir -p /etc/nginx/conf.d && \
     chmod -R 755 /etc/nginx
 
 ARG SERVERSIDEUP_PHP_VERSION
-ARG NODE_VERSION
+ARG DISTRO
 ARG CREATED
 ARG GIT_SHA
 
 LABEL org.opencontainers.image.title="Coolify" \
     org.opencontainers.image.description="An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers." \
     org.opencontainers.image.version="${COOLIFY_VERSION}" \
-    org.opencontainers.image.created="${CREATED}" \
     org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.created="${CREATED}" \
     org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.authors="coollabsio" \
-    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.authors="coolLabs" \
+    org.opencontainers.image.vendor="coolLabs" \
     org.opencontainers.image.url="https://coolify.io" \
-    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
     org.opencontainers.image.documentation="https://coolify.io/docs" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
     org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
-    io.coolify.nginx.version="${NGINX_VERSION}" \
-    io.coolify.node.version="${NODE_VERSION}" \
-    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
-    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
-    io.coolify.php-uv.version="${PHP_UV_VERSION}"
+    io.coolify.image.version="${COOLIFY_VERSION}" \
+    io.coolify.image.distro="${DISTRO}" \
+    io.coolify.image.variant="runtime" \
+    io.coolify.image.flavor="" \
+    io.coolify.image.shell="busybox" \
+    io.coolify.image.package-manager="apk"
 
 # Switch to non-root user
 USER www-data
