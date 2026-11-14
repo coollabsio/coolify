@@ -481,6 +481,29 @@ describe('deploy order', function () {
             ->and($deploys[0]['request'])->not->toHaveKey('files');
     });
 
+    it('runs the exec form of a Compose health check without a shell, only on a Sentinel that supports it', function () {
+        // An image without /bin/sh (distroless) must keep its health check: the CMD form is sent as a JSON array.
+        $compose = str_replace('test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]', 'test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-appdb}"]', stackCompose());
+        $stack = createStack($this, $compose);
+        $postgres = $stack->workloads()->where('stack_service', 'postgres')->sole();
+        expect($postgres->stack_health_check['command'])->toBe('["pg_isready","-d","appdb"]');
+
+        prepareStackForDeploy($stack, $this->node);
+        $deploys = new ArrayObject;
+        $states = ['postgres' => ['state' => 'running', 'health' => 'healthy'], 'migrate' => ['state' => 'exited', 'exit_code' => 0], 'app' => ['state' => 'running']];
+        fakeStackFlux($stack, $states, $deploys);
+        (new DeployNodeStackJob($stack->id, $this->user->id))->handle();
+
+        expect($stack->refresh()->deploy_error)->toContain('does not support workload.healthcheck.exec.v1. Upgrade Sentinel')
+            ->and($deploys)->toHaveCount(0);
+
+        Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => stackNodeCapabilities(['workload.healthcheck.exec.v1'])]);
+        (new DeployNodeStackJob($stack->id, $this->user->id))->handle();
+
+        expect($stack->refresh()->deploy_status)->toBe('deployed')
+            ->and($deploys[0]['request']['health_check']['command'])->toBe('["pg_isready","-d","appdb"]');
+    });
+
     it('stops at a dependency that does not get healthy and names the services that wait for it', function () {
         $stack = createStack($this);
         prepareStackForDeploy($stack, $this->node);

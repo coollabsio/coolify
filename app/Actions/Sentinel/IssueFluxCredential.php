@@ -58,6 +58,7 @@ class IssueFluxCredential
             'database.restore.v1',
             'workload.stop_timeout.v1',
             'workload.healthcheck.v1',
+            'workload.healthcheck.exec.v1',
             'workload.secrets.v1',
             'workload.rolling_deploy.v1',
             'workload.dns_search.v1',

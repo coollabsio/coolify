@@ -20,6 +20,9 @@ class DispatchWorkloadDeployment
     /** Sentinel drains a removed container whenever another one serves (decision 0022). */
     public const ROLLING_CAPABILITY = 'workload.rolling_deploy.v1';
 
+    /** A health check command that is a JSON array runs without a shell (the Compose `CMD` form). */
+    public const HEALTHCHECK_EXEC_CAPABILITY = 'workload.healthcheck.exec.v1';
+
     /** Sentinel sets `--dns-search` (decision 0023). */
     public const DNS_SEARCH_CAPABILITY = 'workload.dns_search.v1';
 
@@ -66,6 +69,10 @@ class DispatchWorkloadDeployment
         if ($healthCheck !== null) {
             // An older Sentinel ignores unknown fields and would start the container without the check.
             $operation->node->ensureReportedCapability('workload.healthcheck.v1');
+            if (str_starts_with(trim($healthCheck['command']), '[')) {
+                // An older Sentinel rejects the exec form of a health check.
+                $operation->node->ensureReportedCapability(self::HEALTHCHECK_EXEC_CAPABILITY);
+            }
         }
         $files = $configuration['files'] ?? [];
         if ($files !== []) {

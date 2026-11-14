@@ -85,6 +85,9 @@ class CreateDeploymentOperation
 
             if (filled(data_get($revision->configuration, 'health_check'))) {
                 $node->ensureReportedCapability('workload.healthcheck.v1');
+                if (str_starts_with(trim((string) data_get($revision->configuration, 'health_check.command')), '[')) {
+                    $node->ensureReportedCapability(DispatchWorkloadDeployment::HEALTHCHECK_EXEC_CAPABILITY);
+                }
             }
 
             if (filled(data_get($revision->configuration, 'files'))) {

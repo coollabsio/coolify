@@ -506,7 +506,8 @@ class NodeStackComposeMapper
             $form = strtoupper((string) array_shift($test));
             $command = match ($form) {
                 'CMD-SHELL' => implode(' ', array_map('strval', $test)),
-                'CMD' => implode(' ', array_map(fn ($argument): string => escapeshellarg(self::interpolate((string) $argument, $variables)), $test)),
+                // The exec form runs without a shell, so images without /bin/sh keep their health check.
+                'CMD' => json_encode(array_map(fn ($argument): string => self::interpolate((string) $argument, $variables), array_values($test)), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 default => null,
             };
             if ($form === 'CMD-SHELL' && $command !== null) {
