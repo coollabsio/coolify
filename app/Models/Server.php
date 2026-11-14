@@ -1351,9 +1351,12 @@ $siteAddress {
      */
     public function markProxyConfigurationApplied(string $configuration): void
     {
-        $this->proxy->last_applied_settings = str(base64_encode($configuration))->pipe('md5')->value();
+        $hash = ProxyConfigurationVersion::hashOf($configuration);
+        $this->proxy->last_applied_settings = $hash;
         $this->proxy->certificates_restart_required = false;
         $this->save();
+
+        $this->proxyConfigurationVersions()->where('hash', $hash)->first()?->update(['applied_at' => now()]);
     }
 
     public function hasCurrentTraefikOutdatedInfo(): bool
@@ -2170,6 +2173,14 @@ $siteAddress {
     protected function unreachableNotificationSent(): Attribute
     {
         return Attribute::get(fn (): bool => NotificationThrottle::wasSent($this, Unreachable::class));
+    }
+
+    /**
+     * @return HasMany<ProxyConfigurationVersion, $this>
+     */
+    public function proxyConfigurationVersions(): HasMany
+    {
+        return $this->hasMany(ProxyConfigurationVersion::class)->orderByDesc('id');
     }
 
     public function sslCertificates()

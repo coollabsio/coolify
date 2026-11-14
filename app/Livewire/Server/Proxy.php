@@ -5,11 +5,13 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
+use App\Models\ProxyConfigurationVersion;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Rules\SafeExternalUrl;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Proxy extends Component
@@ -227,7 +229,7 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->validate();
-            SaveProxyConfiguration::run($this->server, $this->proxySettings);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings, 'ui');
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->proxy_error_page = filled($this->customErrorPage) ? $this->customErrorPage : null;
             $this->server->save();
@@ -247,7 +249,7 @@ class Proxy extends Component
             $this->authorize('update', $this->server);
             // Explicitly regenerate default configuration
             $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
-            SaveProxyConfiguration::run($this->server, $this->proxySettings);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings, 'reset');
             $this->server->save();
             auditLog('ui.server.proxy.configuration_reset', $this->proxyAuditContext());
             $this->dispatch('refreshServerShow');
@@ -274,6 +276,66 @@ class Proxy extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Saved versions of the proxy file, without their content. Only editors see them, as with the file itself.
+     *
+     * @return Collection<int, ProxyConfigurationVersion>
+     */
+    public function getConfigurationVersionsProperty(): Collection
+    {
+        if (! in_array($this->server->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)
+            || ! auth()->user()?->can('update', $this->server)) {
+            return collect();
+        }
+
+        return $this->server->proxyConfigurationVersions()
+            ->select(['id', 'uuid', 'server_id', 'hash', 'source', 'user_id', 'applied_at', 'created_at'])
+            ->with('user:id,name')
+            ->get();
+    }
+
+    /**
+     * @return array{original: string, modified: string, label: string}
+     */
+    public function showConfigurationVersionDiff(string $uuid): array
+    {
+        $this->authorize('update', $this->server);
+        $version = $this->findConfigurationVersion($uuid);
+
+        return [
+            'original' => $version->configuration,
+            'modified' => (string) $this->server->proxy->get('last_saved_proxy_configuration'),
+            'label' => $version->created_at->format('Y-m-d H:i:s').' · '.substr($version->hash, 0, 8),
+        ];
+    }
+
+    public function restoreConfigurationVersion(string $uuid)
+    {
+        $this->authorize('update', $this->server);
+        $version = $this->findConfigurationVersion($uuid);
+
+        try {
+            SaveProxyConfiguration::run($this->server, $version->configuration, 'restore');
+            $this->proxySettings = $version->configuration;
+            auditLog('ui.server.proxy.configuration_restored', $this->proxyAuditContext([
+                'version_uuid' => $version->uuid,
+                'version_hash' => $version->hash,
+            ]));
+            $this->dispatch('refreshServerShow');
+            $this->dispatch('success', 'Proxy configuration restored. Restart the proxy to apply it.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function findConfigurationVersion(string $uuid): ProxyConfigurationVersion
+    {
+        return ProxyConfigurationVersion::query()
+            ->where('server_id', $this->server->id)
+            ->where('uuid', $uuid)
+            ->firstOrFail();
     }
 
     public function getTraefikVersionForWarningProperty(): ?string

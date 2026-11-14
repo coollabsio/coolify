@@ -3974,6 +3974,11 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 55rem;
 }
 
+.proxy-configuration-versions-table-grid {
+    grid-template-columns: 10rem minmax(8rem, 1fr) 5rem 5.5rem minmax(7rem, 1fr) 6.5rem;
+    min-width: 48rem;
+}
+
 .package-updates-table-grid {
     grid-template-columns: 1.25rem minmax(12rem, 1.4fr) minmax(10rem, 1fr);
 }
