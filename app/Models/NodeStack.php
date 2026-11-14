@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\NodeStack\NodeStackComposeMapper;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RuntimeException;
 
 /**
  * A Docker Compose file on a cluster (decision 0023): one workload for each Compose service. Its
@@ -36,6 +38,65 @@ class NodeStack extends BaseModel
     public function searchDomain(): string
     {
         return $this->dns_label.'.coolify.internal';
+    }
+
+    /**
+     * The `depends_on` of each service: service => [dependency => condition]. A dependency on a
+     * service that the stack does not run (a Compose profile) is left out.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public function dependencies(): array
+    {
+        $services = $this->compose_parsed['services'] ?? [];
+        $dependencies = [];
+        foreach ($services as $name => $service) {
+            if (filled($service['profiles'] ?? null)) {
+                continue;
+            }
+            $dependencies[(string) $name] = array_filter(
+                NodeStackComposeMapper::dependencies($service['depends_on'] ?? []),
+                fn (string $condition, string $dependency): bool => isset($services[$dependency]) && blank($services[$dependency]['profiles'] ?? null),
+                ARRAY_FILTER_USE_BOTH,
+            );
+        }
+
+        return $dependencies;
+    }
+
+    /**
+     * The services in `depends_on` order: every service after the services it depends on.
+     *
+     * @param  array<string, array<string, string>>|null  $dependencies  See dependencies().
+     * @return list<string>
+     *
+     * @throws RuntimeException When services depend on each other.
+     */
+    public function deployOrder(?array $dependencies = null): array
+    {
+        $dependencies ??= $this->dependencies();
+        $order = [];
+        $state = [];
+        $visit = function (string $service, array $path) use (&$visit, &$order, &$state, $dependencies): void {
+            if (($state[$service] ?? null) === 'done') {
+                return;
+            }
+            if (($state[$service] ?? null) === 'visiting') {
+                $cycle = [...array_slice($path, (int) array_search($service, $path, true)), $service];
+                throw new RuntimeException('The services '.implode(' -> ', $cycle).' depend on each other in a cycle.');
+            }
+            $state[$service] = 'visiting';
+            foreach (array_keys($dependencies[$service] ?? []) as $dependency) {
+                $visit((string) $dependency, [...$path, $service]);
+            }
+            $state[$service] = 'done';
+            $order[] = $service;
+        };
+        foreach (array_keys($dependencies) as $service) {
+            $visit((string) $service, []);
+        }
+
+        return $order;
     }
 
     public function team(): BelongsTo

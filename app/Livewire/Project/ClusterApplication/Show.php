@@ -391,7 +391,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->workload);
         $field = $forEdit ? 'editingDomainParts' : 'newDomainParts';
-        $suggestedDomain = $this->suggestedDomain($this->ingressAddresses());
+        $suggestedDomain = $this->suggestedDomain();
         if ($suggestedDomain === null) {
             $this->addError("{$field}.host", 'Turn on ingress for a server of the cluster to generate a domain.');
 
@@ -976,7 +976,7 @@ class Show extends Component
             'ingressTls' => (bool) $this->node?->cluster?->supportsIngressTls(),
             'ingressRoutesV2' => $this->node?->cluster === null || $this->node->cluster->supportsIngressRoutesV2(),
             'domainCertificates' => $this->workload->domainCertificates(),
-            'suggestedDomain' => $this->suggestedDomain($ingressAddresses),
+            'suggestedDomain' => $this->suggestedDomain(),
         ];
     }
 
@@ -996,31 +996,12 @@ class Show extends Component
             ->all();
     }
 
-    /**
-     * An sslip.io domain that points to the first ingress server, like the generated domains of v4.
-     * In development, the ingress servers are VMs on a private network, so it uses DEV_SEED_IP, like the seeded v4 domains.
-     *
-     * @param  list<string>  $ingressAddresses
-     */
-    private function suggestedDomain(array $ingressAddresses): ?string
+    /** A generated domain for this application, like the generated domains of v4 (NodeCluster::generatedDomainBase()). */
+    private function suggestedDomain(): ?string
     {
-        $ingress = $this->node?->cluster === null ? null : Node::query()
-            ->where('team_id', $this->workload->team_id)
-            ->where('node_cluster_id', $this->node->node_cluster_id)
-            ->where('is_ingress', true)
-            ->orderBy('name')
-            ->first();
-        $wildcard = data_get($ingress?->settings, 'wildcard_domain');
-        if (filled($wildcard)) {
-            return $this->workload->uuid.'.'.parse_url($wildcard, PHP_URL_HOST);
-        }
+        $base = $this->node?->cluster?->generatedDomainBase();
 
-        $ip = isDev() ? config('constants.coolify.dev_seed_ip') : ($ingressAddresses[0] ?? null);
-        if ($ip === null || filter_var(normalizeIpAddress($ip), FILTER_VALIDATE_IP) === false) {
-            return null;
-        }
-
-        return $this->workload->uuid.'.'.sslipHostLabel($ip).'.sslip.io';
+        return $base === null ? null : $this->workload->uuid.'.'.$base;
     }
 
     /**

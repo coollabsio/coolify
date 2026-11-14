@@ -21,6 +21,8 @@ return new class extends Migration
             $table->longText('compose_raw');
             $table->json('compose_parsed');
             $table->text('variables')->nullable();
+            $table->string('deploy_status')->nullable();
+            $table->text('deploy_error')->nullable();
             $table->timestamps();
 
             $table->unique(['node_cluster_id', 'dns_label']);

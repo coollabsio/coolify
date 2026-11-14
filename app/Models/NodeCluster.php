@@ -217,6 +217,27 @@ class NodeCluster extends BaseModel
     }
 
     /**
+     * The host that generated domains end with, like the generated domains of v4: the wildcard
+     * domain of the first ingress server, else the sslip.io name of its address. In development,
+     * the ingress servers are VMs on a private network, so it uses DEV_SEED_IP, like the seeded v4
+     * domains. Null without an ingress server.
+     */
+    public function generatedDomainBase(): ?string
+    {
+        $ingress = $this->nodes()->where('is_ingress', true)->orderBy('name')->first();
+        $wildcard = data_get($ingress?->settings, 'wildcard_domain');
+        if (filled($wildcard)) {
+            return parse_url($wildcard, PHP_URL_HOST) ?: null;
+        }
+        $ip = isDev() ? config('constants.coolify.dev_seed_ip') : $ingress?->ip;
+        if ($ip === null || filter_var(normalizeIpAddress($ip), FILTER_VALIDATE_IP) === false) {
+            return null;
+        }
+
+        return sslipHostLabel($ip).'.sslip.io';
+    }
+
+    /**
      * HTTPS needs an ACME directory, at least one ingress Node, and Sentinel with `ingress.tls.v1`
      * on every member Node, because every Node keeps the certificate tables in its Corrosion.
      */
