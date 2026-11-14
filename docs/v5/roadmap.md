@@ -70,7 +70,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | 0004 |
+| P1 | Docker Compose and one-click services on Nodes | 0004; proposed in [0023](decisions/0023-node-compose-stacks.md) |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |

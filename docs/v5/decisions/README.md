@@ -34,6 +34,7 @@ current v5 architecture.
 | [0020: Build and place by CPU architecture](0020-node-cpu-architecture.md) | Accepted | Build on a Node of the target architecture without emulation; place by architecture. |
 | [0021: Run Flux as a service in the Coolify container](0021-production-flux.md) | Accepted | Flux is an s6 service in the Coolify container with a pinned binary, Coolify-generated secrets in the database, a Flux URL setting, an internal API on 127.0.0.1, and a restart after each certificate renewal. |
 | [0022: Deploy without downtime on one Node](0022-node-rolling-deploys.md) | Accepted | Without a writable volume, a redeploy starts the new container in a second slot, waits until it is healthy, drains and removes the old one, and keeps the old one when the new one fails. |
+| [0023: Run Compose services on Nodes as stacks of workloads](0023-node-compose-stacks.md) | Proposed | A stack groups one workload for each Compose service, with names by service, traffic allowed inside the stack, `depends_on` order, and file mounts. 316 of 388 templates in the first step. |
 
 ## Adding a decision
 
