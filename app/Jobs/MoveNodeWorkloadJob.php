@@ -38,8 +38,8 @@ use Throwable;
 
 /**
  * Moves a workload to another Node of its cluster: make before break. A workload with ingress
- * routes first gets the firewall allow for its target address on every reachable Node, and its
- * source keeps serving until ingress learned the target.
+ * routes or a stack first gets the firewall allow for its target address on every reachable Node,
+ * and its source keeps serving until ingress and the stack DNS names learned the target.
  *
  * A workload with volumes moves break before make (decision 0007): the data is copied while the
  * source runs, the source stops, a final pass copies the changes, the volumes switch to the
@@ -143,9 +143,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 $target->workloads()->attach($operation->workload);
             }
             $cluster = $target->cluster;
-            $routed = $operation->workload->hasIngressRoutes() && $cluster !== null;
+            $routed = $operation->workload->receivesClusterTraffic() && $cluster !== null;
             if ($routed) {
-                // Every ingress Node must reach the target address before the target serves traffic.
+                // Every ingress Node and every peer of its stack must reach the target address before the target serves traffic.
                 // DispatchWorkloadDeployment then finds the address and queues no second revision.
                 EnsureNodeWorkloadAddress::run($target, $operation->workload);
                 $this->waitForNetworkRevision($cluster, $operation->requestedBy);
@@ -200,7 +200,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             }
 
             $operation->node->workloads()->detach($operation->workload);
-            if ($operation->workload->hasIngressRoutes() && $operation->node->cluster !== null) {
+            if ($operation->workload->receivesClusterTraffic() && $operation->node->cluster !== null) {
                 // The source container IP is gone: drop its firewall allow on every Node.
                 QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
             }
@@ -431,7 +431,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             // The target runs on the data already: nothing to roll back. The source placement goes,
             // so no reconciler starts the old container on the retained copy.
             if ($operation->workload !== null && $operation->node->workloads()->detach($operation->workload) > 0
-                && $operation->workload->hasIngressRoutes() && $operation->node->cluster !== null) {
+                && $operation->workload->receivesClusterTraffic() && $operation->node->cluster !== null) {
                 QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
             }
             self::checkpoint($operation, ['cleaned_up' => true]);
@@ -641,7 +641,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
         if ($target->workloads()->detach($operation->workload) === 0) {
             return;
         }
-        if ($operation->workload->hasIngressRoutes() && $target->cluster !== null) {
+        if ($operation->workload->receivesClusterTraffic() && $target->cluster !== null) {
             // Withdraw the firewall allow for the address that the target no longer uses.
             QueueNodeClusterNetworkRevision::run($target->cluster, $operation->requestedBy);
         }
