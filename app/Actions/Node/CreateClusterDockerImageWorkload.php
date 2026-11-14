@@ -150,15 +150,21 @@ class CreateClusterDockerImageWorkload
         return $candidate;
     }
 
-    /** Adds the Docker Hub registry to an image reference without a registry. */
+    /**
+     * Adds the Docker Hub registry to an image reference without a registry, and `:latest` to one
+     * without a tag or digest, as Podman reports the image in the inventory. Otherwise a deploy
+     * cannot match the running container to its revision.
+     */
     public static function qualifiedImage(string $image): string
     {
         $name = str($image)->before('@')->toString();
         $lastSlash = strrpos($name, '/');
         $lastColon = strrpos($name, ':');
+        $tagged = str_contains($image, '@') || ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash));
         if ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash)) {
             $name = substr($name, 0, $lastColon);
         }
+        $image = $tagged ? $image : $image.':latest';
         $firstSegment = str($name)->before('/')->toString();
         if (str_contains($firstSegment, '.') || str_contains($firstSegment, ':') || $firstSegment === 'localhost') {
             return $image;

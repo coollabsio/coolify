@@ -85,6 +85,12 @@ it('creates a project and environment linked workload for a cluster Docker image
         ->and($workload->operations()->exists())->toBeFalse();
 });
 
+it('stores an image without a tag as latest, so the deploy matches the inventory', function () {
+    $deployment = CreateClusterDockerImageWorkload::run($this->project, $this->environment, $this->cluster, 'searxng/searxng', $this->user);
+
+    expect($deployment['revision']->image)->toBe('docker.io/searxng/searxng:latest');
+});
+
 it('deploys a cluster Docker image to the selected Node', function () {
     $selectedNode = Node::factory()->create([
         'team_id' => $this->team->id,
