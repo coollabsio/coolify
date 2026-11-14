@@ -50,7 +50,7 @@ class CreateClusterStack
             throw new RuntimeException('The cluster network is not ready.');
         }
         $yaml = NodeStackCompose::parse($compose);
-        $reason = NodeStackCompose::unavailableReason($yaml);
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames());
         if ($reason !== null) {
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }

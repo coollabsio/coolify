@@ -145,7 +145,7 @@ class Select extends Component
         $services = get_service_templates();
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
         // Shown only when a cluster can be the destination (decision 0023).
-        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services) : [];
+        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames()) : [];
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap, $nodeReasons) {
             $serviceKey = (string) $key;
@@ -472,7 +472,7 @@ class Select extends Component
         }
         if (str_starts_with($type, 'one-click-service-') && $this->clusters?->isNotEmpty()) {
             $template = resolve_service_template_key(str($type)->after('one-click-service-')->value());
-            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons()[$template] ?? null;
+            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames())[$template] ?? null;
         }
         // Clusters run Docker images, build Git repositories, databases, and one-click services; Docker servers keep their flow.
         if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) && $this->clusters?->isNotEmpty()) {
@@ -635,6 +635,12 @@ class Select extends Component
                 'server_id' => $this->server_id,
             ]);
         }
+    }
+
+    /** A template with `_` in a service name is offered when a listed cluster resolves such names. The cluster is checked again on create. */
+    private function clustersSupportUnderscoreNames(): bool
+    {
+        return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsUnderscoreNames());
     }
 
     public function loadServers()

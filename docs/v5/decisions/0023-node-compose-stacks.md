@@ -138,19 +138,23 @@ differ from the decision above:
   Each service gets its values as environment variables of its own
   application. A change to a value in one service does not change it in the
   other services.
-- **Templates on Nodes.** 291 of the 388 templates run on Nodes, not 316:
-  - 20 templates share a volume between two services, or use `volumes_from`.
-    A Node volume belongs to one workload (decision 0007).
-  - 5 more templates have a service name with `_`, for example `rallly_db`.
-    Sentinel rejects the whole name table for one name with `_`.
-  - The decision counts `.yaml` files only. `templates/compose` also has 4
-    `.yml` templates.
-- **Traffic.** Sentinel firewall rules need a port, and no all-ports rule
-  exists. Coolify sends `stack_rules` (`source_ip`, `destination_ip`) in
-  `network.firewall.reconcile` only to Nodes that report
-  `network.firewall.stack_rules.v1`. Sentinel does not have that capability
-  yet, so the services of a stack reach each other only through firewall
-  rules that the user adds.
+- **Templates on Nodes.** 296 of the 388 templates run on Nodes, not 316.
+  The 20 others share a volume between two services, or use `volumes_from`.
+  A Node volume belongs to one workload (decision 0007). The decision counts
+  `.yaml` files only; `templates/compose` also has 4 `.yml` templates.
+- **Names with `_`.** Compose names often have `_`, for example `rallly_db`.
+  Sentinel accepts `_` inside a name of a stack namespace with
+  `discovery.names.underscore.v1`. Coolify sends such a name, and offers such a
+  template, only when every usable server of the cluster reports it. Otherwise
+  the template shows "Not available on Nodes" (291 templates run), because one
+  invalid name rejects the whole name table.
+- **Traffic.** Sentinel firewall rules need a port, so Coolify sends the stack
+  allows apart, as `stack_rules` (`source_ip`, `destination_ip`) in
+  `network.firewall.reconcile`, to Nodes that report
+  `network.firewall.stack_rules.v1`. Sentinel renders them in the forward
+  chains only, because both ends are workload addresses. A Node without the
+  capability does not get them, and the services on it reach each other only
+  through firewall rules that the user adds.
 - **Entrypoint.** A workload has no entrypoint field. The Compose
   `entrypoint` becomes the first words of the command, after the entrypoint
   of the image. A note on the service says this.
@@ -169,4 +173,5 @@ differ from the decision above:
   first failure stops the deploy and names the services that were not
   deployed. A dependency cycle fails when the stack is created.
 - **Images.** An image without a tag gets `:latest`, as the container
-  inventory reports it.
+  inventory reports it. The same applies to a cluster Docker image
+  application.

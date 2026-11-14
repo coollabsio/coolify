@@ -53,12 +53,12 @@ class NodeStackCompose
      *
      * @param  array<string, mixed>  $yaml
      */
-    public static function unavailableReason(array $yaml): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false): ?string
     {
         $owners = [];
         foreach ($yaml['services'] ?? [] as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -92,16 +92,16 @@ class NodeStackCompose
      *
      * @return array<string, string>
      */
-    public static function templateUnavailableReasons(?Collection $templates = null): array
+    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false): array
     {
         $templates ??= get_service_templates();
         $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
 
-        return Cache::remember('node-stack-template-availability:'.md5($composes->toJson()), now()->addDay(), function () use ($composes): array {
+        return Cache::remember('node-stack-template-availability:'.($underscoreNames ? 'underscore:' : '').md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames): array {
             $reasons = [];
             foreach ($composes as $key => $encoded) {
                 try {
-                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)));
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames);
                 } catch (RuntimeException $exception) {
                     $reason = $exception->getMessage();
                 }
@@ -115,10 +115,12 @@ class NodeStackCompose
     }
 
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames): ?string
     {
-        if (! self::validServiceName($name)) {
-            return 'has a name that is not a DNS label (letters, digits, and -)';
+        if (! self::validServiceName($name, $underscoreNames)) {
+            return $underscoreNames || ! self::validServiceName($name, true)
+                ? 'has a name that is not a DNS label (letters, digits, and -)'
+                : 'has a name with _, which needs Sentinel with discovery.names.underscore.v1 on every server of the cluster';
         }
         foreach (self::UNSUPPORTED_KEYS as $key => $reason) {
             $value = $service[$key] ?? null;
@@ -143,11 +145,14 @@ class NodeStackCompose
 
     /**
      * A service name becomes `<service>.<stack>.coolify.internal`, so it must be a DNS label.
-     * Sentinel rejects `_` in a name (`rallly_db`), so such a template does not run on Nodes yet.
+     * Compose names often have `_` (`rallly_db`): Sentinel accepts `_` inside a stack name with
+     * `discovery.names.underscore.v1`, and rejects the whole name table without it.
      */
-    public static function validServiceName(string $name): bool
+    public static function validServiceName(string $name, bool $underscoreNames = false): bool
     {
-        return preg_match('/\A(?!-)[a-z0-9-]{1,63}(?<!-)\z/', strtolower($name)) === 1;
+        $pattern = $underscoreNames ? '/\A(?![-_])[a-z0-9_-]{1,63}(?<![-_])\z/' : '/\A(?!-)[a-z0-9-]{1,63}(?<!-)\z/';
+
+        return preg_match($pattern, strtolower($name)) === 1;
     }
 
     /**

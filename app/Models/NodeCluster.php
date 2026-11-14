@@ -216,6 +216,20 @@ class NodeCluster extends BaseModel
                 : 'pending';
     }
 
+    /** Sentinel resolves stack names with `_` (`rallly_db`), decision 0023. */
+    public const UNDERSCORE_NAMES_CAPABILITY = 'discovery.names.underscore.v1';
+
+    /**
+     * Whether every usable server of the cluster resolves stack names with `_`. One server
+     * without it would reject the whole name table.
+     */
+    public function supportsUnderscoreNames(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(self::UNDERSCORE_NAMES_CAPABILITY) === true);
+    }
+
     /**
      * The host that generated domains end with, like the generated domains of v4: the wildcard
      * domain of the first ingress server, else the sslip.io name of its address. In development,

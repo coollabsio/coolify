@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
+use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Database\Eloquent\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -173,7 +174,9 @@ class BuildNodeClusterIngressRoutes
     }
 
     /**
-     * `<service>.<stack>.coolify.internal` for each service of a stack (decision 0023).
+     * `<service>.<stack>.coolify.internal` for each service of a stack (decision 0023). A name with
+     * `_` is sent only when every usable server of the cluster accepts it; otherwise Sentinel
+     * would reject the whole name table.
      *
      * @param  Collection<int, NodeWorkload>  $workloads
      * @return list<array{name: string, workload_id: string, namespace: string}>
@@ -186,6 +189,7 @@ class BuildNodeClusterIngressRoutes
         if ($stackWorkloads->isEmpty()) {
             return [];
         }
+        $underscoreNames = $cluster->supportsUnderscoreNames();
 
         return $stackWorkloads
             ->map(fn (NodeWorkload $workload): array => [
@@ -195,7 +199,7 @@ class BuildNodeClusterIngressRoutes
             ])
             ->filter(fn (array $name): bool => self::validLabel($name['namespace'])
                 && ! in_array($name['namespace'], NodeStack::RESERVED_LABELS, true)
-                && self::validLabel($name['name']))
+                && NodeStackCompose::validServiceName($name['name'], $underscoreNames))
             ->unique(fn (array $name): string => $name['namespace'].'|'.$name['name'])
             ->values()
             ->all();

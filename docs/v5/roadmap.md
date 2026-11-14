@@ -70,7 +70,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md). Step 1 is done: one-click services run as stacks (291 templates). Still open: the Sentinel all-ports stack firewall rule (`network.firewall.stack_rules.v1`), service names with `_`, shared volumes, and step 2 (Compose from Git) |
+| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md). Step 1 is done: one-click services run as stacks (296 templates). Still open: volumes that two services share, and step 2 (Compose from Git) |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |

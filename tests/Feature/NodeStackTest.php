@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\BuildNodeClusterIngressRoutes;
+use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateClusterStack;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
@@ -166,18 +167,22 @@ function createStack(object $test, ?string $compose = null, string $name = 'shop
 
 describe('availability', function () {
     it('tells which templates can run on Nodes', function () {
-        $reasons = collect(glob(base_path('templates/compose/*.{yaml,yml}'), GLOB_BRACE))
-            ->mapWithKeys(fn (string $path): array => [pathinfo($path, PATHINFO_FILENAME) => NodeStackCompose::unavailableReason(NodeStackCompose::parse(file_get_contents($path)))]);
+        $reasons = fn (bool $underscoreNames) => collect(glob(base_path('templates/compose/*.{yaml,yml}'), GLOB_BRACE))
+            ->mapWithKeys(fn (string $path): array => [pathinfo($path, PATHINFO_FILENAME) => NodeStackCompose::unavailableReason(NodeStackCompose::parse(file_get_contents($path)), $underscoreNames)]);
+        $withUnderscores = $reasons(true);
+        $withoutUnderscores = $reasons(false);
 
-        // Decision 0023 counts 316 runnable templates. 20 more share a volume between two
-        // services (or use volumes_from), which a Node volume cannot do (decision 0007), and 5
-        // more have a service name with `_`, which Sentinel cannot resolve yet.
-        expect($reasons->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(291)
-            ->and($reasons['twenty'])->toBe('The services twenty and worker share the volume twenty-local-storage.')
-            ->and($reasons['portainer'])->toBe('The service portainer mounts the Docker socket.')
-            ->and($reasons['gitea'])->toContain('publishes ports')
-            ->and($reasons['n8n-with-postgresql'])->toBeNull()
-            ->and($reasons['rallly'])->toBe('The service rallly_db has a name that is not a DNS label (letters, digits, and -).');
+        // Decision 0023 counts 316 runnable templates. 20 of them share a volume between two
+        // services (or use volumes_from), which a Node volume cannot do (decision 0007). 5 more
+        // have a service name with `_`, which needs discovery.names.underscore.v1 on every Node.
+        expect($withUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(296)
+            ->and($withoutUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(291)
+            ->and($withUnderscores['twenty'])->toBe('The services twenty and worker share the volume twenty-local-storage.')
+            ->and($withUnderscores['portainer'])->toBe('The service portainer mounts the Docker socket.')
+            ->and($withUnderscores['gitea'])->toContain('publishes ports')
+            ->and($withUnderscores['n8n-with-postgresql'])->toBeNull()
+            ->and($withUnderscores['rallly'])->toBeNull()
+            ->and($withoutUnderscores['rallly'])->toBe('The service rallly_db has a name with _, which needs Sentinel with discovery.names.underscore.v1 on every server of the cluster.');
     });
 
     it('rejects each feature that a workload does not have', function (string $service, string $reason) {
@@ -281,13 +286,15 @@ describe('mapping', function () {
         ['100$', '100$'],
     ]);
 
-    it('tags an image without a tag as latest, as the inventory reports it', function (string $image, string $expected) {
-        expect(NodeStackComposeMapper::taggedImage($image))->toBe($expected);
+    it('qualifies an image like the inventory reports it, with latest for an untagged image', function (string $image, string $expected) {
+        expect(CreateClusterDockerImageWorkload::qualifiedImage($image))->toBe($expected);
     })->with([
-        ['docker.io/searxng/searxng', 'docker.io/searxng/searxng:latest'],
+        ['searxng/searxng', 'docker.io/searxng/searxng:latest'],
+        ['nginx', 'docker.io/library/nginx:latest'],
         ['localhost:5000/app', 'localhost:5000/app:latest'],
-        ['docker.io/library/redis:7', 'docker.io/library/redis:7'],
+        ['redis:7', 'docker.io/library/redis:7'],
         ['ghcr.io/acme/app@sha256:abc', 'ghcr.io/acme/app@sha256:abc'],
+        ['ghcr.io/acme/app:1.2@sha256:abc', 'ghcr.io/acme/app:1.2@sha256:abc'],
     ]);
 
     it('gives each stack of a cluster its own DNS label and never a reserved one', function () {
@@ -320,9 +327,22 @@ describe('names and traffic', function () {
             ]);
     });
 
-    it('rejects a service name with an underscore, because Sentinel would reject the whole name table', function () {
+    it('rejects a service name with an underscore when a server would reject the whole name table', function () {
         expect(fn () => createStack($this, "services:\n  web:\n    image: nginx\n  rallly_db:\n    image: postgres\n"))
-            ->toThrow(RuntimeException::class, 'The service rallly_db has a name that is not a DNS label');
+            ->toThrow(RuntimeException::class, 'The service rallly_db has a name with _');
+    });
+
+    it('sends a service name with an underscore only while every server of the cluster accepts it', function () {
+        Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => stackNodeCapabilities([NodeCluster::UNDERSCORE_NAMES_CAPABILITY])]);
+        $stack = createStack($this, "services:\n  web:\n    image: nginx\n  rallly_db:\n    image: postgres\n");
+        $database = $stack->workloads()->where('stack_service', 'rallly_db')->sole();
+
+        expect(collect(BuildNodeClusterIngressRoutes::names($this->cluster))->where('namespace', 'shop')->pluck('name')->all())->toBe(['web', 'rallly_db'])
+            ->and($database->internal_dns_name)->toBe('shop-rallly-db');
+
+        stackNode($this->team, $this->cluster, 'old', '203.0.113.11', stackNodeCapabilities());
+
+        expect(collect(BuildNodeClusterIngressRoutes::names($this->cluster->refresh()))->where('namespace', 'shop')->pluck('name')->all())->toBe(['web']);
     });
 
     it('allows all traffic between the services of a stack on Nodes that support it', function () {

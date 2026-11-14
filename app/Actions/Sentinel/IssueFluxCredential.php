@@ -63,6 +63,7 @@ class IssueFluxCredential
             'workload.dns_search.v1',
             'workload.files.v1',
             'network.firewall.stack_rules.v1',
+            'discovery.names.underscore.v1',
             'image.build.v1',
             'image.build.private_git.v1',
             'image.load.v1',
