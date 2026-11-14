@@ -51,8 +51,16 @@
                 @foreach ($volumes as $volume)
                     <div wire:key="cluster-application-volume-{{ $volume['uuid'] }}" class="env-table-item">
                         <div class="data-table-row {{ $gridClass }} py-2!">
-                            <span class="min-w-0 truncate text-[13px] text-black dark:text-fg" title="{{ $volume['name'] }}">{{ $volume['name'] }}</span>
-                            <span class="min-w-0 truncate font-mono text-[12px]" title="{{ $volume['mountPath'] }}">{{ $volume['mountPath'] }}</span>
+                            <div class="min-w-0">
+                                <span class="block truncate text-[13px] text-black dark:text-fg" title="{{ $volume['name'] }}">{{ $volume['name'] }}</span>
+                                @if ($volume['sharedWith'] !== null)
+                                    <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-dim"
+                                        title="A volume of the stack. Every service that mounts it runs on its server and moves with it.">
+                                        Shared with: {{ $volume['sharedWith'] === [] ? 'no other service' : implode(', ', $volume['sharedWith']) }}
+                                    </span>
+                                @endif
+                            </div>
+                            <span class="min-w-0 truncate font-mono text-[12px]" title="{{ $volume['mountPath'] }}">{{ $volume['mountPath'] }}@if ($volume['readOnly']) <span class="font-sans text-neutral-500 dark:text-fg-dim">(read-only)</span>@endif</span>
                             <span class="min-w-0 truncate text-[12px]">{{ $volume['server'] ?? '-' }}</span>
                             <div class="justify-self-start">
                                 @if ($volume['detached'])
@@ -83,7 +91,10 @@
                                     @else
                                         <x-modal-confirmation class="!w-auto shrink-0" title="Remove volume?" buttonTitle="Remove"
                                             isErrorButton canGate="update" :canResource="$workload"
-                                            submitAction="removeVolume('{{ $volume['uuid'] }}')" :actions="[
+                                            submitAction="removeVolume('{{ $volume['uuid'] }}')" :actions="$volume['sharedWith'] !== null ? [
+                                                'The next deployment of this service no longer mounts this volume.',
+                                                'The other services keep it. Delete it on the stack page once no service mounts it.',
+                                            ] : [
                                                 'The next deployment no longer mounts this volume.',
                                                 'Its data stays on the server until you delete it.',
                                             ]" :confirmWithPassword="false" :confirmWithText="false"

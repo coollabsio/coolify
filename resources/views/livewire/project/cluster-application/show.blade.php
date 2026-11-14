@@ -102,6 +102,17 @@
                                 <x-forms.listbox id="moveTarget" htmlId="cluster-application-move-target"
                                     label="Target server" placeholder="Select a server" :options="$moveTargetOptions"
                                     portal required />
+                                @if ($moveGroup !== [])
+                                    <div class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                        <p class="font-medium text-warning">These services share a volume with this one and move with it:</p>
+                                        <ul class="list-disc pl-4">
+                                            @foreach ($moveGroup as $service)
+                                                <li class="font-mono">{{ $service }}</li>
+                                            @endforeach
+                                        </ul>
+                                        <p>They all stop for the final copy of the volumes and start on the target server in their depends_on order.</p>
+                                    </div>
+                                @endif
                                 @if ($moveRecovery)
                                     <div class="flex flex-col gap-2 text-[12px] text-neutral-500 dark:text-fg-dim">
                                         <p class="font-medium text-error">Server {{ $moveRecovery['source'] }} is offline.</p>

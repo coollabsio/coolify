@@ -337,7 +337,7 @@ class Show extends Component
             $operation = CreateMoveOperation::run($this->node, $target, $revision, auth()->user());
             MoveNodeWorkloadJob::dispatch($operation->id);
             $this->dispatch('close-modal');
-            $this->dispatch('success', data_get($operation->result, 'stateful') || NodeVolume::query()->where('node_workload_id', $operation->node_workload_id)->whereNotNull('node_id')->exists()
+            $this->dispatch('success', data_get($operation->result, 'stateful') || $operation->workload?->hasVolumesWithData()
                 ? 'Workload move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
                 : 'Workload move queued. The source stays active until the target is ready.');
             $this->loadNodeData();

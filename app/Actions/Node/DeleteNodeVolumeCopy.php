@@ -27,7 +27,7 @@ class DeleteNodeVolumeCopy
             $copy->setRelation('volume', $volume);
             // The live data of the volume is never a copy.
             if (! $copy->isLiveData()) {
-                if ($volume->workload?->hasActiveMove()) {
+                if ($volume->usedBy()->contains(fn ($workload): bool => $workload->hasActiveMove())) {
                     throw new RuntimeException('Wait until the move of this application finishes.');
                 }
                 DeleteNodeVolumes::run($copy->node, [$copy->podmanName()]);

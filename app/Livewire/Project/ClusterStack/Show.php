@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Project\ClusterStack;
 
+use App\Actions\Node\DeleteNodeVolumeData;
+use App\Enums\NodeVolumeCopyState;
 use App\Jobs\DeleteNodeStackJob;
 use App\Jobs\DeployNodeStackJob;
 use App\Models\NodeContainer;
 use App\Models\NodeStack;
+use App\Models\NodeVolume;
+use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -13,7 +17,7 @@ use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
-/** A stack of Compose services on a cluster (decision 0023): its services, Deploy, and Delete. */
+/** A stack of Compose services on a cluster (decision 0023): its services, shared volumes (decision 0024), Deploy, and Delete. */
 class Show extends Component
 {
     use AuthorizesRequests;
@@ -66,6 +70,23 @@ class Show extends Component
         ]);
     }
 
+    /** Deletes a shared volume that no service of the stack mounts anymore (decision 0024). */
+    public function deleteVolume(string $volumeUuid): void
+    {
+        try {
+            $this->authorize('update', $this->stack);
+            $volume = NodeVolume::query()
+                ->where('node_stack_id', $this->stack->id)
+                ->where('team_id', $this->stack->team_id)
+                ->where('uuid', $volumeUuid)
+                ->firstOrFail();
+            DeleteNodeVolumeData::run($volume);
+            $this->dispatch('success', 'Volume deleted.');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
     public function render(): View
     {
         $this->stack->refresh();
@@ -81,7 +102,23 @@ class Show extends Component
             ->groupBy('node_workload_id');
         $dependencies = $this->stack->dependencies();
 
+        $volumes = $this->stack->volumes()
+            ->with(['node', 'copies', 'mounts.workload' => fn ($workloads) => $workloads->withoutGlobalScopes()])
+            ->get();
+
         return view('livewire.project.cluster-stack.show', [
+            'volumes' => $volumes->map(fn (NodeVolume $volume): array => [
+                'uuid' => $volume->uuid,
+                'name' => $volume->name,
+                'server' => $volume->node?->name,
+                'status' => $volume->inventoryStatus($volume->node?->freshVolumeInventory()),
+                'receiving' => $volume->copies->contains('state', NodeVolumeCopyState::RECEIVING),
+                'mounts' => $volume->mounts->sortBy('node_workload_id')->map(fn (NodeVolumeMount $mount): array => [
+                    'service' => $mount->workload?->stack_service,
+                    'path' => $mount->mount_path,
+                    'readOnly' => $mount->read_only,
+                ])->values()->all(),
+            ])->all(),
             'services' => $workloads->map(function (NodeWorkload $workload) use ($containers, $dependencies): array {
                 $container = $containers->get($workload->id)?->sortByDesc(fn (NodeContainer $container): int => $container->state === 'running' ? 1 : 0)->first();
                 $statusType = match (true) {

@@ -534,7 +534,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->workload);
-            $outcome = RemoveNodeVolume::run($this->findVolume($volumeUuid));
+            $outcome = RemoveNodeVolume::run($this->findVolume($volumeUuid), $this->workload);
             $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
             $this->dispatch('success', $outcome === 'deleted'
                 ? 'Volume removed.'
@@ -563,7 +563,9 @@ class Show extends Component
                 ->where('uuid', $copyUuid)
                 ->where('state', NodeVolumeCopyState::RETAINED)
                 ->whereHas('volume', fn (Builder $volume) => $volume
-                    ->where('node_workload_id', $this->workload->id)
+                    ->where(fn (Builder $query) => $query
+                        ->where('node_workload_id', $this->workload->id)
+                        ->orWhereHas('mounts', fn (Builder $mounts) => $mounts->where('node_workload_id', $this->workload->id)))
                     ->where('team_id', $this->workload->team_id))
                 ->firstOrFail();
             DeleteNodeVolumeCopy::run($copy);
@@ -576,7 +578,9 @@ class Show extends Component
     private function findVolume(string $volumeUuid): NodeVolume
     {
         return NodeVolume::query()
-            ->where('node_workload_id', $this->workload->id)
+            ->where(fn (Builder $query) => $query
+                ->where('node_workload_id', $this->workload->id)
+                ->orWhereHas('mounts', fn (Builder $mounts) => $mounts->where('node_workload_id', $this->workload->id)))
             ->where('team_id', $this->workload->team_id)
             ->where('uuid', $volumeUuid)
             ->firstOrFail();
@@ -587,7 +591,11 @@ class Show extends Component
      */
     private function storageData(): array
     {
-        $volumes = $this->workload->volumes()->with(['node', 'copies.node'])->orderBy('mount_path')->orderBy('id')->get();
+        $own = $this->workload->volumes()->with(['node', 'copies.node'])->get();
+        // Stack volumes (decision 0024) show the path and mode of this service and the services that share them.
+        $shared = $this->workload->stackVolumes()->with(['node', 'copies.node', 'mountingWorkloads' => fn ($workloads) => $workloads->withoutGlobalScopes()])->get()
+            ->each(fn (NodeVolume $volume) => $volume->setAttribute('mount_path', $volume->pivot->mount_path));
+        $volumes = $own->concat($shared)->sortBy([['mount_path', 'asc'], ['id', 'asc']])->values();
 
         return [
             'volumes' => $volumes->map(fn (NodeVolume $volume): array => [
@@ -598,6 +606,10 @@ class Show extends Component
                 'detached' => $volume->isDetached(),
                 'status' => $volume->inventoryStatus($volume->node?->freshVolumeInventory()),
                 'receiving' => $volume->copies->contains('state', NodeVolumeCopyState::RECEIVING),
+                'readOnly' => $volume->isStackVolume() && (bool) $volume->pivot?->read_only,
+                'sharedWith' => $volume->isStackVolume()
+                    ? $volume->mountingWorkloads->reject(fn (NodeWorkload $workload): bool => $workload->is($this->workload))->pluck('stack_service')->values()->all()
+                    : null,
             ])->values()->all(),
             'retainedCopies' => $volumes->flatMap(fn (NodeVolume $volume) => $volume->copies
                 ->where('state', NodeVolumeCopyState::RETAINED)
@@ -704,7 +716,7 @@ class Show extends Component
                 ->firstOrFail();
             $revision = $this->workload->revisions()->latest('id')->firstOrFail();
             $recovery = NotifyNodeReachability::isOffline($source);
-            $hasVolumes = NodeVolume::query()->where('node_workload_id', $this->workload->id)->whereNotNull('node_id')->exists();
+            $hasVolumes = $this->workload->hasVolumesWithData();
             if ($recovery && $hasVolumes && ! $this->moveRecoveryConfirmed) {
                 $this->addError('moveRecoveryConfirmed', 'Confirm that the volumes are restored from their latest backups.');
 
@@ -715,11 +727,12 @@ class Show extends Component
             $this->moveTarget = '';
             $this->moveRecoveryConfirmed = false;
             $this->dispatch('close-modal');
-            $this->dispatch('success', $recovery
+            $group = MoveNodeWorkloadJob::movingGroup($operation)->slice(1)->pluck('workload.stack_service')->filter();
+            $this->dispatch('success', ($group->isEmpty() ? '' : 'The services '.$group->implode(', ').' move too, because they share a volume. ').($recovery
                 ? 'Recovery move queued. The application starts on '.$target->name.($hasVolumes ? ' with the volumes from their latest backups' : '').'. Its old container on '.$source->name.' is removed when that server comes back.'
                 : (data_get($operation->result, 'stateful') || $hasVolumes
                 ? 'Move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
-                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.'));
+                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.')));
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -750,6 +763,8 @@ class Show extends Component
             'moveSourceOptions' => $sources->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->all(),
             'moveTargetOptions' => $targets->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->values()->all(),
             'moveRecovery' => $this->moveRecovery($sources->firstWhere('uuid', $this->moveSource), $targets->firstWhere('uuid', $this->moveTarget) ?? $targets->first()),
+            // The services that share stack volumes with this one move with it (decision 0024).
+            'moveGroup' => $this->workload->volumeGroup()->slice(1)->pluck('stack_service')->filter()->values()->all(),
         ];
     }
 
@@ -765,8 +780,9 @@ class Show extends Component
             return null;
         }
         try {
-            $backups = collect(CreateMoveOperation::recoveryBackups($this->workload, $source, $target));
-            $volumes = $this->workload->volumes()->whereIn('uuid', $backups->keys())->pluck('name', 'uuid');
+            $group = $this->workload->volumeGroup();
+            $backups = collect(CreateMoveOperation::recoveryBackups($group, $source, $target));
+            $volumes = NodeVolume::query()->where('team_id', $this->workload->team_id)->whereIn('uuid', $backups->keys())->pluck('name', 'uuid');
             $error = null;
         } catch (\RuntimeException $exception) {
             $backups = collect();
