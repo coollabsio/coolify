@@ -1,6 +1,6 @@
 # Decision 0023: Run Compose services on Nodes as stacks of workloads
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-14**
 
@@ -49,17 +49,34 @@ rollback.
 - **Names.** A service reaches another service of its stack by its bare name.
   Each service gets the name `<service>.<stack>.coolify.internal`, and its
   containers get the DNS search domain `<stack>.coolify.internal`. Sentinel
-  needs a `dns_search` field in `workload.deploy` (new capability).
-- **Traffic.** Coolify allows all traffic between the services of one stack, as
-  a Compose project network does. Traffic between stacks and other workloads
-  stays dropped unless a firewall rule allows it.
+  needs a `dns_search` field in `workload.deploy` (new capability). Each
+  service also keeps its cluster-wide name `<name>.default.coolify.internal`,
+  so a firewall rule can let another application reach it, for example a
+  shared database.
+- **Traffic.** Coolify allows all traffic, on every port, between the services
+  of one stack, as a Compose project network does. Only 5 templates list their
+  ports in `expose:`, so a list of ports would break most stacks. Coolify
+  builds these allows from the stack membership in each cluster network
+  revision, not from stored addresses, so they follow every move. Traffic
+  between stacks and other workloads stays dropped unless a firewall rule
+  allows it.
 - **Order.** A stack deploy deploys its services in `depends_on` order.
   `service_healthy` waits for the health check, `service_started` for the
   start, and `service_completed_successfully` for an exit code of 0. A one-time
   service has restart policy `no` and counts as deployed when it exits with 0.
-- **Placement.** A new stack runs on one Node, which the user selects. A
-  service can move to another Node later, like any workload; the names and the
-  firewall follow it.
+- **Placement.** A new stack runs on one Node, which the user selects. Each
+  service can move to another Node on its own in the first step, with **Move
+  to another server**:
+  - its name follows its endpoint in Corrosion, and its search domain is the
+    same on every Node;
+  - the next network revision allows the stack traffic for its new address on
+    every Node. Its peers call it, so the move waits until that revision
+    applies before the target takes traffic, as a move of a routed workload
+    does today;
+  - a service with a writable volume moves with its data, as decision 0014
+    describes;
+  - traffic between Nodes goes over the mesh with its source address
+    (decision 0005).
 - **Volumes.** Named volumes stay named volumes. A relative bind mount
   (`./data`) becomes a named volume of the stack. The rules of decision 0007
   stay: a writable volume pins its service to one Node.
@@ -99,6 +116,7 @@ port publishing.
 
 - Docker or Podman socket access for a stack (12 templates need only that). A
   Podman socket gives root on the Node.
-- Placement of the services of one stack on several Nodes by default.
+- Placement of the services of one stack on several Nodes when the stack is
+  created.
 - Rollback of a whole stack to one point in time.
 - Conversion of a v4 service on a legacy server to a stack.
