@@ -44,6 +44,26 @@ class VerifyDeploymentConvergence
         $hasHealthCheck = filled(data_get($operation->revision->configuration, 'health_check'));
         $healthy = $hasHealthCheck ? $health === 'healthy' : in_array($health, [null, 'healthy', 'unknown'], true);
 
+        // A one-time container (restart policy `no`) is deployed when it exited with 0 (decision 0023).
+        if (data_get($operation->revision->configuration, 'restart_policy') === 'no') {
+            $completed = $container !== null
+                && $container->image === $operation->revision->image
+                && in_array($container->state, ['exited', 'stopped'], true)
+                && $container->exit_code === 0
+                && $this->tookEffect($operation, $container);
+
+            return [
+                'converged' => $completed,
+                'pending' => $running,
+                'observed_at' => data_get($operation->node->fresh()->metadata, 'container_inventory_observed_at'),
+                'runtime_id' => $container?->runtime_id,
+                'state' => $container?->state ?? 'missing',
+                'image' => $container?->image,
+                'health' => $health,
+                'exit_code' => $container?->exit_code,
+            ];
+        }
+
         return [
             'converged' => $running && $healthy,
             'pending' => $running && ! $healthy && $health !== 'unhealthy',

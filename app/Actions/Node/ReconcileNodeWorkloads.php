@@ -129,6 +129,10 @@ class ReconcileNodeWorkloads
         if ($currentContainer?->state === 'running') {
             return 0;
         }
+        // A one-time container ran: restart policy `no` means it does not start again (decision 0023).
+        if ($currentContainer !== null && data_get($latestRevision->configuration, 'restart_policy') === 'no') {
+            return 0;
+        }
         if ($currentContainer !== null) {
             return $this->dispatchLifecycle($node, $currentContainer, $latestRevision, NodeWorkloadAction::START);
         }

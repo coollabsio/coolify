@@ -50,6 +50,8 @@ class FetchContainers
             'containers.*.labels.*' => ['nullable', 'string', 'max:4096'],
             'containers.*.created_at_unix_ms' => ['nullable', 'integer', 'min:1'],
             'containers.*.started_at_unix_ms' => ['nullable', 'integer', 'min:1'],
+            // The exit code of a stopped container; an older Sentinel omits it.
+            'containers.*.exit_code' => ['nullable', 'integer'],
             // Only Coolify volumes (`coolify.managed=true`); an older Sentinel omits the key.
             'volumes' => ['sometimes', 'array', 'max:10000'],
             'volumes.*.name' => ['required', 'string', 'max:255', 'distinct'],
@@ -71,6 +73,7 @@ class FetchContainers
             'state' => $container['state'],
             'health_status' => $container['health_status'] ?? null,
             'restart_count' => $container['restart_count'] ?? null,
+            'exit_code' => $container['exit_code'] ?? null,
             'ports' => $container['ports'],
             'labels' => $container['labels'],
             'created_at' => isset($container['created_at_unix_ms'])

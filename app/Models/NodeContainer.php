@@ -19,6 +19,7 @@ class NodeContainer extends BaseModel
             'ports' => 'array',
             'management_state' => NodeContainerManagementState::class,
             'is_managed' => 'boolean',
+            'exit_code' => 'integer',
             'runtime_created_at' => 'datetime',
             'runtime_started_at' => 'datetime',
             'observed_at' => 'datetime',
