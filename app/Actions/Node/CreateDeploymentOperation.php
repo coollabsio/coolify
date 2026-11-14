@@ -82,6 +82,14 @@ class CreateDeploymentOperation
                 $node->ensureReportedCapability('workload.healthcheck.v1');
             }
 
+            if (filled(data_get($revision->configuration, 'files'))) {
+                $node->ensureReportedCapability(DispatchWorkloadDeployment::FILES_CAPABILITY);
+            }
+
+            if ($workload->node_stack_id !== null) {
+                $node->ensureReportedCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY);
+            }
+
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $revision);
             $workload->update(['desired_state' => NodeWorkloadDesiredState::RUNNING]);
 

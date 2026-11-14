@@ -143,10 +143,13 @@ class NodeWorkload extends BaseModel
         return $this->hasIngressRoutes() || $this->node_stack_id !== null;
     }
 
-    /** The stack that this workload is a service of (decision 0023). */
+    /**
+     * The stack that this workload is a service of (decision 0023). Unscoped: a member with a
+     * grant on this service only still deploys it with the names of its stack.
+     */
     public function stack(): BelongsTo
     {
-        return $this->belongsTo(NodeStack::class, 'node_stack_id');
+        return $this->belongsTo(NodeStack::class, 'node_stack_id')->withoutGlobalScopes();
     }
 
     /** @return list<int> The distinct container ports that the domains of this workload route to. */

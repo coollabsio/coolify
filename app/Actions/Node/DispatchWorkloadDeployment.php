@@ -19,6 +19,12 @@ class DispatchWorkloadDeployment
     /** Sentinel drains a removed container whenever another one serves (decision 0022). */
     public const ROLLING_CAPABILITY = 'workload.rolling_deploy.v1';
 
+    /** Sentinel sets `--dns-search` (decision 0023). */
+    public const DNS_SEARCH_CAPABILITY = 'workload.dns_search.v1';
+
+    /** Sentinel writes Compose `content:` files and mounts them (decision 0023). */
+    public const FILES_CAPABILITY = 'workload.files.v1';
+
     /** @return array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
     public function handle(NodeOperation $operation): array
     {
@@ -60,6 +66,17 @@ class DispatchWorkloadDeployment
             // An older Sentinel ignores unknown fields and would start the container without the check.
             $operation->node->ensureReportedCapability('workload.healthcheck.v1');
         }
+        $files = $configuration['files'] ?? [];
+        if ($files !== []) {
+            // An older Sentinel ignores unknown fields and would start the container without its files.
+            $operation->node->ensureReportedCapability(self::FILES_CAPABILITY);
+        }
+        $stack = $operation->workload->stack;
+        $dnsSearch = $stack === null || $operation->node->node_cluster_id === null ? [] : [$stack->searchDomain()];
+        if ($dnsSearch !== []) {
+            // Without the search domain, the services of the stack cannot reach each other by their bare names.
+            $operation->node->ensureReportedCapability(self::DNS_SEARCH_CAPABILITY);
+        }
         $plan = self::containerPlan($operation, $mounts);
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
@@ -71,8 +88,9 @@ class DispatchWorkloadDeployment
             if ((! $hadAddress || ! $hadDnsName) && $operation->node->cluster !== null) {
                 // A new placement needs its name in the name table (creation assigns the name before any network
                 // revision) and, when routed, the firewall allow for this container. A new name needs the name table.
-                if ($plan['replaces'] !== null) {
+                if ($plan['replaces'] !== null || $stack !== null) {
                     // The new container gets traffic as soon as it is healthy, so its firewall allow must be in place.
+                    // The peers of a stack service call it at once, and it calls them.
                     ApplyNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
                 } else {
                     QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
@@ -109,6 +127,8 @@ class DispatchWorkloadDeployment
                 'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
                 ...($mounts === [] ? [] : ['mounts' => $mounts]),
                 ...($secrets === [] ? [] : ['secrets' => $secrets]),
+                ...($files === [] ? [] : ['files' => $files]),
+                ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
                 ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
                 ...($healthCheck === null ? [] : ['health_check' => [
                     'command' => $healthCheck['command'],
@@ -239,6 +259,12 @@ class DispatchWorkloadDeployment
             'volumes.*.volume_name' => ['required', 'string', 'regex:/\\Acoolify-vol-[A-Za-z0-9-]+\\z/'],
             'volumes.*.container_path' => ['required', 'string', 'max:4096', 'distinct'],
             'volumes.*.read_only' => ['required', 'boolean'],
+            'files' => ['sometimes', 'array', 'max:64'],
+            'files.*' => ['array:path,content_base64,mode,directory'],
+            'files.*.path' => ['required', 'string', 'max:4096', 'distinct', 'starts_with:/', 'not_regex:/[,\\x00]/'],
+            'files.*.content_base64' => ['present', 'string', 'max:1398104'],
+            'files.*.mode' => ['present', 'string', 'regex:/\\A(0?[0-7]{3})?\\z/'],
+            'files.*.directory' => ['required', 'boolean'],
             'health_check' => ['sometimes', 'array:command,description,interval_seconds,timeout_seconds,retries,start_period_seconds'],
             'health_check.command' => ['required_with:health_check', 'string', 'max:4096', 'not_regex:/[\\x00\\r\\n]/'],
             'health_check.description' => ['required_with:health_check', 'string', 'max:4096'],

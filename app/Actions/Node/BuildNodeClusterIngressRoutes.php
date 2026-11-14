@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Models\NodeCluster;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use Illuminate\Database\Eloquent\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -145,12 +146,14 @@ class BuildNodeClusterIngressRoutes
      */
     public static function names(NodeCluster $cluster): array
     {
-        $names = NodeWorkload::query()
+        $workloads = NodeWorkload::query()
             ->where('team_id', $cluster->team_id)
             ->whereNotNull('internal_dns_name')
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id))
+            ->with('stack')
             ->orderBy('id')
-            ->get(['id', 'uuid', 'internal_dns_name'])
+            ->get(['id', 'uuid', 'internal_dns_name', 'node_stack_id', 'stack_service']);
+        $names = $workloads
             // Sentinel rejects the whole name table for one invalid or duplicate name.
             ->filter(fn (NodeWorkload $workload): bool => self::validLabel((string) $workload->internal_dns_name))
             ->unique('internal_dns_name')
@@ -161,11 +164,43 @@ class BuildNodeClusterIngressRoutes
             ])
             ->values()
             ->all();
+        $names = [...$names, ...self::stackNames($cluster, $workloads)];
         if (count($names) > self::MAX_NAMES) {
             throw new RuntimeException('The cluster has more than '.number_format(self::MAX_NAMES).' internal DNS names. Remove applications to apply the network.');
         }
 
         return $names;
+    }
+
+    /**
+     * `<service>.<stack>.coolify.internal` for each service of a stack (decision 0023). A Compose
+     * name with `_` needs a Sentinel with `workload.dns_search.v1` on every Node of the cluster.
+     *
+     * @param  Collection<int, NodeWorkload>  $workloads
+     * @return list<array{name: string, workload_id: string, namespace: string}>
+     */
+    private static function stackNames(NodeCluster $cluster, Collection $workloads): array
+    {
+        $stackWorkloads = $workloads->filter(fn (NodeWorkload $workload): bool => $workload->stack !== null
+            && $workload->stack->node_cluster_id === $cluster->id
+            && filled($workload->stack_service));
+        if ($stackWorkloads->isEmpty()) {
+            return [];
+        }
+        $underscores = $cluster->nodes()->get()->every(fn ($node): bool => $node->supportsCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY) === true);
+
+        return $stackWorkloads
+            ->map(fn (NodeWorkload $workload): array => [
+                'name' => strtolower((string) $workload->stack_service),
+                'workload_id' => $workload->uuid,
+                'namespace' => $workload->stack->dns_label,
+            ])
+            ->filter(fn (array $name): bool => self::validLabel($name['namespace'])
+                && ! in_array($name['namespace'], NodeStack::RESERVED_LABELS, true)
+                && (self::validLabel($name['name']) || ($underscores && preg_match('/\A(?![-_])[a-z0-9_-]{1,63}(?<![-_])\z/', $name['name']) === 1)))
+            ->unique(fn (array $name): string => $name['namespace'].'|'.$name['name'])
+            ->values()
+            ->all();
     }
 
     /** A lowercase RFC 1123 hostname with at least two labels, as Sentinel accepts it. */
