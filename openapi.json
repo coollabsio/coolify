@@ -413,6 +413,102 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/previews\/{pull_request_id}\/approve": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Approve Preview Commit",
+                "description": "Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions.",
+                "operationId": "approve-preview-commit-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "commit"
+                                ],
+                                "properties": {
+                                    "commit": {
+                                        "description": "Full SHA of the reviewed commit. It must match pending_approval_commit of the preview.",
+                                        "type": "string",
+                                        "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Commit approved.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "deployment_uuid": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Missing permissions."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "The preview does not wait for approval of this commit, for example because the pull request has a newer commit."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "description": "Deployment queue is full."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications": {
             "get": {
                 "tags": [
@@ -869,6 +965,11 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
                                     },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
@@ -1545,6 +1646,11 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
                                     },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
@@ -2894,6 +3000,11 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
+                                    },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
                                         "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
@@ -3460,6 +3571,11 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
+                                    },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
                                         "description": "Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true."
@@ -4005,6 +4121,11 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
                                     },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
@@ -4830,6 +4951,11 @@
                                     "is_pr_deployments_public_enabled": {
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
+                                    },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
                                     },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
@@ -28103,6 +28229,42 @@
                             "null"
                         ]
                     },
+                    "is_fork_pull_request": {
+                        "description": "The pull request comes from a fork.",
+                        "type": "boolean"
+                    },
+                    "approval_status": {
+                        "description": "Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "waiting_for_approval",
+                            "approved"
+                        ]
+                    },
+                    "pending_approval_commit": {
+                        "description": "Commit that waits for approval before it deploys.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "approved_commit": {
+                        "description": "Last approved commit.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "approved_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
                     "created_at": {
                         "type": "string"
                     },
@@ -29314,6 +29476,10 @@
                     },
                     "is_pr_deployments_public_enabled": {
                         "type": "boolean"
+                    },
+                    "is_pr_deployments_public_approval_required": {
+                        "type": "boolean",
+                        "description": "Fork pull request previews wait for an admin to approve each commit."
                     },
                     "use_production_values_in_previews": {
                         "type": "boolean",

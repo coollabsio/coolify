@@ -11,4 +11,5 @@ enum ProcessStatus: string
     case KILLED = 'killed';
     case CANCELLED = 'cancelled';
     case CLOSED = 'closed';
+    case WAITING_FOR_APPROVAL = 'waiting_for_approval';
 }
