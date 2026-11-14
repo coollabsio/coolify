@@ -124,6 +124,12 @@ class NodeStack extends BaseModel
         return $this->hasMany(NodeWorkload::class)->orderBy('id');
     }
 
+    /** The volumes that services of the stack share (decision 0024). */
+    public function volumes(): HasMany
+    {
+        return $this->hasMany(NodeVolume::class)->orderBy('id');
+    }
+
     public function link(): ?string
     {
         $project = $this->project()->value('uuid');

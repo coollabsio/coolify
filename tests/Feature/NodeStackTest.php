@@ -172,12 +172,16 @@ describe('availability', function () {
         $withUnderscores = $reasons(true);
         $withoutUnderscores = $reasons(false);
 
-        // Decision 0023 counts 316 runnable templates. 20 of them share a volume between two
-        // services (or use volumes_from), which a Node volume cannot do (decision 0007). 5 more
-        // have a service name with `_`, which needs discovery.names.underscore.v1 on every Node.
-        expect($withUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(296)
-            ->and($withoutUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(291)
-            ->and($withUnderscores['twenty'])->toBe('The services twenty and worker share the volume twenty-local-storage.')
+        // Decision 0023 counts 316 runnable templates; step 1 ran 296. Decision 0024 shares a volume between
+        // the services of a stack (also with volumes_from), which adds 20: 22 templates had that as their
+        // first reason, and appwrite and trigger also mount the Docker socket. 9 runnable templates have a
+        // service name with `_`, which needs discovery.names.underscore.v1 on every Node.
+        expect($withUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(316)
+            ->and($withoutUnderscores->filter(fn (?string $reason): bool => $reason === null)->count())->toBe(307)
+            ->and($withUnderscores['twenty'])->toBeNull()
+            ->and($withUnderscores['espocrm'])->toBeNull()
+            ->and($withUnderscores['appwrite'])->toBe('The service openruntimes-executor mounts the Docker socket.')
+            ->and($withUnderscores['trigger'])->toBe('The service docker-proxy mounts the Docker socket.')
             ->and($withUnderscores['portainer'])->toBe('The service portainer mounts the Docker socket.')
             ->and($withUnderscores['gitea'])->toContain('publishes ports')
             ->and($withUnderscores['n8n-with-postgresql'])->toBeNull()

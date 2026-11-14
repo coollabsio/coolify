@@ -4,6 +4,7 @@ namespace App\Services\NodeStack;
 
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateNodeVolume;
+use App\Models\NodeVolume;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -108,11 +109,13 @@ class NodeStackComposeMapper
     }
 
     /**
-     * The workload of each service.
+     * The workload of each service. A volume that two or more services mount, directly or with
+     * `volumes_from`, is a stack volume (decision 0024): each of these services lists it in
+     * `stack_volumes` with its own path and mode, keyed by `key`. Other volumes are in `volumes`.
      *
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
-     * @return list<array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
+     * @return list<array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
      */
     public static function services(array $yaml, array $variables): array
     {
@@ -128,6 +131,7 @@ class NodeStackComposeMapper
                 }
             }
         }
+        $storage = self::stackStorage($yaml);
         foreach ($yaml['services'] as $name => $service) {
             $name = (string) $name;
             $service = is_array($service) ? $service : [];
@@ -153,7 +157,7 @@ class NodeStackComposeMapper
             }
             ksort($environment);
 
-            [$volumes, $files, $mountNotes] = self::storage($name, $service);
+            ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $files, 'notes' => $mountNotes] = $storage[$name];
             foreach ($files as $file) {
                 $fileBytes += (int) (strlen($file['content_base64']) * 3 / 4);
                 $fileCount++;
@@ -168,6 +172,7 @@ class NodeStackComposeMapper
                 'health_check' => self::healthCheck($service['healthcheck'] ?? null, $variables),
                 'restart_policy' => in_array($name, $oneTime, true) ? 'no' : self::restartPolicy($service['restart'] ?? null),
                 'volumes' => $volumes,
+                'stack_volumes' => $stackVolumes,
                 'files' => $files,
                 'depends_on' => self::dependencies($service['depends_on'] ?? []),
                 'notes' => [...$notes, ...$mountNotes],
@@ -354,15 +359,99 @@ class NodeStackComposeMapper
     }
 
     /**
-     * Named volumes stay named volumes, a relative bind (`./data`) is a named volume of the
-     * stack, and a `content:` mount is a file that Sentinel writes (decision 0023).
+     * The storage of each service that the stack runs. A volume that two or more of them mount
+     * becomes a stack volume. `volumes_from: [other]` mounts every mount of `other` at the same
+     * path, read-only with `:ro`, as Compose does.
+     *
+     * @param  array<string, mixed>  $yaml
+     * @return array<string, array{volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, notes: list<string>}>
+     */
+    private static function stackStorage(array $yaml): array
+    {
+        $own = [];
+        foreach ($yaml['services'] as $name => $service) {
+            $service = is_array($service) ? $service : [];
+            $own[(string) $name] = self::storage((string) $name, $service);
+        }
+        $resolved = [];
+        $resolve = function (string $name, array $path) use (&$resolve, &$resolved, $own, $yaml): array {
+            if (isset($resolved[$name])) {
+                return $resolved[$name];
+            }
+            if (in_array($name, $path, true)) {
+                throw new RuntimeException('The services '.implode(' -> ', [...$path, $name]).' mount the volumes of each other in a cycle (volumes_from).');
+            }
+            $storage = $own[$name];
+            $paths = array_flip(array_column($storage['mounts'], 'path'));
+            $filePaths = array_flip(array_column($storage['files'], 'path'));
+            foreach (NodeStackCompose::volumesFrom(is_array($yaml['services'][$name] ?? null) ? $yaml['services'][$name] : []) as $entry) {
+                if (! isset($own[$entry['service']])) {
+                    throw new RuntimeException("The service {$name} mounts the volumes of {$entry['service']} (volumes_from), which is not a service of this stack.");
+                }
+                $from = $resolve($entry['service'], [...$path, $name]);
+                foreach ($from['mounts'] as $mount) {
+                    if (! isset($paths[$mount['path']])) {
+                        $paths[$mount['path']] = true;
+                        $storage['mounts'][] = [...$mount, 'read_only' => $mount['read_only'] || $entry['read_only']];
+                    }
+                }
+                foreach ($from['files'] as $file) {
+                    if (! isset($filePaths[$file['path']])) {
+                        $filePaths[$file['path']] = true;
+                        $storage['files'][] = $file;
+                    }
+                }
+            }
+
+            return $resolved[$name] = $storage;
+        };
+
+        $running = array_keys(array_filter($yaml['services'], fn ($service): bool => blank(is_array($service) ? ($service['profiles'] ?? null) : null)));
+        $users = [];
+        foreach ($running as $name) {
+            foreach ($resolve((string) $name, [])['mounts'] as $mount) {
+                $users[$mount['key']][(string) $name] = true;
+            }
+        }
+
+        $result = [];
+        foreach ($running as $name) {
+            $name = (string) $name;
+            $storage = $resolved[$name];
+            $volumes = [];
+            $stackVolumes = [];
+            $notes = $storage['notes'];
+            foreach ($storage['mounts'] as $mount) {
+                if (count($users[$mount['key']]) > 1) {
+                    $stackVolumes[] = $mount;
+
+                    continue;
+                }
+                $volumes[] = ['name' => $mount['name'], 'path' => $mount['path']];
+                if ($mount['read_only']) {
+                    $notes[] = "The volume at {$mount['path']} is mounted read-write: only a volume that services share can be read-only on Nodes.";
+                }
+            }
+            if (count($volumes) + count($stackVolumes) > NodeVolume::MAX_PER_WORKLOAD) {
+                throw new RuntimeException("The service {$name} mounts more than ".NodeVolume::MAX_PER_WORKLOAD.' volumes.');
+            }
+            $result[$name] = ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $storage['files'], 'notes' => $notes];
+        }
+
+        return $result;
+    }
+
+    /**
+     * The mounts of one service: named volumes stay named volumes, a relative bind (`./data`) is a
+     * named volume of the stack, and a `content:` mount is a file that Sentinel writes (decision
+     * 0023). `key` identifies the data, so the services that mount the same key share it.
      *
      * @param  array<string, mixed>  $service
-     * @return array{0: list<array{name: string, path: string}>, 1: list<array{path: string, content_base64: string, mode: string, directory: bool}>, 2: list<string>}
+     * @return array{mounts: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, notes: list<string>}
      */
     private static function storage(string $serviceName, array $service): array
     {
-        $volumes = [];
+        $mounts = [];
         $files = [];
         $notes = [];
         foreach (NodeStackCompose::mounts($service) as $mount) {
@@ -373,13 +462,15 @@ class NodeStackComposeMapper
             switch ($mount['kind']) {
                 case 'named':
                 case 'relative':
-                    $name = $mount['source'] === null
-                        ? $serviceName.'-'.Str::slug(basename($path))
-                        : trim(Str::slug(str_replace('/', '-', ltrim((string) $mount['source'], './'))), '-');
-                    $volumes[] = ['name' => $name !== '' ? $name : $serviceName.'-data', 'path' => $path];
-                    if ($mount['read_only']) {
-                        $notes[] = "The volume at {$path} is mounted read-write: read-only volumes are not supported on Nodes yet.";
+                    if ($mount['source'] === null) {
+                        $name = $serviceName.'-'.Str::slug(basename($path));
+                        $key = "anonymous:{$serviceName}:{$path}";
+                    } else {
+                        $source = $mount['kind'] === 'relative' ? trim(preg_replace('#^(\./)+#', '', (string) $mount['source']), '/') : (string) $mount['source'];
+                        $name = trim(Str::slug(str_replace('/', '-', ltrim($source, './'))), '-');
+                        $key = "{$mount['kind']}:{$source}";
                     }
+                    $mounts[] = ['key' => $key, 'name' => $name !== '' ? $name : $serviceName.'-data', 'path' => $path, 'read_only' => (bool) $mount['read_only']];
                     break;
                 case 'content':
                     $content = (string) $mount['content'];
@@ -396,7 +487,7 @@ class NodeStackComposeMapper
             }
         }
 
-        return [$volumes, $files, $notes];
+        return ['mounts' => $mounts, 'files' => $files, 'notes' => $notes];
     }
 
     /**

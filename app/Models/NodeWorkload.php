@@ -566,19 +566,69 @@ class NodeWorkload extends BaseModel
         return $this->hasMany(NodeVolume::class);
     }
 
-    /** Whether a move of this workload has not finished yet. */
+    /** The volumes of a stack that this service mounts (decision 0024), with its path and mode. */
+    public function stackVolumes(): BelongsToMany
+    {
+        return $this->belongsToMany(NodeVolume::class, 'node_volume_mounts', 'node_workload_id', 'node_volume_id')
+            ->withPivot(['mount_path', 'read_only'])
+            ->withTimestamps();
+    }
+
+    public function stackVolumeMounts(): HasMany
+    {
+        return $this->hasMany(NodeVolumeMount::class);
+    }
+
+    /**
+     * Every volume that this workload owns or mounts: its own volumes (also detached ones) and the
+     * stack volumes that it mounts.
+     *
+     * @return Collection<int, NodeVolume>
+     */
+    public function allVolumes(): Collection
+    {
+        return $this->volumes()->get()->concat($this->stackVolumes()->get())->unique('id')->values();
+    }
+
+    /** Whether a volume that this workload owns or mounts has data on a Node. */
+    public function hasVolumesWithData(): bool
+    {
+        return $this->volumes()->whereNotNull('node_id')->exists() || $this->stackVolumes()->whereNotNull('node_volumes.node_id')->exists();
+    }
+
+    /**
+     * The services that share stack volumes with this one, directly or through another service,
+     * with this one first (decision 0024). A workload without stack volumes is its own group.
+     *
+     * @return Collection<int, NodeWorkload>
+     */
+    public function volumeGroup(): Collection
+    {
+        if ($this->node_stack_id === null) {
+            return new Collection([$this]);
+        }
+        $mounts = NodeVolumeMount::query()
+            ->whereHas('workload', fn ($workloads) => $workloads->withoutGlobalScopes()->where('node_stack_id', $this->node_stack_id))
+            ->get(['node_volume_id', 'node_workload_id']);
+        $ids = [$this->id];
+        $volumeIds = [];
+        do {
+            $before = count($ids);
+            $volumeIds = $mounts->whereIn('node_workload_id', $ids)->pluck('node_volume_id')->unique()->all();
+            $ids = $mounts->whereIn('node_volume_id', $volumeIds)->pluck('node_workload_id')->push($this->id)->unique()->values()->all();
+        } while (count($ids) > $before);
+        if (count($ids) === 1) {
+            return new Collection([$this]);
+        }
+        $others = self::query()->withoutGlobalScopes()->whereKey(array_diff($ids, [$this->id]))->orderBy('id')->get();
+
+        return (new Collection([$this]))->concat($others)->values();
+    }
+
+    /** Whether a move of this workload, or of a service of its volume group, has not finished yet. */
     public function hasActiveMove(): bool
     {
-        return $this->operations()
-            ->where('command_type', 'workload.move.v1')
-            ->whereIn('status', [
-                NodeOperationStatus::QUEUED,
-                NodeOperationStatus::DISPATCHED,
-                NodeOperationStatus::RUNNING,
-                NodeOperationStatus::VERIFYING,
-                NodeOperationStatus::UNCERTAIN,
-            ])
-            ->exists();
+        return NodeOperation::movingWorkloadIds([$this->id]) !== [];
     }
 
     /**
@@ -587,7 +637,7 @@ class NodeWorkload extends BaseModel
      */
     public function ensureNotMovingVolumes(): void
     {
-        if ($this->volumes()->whereNotNull('node_id')->exists() && $this->hasActiveMove()) {
+        if ($this->hasVolumesWithData() && $this->hasActiveMove()) {
             throw new RuntimeException('This application is moving with its volumes. Wait until the move finishes.');
         }
     }
@@ -601,24 +651,32 @@ class NodeWorkload extends BaseModel
     }
 
     /**
-     * The mounts that the next revision records: every volume that is not detached, sorted by path.
+     * The mounts that the next revision records: every volume that is not detached and every stack
+     * volume that the service mounts (decision 0024), sorted by path.
      *
      * @return list<array{volume_uuid: string, volume_name: string, container_path: string, read_only: bool}>
      */
     public function volumeMounts(): array
     {
-        return $this->volumes()
+        $own = $this->volumes()
             ->whereNull('detached_at')
-            ->orderBy('mount_path')
             ->get()
             ->map(fn (NodeVolume $volume): array => [
                 'volume_uuid' => $volume->uuid,
                 'volume_name' => $volume->podmanName(),
                 'container_path' => $volume->mount_path,
                 'read_only' => false,
-            ])
-            ->values()
-            ->all();
+            ]);
+        $shared = $this->stackVolumes()
+            ->get()
+            ->map(fn (NodeVolume $volume): array => [
+                'volume_uuid' => $volume->uuid,
+                'volume_name' => $volume->podmanName(),
+                'container_path' => $volume->pivot->mount_path,
+                'read_only' => (bool) $volume->pivot->read_only,
+            ]);
+
+        return $own->concat($shared)->sortBy('container_path')->values()->all();
     }
 
     /**

@@ -8,6 +8,8 @@ use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeStack;
+use App\Models\NodeVolume;
+use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\User;
@@ -81,9 +83,12 @@ class CreateClusterStack
             $variables = NodeStackComposeMapper::variables($yaml, [], $stack->uuid, (string) $base, $cluster->supportsIngressTls() ? 'https' : 'http');
             $stack->update(['variables' => $variables]);
 
-            foreach (NodeStackComposeMapper::services($yaml, $variables) as $service) {
-                $this->createService($stack, $node, $service, $requestedBy);
+            $services = NodeStackComposeMapper::services($yaml, $variables);
+            $workloads = [];
+            foreach ($services as $service) {
+                $workloads[$service['service']] = $this->createService($stack, $node, $service, $requestedBy);
             }
+            $this->createStackVolumes($stack, $services, $workloads);
             EnsureNodeWorkloadDnsNames::run($node);
 
             return $stack->refresh();
@@ -91,7 +96,7 @@ class CreateClusterStack
     }
 
     /**
-     * @param  array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array<string, mixed>>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, files: list<array<string, mixed>>, depends_on: array<string, string>, notes: list<string>}  $service
+     * @param  array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array<string, mixed>>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array<string, mixed>>, depends_on: array<string, string>, notes: list<string>}  $service
      */
     private function createService(NodeStack $stack, Node $node, array $service, User $requestedBy): NodeWorkload
     {
@@ -124,7 +129,8 @@ class CreateClusterStack
             ]);
         }
         $workload->nodes()->attach($node);
-        $paths = [];
+        // A stack volume takes its path first; createStackVolumes() mounts it.
+        $paths = array_fill_keys(array_column($service['stack_volumes'], 'path'), true);
         foreach ($service['volumes'] as $volume) {
             if (isset($paths[$volume['path']])) {
                 continue;
@@ -137,6 +143,45 @@ class CreateClusterStack
         }
 
         return $workload;
+    }
+
+    /**
+     * One volume of the stack for each volume that two or more services mount (decision 0024),
+     * mounted by each of them at its path, read-write or read-only. The volume has no Node until
+     * the first deployment of one of them creates it.
+     *
+     * @param  list<array{service: string, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>}>  $services
+     * @param  array<string, NodeWorkload>  $workloads
+     */
+    private function createStackVolumes(NodeStack $stack, array $services, array $workloads): void
+    {
+        $volumes = [];
+        $names = [];
+        foreach ($services as $service) {
+            $paths = [];
+            foreach ($service['stack_volumes'] as $mount) {
+                if (isset($paths[$mount['path']])) {
+                    continue;
+                }
+                $paths[$mount['path']] = true;
+                if (! isset($volumes[$mount['key']])) {
+                    $name = $mount['name'];
+                    for ($suffix = 2; isset($names[$name]); $suffix++) {
+                        $name = $mount['name'].'-'.$suffix;
+                    }
+                    $names[$name] = true;
+                    $volumes[$mount['key']] = NodeVolume::query()->create([
+                        'team_id' => $stack->team_id,
+                        'node_stack_id' => $stack->id,
+                        'name' => $name,
+                    ]);
+                }
+                NodeVolumeMount::query()->firstOrCreate(
+                    ['node_volume_id' => $volumes[$mount['key']]->id, 'node_workload_id' => $workloads[$service['service']]->id],
+                    ['mount_path' => $mount['path'], 'read_only' => $mount['read_only']],
+                );
+            }
+        }
     }
 
     /**

@@ -68,7 +68,47 @@ class NodeOperation extends BaseModel
         'Update resources' => 'Resources updated',
     ];
 
+    /** Statuses of a move that blocks deploys, lifecycle actions, and the reconciler. */
+    public const ACTIVE_MOVE_STATUSES = [
+        NodeOperationStatus::QUEUED,
+        NodeOperationStatus::DISPATCHED,
+        NodeOperationStatus::RUNNING,
+        NodeOperationStatus::VERIFYING,
+        NodeOperationStatus::UNCERTAIN,
+    ];
+
     protected $guarded = [];
+
+    /**
+     * The workloads of `$workloadIds` that an unfinished move moves: the workload of the move, and
+     * the other services of its volume group (decision 0024), which the move lists in `group`.
+     *
+     * @param  list<int>  $workloadIds
+     * @return list<int>
+     */
+    public static function movingWorkloadIds(array $workloadIds): array
+    {
+        if ($workloadIds === []) {
+            return [];
+        }
+        $moving = self::query()
+            ->where('command_type', 'workload.move.v1')
+            ->whereIn('status', self::ACTIVE_MOVE_STATUSES)
+            ->get(['id', 'node_workload_id', 'request'])
+            ->flatMap(fn (NodeOperation $operation): array => [$operation->node_workload_id, ...$operation->groupWorkloadIds()]);
+
+        return array_values(array_intersect($workloadIds, $moving->filter()->unique()->all()));
+    }
+
+    /**
+     * The other workloads that this move moves with its own workload (decision 0024).
+     *
+     * @return list<int>
+     */
+    public function groupWorkloadIds(): array
+    {
+        return array_values(array_map('intval', array_column((array) data_get($this->request, 'group', []), 'workload_id')));
+    }
 
     protected function casts(): array
     {

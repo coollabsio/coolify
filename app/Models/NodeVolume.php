@@ -3,12 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 
 /**
  * A named Podman volume of a cluster application. It lives on exactly one Node: `node_id`
  * is the authority for the location of the data (decision 0007).
+ *
+ * A stack volume (decision 0024) belongs to a stack instead of one workload: `node_stack_id` is
+ * set, `node_workload_id` and `mount_path` are null, and each service that mounts it has a
+ * NodeVolumeMount with its path and mode. Every such service runs on the Node of the volume.
  */
 class NodeVolume extends BaseModel
 {
@@ -50,6 +56,53 @@ class NodeVolume extends BaseModel
             in_array($this->podmanName(), $inventory, true) => 'ready',
             default => 'missing',
         };
+    }
+
+    public function isStackVolume(): bool
+    {
+        return $this->node_stack_id !== null;
+    }
+
+    public function stack(): BelongsTo
+    {
+        return $this->belongsTo(NodeStack::class, 'node_stack_id');
+    }
+
+    public function mounts(): HasMany
+    {
+        return $this->hasMany(NodeVolumeMount::class);
+    }
+
+    /** The services of the stack that mount this stack volume, in creation order. */
+    public function mountingWorkloads(): BelongsToMany
+    {
+        return $this->belongsToMany(NodeWorkload::class, 'node_volume_mounts', 'node_volume_id', 'node_workload_id')
+            ->withPivot(['mount_path', 'read_only'])
+            ->orderBy('node_workloads.id');
+    }
+
+    /**
+     * The workloads that use the data: the owner of a volume, or every service that mounts a
+     * stack volume.
+     *
+     * @return Collection<int, NodeWorkload>
+     */
+    public function usedBy(): Collection
+    {
+        if ($this->isStackVolume()) {
+            return $this->mountingWorkloads()->withoutGlobalScopes()->get();
+        }
+
+        return collect([NodeWorkload::query()->withoutGlobalScopes()->find($this->node_workload_id)])->filter()->values();
+    }
+
+    /**
+     * The workload that a backup of this volume runs for: the owner, or the first service that
+     * mounts a stack volume. Its team is the team of the volume.
+     */
+    public function backupWorkload(): ?NodeWorkload
+    {
+        return $this->usedBy()->first();
     }
 
     public function workload(): BelongsTo

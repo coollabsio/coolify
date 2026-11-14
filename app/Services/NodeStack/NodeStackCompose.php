@@ -26,7 +26,6 @@ class NodeStackCompose
         'sysctls' => 'sets kernel parameters (sysctls)',
         'ports' => 'publishes ports (decision 0016)',
         'build' => 'builds an image (build)',
-        'volumes_from' => 'mounts the volumes of another service (volumes_from)',
     ];
 
     /**
@@ -55,26 +54,55 @@ class NodeStackCompose
      */
     public static function unavailableReason(array $yaml, bool $underscoreNames = false): ?string
     {
-        $owners = [];
-        foreach ($yaml['services'] ?? [] as $name => $service) {
+        $services = $yaml['services'] ?? [];
+        foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
             $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
-            foreach (self::mounts($service) as $mount) {
-                if (! in_array($mount['kind'], ['named', 'relative'], true) || $mount['source'] === null) {
-                    continue;
+            // Services of one stack share a volume on one Node (decision 0024), also through volumes_from.
+            foreach (self::volumesFrom($service) as $entry) {
+                if ($entry['container']) {
+                    return "The service {$name} mounts the volumes of the container {$entry['service']} (volumes_from), which is not a service of this stack.";
                 }
-                $owner = $owners[$mount['source']] ??= (string) $name;
-                // A Node volume belongs to one workload (decision 0007).
-                if ($owner !== (string) $name) {
-                    return "The services {$owner} and {$name} share the volume {$mount['source']}.";
+                if (! is_array($services[$entry['service']] ?? null)) {
+                    return "The service {$name} mounts the volumes of {$entry['service']} (volumes_from), which is not a service of this stack.";
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * The `volumes_from` entries of a service: `service`, `service:ro`, `service:rw`, or
+     * `container:<name>`, which Nodes do not have.
+     *
+     * @param  array<string, mixed>  $service
+     * @return list<array{service: string, read_only: bool, container: bool}>
+     */
+    public static function volumesFrom(array $service): array
+    {
+        $entries = [];
+        foreach ((array) ($service['volumes_from'] ?? []) as $entry) {
+            $entry = trim((string) $entry);
+            if ($entry === '') {
+                continue;
+            }
+            $container = str_starts_with($entry, 'container:');
+            if ($container) {
+                $entry = substr($entry, strlen('container:'));
+            }
+            $mode = str_contains($entry, ':') ? strtolower(substr($entry, strrpos($entry, ':') + 1)) : '';
+            $entries[] = [
+                'service' => in_array($mode, ['ro', 'rw'], true) ? substr($entry, 0, strrpos($entry, ':')) : $entry,
+                'read_only' => $mode === 'ro',
+                'container' => $container,
+            ];
+        }
+
+        return $entries;
     }
 
     /** The Compose file of a one-click service template, or null when it has none. */
