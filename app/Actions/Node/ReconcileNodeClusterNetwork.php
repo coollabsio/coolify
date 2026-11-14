@@ -35,6 +35,9 @@ class ReconcileNodeClusterNetwork
     /** Applies ingress routes and internal DNS names; every Node writes them to Corrosion. */
     public const INGRESS_CAPABILITY = 'ingress.reconcile.v1';
 
+    /** The firewall accepts `stack_rules`: all ports between two addresses (decision 0023). */
+    public const STACK_RULES_CAPABILITY = 'network.firewall.stack_rules.v1';
+
     public const REQUIRED_CAPABILITIES = [
         'network.wireguard.key.ensure.v1',
         'network.wireguard.reconcile.v1',
@@ -202,6 +205,7 @@ class ReconcileNodeClusterNetwork
             $peers = $members->filter(fn (Node $node): bool => filled($node->wireguard_public_key) && filled($node->wireguard_ip) && filled($node->workload_cidr));
             $fluxProbeHost = trim((string) parse_url(rescue(fn () => (new ResolveFluxPublicUrl)->resolve(), '', report: false), PHP_URL_HOST), '[]');
             $firewallRules = $this->firewallRules($cluster);
+            $stackRules = $this->stackRules($cluster);
             $ingressRules = $this->ingressRules($cluster);
             // The registry exists once the cluster has a Git workload. Its certificate is renewed here.
             // The sync also starts zot when a second Node joins, and stops it when one Node remains.
@@ -249,6 +253,8 @@ class ReconcileNodeClusterNetwork
                         'workload_cidrs' => $workloadCidrs,
                         'rules' => $firewallRules,
                         'ingress_rules' => $ingressRules,
+                        // An older Sentinel ignores unknown fields; the services of a stack then cannot reach each other.
+                        ...($node->supportsCapability(self::STACK_RULES_CAPABILITY) === true ? ['stack_rules' => $stackRules] : []),
                         ...($registryIp !== null ? ['registry_ip' => $registryIp] : []),
                     ]);
                     $operations[] = $this->runOperation($node, $user, $attempt, 'discovery.corrosion.reconcile.v1', [
@@ -523,6 +529,38 @@ class ReconcileNodeClusterNetwork
                     'port' => $rule->port,
                 ]);
             })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * All traffic, on every port, between the services of each stack, as in a Compose project
+     * network (decision 0023). Built from the stack membership and both container slots of each
+     * placement, so the allows follow every move and rolling deploy.
+     *
+     * @return list<array{source_ip: string, destination_ip: string}>
+     */
+    private function stackRules(NodeCluster $cluster): array
+    {
+        return NodeWorkload::query()
+            ->where('team_id', $cluster->team_id)
+            ->whereNotNull('node_stack_id')
+            ->whereHas('stack', fn ($query) => $query->where('node_cluster_id', $cluster->id))
+            ->with(['nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('node_stack_id')
+            ->flatMap(function ($services) {
+                $addresses = $services->map(fn (NodeWorkload $workload) => self::containerAddresses($workload->nodes));
+
+                return $addresses->flatMap(fn ($sources, int $source) => $addresses
+                    ->except($source)
+                    ->flatten()
+                    ->crossJoin($sources)
+                    ->map(fn (array $pair): array => ['source_ip' => $pair[1], 'destination_ip' => $pair[0]]));
+            })
+            ->unique(fn (array $rule): string => "{$rule['source_ip']}|{$rule['destination_ip']}")
+            ->sortBy(fn (array $rule): string => "{$rule['source_ip']}|{$rule['destination_ip']}")
             ->values()
             ->all();
     }
