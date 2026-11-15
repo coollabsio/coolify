@@ -3,10 +3,11 @@
 namespace App\Jobs;
 
 use App\Actions\Node\Build\IssueNodeGitCredential;
-use App\Actions\Node\Build\ResolveGitCommit;
+use App\Actions\Node\Build\ReadGitComposeFile;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Actions\Node\SyncNodeStackCompose;
 use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadSourceType;
@@ -35,9 +36,11 @@ use Throwable;
  * DeployNodeWorkloadJob waits for exactly that: a running container after its settle time, a
  * healthy container when it has a health check, and an exit code of 0 for restart policy `no`.
  *
- * A stack from Git (step 2) first builds every service with `build:` at one commit of its branch
- * (the pushed commit of a webhook, or the head), without deploying them. Each build is a normal
- * build of its service, with its logs on the service page. When one fails, nothing deploys.
+ * A stack from Git (step 2) first reads its Compose file at the head of its branch and makes the
+ * services match it (SyncNodeStackCompose). The commit of that read is the commit of the deploy: a
+ * webhook commit only starts the deploy, and the head is the same commit or a newer one. Then it
+ * builds every service with `build:` at that commit, without deploying them. Each build is a
+ * normal build of its service, with its logs on the service page. When one fails, nothing deploys.
  */
 class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 {
@@ -81,12 +84,14 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null]);
 
         try {
+            $deadline = now()->addSeconds($this->timeout - 60);
+            $commit = $stack->hasGitSource() ? $this->syncCompose($stack, $requestedBy) : null;
             $dependencies = $stack->dependencies();
             $order = $stack->deployOrder($dependencies);
-            $workloads = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stack->id)->get()->keyBy('stack_service');
-            $deadline = now()->addSeconds($this->timeout - 60);
-            if ($stack->hasGitSource()) {
-                $this->build($stack, $workloads, $requestedBy, $deadline);
+            // A service that left the Compose file is deleted by its own job.
+            $workloads = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stack->id)->whereIn('stack_service', $order)->get()->keyBy('stack_service');
+            if ($commit !== null) {
+                $this->build($stack, $workloads, $requestedBy, $commit, $deadline);
             }
             foreach ($order as $service) {
                 $workload = $workloads->get($service);
@@ -110,21 +115,38 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
+     * Reads the Compose file at the head of the branch and makes the services match it.
+     *
+     * @return string The commit of the file, for every build of this deploy.
+     */
+    private function syncCompose(NodeStack $stack, ?User $requestedBy): string
+    {
+        $file = ReadGitComposeFile::run(
+            (string) $stack->git_repository,
+            (string) $stack->git_branch,
+            IssueNodeGitCredential::run(new NodeWorkload(['team_id' => $stack->team_id, 'github_app_id' => $stack->github_app_id, 'private_key_id' => $stack->private_key_id])),
+            $stack->base_directory,
+            $stack->compose_location,
+        );
+        SyncNodeStackCompose::run($stack, $file['content'], $file['commit_sha'], $requestedBy);
+        $stack->refresh();
+
+        return $file['commit_sha'];
+    }
+
+    /**
      * Builds every service with `build:` at one commit and waits for the builds.
      *
      * @param  Collection<string, NodeWorkload>  $workloads
      */
-    private function build(NodeStack $stack, Collection $workloads, ?User $requestedBy, Carbon $deadline): void
+    private function build(NodeStack $stack, Collection $workloads, ?User $requestedBy, string $commit, Carbon $deadline): void
     {
         $built = $workloads->filter(fn (NodeWorkload $workload): bool => $workload->buildsFromGit());
         if ($built->isEmpty()) {
+            $stack->update(['commit_sha' => $commit]);
+
             return;
         }
-        $commit = $this->commitSha ?? ResolveGitCommit::run(
-            (string) $stack->git_repository,
-            (string) $stack->git_branch,
-            IssueNodeGitCredential::run(new NodeWorkload(['team_id' => $stack->team_id, 'github_app_id' => $stack->github_app_id, 'private_key_id' => $stack->private_key_id])),
-        );
         // A running build of a service is reused: the service has at most one active build.
         $builds = $built->map(fn (NodeWorkload $workload): NodeBuild => StartNodeBuild::run($workload, $requestedBy, $commit, skipDeploy: true));
         while ($builds->contains(fn (NodeBuild $build): bool => ! $build->refresh()->status->isFinal())) {
