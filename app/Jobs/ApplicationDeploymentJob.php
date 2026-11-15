@@ -4978,7 +4978,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
         if ($this->pull_request_id !== 0) {
-            $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            $labels = collect(generateLabelsApplication($this->application, $this->preview))
+                ->merge($this->application->previewCustomLabels());
         }
         $labels = $this->useDestinationNetworkInCaddyLabels($labels);
         $labels = traefikHostRulesWithoutIpv6Brackets($labels);

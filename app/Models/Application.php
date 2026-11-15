@@ -657,6 +657,32 @@ class Application extends BaseModel
     }
 
     /**
+     * The custom container labels that a preview container also gets. Proxy labels are left out,
+     * because they route the domains of the main application. Previews get their own proxy labels.
+     *
+     * @return Collection<int, string>
+     */
+    public function previewCustomLabels(): Collection
+    {
+        if (blank($this->custom_labels)) {
+            return collect();
+        }
+        $labels = decodeBase64EncodedLabels($this->custom_labels) ?? $this->custom_labels;
+
+        return collect(preg_split("/\r\n|\n|\r/", $labels))
+            ->map(fn (string $label) => trim($label))
+            ->filter(function (string $label) {
+                $key = str($label)->before('=')->trim()->lower()->value();
+
+                return $key !== ''
+                    && ! str_starts_with($key, 'traefik.')
+                    && ! str_starts_with($key, 'caddy')
+                    && ! str_starts_with($key, 'coolify.');
+            })
+            ->values();
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     public function maintenanceServers(): Collection
