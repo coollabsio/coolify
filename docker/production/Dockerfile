@@ -166,6 +166,7 @@ RUN mkdir -p /usr/local/bin && \
 
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
 ENV PHP_OPCACHE_ENABLE=1
 # v5 defaults this to 0. Keep 1: app:init rebuilds the Laravel caches while php-fpm already runs.
 ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
