@@ -152,9 +152,10 @@ function scheduledJobDispatchersForMode(?string $mode, bool $selfHosted = true):
     $dispatchers->each(function ($event) {
         expect($event->expression)->toBe('* * * * *')
             ->and($event->onOneServer)->toBeTrue()
-            ->and($event->withoutOverlapping)->toBeTrue()
-            ->and($event->runInBackground)->toBeTrue();
+            ->and($event->withoutOverlapping)->toBeTrue();
     });
+    // A foreground dispatcher must be the last event, so no other event of the minute waits for it.
+    expect($events->slice(-$dispatchers->count())->values()->all())->toBe($dispatchers->all());
 
     return $dispatchers;
 }
@@ -163,6 +164,7 @@ it('runs all scheduled job types in one dispatcher process by default on self-ho
     $dispatchers = scheduledJobDispatchersForMode(null);
 
     expect($dispatchers)->toHaveCount(1)
+        ->and($dispatchers->first()->runInBackground)->toBeFalse()
         ->and((string) $dispatchers->first()->command)->toEndWith('scheduled:dispatch')
         ->and((string) $dispatchers->first()->command)->not->toContain('--type=');
 });
@@ -172,6 +174,7 @@ it('runs one scheduled job dispatcher for each schedule type in concurrent mode'
 
     expect($dispatchers->map(fn ($event) => str((string) $event->command)->after('--type=')->value())->all())
         ->toBe(['backups', 'tasks', 'volume-backups', 'docker-cleanups'])
+        ->and($dispatchers->every->runInBackground)->toBeTrue()
         // Each type has its own overlap lock.
         ->and($dispatchers->map->mutexName()->unique())->toHaveCount(4);
 })->with([

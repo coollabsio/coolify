@@ -172,6 +172,7 @@ ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
 # v5 defaults to 256 MB with 32 MB interned strings. Every PHP CLI process has its own cache, so keep it small.
 ENV PHP_OPCACHE_MEMORY_CONSUMPTION=128
 ENV PHP_OPCACHE_INTERNED_STRINGS_BUFFER=16
+RUN install -d -m 700 -o www-data -g www-data /var/www/opcache
 
 # Configure entrypoint
 COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
