@@ -42,7 +42,15 @@ class NodeWorkload extends BaseModel
         'www_redirect' => 'both',
         'force_https' => true,
         'permanent_redirect' => true,
+        'pull_request_from_fork' => false,
+        'preview_deployments_enabled' => false,
+        'fork_preview_deployments_enabled' => false,
+        'preview_url_template' => self::DEFAULT_PREVIEW_URL_TEMPLATE,
+        'preview_uses_production_values' => true,
     ];
+
+    /** The v4 default: the pull request number in front of each domain of the parent. */
+    public const DEFAULT_PREVIEW_URL_TEMPLATE = '{{pr_id}}.{{domain}}';
 
     /** @var list<int> Clusters that routed, named, or published this workload before it was deleted. */
     private array $networkClusterIdsBeforeDelete = [];
@@ -75,6 +83,13 @@ class NodeWorkload extends BaseModel
             'manual_webhook_secret_gitlab' => 'encrypted',
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
+            'preview_of_id' => 'integer',
+            'pull_request_id' => 'integer',
+            'pull_request_from_fork' => 'boolean',
+            'pull_request_comment_id' => 'integer',
+            'preview_deployments_enabled' => 'boolean',
+            'fork_preview_deployments_enabled' => 'boolean',
+            'preview_uses_production_values' => 'boolean',
         ];
     }
 
@@ -154,6 +169,35 @@ class NodeWorkload extends BaseModel
     public function stack(): BelongsTo
     {
         return $this->belongsTo(NodeStack::class, 'node_stack_id')->withoutGlobalScopes();
+    }
+
+    /**
+     * The workload that this preview deploys a pull request of (decision 0025). Unscoped: the
+     * parent is in the same environment, and a webhook or job resolves it without an actor.
+     */
+    public function previewOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'preview_of_id')->withoutGlobalScopes();
+    }
+
+    /** The previews of the pull requests of this workload. */
+    public function previews(): HasMany
+    {
+        return $this->hasMany(self::class, 'preview_of_id')->orderBy('pull_request_id');
+    }
+
+    public function isPreview(): bool
+    {
+        return $this->preview_of_id !== null;
+    }
+
+    /**
+     * Only a Git application can have previews: not a database, an image application, an inline
+     * Dockerfile, a service of a stack, or a preview.
+     */
+    public function canHavePreviews(): bool
+    {
+        return $this->buildsFromGit() && ! $this->isDatabase() && $this->node_stack_id === null && ! $this->isPreview();
     }
 
     /** @return list<int> The distinct container ports that the domains of this workload route to. */
