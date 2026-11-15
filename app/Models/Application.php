@@ -1558,6 +1558,29 @@ class Application extends BaseModel
         return 'other';
     }
 
+    /**
+     * Stops git commands when the application points to a Git source row that does not exist (for example after an
+     * incomplete database restore). Without this check, git gets only the repository path and fails with
+     * "does not appear to be a git repository".
+     *
+     * @throws RuntimeException
+     */
+    private function ensureGitSourceExists(): void
+    {
+        if ($this->deploymentType() !== 'other' || blank($this->source_type) || is_null($this->source_id)) {
+            return;
+        }
+
+        $sourceName = match ($this->source_type) {
+            GithubApp::class => 'GitHub App',
+            GitlabApp::class => 'GitLab App',
+            GiteaApp::class => 'Gitea App',
+            default => class_basename($this->source_type),
+        };
+
+        throw new RuntimeException("The Git source of this application ({$sourceName} with ID {$this->source_id}) does not exist. Select a Git source on the Source page of the application, then deploy again.");
+    }
+
     public function could_set_build_commands(): bool
     {
         if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
@@ -1847,6 +1870,7 @@ class Application extends BaseModel
 
     public function generateGitLsRemoteCommands(string $deployment_uuid, bool $exec_in_docker = true)
     {
+        $this->ensureGitSourceExists();
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
@@ -2171,6 +2195,7 @@ class Application extends BaseModel
 
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
+        $this->ensureGitSourceExists();
         $commit = $commit ?: ($this->git_commit_sha ?: 'HEAD');
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
