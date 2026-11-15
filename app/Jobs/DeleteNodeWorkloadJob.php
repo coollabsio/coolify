@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DeleteNodeVolumes;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Actions\Node\RemoveNodePreview;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
@@ -50,7 +51,9 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
         public bool $deleteVolumes = true,
     ) {
         $this->onQueue('high');
-        $servers = NodeWorkload::query()->find($workloadId)?->nodes()->count() ?? 0;
+        $workload = NodeWorkload::query()->find($workloadId);
+        // Each preview runs on one server and is removed first (decision 0025).
+        $servers = ($workload?->nodes()->count() ?? 0) + ($workload?->previews()->withoutGlobalScopes()->count() ?? 0);
         $this->timeout = max($this->timeout, $servers * (new ManageNodeWorkloadJob(0))->timeout + 120);
     }
 
@@ -72,6 +75,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
             return;
         }
         $requestedBy = $this->requestedById === null ? null : User::query()->find($this->requestedById);
+        $this->deletePreviews($workload);
 
         if (! $this->deleteFromCoolifyOnly) {
             $failures = $this->removeContainers($workload, $requestedBy);
@@ -87,6 +91,18 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
 
         $this->deleteBackupSchedules($workload);
         $this->deleteRecords($workload, $requestedBy);
+    }
+
+    /**
+     * The previews go first, with their volumes, so none keeps running without its parent. A
+     * preview that cannot be deleted stops the delete of the parent; its own failure is reported.
+     */
+    private function deletePreviews(NodeWorkload $workload): void
+    {
+        foreach ($workload->previews()->withoutGlobalScopes()->get() as $preview) {
+            RemoveNodePreview::cancelBuilds($preview);
+            (new self($preview->id, $this->requestedById, $this->deleteFromCoolifyOnly, deleteVolumes: true))->handle();
+        }
     }
 
     /**
@@ -201,6 +217,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
                 ->orWhere('destination_workload_id', $workload->id)
                 ->delete();
             $workload->environment_variables()->delete();
+            $workload->previewEnvironmentVariables()->delete();
             // Revisions cascade with the workload; operations and container inventory keep their
             // history with a null workload (see the node_operations and node_containers foreign keys).
             $workload->delete();
