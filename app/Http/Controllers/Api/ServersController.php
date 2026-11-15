@@ -11,7 +11,6 @@ use App\Enums\ServerRole;
 use App\Helpers\SshMultiplexingHelper;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
-use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
@@ -992,6 +991,13 @@ class ServersController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
+            new OA\Parameter(
+                name: 'remove_resources_from_server',
+                in: 'query',
+                description: 'With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: true)
+            ),
         ],
         responses: [
             new OA\Response(response: 403, description: 'The token needs the deploy permission to delete the resources or the cloud server.'),
@@ -1053,6 +1059,10 @@ class ServersController extends Controller
         if (is_null($removeSshKey)) {
             return response()->json(['message' => 'remove_ssh_key must be a boolean.'], 422);
         }
+        $removeResourcesFromServer = filter_var($request->query('remove_resources_from_server', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($removeResourcesFromServer)) {
+            return response()->json(['message' => 'remove_resources_from_server must be a boolean.'], 422);
+        }
         // Another Coolify instance manages a transferred server. This instance deletes only its own records:
         // never the cloud server, the containers, or the DNS records that the other instance uses.
         if ($server->isTransferredAway()) {
@@ -1110,12 +1120,7 @@ class ServersController extends Controller
         }
 
         // Applications that use the server only as an additional destination keep running on their other servers.
-        $server->detachAdditionalApplications();
-        if ($force) {
-            foreach ($resources as $resource) {
-                DeleteResourceJob::dispatch($resource);
-            }
-        }
+        $server->detachAdditionalApplications(stopContainers: $removeResourcesFromServer);
 
         $deletedUuid = $server->uuid;
         $deletedName = $server->name;
@@ -1130,7 +1135,10 @@ class ServersController extends Controller
             $deleteFromProvider,
             $server->vultr_instance_id,
             $deleteFromProvider,
-            $server->digitalocean_droplet_id
+            $server->digitalocean_droplet_id,
+            false,
+            null,
+            $removeResourcesFromServer,
         );
 
         auditLog('api.server.deleted', [

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Server\DeleteServer;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -64,7 +65,8 @@ class CleanupStuckedResources extends Command
             $servers = Server::onlyTrashed()->lazyById();
             foreach ($servers as $server) {
                 echo "Force deleting stuck server: {$server->name}\n";
-                $server->forceDelete();
+                // Deletes its resources from Coolify first. The containers stay, because the choice made at the delete is not known.
+                DeleteServer::run($server->id, removeResourcesFromServer: false);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck servers: {$e->getMessage()}\n";

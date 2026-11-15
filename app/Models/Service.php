@@ -165,7 +165,7 @@ class Service extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                return $this->server->isFunctional();
+                return $this->server?->isFunctional() ?? false;
             }
         );
     }

@@ -61,7 +61,7 @@
                                     <x-reicon name="play-circle" class="size-3.5" />
                                     {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </x-slot:main>
-                                @if (!$application->destination->server->isSwarm())
+                                @if (!$application->destination?->server?->isSwarm())
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
@@ -76,7 +76,7 @@
                                     </button>
                                 @endif
                             @else
-                                @if ($application->destination->server->isSwarm())
+                                @if ($application->destination?->server?->isSwarm())
                                     @if ($application->build_pack !== 'dockercompose')
                                         <x-slot:main wire:click="deploy">
                                             <x-reicon name="refresh" class="size-3.5" />
@@ -108,7 +108,7 @@
                                         </button>
                                     @endif
                                 @endif
-                                @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                         role="menuitem">
@@ -189,7 +189,7 @@
                                         <x-reicon name="play-circle" class="size-3.5" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </x-slot:main>
-                                    @if (!$application->destination->server->isSwarm())
+                                    @if (!$application->destination?->server?->isSwarm())
                                         <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
@@ -204,7 +204,7 @@
                                         </button>
                                     @endif
                                 @else
-                                    @if ($application->destination->server->isSwarm())
+                                    @if ($application->destination?->server?->isSwarm())
                                         @if ($application->build_pack !== 'dockercompose')
                                             <x-slot:main wire:click="deploy">
                                                 <x-reicon name="refresh" class="size-3.5" />
@@ -236,7 +236,7 @@
                                             </button>
                                         @endif
                                     @endif
-                                    @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                    @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">

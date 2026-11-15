@@ -21190,6 +21190,16 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "remove_resources_from_server",
+                        "in": "query",
+                        "description": "With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
                     }
                 ],
                 "responses": {

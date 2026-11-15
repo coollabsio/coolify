@@ -82,7 +82,7 @@
             </div>
 
             <div class="shrink-0">
-                @if ($database->destination->server->isFunctional())
+                @if ($database->server_status)
                     @can('manage', $database)
                         <x-split-action id="database-mobile-actions">
                             @if (! $databaseStatus->startsWith('exited'))
@@ -119,7 +119,7 @@
                     @if ($isDeploymentProgress)
                         <x-deploying-indicator label="Working" class="mr-1" />
                     @endif
-                    @if ($database->destination->server->isFunctional())
+                    @if ($database->server_status)
                         @can('manage', $database)
                             <x-split-action id="database-desktop-actions">
                                 @if (! $databaseStatus->startsWith('exited'))
@@ -153,7 +153,7 @@
 
     </div>
 
-    @if ($database->destination->server->isFunctional())
+    @if ($database->server_status)
         <div class="hidden" aria-hidden="true">
             <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart"
                 submitAction="restartEvent" :actions="[
