@@ -27,7 +27,7 @@ current v5 architecture.
 | [0013: Upgrade host Sentinel one Node at a time](0013-host-sentinel-upgrades.md) | Accepted | Pinned version; manual cluster upgrade one Node at a time; SSH rollback after 5 minutes without a reconnect. |
 | [0014: Keep explicit placement](0014-node-placement-and-failure.md) | Accepted | The user selects Nodes; no automatic failover; notify, then move or restore from backup. |
 | [0015: Release Nodes as beta](0015-node-release-criteria.md) | Accepted | An instance setting replaces `SENTINEL_HOST_ENABLED`; lists the beta and stable criteria. |
-| [0016: Publish TCP and UDP ports](0016-node-port-publishing.md) | Accepted | Host port = container port on every Node of the cluster, with nftables NAT and no redeploy. |
+| [0016: Publish TCP and UDP ports](0016-node-port-publishing.md) | Accepted, amended | Host and container port on every Node of the cluster, with nftables NAT, reserved ports, an optional source allow-list, and no redeploy. |
 | [0017: Roll back by image digest](0017-node-revision-rollback.md) | Accepted | Revisions store the digest; the registry keeps 10 images; rebuild or pull when the image is gone. |
 | [0018: Add typed exec and terminal commands](0018-node-exec-and-terminal.md) | Accepted | `workload.exec.v1` for scheduled tasks and `workload.terminal.v1` over Flux; no host shell. |
 | [0019: Manage DNS records of cluster domains](0019-node-dns-records.md) | Accepted | Reuse v4 managed DNS records for the ingress Node addresses. |
