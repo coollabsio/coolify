@@ -685,6 +685,7 @@ test('system-wide github apps are not exported and re-link on import by uuid', f
         'team_id' => $this->team->id,
         'app_id' => 12345,
         'installation_id' => 67890,
+        'installation_account' => 'acme-installation',
         'client_id' => 'Iv1.test',
         'client_secret' => 'secret',
         'webhook_secret' => 'hook',
@@ -758,6 +759,7 @@ test('system-wide github apps are not exported and re-link on import by uuid', f
         ->and($importedSystem->source_id)->toBe($targetSystemWide->id)
         ->and($importedTeam->source_id)->toBe($importedGhTeam->id)
         ->and($importedGhTeam->is_system_wide)->toBeFalse()
+        ->and($importedGhTeam->installation_account)->toBe('acme-installation')
         ->and(GithubApp::where('is_system_wide', true)->where('uuid', 'system-github-public')->count())->toBe(1);
 });
 

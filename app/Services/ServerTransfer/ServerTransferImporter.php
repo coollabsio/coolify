@@ -1881,6 +1881,7 @@ class ServerTransferImporter
             'custom_port' => data_get($payload, 'custom_port'),
             'app_id' => data_get($payload, 'app_id'),
             'installation_id' => data_get($payload, 'installation_id'),
+            'installation_account' => data_get($payload, 'installation_account'),
             'client_id' => data_get($payload, 'client_id'),
             'client_secret' => data_get($payload, 'client_secret'),
             'webhook_secret' => data_get($payload, 'webhook_secret'),

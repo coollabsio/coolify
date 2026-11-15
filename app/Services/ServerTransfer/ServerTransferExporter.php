@@ -1443,6 +1443,7 @@ class ServerTransferExporter
             'custom_port' => $app->custom_port,
             'app_id' => $app->app_id,
             'installation_id' => $app->installation_id,
+            'installation_account' => $app->installation_account,
             'client_id' => $app->client_id,
             'client_secret' => $app->client_secret,
             'webhook_secret' => $app->webhook_secret,

@@ -6,6 +6,9 @@
     @if (session('error'))
         <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
     @endif
+    @if (session('success'))
+        <span x-data x-init="$wire.dispatch('success', @js(session('success')))" />
+    @endif
 
     @if (data_get($github_app, 'app_id'))
         @php
@@ -172,7 +175,8 @@
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
                                             label="App ID" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                                            id="installationId" label="Installation ID" required />
+                                            id="installationId" label="Installation ID" required
+                                            helper="{{ filled($github_app->installation_account) ? 'Installed on '.$github_app->installation_account.'. ' : '' }}To use this GitHub App with another account or organization, click Repositories and install it there. Coolify adds a new source for each installation." />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientId"
                                             label="Client ID" type="password" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
