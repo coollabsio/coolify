@@ -305,15 +305,22 @@ it('runs the scanner containers with the time limits and CPUs of the server sett
     $commands = new ScannerCommands(scannerServerWith(['image_scan_syft_timeout' => 1800, 'image_scan_grype_timeout' => 1200, 'image_scan_cpus' => 2.0]), SCANNER_TEST_RUN_ID);
     $local = implode("\n", scannerUnwrapped($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX)));
 
-    expect($local)->toContain('timeout -k 10 600 docker save ')
+    expect($local)->toContain('timeout -k 10 1800 docker save ')
         ->and(scannerDockerRuns($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1800 docker run ')
         ->and(scannerDockerRuns($commands->sbomFromHost())[0])->toContain('; timeout -k 10 1800 docker run ')
         ->and(scannerDockerRuns($commands->sbomFromRegistry('nginx:1', 'linux/amd64', 'cand-1', null))[0])->toContain('; timeout -k 10 1800 docker run ');
 
     expect(scannerDockerRuns($commands->grype(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1200 docker run ')
         ->toContain('--cpus 2 --memory 1024m ')
+        ->and(scannerDockerRuns($commands->dbStatus())[0])->toContain('; timeout -k 10 1200 docker run ')
         ->and(scannerDockerRuns($commands->packages(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 300 docker run ')
         ->toContain('--cpus 2 ');
+});
+
+it('gives docker save at least 10 minutes when the Syft time limit is lower', function () {
+    $commands = new ScannerCommands(scannerServerWith(['image_scan_syft_timeout' => 300]), SCANNER_TEST_RUN_ID);
+
+    expect(implode("\n", scannerUnwrapped($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))))->toContain('timeout -k 10 600 docker save ');
 });
 
 it('keeps stored scanner limits inside the options', function () {
