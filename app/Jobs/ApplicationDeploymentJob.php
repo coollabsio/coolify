@@ -2185,11 +2185,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push($key.'='.$value);
                 }
 
-                // Generate SERVICE_NAME for dockercompose services
-                $rawDockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
-                $rawServices = data_get($rawDockerCompose, 'services', []);
-                foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                foreach ($this->previewComposeServiceNameVariables() as $key => $value) {
+                    $envs->push($key.'='.$value);
                 }
             }
 
@@ -2263,6 +2260,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $resolvedValue,
             allowInterpolation: $this->application->environmentVariableAllowsInterpolation($environmentVariable, $resolvedValue),
         );
+    }
+
+    /**
+     * SERVICE_NAME_* values of a preview: the names of the services in the parsed Compose file.
+     */
+    private function previewComposeServiceNameVariables(): Collection
+    {
+        $services = data_get(parseDockerComposeYaml($this->application->docker_compose_raw), 'services', []);
+
+        return generateDockerComposeServiceName($services, $this->application->renamesPreviewComposeServices() ? $this->pull_request_id : 0);
     }
 
     /**
@@ -2522,11 +2529,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs_dict[$key] = escapeBashEnvValue($value);
                 }
             } else {
-                // Generate SERVICE_NAME for preview deployments
-                $rawDockerCompose = parseDockerComposeYaml($this->application->docker_compose_raw);
-                $rawServices = data_get($rawDockerCompose, 'services', []);
-                foreach ($rawServices as $rawServiceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                foreach ($this->previewComposeServiceNameVariables() as $key => $value) {
+                    $envs_dict[$key] = escapeBashEnvValue($value);
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains

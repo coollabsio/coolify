@@ -393,7 +393,7 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
-     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     * Compose service names for this preview (the PR suffix of the legacy parser stripped), excluding database images.
      *
      * @return list<string>
      */
@@ -411,9 +411,9 @@ class ApplicationPreview extends BaseModel
                 continue;
             }
 
-            $names[] = str((string) $serviceName)
-                ->replaceLast('-pr-'.$this->pull_request_id, '')
-                ->toString();
+            $names[] = $this->application->renamesPreviewComposeServices()
+                ? str((string) $serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString()
+                : (string) $serviceName;
         }
 
         return array_values(array_unique($names));

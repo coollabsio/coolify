@@ -621,7 +621,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 117, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-117.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
         ->toBeTrue()
@@ -659,7 +659,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 118, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-118.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
         ->toBeFalse()
@@ -991,7 +991,8 @@ it('reports the readonly preview redirect policy used by proxy labels', function
         ->assertSet('domainRows.0.redirect', $expectedRedirect);
 
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), 'services.web-pr-147.labels'))->implode("\n")
+        // The legacy parser (version 2) renames the services of a preview.
+        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), $parserVersion < 3 ? 'services.web-pr-147.labels' : 'services.web.labels'))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
     if ($expectedRedirect === 'both') {
@@ -1036,7 +1037,7 @@ it('inherits preview HTTPS redirect policy while always preventing indexing', fu
     ] : []));
 
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web-pr-149.labels'))->implode("\n")
+        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web.labels'))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
 
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
@@ -1208,7 +1209,7 @@ it('routes every generated compose preview domain when a service has more than o
     expect(json_decode($preview->docker_compose_domains, true)['frontend']['domain'])
         ->toBe('https://92.dev.example.com,https://92.www.dev.example.com');
 
-    $labels = collect(data_get(applicationParser($this->application->fresh(), 92, $preview->id), 'services.frontend-pr-92.labels'));
+    $labels = collect(data_get(applicationParser($this->application->fresh(), 92, $preview->id), 'services.frontend.labels'));
     $routerRules = $labels->filter(fn (string $label): bool => str_contains($label, '.rule='))->values();
 
     expect($routerRules)->not->toBeEmpty()

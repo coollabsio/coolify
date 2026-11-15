@@ -1482,7 +1482,7 @@
     WITH_DEFAULT: null
   compose:
     services:
-      web-pr-7:
+      web:
         build:
           context: .
           dockerfile: Dockerfile
@@ -1530,15 +1530,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -1582,18 +1582,18 @@
             bind:
               create_host_path: true
         depends_on:
-          db-pr-7:
+          db:
             condition: service_healthy
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
           referenceapplication0001-7:
             aliases:
-              - web
+              - web-pr-7
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-7'
-      api-pr-7:
+      api:
         image: 'node:22-alpine'
         environment:
           MAP_LITERAL: map-value
@@ -1620,15 +1620,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         ports:
           - '3001:3001'
           -
@@ -1673,10 +1673,10 @@
         networks:
           referenceapplication0001-7:
             aliases:
-              - api
+              - api-pr-7
         env_file:
           - .env
-      my-app-pr-7:
+      my-app:
         image: 'httpd:2.4-alpine'
         environment:
           SERVICE_URL_MY_APP_80: ''
@@ -1701,15 +1701,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1743,10 +1743,10 @@
         networks:
           referenceapplication0001-7:
             aliases:
-              - my-app
+              - my-app-pr-7
         env_file:
           - .env
-      api.v2-pr-7:
+      api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-7
         restart: unless-stopped
@@ -1777,7 +1777,7 @@
         networks:
           referenceapplication0001-7:
             aliases:
-              - api.v2
+              - api.v2-pr-7
         environment:
           COOLIFY_BRANCH: '"pull/7/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
@@ -1800,18 +1800,18 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
-      admin-pr-7:
+      admin:
         image: 'nginx:alpine'
         environment:
           COOLIFY_BRANCH: '"pull/7/head"'
@@ -1835,21 +1835,21 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         networks:
           internal:
             ipv4_address: 172.30.0.10
           referenceapplication0001-7:
             aliases:
-              - admin
+              - admin-pr-7
         container_name: admin-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1882,7 +1882,7 @@
           - traefik.http.services.https-0-referenceapplication0001-7-admin-2123.loadbalancer.server.port=8080
         env_file:
           - .env
-      blog-pr-7:
+      blog:
         image: 'ghost:5-alpine'
         environment:
           SERVICE_URL_BLOG_2368: /blog
@@ -1907,15 +1907,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1950,10 +1950,10 @@
         networks:
           referenceapplication0001-7:
             aliases:
-              - blog
+              - blog-pr-7
         env_file:
           - .env
-      db-pr-7:
+      db:
         image: 'postgres:16-alpine'
         environment:
           POSTGRES_USER: '${SERVICE_USER_DB}'
@@ -1978,22 +1978,22 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         volumes:
           - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
         networks:
           internal: null
           referenceapplication0001-7:
             aliases:
-              - db
+              - db-pr-7
         healthcheck:
           test:
             - CMD-SHELL
@@ -2014,7 +2014,7 @@
           - coolify.pullRequestId=7
         env_file:
           - .env
-      sidecar-pr-7:
+      sidecar:
         image: busybox
         restart: 'no'
         network_mode: 'service:web'
@@ -2052,18 +2052,18 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
-      worker-pr-7:
+      worker:
         image: 'node:22-alpine'
         command:
           - node
@@ -2091,17 +2091,17 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-7
-          SERVICE_NAME_API: api-pr-7
-          SERVICE_NAME_MY_APP: my-app-pr-7
-          SERVICE_NAME_API_V2: api.v2-pr-7
-          SERVICE_NAME_ADMIN: admin-pr-7
-          SERVICE_NAME_BLOG: blog-pr-7
-          SERVICE_NAME_DB: db-pr-7
-          SERVICE_NAME_SIDECAR: sidecar-pr-7
-          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         depends_on:
-          - db-pr-7
+          - db
         container_name: worker-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -2118,7 +2118,7 @@
         networks:
           referenceapplication0001-7:
             aliases:
-              - worker
+              - worker-pr-7
         env_file:
           - .env
     volumes:
@@ -2250,7 +2250,7 @@
     WITH_DEFAULT: null
   compose:
     services:
-      web-pr-8:
+      web:
         build:
           context: .
           dockerfile: Dockerfile
@@ -2284,15 +2284,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -2319,18 +2319,18 @@
             bind:
               create_host_path: true
         depends_on:
-          db-pr-8:
+          db:
             condition: service_healthy
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
           referenceapplication0001-8:
             aliases:
-              - web
+              - web-pr-8
         env_file:
           - .env
         image: 'referenceapplication0001_web:pr-8'
-      api-pr-8:
+      api:
         image: 'node:22-alpine'
         environment:
           MAP_LITERAL: map-value
@@ -2343,15 +2343,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         ports:
           - '3001:3001'
           -
@@ -2379,10 +2379,10 @@
         networks:
           referenceapplication0001-8:
             aliases:
-              - api
+              - api-pr-8
         env_file:
           - .env
-      my-app-pr-8:
+      my-app:
         image: 'httpd:2.4-alpine'
         environment:
           SERVICE_URL_MY_APP_80: ''
@@ -2393,15 +2393,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2418,10 +2418,10 @@
         networks:
           referenceapplication0001-8:
             aliases:
-              - my-app
+              - my-app-pr-8
         env_file:
           - .env
-      api.v2-pr-8:
+      api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-8
         restart: unless-stopped
@@ -2439,7 +2439,7 @@
         networks:
           referenceapplication0001-8:
             aliases:
-              - api.v2
+              - api.v2-pr-8
         environment:
           COOLIFY_BRANCH: '"pull/8/head"'
           COOLIFY_RESOURCE_UUID: referenceapplication0001
@@ -2448,18 +2448,18 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
-      admin-pr-8:
+      admin:
         image: 'nginx:alpine'
         environment:
           COOLIFY_BRANCH: '"pull/8/head"'
@@ -2469,21 +2469,21 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         networks:
           internal:
             ipv4_address: 172.30.0.10
           referenceapplication0001-8:
             aliases:
-              - admin
+              - admin-pr-8
         container_name: admin-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2499,7 +2499,7 @@
           - coolify.pullRequestId=8
         env_file:
           - .env
-      blog-pr-8:
+      blog:
         image: 'ghost:5-alpine'
         environment:
           SERVICE_URL_BLOG_2368: /blog
@@ -2510,15 +2510,15 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2535,10 +2535,10 @@
         networks:
           referenceapplication0001-8:
             aliases:
-              - blog
+              - blog-pr-8
         env_file:
           - .env
-      db-pr-8:
+      db:
         image: 'postgres:16-alpine'
         environment:
           POSTGRES_USER: '${SERVICE_USER_DB}'
@@ -2551,22 +2551,22 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         volumes:
           - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
         networks:
           internal: null
           referenceapplication0001-8:
             aliases:
-              - db
+              - db-pr-8
         healthcheck:
           test:
             - CMD-SHELL
@@ -2587,7 +2587,7 @@
           - coolify.pullRequestId=8
         env_file:
           - .env
-      sidecar-pr-8:
+      sidecar:
         image: busybox
         restart: 'no'
         network_mode: 'service:web'
@@ -2613,18 +2613,18 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
-      worker-pr-8:
+      worker:
         image: 'node:22-alpine'
         command:
           - node
@@ -2640,17 +2640,17 @@
           COOLIFY_PROJECT_NAME: 'Reference Project'
           COOLIFY_ENVIRONMENT_NAME: production
           COOLIFY_SERVER_IP: 10.0.0.1
-          SERVICE_NAME_WEB: web-pr-8
-          SERVICE_NAME_API: api-pr-8
-          SERVICE_NAME_MY_APP: my-app-pr-8
-          SERVICE_NAME_API_V2: api.v2-pr-8
-          SERVICE_NAME_ADMIN: admin-pr-8
-          SERVICE_NAME_BLOG: blog-pr-8
-          SERVICE_NAME_DB: db-pr-8
-          SERVICE_NAME_SIDECAR: sidecar-pr-8
-          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         depends_on:
-          - db-pr-8
+          - db
         container_name: worker-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2667,7 +2667,7 @@
         networks:
           referenceapplication0001-8:
             aliases:
-              - worker
+              - worker-pr-8
         env_file:
           - .env
     volumes:

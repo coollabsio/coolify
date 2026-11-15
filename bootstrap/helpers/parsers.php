@@ -1197,6 +1197,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
+    $renamesServices = $isPullRequest && $resource->renamesPreviewComposeServices();
     $pullRequestPreview = $isPullRequest
         ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
         : null;
@@ -1526,7 +1527,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     // generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = collect([]);
     if ($resource->build_pack === 'dockercompose') {
-        $serviceNameEnvironments = generateDockerComposeServiceName($services, $pullRequestId);
+        $serviceNameEnvironments = generateDockerComposeServiceName($services, $renamesServices ? $pullRequestId : 0);
     }
 
     // Parse the rest of the services
@@ -1757,22 +1758,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
 
-        if ($depends_on?->count() > 0) {
-            if ($isPullRequest) {
-                $newDependsOn = collect([]);
-                $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
-                    if (is_numeric($condition)) {
-                        $dependency = addPreviewDeploymentSuffix($dependency, $pullRequestId);
-
-                        $newDependsOn->put($condition, $dependency);
-                    } else {
-                        $condition = addPreviewDeploymentSuffix($condition, $pullRequestId);
-                        $newDependsOn->put($condition, $dependency);
-                    }
-                });
-                $depends_on = $newDependsOn;
-            }
-        }
         if (! $use_network_mode) {
             if ($topLevel->get('networks')?->count() > 0) {
                 foreach ($topLevel->get('networks') as $networkName => $network) {
@@ -1835,10 +1820,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
-            // A preview renames its services to "<name>-pr-<id>". The alias keeps the original name as a hostname
-            // on the preview network, so that services can still reach each other by their Compose names.
+            // On the preview network, a preview service also answers to its other name: the Compose name
+            // when the preview renames its services, otherwise the "<name>-pr-<id>" name of older versions.
+            $previewAlias = $renamesServices ? (string) $serviceName : addPreviewDeploymentSuffix((string) $serviceName, $pullRequestId);
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, $isPullRequest ? ['aliases' => [(string) $serviceName]] : null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [$previewAlias]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
@@ -2350,6 +2336,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($logging) {
             $payload['logging'] = $logging;
         }
+        if ($renamesServices) {
+            $depends_on = $depends_on->mapWithKeys(fn ($dependency, $condition) => is_numeric($condition)
+                ? [$condition => addPreviewDeploymentSuffix($dependency, $pullRequestId)]
+                : [addPreviewDeploymentSuffix($condition, $pullRequestId) => $dependency]);
+        }
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
@@ -2376,10 +2367,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $payload['image'] = "{$imageRepo}:{$imageTag}";
         }
 
-        if ($isPullRequest) {
+        // A preview keeps the Compose service names, which other Compose files and start commands use:
+        // its own project and network isolate it. See Application::renamesPreviewComposeServices().
+        if ($renamesServices) {
             $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
-
         $parsedServices->put($serviceName, $payload);
     }
     // The preview mounts its own volumes instead of these external and network volumes (see above), so it does not declare them.

@@ -2610,6 +2610,29 @@ class Application extends BaseModel
         $this->syncOriginalAttribute('docker_compose_image_overrides');
     }
 
+    /**
+     * Whether a preview renames its Compose services to "<name>-pr-<id>". The legacy parser (version 1 and 2)
+     * always does. On the predefined network and on a Compose network with a fixed name (`name:` or
+     * `external:`), the services of the preview and of production share one network, where Docker Compose
+     * gives each container its service name as a hostname: without the rename, a preview service would
+     * also answer for the production service.
+     */
+    public function renamesPreviewComposeServices(): bool
+    {
+        if ((int) $this->compose_parsing_version < 3 || (bool) data_get($this, 'settings.connect_to_docker_network')) {
+            return true;
+        }
+
+        try {
+            $networks = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'networks', []);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return collect(is_array($networks) ? $networks : [])
+            ->contains(fn ($network) => filled(data_get($network, 'name')) || filled(data_get($network, 'external')));
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {

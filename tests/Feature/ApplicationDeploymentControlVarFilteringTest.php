@@ -867,7 +867,7 @@ YAML;
     $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
     $envString = $buildtimeEnvs->implode("\n");
 
-    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp-pr-241'");
+    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp'");
     expect($envString)->not->toContain('SERVICE_NAME_POSTGRESAPP=""');
     expect($envString)->not->toContain('SERVICE_URL_APP=');
 });
