@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Enums\AccessScope;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\NodeWorkload;
 use App\Models\PersonalAccessToken;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
@@ -493,6 +494,13 @@ class AccessResolver
     {
         if ($target instanceof Project) {
             return [$target->team_id, $target->id, null, null];
+        }
+        // A preview has the access of its parent (decision 0025), also a grant on the parent alone.
+        if ($target instanceof NodeWorkload && $target->isPreview()) {
+            $target = $target->previewOf;
+            if ($target === null) {
+                return null;
+            }
         }
 
         $environmentId = $target instanceof Environment ? $target->id : $target->getAttribute('environment_id');
