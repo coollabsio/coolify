@@ -54,6 +54,7 @@
 @endphp
 
 <x-main-nav-menu back-label="Servers">
+    <div hidden data-settings-search-items="{{ json_encode(settingsSearchItems($groupedClusterMenuItems, $clusterRouteParameters)) }}"></div>
     <nav aria-label="Cluster configuration sections"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedClusterMenuItems as $groupLabel => $groupItems)

@@ -126,11 +126,18 @@
             ['id' => 'cluster-application-memory-limits', 'label' => 'Memory'],
         ],
     ];
+    $settingsSearchItems = settingsSearchItems(
+        $groupedMenuItems->map(fn ($items) => $items->filter(fn (array $item): bool => isset($item['key']))
+            ->map(fn (array $item): array => [...$item, 'route' => $sectionRoutes[$item['key']]])),
+        $routeParameters,
+        collect($pageSections)->mapWithKeys(fn (array $sections, string $key): array => [$sectionRoutes[$key] => $sections])->all(),
+    );
 @endphp
 
 <x-main-nav-menu back-label="Dashboard" :name="$workload->name">
     <nav aria-label="{{ $workload->isDatabase() ? 'Cluster database sections' : 'Cluster application sections' }}"
         class="grid grid-cols-1 gap-0.5">
+        <div hidden data-settings-search-items="{{ json_encode($settingsSearchItems) }}"></div>
         @foreach ($groupedMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
