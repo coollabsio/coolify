@@ -279,7 +279,21 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->sshConnectionLostHint($exitCode);
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->registryLoginHint($error).$this->sshConnectionLostHint($exitCode);
+    }
+
+    /**
+     * A registry that refuses a pull or push gives only a generic Docker error, which does not tell on which server
+     * the login is missing. With a build server or a Coolify host that is not the deployment server, users often log
+     * in on the wrong server, or as another user than the SSH user.
+     */
+    private function registryLoginHint(string $error): string
+    {
+        if (! preg_match('~pull access denied|requested access to the resource is denied|no basic auth credentials|unauthorized: authentication required|/v2/[^"\s]*": (?:unauthorized|denied)~i', $error)) {
+            return '';
+        }
+
+        return "\nThe registry refused access to the image. Deployments use the Docker registry logins of the SSH user ({$this->server->user}) on the server {$this->server->name}. Log in to the registry on the Registries page of this server, then deploy again. If a 'docker pull' of the image on the server also fails, the token cannot read the image: check its scopes.";
     }
 
     /**

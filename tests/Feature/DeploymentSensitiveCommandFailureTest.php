@@ -808,3 +808,36 @@ it('removes the old helper synchronously before it starts the helper again with 
         ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker rm -f') && str_contains($command, 'sensitive-failure-deployment')))->toBeTrue()
         ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker stop')))->toBeFalse();
 });
+
+it('explains where to log in when a registry refuses access to an image', function (string $error) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: $error, exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose pull',
+    ]));
+
+    $server = $reflection->getProperty('server')->getValue($job);
+    expect($exception->getMessage())
+        ->toContain($error)
+        ->toContain("Docker registry logins of the SSH user ({$server->user}) on the server {$server->name}")
+        ->toContain('Registries page of this server');
+})->with([
+    'Docker Hub' => "Error response from daemon: pull access denied for acme/app, repository does not exist or may require 'docker login': denied: requested access to the resource is denied",
+    'ghcr.io' => 'Error response from daemon: Head "https://ghcr.io/v2/acme/app/manifests/latest": unauthorized',
+    'ghcr.io denied' => 'Error response from daemon: Head "https://ghcr.io/v2/acme/app/manifests/latest": denied',
+    'no credentials' => 'Error response from daemon: Get "https://registry.example.com/v2/acme/app/manifests/1.0": no basic auth credentials',
+]);
+
+it('does not add the registry login hint to other failures', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'Error response from daemon: manifest for acme/app:missing not found: manifest unknown', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose pull',
+    ]));
+
+    expect($exception->getMessage())->not->toContain('Registries');
+});
