@@ -35,6 +35,7 @@ use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -2065,17 +2066,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return RemoteSecretValueFormatter::dotenv($value);
     }
 
+    /**
+     * Order variables like the Environment Variables page does, so a variable
+     * written to the .env file can reference the variables listed before it.
+     */
+    private function orderEnvironmentVariables(MorphMany $query): MorphMany
+    {
+        if ($this->application->settings->is_env_sorting_enabled) {
+            return $query->orderBy('key');
+        }
+
+        return $query->orderBy('order')->orderBy('id');
+    }
+
     private function generate_runtime_environment_variables()
     {
         $envs = collect([]);
-        $sort = $this->application->settings->is_env_sorting_enabled;
-        if ($sort) {
-            $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('key');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('key');
-        } else {
-            $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('id');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('id');
-        }
+        $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->runtime_environment_variables())->get();
+        $sorted_environment_variables_preview = $this->orderEnvironmentVariables($this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues()))->get();
         if ($this->build_pack === 'dockercompose') {
             $sorted_environment_variables = $sorted_environment_variables->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
             $sorted_environment_variables_preview = $sorted_environment_variables_preview->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
@@ -2508,10 +2516,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
         if ($this->pull_request_id === 0) {
-            $sorted_environment_variables = $this->application->environment_variables()
+            $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->environment_variables()
                 ->withoutBuildpackControlVariables()
-                ->where('is_buildtime', true)  // ONLY build-time variables
-                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->where('is_buildtime', true))  // ONLY build-time variables
                 ->get();
             $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
@@ -2571,11 +2578,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } else {
-            $sorted_environment_variables = $this->application->environment_variables_preview()
+            $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->environment_variables_preview()
                 ->whereNotIn('id', $this->previewVariableIdsWithProductionValues())
                 ->withoutBuildpackControlVariables()
-                ->where('is_buildtime', true)  // ONLY build-time variables
-                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->where('is_buildtime', true))  // ONLY build-time variables
                 ->get();
             $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
