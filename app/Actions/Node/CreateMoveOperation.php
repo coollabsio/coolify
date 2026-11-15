@@ -10,6 +10,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\User;
+use App\Support\CpuArchitecture;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -62,6 +63,12 @@ class CreateMoveOperation
             }
             // The services that share stack volumes with this one move with it (decision 0024).
             $group = self::group($workload, $source, $revision);
+            foreach ($group as $member) {
+                $mismatch = CpuArchitecture::mismatch($target, ReadImageArchitectures::forRevision($member['revision']));
+                if ($mismatch !== null) {
+                    throw new RuntimeException(($group->count() > 1 ? "The service {$member['workload']->stack_service} cannot move. " : '').$mismatch.' Select a server with one of these architectures.');
+                }
+            }
             if (NodeOperation::movingWorkloadIds($group->pluck('workload.id')->all()) !== []) {
                 throw new RuntimeException($group->count() > 1 ? 'A service of this volume group already has an active move.' : 'This workload already has an active move.');
             }

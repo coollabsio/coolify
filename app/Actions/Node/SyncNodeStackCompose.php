@@ -100,7 +100,9 @@ class SyncNodeStackCompose
             $nodes = [];
             foreach ($diff->added as $service) {
                 $placement = $diff->placements[$service['service']] === null ? null : Node::query()->find($diff->placements[$service['service']]);
-                $node = CreateClusterDockerImageWorkload::placementNode($cluster, $placement);
+                $node = CreateClusterDockerImageWorkload::placementNode($cluster, $placement, $service['build'] !== null
+                    ? $cluster->builderArchitectures()
+                    : ReadImageArchitectures::run((string) $service['image']));
                 $all[$service['service']] = CreateClusterStack::createService($stack, $node, $service, $actor);
                 $nodes[$node->id] = $node;
             }

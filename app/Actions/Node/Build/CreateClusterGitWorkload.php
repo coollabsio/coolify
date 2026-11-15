@@ -61,7 +61,8 @@ class CreateClusterGitWorkload
 
         $registryIsNew = ! $cluster->registry()->exists();
         $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey): NodeWorkload {
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode);
+            // A build runs on a builder of the architecture of the Node (decision 0020).
+            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures());
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,
                 'project_id' => $project->id,

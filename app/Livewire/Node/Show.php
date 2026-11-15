@@ -11,6 +11,7 @@ use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Actions\Node\ReadImageArchitectures;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\RotateSentinelToken;
 use App\Actions\Node\UpgradeSentinel;
@@ -33,6 +34,7 @@ use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\ValidServerIp;
+use App\Support\CpuArchitecture;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -471,7 +473,7 @@ class Show extends Component
     /**
      * Builds the Applications rows with a fixed number of queries, however many applications run here.
      *
-     * @return array{workloadRows: list<array<string, mixed>>, moveTargetOptions: list<array{value: string, label: string}>}
+     * @return array{workloadRows: list<array<string, mixed>>}
      */
     private function workloadsViewData(): array
     {
@@ -524,16 +526,21 @@ class Show extends Component
             ];
         })->values()->all();
 
-        $moveTargetOptions = $this->node->node_cluster_id === null ? [] : Node::query()
+        $moveTargets = $this->node->node_cluster_id === null ? collect() : Node::query()
             ->where('team_id', $this->node->team_id)
             ->where('node_cluster_id', $this->node->node_cluster_id)
             ->whereKeyNot($this->node->id)
             ->orderBy('name')
-            ->get(['uuid', 'name'])
-            ->map(fn (Node $target): array => ['value' => $target->uuid, 'label' => $target->name])
-            ->all();
+            ->get(['id', 'uuid', 'name', 'metadata']);
+        // Each application lists the targets of the CPU architectures of its image (decision 0020).
+        // The architectures are cached, but each row reads its build or registry credential.
+        $workloadRows = array_map(function (array $row) use ($moveTargets): array {
+            $architectures = $moveTargets->isEmpty() || $row['revision'] === null ? null : ReadImageArchitectures::forRevision($row['revision']);
 
-        return compact('workloadRows', 'moveTargetOptions');
+            return [...$row, 'moveTargetOptions' => $moveTargets->map(fn (Node $target): array => CpuArchitecture::nodeOption($target, $architectures))->all()];
+        }, $workloadRows);
+
+        return compact('workloadRows');
     }
 
     /**

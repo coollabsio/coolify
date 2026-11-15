@@ -10,6 +10,7 @@ use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -29,6 +30,11 @@ class CreateDeploymentOperation
         $node->ensureCapability('workload.deploy.v1');
         if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
             throw new InvalidArgumentException('The image pull policy is invalid.');
+        }
+        // No emulation (decision 0020): an image runs only on a Node of one of its CPU architectures.
+        $mismatch = CpuArchitecture::mismatch($node, ReadImageArchitectures::forRevision($revision));
+        if ($mismatch !== null) {
+            throw new RuntimeException("{$mismatch} Coolify does not emulate another CPU architecture.");
         }
         // A local build exists only in the Podman store of this Node; there is nothing to pull.
         if (NodeRegistry::isLocalImage($revision->image)) {

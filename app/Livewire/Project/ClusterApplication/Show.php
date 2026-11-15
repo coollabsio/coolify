@@ -17,6 +17,7 @@ use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\NotifyNodeReachability;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\PublishNodeWorkloadPort;
+use App\Actions\Node\ReadImageArchitectures;
 use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\RollbackNodeWorkload;
@@ -51,6 +52,7 @@ use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Services\DockerImageParser;
 use App\Services\DockerRegistryLogins;
+use App\Support\CpuArchitecture;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
@@ -796,7 +798,7 @@ class Show extends Component
      * Servers the application can move from and to. Targets are servers of the same cluster that run workloads
      * and do not run this application yet.
      *
-     * @return array{moveSourceOptions: list<array{value: string, label: string}>, moveTargetOptions: list<array{value: string, label: string}>}
+     * @return array{moveSourceOptions: list<array{value: string, label: string}>, moveTargetOptions: list<array{value: string, label: string, description: ?string, disabled: bool}>}
      */
     private function moveOptions(): array
     {
@@ -809,10 +811,12 @@ class Show extends Component
             ->orderBy('name')
             ->get()
             ->filter(fn (Node $node): bool => $node->role->runsWorkloads());
+        $architectures = $targets->isEmpty() ? null : ReadImageArchitectures::forWorkload($this->workload);
 
         return [
             'moveSourceOptions' => $sources->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->all(),
-            'moveTargetOptions' => $targets->map(fn (Node $node): array => ['value' => $node->uuid, 'label' => $node->name])->values()->all(),
+            // A server of another CPU architecture is listed, but disabled with the reason (decision 0020).
+            'moveTargetOptions' => $targets->map(fn (Node $node): array => CpuArchitecture::nodeOption($node, $architectures))->values()->all(),
             'moveRecovery' => $this->moveRecovery($sources->firstWhere('uuid', $this->moveSource), $targets->firstWhere('uuid', $this->moveTarget) ?? $targets->first()),
             // The services that share stack volumes with this one move with it (decision 0024).
             'moveGroup' => $this->workload->volumeGroup()->slice(1)->pluck('stack_service')->filter()->values()->all(),

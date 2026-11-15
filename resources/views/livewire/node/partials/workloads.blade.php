@@ -72,7 +72,7 @@
                                 deploy-action="deployRevision('{{ $revision->uuid }}')" :trigger-prefix="$triggerPrefix"
                                 class="shrink-0">
                                 <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
-                                @if ($moveTargetOptions !== [])
+                                @if ($row['moveTargetOptions'] !== [])
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('{{ $triggerPrefix }}-move-trigger')?.click()"
                                         role="menuitem">
@@ -115,7 +115,7 @@
                                     </x-slot:trigger>
                                 </x-modal-confirmation>
 
-                                @if ($moveTargetOptions !== [])
+                                @if ($row['moveTargetOptions'] !== [])
                                     <x-modal-input title="Move to another server" :subtitle="$workload->name" :wireIgnore="false">
                                         <x-slot:content>
                                             <button id="{{ $triggerPrefix }}-move-trigger" type="button">Move</button>
@@ -123,7 +123,7 @@
                                         <form wire:submit="moveWorkload('{{ $workload->uuid }}')" class="flex flex-col gap-4">
                                             <x-forms.listbox id="moveTargets.{{ $workload->uuid }}"
                                                 htmlId="move-target-{{ $workload->uuid }}" label="Target server"
-                                                placeholder="Select a server" :options="$moveTargetOptions" portal required />
+                                                placeholder="Select a server" :options="$row['moveTargetOptions']" portal required />
                                             <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
                                                 The application keeps running here until it is ready on the target server.
                                             </p>

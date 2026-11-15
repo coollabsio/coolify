@@ -12,6 +12,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -50,8 +51,10 @@ class CreateClusterDockerImageWorkload
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $image, $targetNode, $name): array {
-            $node = self::placementNode($cluster, $targetNode);
+        $architectures = ReadImageArchitectures::run($image);
+
+        return DB::transaction(function () use ($project, $environment, $cluster, $image, $targetNode, $name, $architectures): array {
+            $node = self::placementNode($cluster, $targetNode, $architectures);
 
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,
@@ -73,9 +76,12 @@ class CreateClusterDockerImageWorkload
 
     /**
      * The worker Node that a new cluster application runs on: the selected one, or the
-     * usable worker with the fewest workloads that accepts a deployment.
+     * usable worker with the fewest workloads that accepts a deployment. With the CPU
+     * architectures of the image (ReadImageArchitectures), only a Node of one of them.
+     *
+     * @param  list<string>|null  $architectures  Null when they are unknown: every Node fits.
      */
-    public static function placementNode(NodeCluster $cluster, ?Node $targetNode): Node
+    public static function placementNode(NodeCluster $cluster, ?Node $targetNode, ?array $architectures = null): Node
     {
         $availableNodes = $cluster->nodes()
             ->where('is_usable', true)
@@ -85,8 +91,16 @@ class CreateClusterDockerImageWorkload
             ->withCount('workloads')
             ->orderBy('workloads_count')
             ->orderBy('id');
-        $node = $targetNode === null
-            ? $availableNodes->get()->first(function (Node $candidate): bool {
+        if ($targetNode !== null) {
+            $node = $availableNodes->whereKey($targetNode->id)->first()
+                ?? throw new RuntimeException('The selected server is not available in this cluster.');
+            $mismatch = CpuArchitecture::mismatch($node, $architectures);
+            if ($mismatch !== null) {
+                throw new RuntimeException("{$mismatch} Select a server with one of these architectures.");
+            }
+        } else {
+            $fitting = $availableNodes->get()->filter(fn (Node $candidate): bool => CpuArchitecture::mismatch($candidate, $architectures) === null);
+            $node = $fitting->first(function (Node $candidate): bool {
                 try {
                     EnsureNodeAcceptsDeployment::run($candidate);
 
@@ -94,12 +108,9 @@ class CreateClusterDockerImageWorkload
                 } catch (\DomainException) {
                     return false;
                 }
-            })
-            : $availableNodes->whereKey($targetNode->id)->first();
-        if ($node === null) {
-            throw new RuntimeException($targetNode === null
-                ? 'The cluster has no workload server that can accept a deployment.'
-                : 'The selected server is not available in this cluster.');
+            }) ?? throw new RuntimeException($fitting->isEmpty() && $architectures !== null
+                ? 'The cluster has no workload server with a CPU architecture of the image ('.(implode(', ', $architectures) ?: 'none in common').'). Coolify does not emulate another architecture.'
+                : 'The cluster has no workload server that can accept a deployment.');
         }
         EnsureNodeAcceptsDeployment::run($node);
 

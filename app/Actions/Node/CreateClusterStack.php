@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
 use App\Services\NodeStack\NodeStackComposeMapper;
 use App\Services\NodeStack\NodeStackGitSource;
+use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -70,9 +71,10 @@ class CreateClusterStack
         }
         $name = filled($name) ? trim($name) : ($template ?? ($git !== null ? CreateClusterGitWorkload::defaultName($git->repository) : 'stack'));
         $registryIsNew = ! $cluster->registry()->exists();
+        $architectures = self::architectures($cluster, $yaml);
 
-        $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory): NodeStack {
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode);
+        $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory, $architectures): NodeStack {
+            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
             NodeCluster::query()->whereKey($cluster->id)->lockForUpdate()->first();
             $stack = NodeStack::query()->create([
                 'team_id' => $project->team_id,
@@ -124,6 +126,23 @@ class CreateClusterStack
         }
 
         return $stack;
+    }
+
+    /**
+     * The CPU architectures that every service of the stack can run on, because all services run on one
+     * Node (decision 0020): those of each image, and those of the builders for a service with `build`.
+     * An image with a variable in its name is resolved later and is not counted.
+     *
+     * @param  array<string, mixed>  $yaml
+     * @return list<string>|null
+     */
+    private static function architectures(NodeCluster $cluster, array $yaml): ?array
+    {
+        return CpuArchitecture::common(collect($yaml['services'] ?? [])
+            ->filter(fn ($service): bool => is_array($service))
+            ->map(fn (array $service): ?array => isset($service['build'])
+                ? $cluster->builderArchitectures()
+                : (is_string($service['image'] ?? null) && ! str_contains($service['image'], '$') ? ReadImageArchitectures::run($service['image']) : null)));
     }
 
     /**

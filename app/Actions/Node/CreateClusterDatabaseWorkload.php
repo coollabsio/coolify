@@ -47,9 +47,10 @@ class CreateClusterDatabaseWorkload
             throw new RuntimeException('The cluster network is not ready. Wait until the cluster shows the network as active, then try again.');
         }
         $image = filled($image) ? trim($image) : $type->defaultImage();
+        $architectures = ReadImageArchitectures::run($image);
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $type, $targetNode, $image): NodeWorkload {
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode);
+        return DB::transaction(function () use ($project, $environment, $cluster, $type, $targetNode, $image, $architectures): NodeWorkload {
+            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
 
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,
