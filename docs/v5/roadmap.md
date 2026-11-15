@@ -1,6 +1,6 @@
 # Coolify v5 Roadmap
 
-**Last reviewed:** 2026-11-13
+**Last reviewed:** 2026-11-15
 
 This list sorts the open v5 work. Every item in "Build" has an accepted
 decision. The accepted decisions are in [decisions/README.md](decisions/README.md).
@@ -38,6 +38,16 @@ stable need.
 | S4 | ~~Exec and terminal~~ | [0018](decisions/0018-node-exec-and-terminal.md). Done: scheduled tasks and a container terminal through Flux. |
 | S5 | ~~Deploy without downtime on one Node~~ | [0022](decisions/0022-node-rolling-deploys.md). Done: two container slots, make-before-break without a writable volume, stop-then-start with one. Stop-then-start fails no requests in the test (slowest 0.25 s): Caddy holds requests while the only container restarts (Sentinel `011223e`, `a8bef06`: the passive health check only for several upstreams), and Sentinel publishes every second while a health check is `starting` (`ce966b5`). |
 
+## Sentinel versions
+
+Until the first release, Coolify uses Sentinel `main-<sha>` images, not
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin
+`main-0d256e1` by digest. `upstream.json` takes only release versions, so a
+new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
+`image.build.target.v1` and no read lane for fast commands (Sentinel
+`0d256e1`). Install the `main-<sha>` `sentinel-host` on it by hand with
+`InstallSentinel`.
+
 ## Build when there is time
 
 | # | Work | Decision |
@@ -48,7 +58,7 @@ stable need.
 | L4 | Build and place by CPU architecture | [0020](decisions/0020-node-cpu-architecture.md) |
 | L5 | Preview deployments | [0011](decisions/0011-node-git-sources.md) |
 | L6 | Ctrl+K search entries for cluster settings pages | — |
-| L7 | A clear error instead of a 500 when you create a database and the cluster network is not ready | 0010 |
+| L7 | ~~A clear error instead of a 500 when you create a database and the cluster network is not ready~~ Done: the create page shows the reason above the image picker. | 0010 |
 | L9 | ~~Reverse lookups of external addresses from containers get NXDOMAIN~~ | — | Fixed in Sentinel `26334ea`: the discovery DNS claims only the mesh and workload reverse zones and forwards the rest. A restart of systemd-resolved drops the routing domains and is not detected as drift (older gap). |
 | L8 | Strict "serve files only" mode for Static | 0006. Needs a Sentinel builder change. |
 
@@ -70,7 +80,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Still open: reload of a changed Compose file |
+| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Each deploy of a Git stack reads the Compose file again and adds, changes, and removes services (three-way rule for values that the user changed). Still open: Docker socket access, `ports` (L1), and the placement of stack services on several Nodes when the stack is created. |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |
