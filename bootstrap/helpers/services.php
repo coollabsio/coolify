@@ -398,7 +398,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');
         $currentImage = data_get_str($dockerCompose, ['services', $name, 'image']);
-        if ($currentImage !== $updatedImage) {
+        if ($updatedImage->isNotEmpty() && $currentImage->value() !== $updatedImage->value()) {
             data_set($dockerCompose, ['services', $name, 'image'], $updatedImage->value());
             $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
             $resource->service->docker_compose_raw = $dockerComposeRaw;
