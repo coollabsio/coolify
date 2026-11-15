@@ -261,7 +261,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $serverUserHomeDir = '/root';
 
-    private string $dockerConfigFileExists = 'NOK';
+    private ?string $dockerConfigPath = null;
 
     private int $customPort = 22;
 
@@ -3453,6 +3453,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return " --mount type=bind,source={$bundle},target=".self::HELPER_HOST_CA_BUNDLE_PATH.',readonly';
     }
 
+    /**
+     * The Docker config with the registry logins that the helper container mounts. It is the config of the SSH user.
+     * On a non-root server without that config, it is the config of root, where `sudo docker login` saves the login.
+     * Host pulls use the same order (serverDockerConfigPrefix), so both pull with the same credentials.
+     */
+    private function dockerConfigPath(): ?string
+    {
+        $candidates = ["{$this->serverUserHomeDir}/.docker/config.json"];
+        if ($this->server->isNonRoot()) {
+            $candidates[] = '/root/.docker/config.json';
+        }
+
+        foreach ($candidates as $path) {
+            if (instant_remote_process(["test -f {$path} && echo 'OK' || echo 'NOK'"], $this->server) === 'OK') {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
     private function prepare_builder_image(bool $firstTry = true)
     {
         $this->checkForCancellation();
@@ -3461,7 +3482,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         instant_remote_process(["mkdir -p {$this->serverUserHomeDir}/.docker/buildx"], $this->server);
-        $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
+        $this->dockerConfigPath = $this->dockerConfigPath();
 
         // Build secrets put user variables such as HOME or DOCKER_CONFIG into the helper environment.
         // DOCKER_CONFIG comes after them, so the Docker CLI keeps its plugins. Without build secrets the
@@ -3473,16 +3494,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
         $hostCaBundleVolume = $this->hostCaBundleMount();
         if ($this->use_build_server) {
-            if ($this->dockerConfigFileExists === 'NOK') {
-                throw new DeploymentException("Docker config file (~/.docker/config.json) of the SSH user ({$this->server->user}) not found on the build server ({$this->server->name}). Log in to your registry under Server → Docker Registries on the build server. On a non-root server, a login made with \"sudo docker login\" is saved for root and is not used for builds.");
+            if ($this->dockerConfigPath === null) {
+                throw new DeploymentException("Docker config file (~/.docker/config.json) of the SSH user ({$this->server->user}) not found on the build server ({$this->server->name}). Log in to your registry under Server → Docker Registries on the build server.");
             }
-            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->dockerConfigPath}:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             // docker compose runs in this helper and reads seccomp profile files from the custom Docker options
             $seccompMounts = $this->pull_request_id === 0 ? seccompProfileMountFlags($this->application->custom_docker_run_options) : '';
-            if ($this->dockerConfigFileExists === 'OK') {
+            if ($this->dockerConfigPath !== null) {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->dockerConfigPath}:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
                 $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
