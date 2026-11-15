@@ -136,6 +136,19 @@ it('mounts the backup file in the S3 upload container with --mount, which fails 
         ->not->toContain("{$file}:{$file}:ro");
 });
 
+it('dumps Supabase images over 127.0.0.1, because their socket refuses users other than postgres and supabase_admin', function (bool $dumpAll) {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy', 'postgres_user' => 'app'], 'supabase/postgres:17.11.0.018');
+    $official = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy']);
+
+    (new DatabaseBackupJob(backupQuotingSchedule($database, $this->team, ['dump_all' => $dumpAll])))->handle();
+    (new DatabaseBackupJob(backupQuotingSchedule($official, $this->team, ['dump_all' => $dumpAll])))->handle();
+
+    $dumps = $this->commands->filter(fn (string $command) => str_contains($command, 'pg_dump'))->values();
+    expect($dumps)->toHaveCount(2)
+        ->and($dumps[0])->toContain('-e PGHOST=')->toContain('127.0.0.1')->toContain($database->uuid)
+        ->and($dumps[1])->not->toContain('PGHOST')->toContain($official->uuid);
+})->with(['one database' => [false], 'all databases' => [true]]);
+
 it('backs up a service database with a supported container name', function () {
     $service = backupQuotingService($this->server, $this->destination, $this->environment);
     $database = ServiceDatabase::create(['service_id' => $service->id, 'name' => 'db-name_service.1', 'image' => 'postgres:16', 'status' => 'running:healthy']);

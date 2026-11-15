@@ -228,6 +228,7 @@ function restoreScriptResource(string $engine): object
 
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn('postgres:18-alpine');
 
     return $resource;
 }

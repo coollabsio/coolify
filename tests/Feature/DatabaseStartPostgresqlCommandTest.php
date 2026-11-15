@@ -89,3 +89,25 @@ it('does not add a config directory for the official PostgreSQL image', function
         '-c', 'ssl_key_file=/var/lib/postgresql/certs/server.key',
     ]);
 });
+
+it('starts a new Supabase database as supabase_admin and checks its health over 127.0.0.1', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, databaseImage: 'supabase/postgres:17.11.0.018')->fresh();
+
+    StartPostgresql::run($database, new Activity);
+
+    $composeCommand = collect($this->executor->commands)->first(fn (string $command) => str_ends_with($command, 'docker-compose.yml > /dev/null'));
+    preg_match("/^echo '([^']+)'/", $composeCommand, $matches);
+    $service = data_get(Yaml::parse(base64_decode($matches[1])), "services.{$database->uuid}");
+
+    expect($database->postgres_user)->toBe('supabase_admin')
+        ->and($service['environment'])->toContain('POSTGRES_USER=supabase_admin')
+        ->and($service['healthcheck']['test'])->toBe(['CMD', 'psql', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-c', 'SELECT 1']);
+});
+
+it('keeps the chosen user of a new Supabase database and the postgres user of other images', function () {
+    $custom = create_standalone_postgresql($this->environment->id, $this->destination, ['image' => 'supabase/postgres:17.11.0.018', 'postgres_user' => 'app']);
+    $official = create_standalone_postgresql($this->environment->id, $this->destination);
+
+    expect($custom->postgres_user)->toBe('app')
+        ->and($official->fresh()->postgres_user)->toBe('postgres');
+});

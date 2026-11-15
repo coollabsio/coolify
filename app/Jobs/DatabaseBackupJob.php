@@ -737,6 +737,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->postgres_password) {
                 $backupCommand .= ' -e PGPASSWORD='.escapeshellarg($this->postgres_password);
             }
+            $host = PostgresUser::clientHost($this->database->image);
+            if ($host !== null) {
+                $backupCommand .= ' -e PGHOST='.escapeshellarg($host);
+            }
             $escapedUsername = escapeshellarg($this->database->postgres_user);
             $escapedContainerName = escapeshellarg($this->container_name);
             $escapedBackupLocation = escapeshellarg($this->backup_location);

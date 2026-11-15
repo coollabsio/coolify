@@ -9,10 +9,11 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 
-function importResource(string $class, ?string $databaseType = null): object
+function importResource(string $class, ?string $databaseType = null, string $image = 'postgres:18-alpine'): object
 {
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn($image);
     if ($class === ServiceDatabase::class) {
         $resource->shouldReceive('databaseType')->andReturn($databaseType);
     }
@@ -143,6 +144,17 @@ test('restores PostgreSQL archives without owners and privileges by default', fu
     // --single-transaction would roll back the whole restore on the first ALTER OWNER.
     expect($command)->toContain('pg_restore --exit-on-error --single-transaction --no-owner --no-acl');
 })->with(['keep existing objects' => [false], 'replace existing objects' => [true]]);
+
+test('restores into Supabase images over 127.0.0.1, because their socket refuses users other than postgres and supabase_admin', function (string $class, ?string $type) {
+    $supabase = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type, 'supabase/postgres:15.8.1.085'), '/tmp/backup.dump', false);
+    $official = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type), '/tmp/backup.dump', false);
+
+    expect($supabase)->toContain("export PGHOST='127.0.0.1'")
+        ->and($official)->not->toContain('PGHOST');
+})->with([
+    'standalone' => [StandalonePostgresql::class, null],
+    'service' => [ServiceDatabase::class, 'postgresql'],
+]);
 
 test('keeps PostgreSQL owners and privileges when requested', function () {
     $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump', false, false, keepOwners: true);

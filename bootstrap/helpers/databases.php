@@ -19,6 +19,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Services\Access\AccessResolver;
 use App\Support\DeletesEmptyDirectories;
+use App\Support\PostgresUser;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +40,9 @@ function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDock
     $database->destination_type = $destination->getMorphClass();
     if ($otherData) {
         $database->fill($otherData);
+    }
+    if (blank($otherData['postgres_user'] ?? null) && PostgresUser::isSupabaseImage($database->getAttributes()['image'])) {
+        $database->postgres_user = PostgresUser::SUPABASE_ADMIN;
     }
     $database->save();
 

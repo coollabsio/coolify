@@ -7,6 +7,7 @@ use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Support\PostgresUser;
 use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
@@ -107,7 +108,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
+                        'CMD', 'psql', ...$this->healthCheckHostArguments(), '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -204,7 +205,7 @@ class StartPostgresql
         if (count($command) > 1) {
             // The Supabase image keeps its config (listen_addresses, preloaded extensions) in /etc/postgresql and starts
             // with "postgres -D /etc/postgresql". Keep that directory when this command replaces the image CMD.
-            if (blank($this->database->postgres_conf) && str($this->database->image)->contains('supabase/postgres')) {
+            if (blank($this->database->postgres_conf) && PostgresUser::isSupabaseImage($this->database->image)) {
                 array_splice($command, 1, 0, ['-D', '/etc/postgresql']);
             }
             $docker_compose['services'][$container_name]['command'] = $command;
@@ -261,6 +262,16 @@ class StartPostgresql
         }
 
         return $local_persistent_volumes_names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function healthCheckHostArguments(): array
+    {
+        $host = PostgresUser::clientHost($this->database->image);
+
+        return $host === null ? [] : ['-h', $host];
     }
 
     private function generate_environment_variables()
