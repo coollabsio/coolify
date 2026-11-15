@@ -25,7 +25,10 @@
                     <x-reicon name="servers" class="size-4" />
                 </div>
                 <div class="min-w-0">
-                    <p class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</p>
+                    <div class="flex min-w-0 items-center gap-1.5">
+                        <p class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</p>
+                        <x-node.architecture :node="$node" />
+                    </div>
                     <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
                 </div>
             </div>

@@ -125,10 +125,13 @@
                             <x-reicon name="servers" class="size-4" />
                         </div>
                         <div class="min-w-0">
-                            <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" {{ wireNavigate() }}
-                                class="block truncate text-[13px] font-semibold text-black dark:text-fg">
-                                {{ $node->name }}
-                            </a>
+                            <div class="flex min-w-0 items-center gap-1.5">
+                                <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" {{ wireNavigate() }}
+                                    class="block truncate text-[13px] font-semibold text-black dark:text-fg">
+                                    {{ $node->name }}
+                                </a>
+                                <x-node.architecture :node="$node" />
+                            </div>
                             @if (filled($node->description))
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
                             @endif

@@ -70,7 +70,7 @@ class DockerImage extends Component
      * Cluster targets for a new cluster application: automatic placement in a cluster, or one
      * of its servers.
      *
-     * @return array<int, array{value: string, label: string, disabled: bool}>
+     * @return array<int, array{value: string, label: string, description?: ?string, disabled: bool}>
      */
     public static function clusterDeploymentTargets(): array
     {
@@ -95,6 +95,7 @@ class DockerImage extends Component
                     'label' => $cluster->name.' · Automatic placement · '.($ready
                         ? $cluster->available_nodes_count.' available '.str('server')->plural($cluster->available_nodes_count)
                         : 'not ready'),
+                    'description' => $ready ? ($cluster->nodes->map(fn (Node $node): ?string => $node->cpuArchitecture())->filter()->unique()->sort()->implode(', ') ?: null) : null,
                     'disabled' => ! $ready,
                 ]];
                 if ($ready) {
@@ -102,6 +103,8 @@ class DockerImage extends Component
                         $targets[] = [
                             'value' => 'node:'.$node->uuid,
                             'label' => $cluster->name.' · Server: '.$node->name,
+                            // Placement checks the CPU architecture of the image (decision 0020).
+                            'description' => $node->cpuArchitecture(),
                             'disabled' => false,
                         ];
                     }
