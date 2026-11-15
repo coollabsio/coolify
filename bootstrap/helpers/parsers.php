@@ -29,7 +29,33 @@ function parseDockerComposeYaml(string $compose): mixed
     // Editors on Windows can save files with a UTF-8 BOM, which Symfony YAML keeps in the first key.
     $compose = preg_replace('/^\xEF\xBB\xBF/', '', $compose);
 
-    return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+    try {
+        return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+    } catch (ParseException $e) {
+        $joined = joinComposeAnchorsToTheirKeys($compose);
+        if ($joined === $compose) {
+            throw $e;
+        }
+        try {
+            return Yaml::parse($joined, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+        } catch (ParseException) {
+            throw $e;
+        }
+    }
+}
+
+/**
+ * Moves an anchor that is on its own line below a key to the line of the key ("key:\n  &name" becomes "key: &name").
+ * Docker Compose accepts both forms (the Airflow Compose file uses the first), but Symfony YAML only reads the second.
+ * Only used after a failed parse, so a valid file (for example a block scalar with such lines) stays unchanged.
+ */
+function joinComposeAnchorsToTheirKeys(string $compose): string
+{
+    return preg_replace_callback(
+        '/^([ \t]*)((?:- )?[^\s#][^\n]*?:)[ \t]*(?:#[^\n]*)?\r?\n([ \t]+)(&[^\s#]+)[ \t]*(?:#[^\n]*)?\r?$/m',
+        fn (array $match) => strlen($match[3]) > strlen($match[1]) ? "{$match[1]}{$match[2]} {$match[4]}" : $match[0],
+        $compose
+    );
 }
 
 /**

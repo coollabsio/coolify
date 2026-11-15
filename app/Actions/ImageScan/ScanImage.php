@@ -36,7 +36,6 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
 /**
@@ -939,7 +938,7 @@ class ScanImage
         }
 
         try {
-            $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
+            $compose = parseDockerComposeYaml((string) ($application->docker_compose ?: $application->docker_compose_raw));
         } catch (ParseException) {
             return false;
         }

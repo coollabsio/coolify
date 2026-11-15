@@ -2625,7 +2625,7 @@ class Application extends BaseModel
     public function activeComposeImageOverrides(): array
     {
         try {
-            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services', []);
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services', []);
         } catch (\Throwable) {
             return [];
         }
@@ -2653,7 +2653,7 @@ class Application extends BaseModel
         }
 
         try {
-            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services');
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services');
         } catch (\Throwable) {
             return;
         }
