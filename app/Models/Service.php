@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\ComposeRejectedException;
 use App\Services\ContainerStatusAggregator;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
@@ -1648,6 +1649,32 @@ class Service extends BaseModel
     public function workdir()
     {
         return service_configuration_dir()."/{$this->uuid}";
+    }
+
+    /**
+     * Docker Compose must accept the generated file, or the next deployment fails with the old containers still running.
+     * Call it after parse(), in the transaction that saves the Compose file. The check is best effort: it is skipped
+     * when the server is not reachable or the SSH connection fails, so the file can still be edited.
+     *
+     * @throws ComposeRejectedException If `docker compose config` on the server rejects the generated file
+     */
+    public function ensureDockerComposeAccepted(): void
+    {
+        $server = $this->server;
+        if (! $server?->isFunctional()) {
+            return;
+        }
+        try {
+            checkComposeFileOnServer((string) $this->docker_compose, $server, $this->workdir());
+        } catch (\Throwable $e) {
+            // Only an exit code of the remote command is a rejection: 255 is an SSH failure, 124 a timeout.
+            $exitCode = $e->getCode();
+            if (! $e instanceof \RuntimeException || ! is_int($exitCode) || in_array($exitCode, [0, 124, 255], true)) {
+                return;
+            }
+
+            throw new ComposeRejectedException("Docker Compose rejected the file, so Coolify did not save it.\n{$e->getMessage()}", previous: $e);
+        }
     }
 
     public function saveComposeConfigs()
