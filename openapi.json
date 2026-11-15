@@ -1747,6 +1747,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "429": {
+                        "description": "GitHub API rate limit exceeded. The message tells when to try again."
+                    },
                     "409": {
                         "description": "Domain conflicts detected.",
                         "content": {
