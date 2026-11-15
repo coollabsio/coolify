@@ -323,7 +323,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->rollback = $this->application_deployment_queue->rollback;
         $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
-        if ($this->disableBuildCache) {
+        // A restart reuses the existing image. When a restart must build, the build turns the cache off again.
+        if ($this->disableBuildCache && ! $this->application_deployment_queue->restart_only) {
             $this->force_rebuild = true;
         }
         $this->restart_only = $this->application_deployment_queue->restart_only;
@@ -792,6 +793,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        // The image has no commit tag, so only a restart reuses it. A deployment builds the Dockerfile again.
+        if ($this->application_deployment_queue->restart_only && ! $this->force_rebuild) {
+            $this->check_image_locally_or_remotely();
+            if ($this->should_skip_build()) {
+                return;
+            }
+        }
         $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
 
         // Save build-time .env file BEFORE the build
@@ -991,6 +999,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->can_reuse_docker_compose_images($composeFile)) {
             $this->skip_build = true;
         } else {
+            // A restart keeps the cache on to reuse the images, so set it again for the build.
+            $this->force_rebuild = $this->force_rebuild || $this->disableBuildCache;
             $this->build_docker_compose_images($composeFile, $buildEnvironment);
         }
 
@@ -1783,7 +1793,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $configurationDiff = $this->application->pendingDeploymentConfigurationDiff();
             if (! $configurationDiff->requiresBuild()) {
-                $this->application_deployment_queue->addLogEntry("No build configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $sameCommit = $this->application->dockerfile ? '' : ' with the same Git Commit SHA';
+                $this->application_deployment_queue->addLogEntry("No build configuration changed & image found ({$this->production_image_name}){$sameCommit}. Build step skipped.");
                 $this->skip_build = true;
                 $this->generate_compose_file();
 
@@ -1808,6 +1819,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 throw new DeploymentException($message);
             }
             $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
+        }
+        if ($this->disableBuildCache) {
+            $this->force_rebuild = true;
         }
         if ($this->restart_only) {
             $this->restart_only = false;
