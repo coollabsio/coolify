@@ -247,6 +247,17 @@ it('fails with lock busy after the wait when another scan holds the server lock'
     Process::assertNothingRan();
 });
 
+it('names the resource and the image in the error of an image reference that is not valid', function () {
+    scanImageTestFake();
+
+    $scan = ScanImage::run($this->server, $this->application, 'nginx:${NGINX_VERSION}');
+
+    expect($scan->status)->toBe(ImageScanStatus::Failed)
+        ->and($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
+        ->and($scan->error_context['detail'])->toBe("invalid image reference 'nginx:\${NGINX_VERSION}' of {$this->application->name}: Invalid image reference.");
+    Process::assertNothingRan();
+});
+
 it('keeps the progress of another run of the resource and records no busy lock for it', function () {
     scanImageTestFake();
     $progress = ['run_id' => 'otherrun123456', 'stage' => 'sbom', 'started_at' => now()->toIso8601String()];

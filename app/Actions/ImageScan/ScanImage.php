@@ -132,7 +132,7 @@ class ScanImage
         try {
             ImageRef::parse($imageRef);
         } catch (InvalidArgumentException $e) {
-            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference: {$e->getMessage()}");
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference '{$imageRef}' of {$resource->getAttribute('name')}: {$e->getMessage()}");
             $failure->log($server, $imageRef);
 
             return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $failure->errorContext($context));
