@@ -14,7 +14,15 @@ $email = getOldOrLocal('email', 'test3@example.com');
     <x-auth.shell title="Coolify"
         :description="$isFirstUser ? 'Create the root account for this instance.' : 'Create your account to get started.'">
         <div class="flex flex-col gap-4">
-            @if ($isRootSetupWindowPending)
+            @if ($isRootUserPredefined)
+                <x-auth.alert type="warning">
+                    <p class="font-medium">Root user not created</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">Coolify creates the root account from the
+                        ROOT_USER_* values in /data/coolify/source/.env, but it rejected them. Read the reason in
+                        the logs, then run the installer again with corrected values:</p>
+                    <code class="mt-2 block font-mono text-xs">docker logs coolify</code>
+                </x-auth.alert>
+            @elseif ($isRootSetupWindowPending)
                 <x-auth.alert type="warning">
                     <p class="font-medium">Coolify is starting</p>
                     <p class="mt-0.5 text-black/70 dark:text-white/70">Coolify has not finished its start-up tasks.

@@ -1232,10 +1232,10 @@ if [ -n "$ROOT_USER_ERRORS" ]; then
     while IFS= read -r ROOT_USER_ERROR; do
         printf '    %s- %s%s\n' "$C_YELLOW" "$ROOT_USER_ERROR" "$C_RESET" >&3
     done <<<"$ROOT_USER_ERRORS"
-    printf '  %sRun the installer again with corrected ROOT_USER_* values, or create the root account in the browser.%s\n' "$C_YELLOW" "$C_RESET" >&3
+    printf '  %sRun the installer again with corrected ROOT_USER_* values. Registration in the browser stays closed while they are set.%s\n' "$C_YELLOW" "$C_RESET" >&3
     printf '  %sRequirements: https://coolify.io/docs/start-with-self-hosted#_1-root-user%s\n' "$C_YELLOW" "$C_RESET" >&3
 fi
-if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ] || [ -n "$ROOT_USER_ERRORS" ]; }; then
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
     printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
 fi
 printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3

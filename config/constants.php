@@ -74,6 +74,7 @@ return [
 
     'seeder' => [
         'is_seeder_enabled' => env('SEEDER_ENABLED', true),
+        'is_root_user_predefined' => env('ROOT_USER_EMAIL') && env('ROOT_USER_PASSWORD'),
     ],
 
     'horizon' => [
