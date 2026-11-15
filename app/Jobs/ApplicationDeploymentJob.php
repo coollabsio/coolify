@@ -5738,11 +5738,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     // The gate pulled and scanned the pinned image.
                     $this->execute_remote_command($up);
                 } else {
-                    $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
-                    $this->execute_remote_command(
-                        [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->composeProjectName()} --project-directory {$this->workdir} pull"), 'hidden' => true],
-                        $up,
-                    );
+                    $this->pull_docker_image();
+                    $this->execute_remote_command($up);
                 }
             } else {
                 if ($this->use_build_server) {
@@ -5760,6 +5757,33 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('New container started.');
         } catch (Exception $e) {
             throw new DeploymentException("Failed to start container: {$e->getMessage()}", $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * An image that is only on the server (built there, or loaded with `docker load`) cannot be pulled. When the pull
+     * fails, the deployment starts the image that is on the server. Without that image, the pull error stops it.
+     */
+    private function pull_docker_image(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
+
+        try {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->composeProjectName()} --project-directory {$this->workdir} pull"), 'hidden' => true],
+            );
+        } catch (DeploymentException $e) {
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, 'docker image inspect --format '.escapeshellarg('{{.Id}}').' '.escapeshellarg($this->production_image_name).' 2>/dev/null || true'),
+                'hidden' => true,
+                'save' => 'local_docker_image',
+                'append' => false,
+            ]);
+            if (str($this->saved_outputs->get('local_docker_image'))->isEmpty()) {
+                throw $e;
+            }
+
+            $this->application_deployment_queue->addLogEntry("Could not pull the image ({$this->production_image_name}) from the registry. Using the image that is already on the server.", 'stderr');
         }
     }
 
