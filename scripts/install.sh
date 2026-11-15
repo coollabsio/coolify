@@ -517,6 +517,20 @@ if [ "$OS_TYPE" = "zorin" ]; then
     OS_TYPE="ubuntu"
 fi
 
+# Arch based distributions (Garuda, Manjaro, EndeavourOS, CachyOS, ...) list arch in ID_LIKE
+is_arch_based() {
+    local id_like
+    id_like=$(. "$1" && echo "${ID_LIKE:-}")
+    case " $id_like " in
+    *" arch "*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
+if is_arch_based /etc/os-release; then
+    OS_TYPE="arch"
+fi
+
 if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
