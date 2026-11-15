@@ -98,19 +98,15 @@ class CreateClusterStack
             // Fails before any workload exists.
             $stack->deployOrder();
 
-            $base = $cluster->generatedDomainBase();
-            if ($base === null && Str::contains($compose, ['SERVICE_URL_', 'SERVICE_FQDN_'])) {
-                throw new RuntimeException('Turn on ingress for a server of the cluster to generate the domains of this stack.');
-            }
-            $variables = NodeStackComposeMapper::variables($yaml, [], $stack->uuid, (string) $base, $cluster->supportsIngressTls() ? 'https' : 'http');
+            $variables = self::stackVariables($cluster, $stack, $yaml, $compose, []);
             $stack->update(['variables' => $variables]);
 
             $services = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory);
             $workloads = [];
             foreach ($services as $service) {
-                $workloads[$service['service']] = $this->createService($stack, $node, $service, $requestedBy);
+                $workloads[$service['service']] = self::createService($stack, $node, $service, $requestedBy);
             }
-            $this->createStackVolumes($stack, $services, $workloads);
+            self::createStackVolumes($stack, NodeStackComposeMapper::stackMounts($services), $workloads);
             EnsureNodeWorkloadDnsNames::run($node);
             if (in_array(true, array_map(fn (array $service): bool => $service['build'] !== null, $services), true)) {
                 EnsureNodeRegistry::run($cluster);
@@ -129,7 +125,7 @@ class CreateClusterStack
     /**
      * @param  array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array<string, mixed>>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array<string, mixed>>, depends_on: array<string, string>, notes: list<string>}  $service
      */
-    private function createService(NodeStack $stack, Node $node, array $service, User $requestedBy): NodeWorkload
+    public static function createService(NodeStack $stack, Node $node, array $service, User $requestedBy): NodeWorkload
     {
         $environment = Environment::query()->findOrFail($stack->environment_id);
         $build = $service['build'];
@@ -158,17 +154,8 @@ class CreateClusterStack
         if ($build === null) {
             $workload->createRevision((string) $service['image'], NodeStackComposeMapper::revisionConfiguration($service));
         }
-        // A build arg with the name of an environment variable is that variable, also at build time.
-        $buildArgs = $build['args'] ?? [];
-        foreach ([...$service['environment'], ...array_diff_key($buildArgs, $service['environment'])] as $key => $value) {
-            $workload->environment_variables()->create([
-                'key' => $key,
-                'value' => $value,
-                'is_literal' => true,
-                'is_runtime' => array_key_exists($key, $service['environment']),
-                'is_buildtime' => array_key_exists($key, $buildArgs),
-                'is_preview' => false,
-            ]);
+        foreach (NodeStackComposeMapper::environmentVariables($service) as $key => $variable) {
+            $workload->environment_variables()->create(['key' => $key, ...$variable, 'is_literal' => true, 'is_preview' => false]);
         }
         $workload->nodes()->attach($node);
         // A stack volume takes its path first; createStackVolumes() mounts it.
@@ -188,41 +175,53 @@ class CreateClusterStack
     }
 
     /**
-     * One volume of the stack for each volume that two or more services mount (decision 0024),
-     * mounted by each of them at its path, read-write or read-only. The volume has no Node until
-     * the first deployment of one of them creates it.
+     * The generated `SERVICE_*` values of the stack for a Compose file: the existing values stay,
+     * and each new one is generated once.
      *
-     * @param  list<array{service: string, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>}>  $services
-     * @param  array<string, NodeWorkload>  $workloads
+     * @param  array<string, mixed>  $yaml
+     * @param  array<string, string>  $existing
+     * @return array<string, string>
      */
-    private function createStackVolumes(NodeStack $stack, array $services, array $workloads): void
+    public static function stackVariables(NodeCluster $cluster, NodeStack $stack, array $yaml, string $compose, array $existing): array
     {
-        $volumes = [];
-        $names = [];
-        foreach ($services as $service) {
-            $paths = [];
-            foreach ($service['stack_volumes'] as $mount) {
-                if (isset($paths[$mount['path']])) {
-                    continue;
+        $base = $cluster->generatedDomainBase();
+        if ($base === null && Str::contains($compose, ['SERVICE_URL_', 'SERVICE_FQDN_'])) {
+            throw new RuntimeException('Turn on ingress for a server of the cluster to generate the domains of this stack.');
+        }
+
+        return NodeStackComposeMapper::variables($yaml, $existing, $stack->uuid, (string) $base, $cluster->supportsIngressTls() ? 'https' : 'http');
+    }
+
+    /**
+     * Mounts the volumes that services of the stack share (decision 0024): each mount mounts the
+     * volume of its key, at its path, read-write or read-only. A key without a volume in
+     * `$volumes` gets a new volume of the stack, with a name that no other volume of the stack
+     * has. A new volume has no Node until the first deployment of one of its services creates it.
+     *
+     * @param  list<array{service: string, key: string, name: string, path: string, read_only: bool}>  $mounts  See NodeStackComposeMapper::stackMounts().
+     * @param  array<string, NodeWorkload>  $workloads  By service.
+     * @param  array<string, NodeVolume>  $volumes  The existing volumes of the stack, by key.
+     */
+    public static function createStackVolumes(NodeStack $stack, array $mounts, array $workloads, array $volumes = []): void
+    {
+        $names = NodeVolume::query()->where('node_stack_id', $stack->id)->pluck('name')->flip()->all();
+        foreach ($mounts as $mount) {
+            if (! isset($volumes[$mount['key']])) {
+                $name = $mount['name'];
+                for ($suffix = 2; isset($names[$name]); $suffix++) {
+                    $name = $mount['name'].'-'.$suffix;
                 }
-                $paths[$mount['path']] = true;
-                if (! isset($volumes[$mount['key']])) {
-                    $name = $mount['name'];
-                    for ($suffix = 2; isset($names[$name]); $suffix++) {
-                        $name = $mount['name'].'-'.$suffix;
-                    }
-                    $names[$name] = true;
-                    $volumes[$mount['key']] = NodeVolume::query()->create([
-                        'team_id' => $stack->team_id,
-                        'node_stack_id' => $stack->id,
-                        'name' => $name,
-                    ]);
-                }
-                NodeVolumeMount::query()->firstOrCreate(
-                    ['node_volume_id' => $volumes[$mount['key']]->id, 'node_workload_id' => $workloads[$service['service']]->id],
-                    ['mount_path' => $mount['path'], 'read_only' => $mount['read_only']],
-                );
+                $names[$name] = true;
+                $volumes[$mount['key']] = NodeVolume::query()->create([
+                    'team_id' => $stack->team_id,
+                    'node_stack_id' => $stack->id,
+                    'name' => $name,
+                ]);
             }
+            NodeVolumeMount::query()->firstOrCreate(
+                ['node_volume_id' => $volumes[$mount['key']]->id, 'node_workload_id' => $workloads[$mount['service']]->id],
+                ['mount_path' => $mount['path'], 'read_only' => $mount['read_only']],
+            );
         }
     }
 

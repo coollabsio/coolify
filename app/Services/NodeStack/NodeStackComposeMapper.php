@@ -221,6 +221,52 @@ class NodeStackComposeMapper
     }
 
     /**
+     * The environment variables of a service: each variable of its environment, and each build
+     * arg. A build arg with the name of an environment variable is that variable, also at build time.
+     *
+     * @param  array{environment: array<string, string>, build: ?array{args: array<string, string>}}  $service  One service of services().
+     * @return array<string, array{value: string, is_runtime: bool, is_buildtime: bool}>
+     */
+    public static function environmentVariables(array $service): array
+    {
+        $buildArgs = $service['build']['args'] ?? [];
+        $variables = [];
+        foreach ([...$service['environment'], ...array_diff_key($buildArgs, $service['environment'])] as $key => $value) {
+            $variables[(string) $key] = [
+                'value' => (string) $value,
+                'is_runtime' => array_key_exists($key, $service['environment']),
+                'is_buildtime' => array_key_exists($key, $buildArgs),
+            ];
+        }
+
+        return $variables;
+    }
+
+    /**
+     * The mounts of the volumes that services share, one for each service and path: the first
+     * mount at a path wins.
+     *
+     * @param  list<array{service: string, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>}>  $services  See services().
+     * @return list<array{service: string, key: string, name: string, path: string, read_only: bool}>
+     */
+    public static function stackMounts(array $services): array
+    {
+        $mounts = [];
+        foreach ($services as $service) {
+            $paths = [];
+            foreach ($service['stack_volumes'] as $mount) {
+                if (isset($paths[$mount['path']])) {
+                    continue;
+                }
+                $paths[$mount['path']] = true;
+                $mounts[] = ['service' => $service['service'], ...$mount];
+            }
+        }
+
+        return $mounts;
+    }
+
+    /**
      * Resolves Compose interpolation: `$$` is `$`, `${VAR}` and `$VAR` are the value of VAR,
      * and `${VAR:-default}`, `${VAR-default}`, `${VAR:+other}`, `${VAR:?error}` work as in Compose.
      *
