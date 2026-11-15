@@ -38,6 +38,15 @@ class ReconcileNodeClusterNetwork
     /** The firewall accepts `stack_rules`: all ports between two addresses (decision 0023). */
     public const STACK_RULES_CAPABILITY = 'network.firewall.stack_rules.v1';
 
+    /** The firewall accepts `published_ports`: host ports that every Node forwards to a workload (decision 0016). */
+    public const PUBLISHED_PORTS_CAPABILITY = 'network.firewall.published_ports.v1';
+
+    /** The Corrosion gossip port (UDP) on the WireGuard address of each Node. */
+    public const CORROSION_GOSSIP_PORT = 8787;
+
+    /** The Corrosion API port (TCP) that Sentinel writes to the Corrosion configuration of each Node. */
+    public const CORROSION_API_PORT = 8080;
+
     public const REQUIRED_CAPABILITIES = [
         'network.wireguard.key.ensure.v1',
         'network.wireguard.reconcile.v1',
@@ -262,7 +271,7 @@ class ReconcileNodeClusterNetwork
                         'cluster_id' => $cluster->uuid,
                         'bind_address' => $node->wireguard_ip,
                         'node_dns_name' => $node->discoveryDnsName(),
-                        'peers' => $nodePeers->map(fn (Node $peer): string => $peer->wireguard_ip.':8787')->all(),
+                        'peers' => $nodePeers->map(fn (Node $peer): string => $peer->wireguard_ip.':'.self::CORROSION_GOSSIP_PORT)->all(),
                     ]);
                     $applied[$nodeId] = $node;
                 } catch (Throwable $exception) {

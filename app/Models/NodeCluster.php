@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Traits\Auditable;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -233,6 +234,42 @@ class NodeCluster extends BaseModel
         $nodes = $this->nodes()->where('is_usable', true)->get();
 
         return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(self::UNDERSCORE_NAMES_CAPABILITY) === true);
+    }
+
+    /**
+     * Whether every usable server of the cluster can publish ports (decision 0016). A server
+     * without it would not open the ports of a stack.
+     */
+    public function supportsPublishedPorts(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_CAPABILITY) === true);
+    }
+
+    /**
+     * The host ports that the Nodes of the cluster use, with what uses them (decision 0016). A
+     * published port cannot take them, on TCP or UDP. Sentinel also refuses its own ports.
+     *
+     * @return array<int, string>
+     */
+    public function reservedHostPorts(): array
+    {
+        $reserved = [
+            53 => 'the internal DNS of the cluster',
+            80 => 'HTTP ingress',
+            443 => 'HTTPS ingress',
+            (int) $this->wireguard_port => 'the WireGuard network of the cluster',
+            ReconcileNodeClusterNetwork::CORROSION_GOSSIP_PORT => 'Corrosion service discovery',
+            ReconcileNodeClusterNetwork::CORROSION_API_PORT => 'the Corrosion API',
+            NodeRegistry::PORT => 'the cluster registry',
+        ];
+        foreach ($this->nodes()->orderBy('id')->get(['id', 'name', 'port']) as $node) {
+            $reserved[(int) $node->port] ??= "SSH on server {$node->name}";
+        }
+        ksort($reserved);
+
+        return $reserved;
     }
 
     /**
