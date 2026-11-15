@@ -116,3 +116,11 @@ environment, so a PaaS must keep environment variables as the default.
 - **Server transfer.** A transfer does not move cluster applications, so the
   columns are in `ServerTransferCoverage` as not exported, like
   `is_file_secret`.
+- **Sentinel.** Sentinel `dd12f4d` adds `uid=`, `gid=`, and `mode=` (four
+  octal digits) to the `--secret` mount option. Podman reads `mode` as an
+  octal value. The name of the Podman secret does not change.
+- **Live test (2026-11-15).** On the cluster Postgres (`postgres:18-alpine`),
+  owner 70 and mode `0400` gave `70 70 400`. Another user could not read the
+  file, and Postgres started with the password. Mode `0440` alone gave
+  `0 0 440`. Without the fields, the file was `0 0 444` again, and no change
+  was pending.
