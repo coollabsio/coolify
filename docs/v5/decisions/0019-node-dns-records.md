@@ -89,4 +89,10 @@ Deviations:
   A conflict is reported only.
 - Problems of the background sync are kept in the cache for 7 days, not in
   the database.
-- Not tested against Cloudflare. Tested with a fake Cloudflare API.
+- Tested with a fake Cloudflare API, and against Cloudflare on 2026-11-16
+  (zone `jata.app`). The dev Nodes have only private addresses, so the test
+  replaced the address lookup. Results: Coolify created one A record without
+  proxy and with the owner comment, added a second record for a second address,
+  deleted it when the address went away, and made no writes when nothing
+  changed. A record of the user was reported and kept. When every domain was
+  removed, Coolify deleted only its own records.
