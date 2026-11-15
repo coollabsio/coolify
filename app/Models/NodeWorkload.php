@@ -44,8 +44,8 @@ class NodeWorkload extends BaseModel
         'permanent_redirect' => true,
     ];
 
-    /** @var list<int> Clusters that routed this workload before it was deleted. */
-    private array $ingressClusterIdsBeforeDelete = [];
+    /** @var list<int> Clusters that routed, named, or published this workload before it was deleted. */
+    private array $networkClusterIdsBeforeDelete = [];
 
     protected function casts(): array
     {
@@ -86,12 +86,15 @@ class NodeWorkload extends BaseModel
             }
         });
         static::deleting(function (NodeWorkload $workload): void {
-            $workload->ingressClusterIdsBeforeDelete = $workload->hasIngressRoutes() || filled($workload->internal_dns_name) ? $workload->clusterIds() : [];
+            $workload->networkClusterIdsBeforeDelete = array_values(array_unique([
+                ...($workload->hasIngressRoutes() || filled($workload->internal_dns_name) ? $workload->clusterIds() : []),
+                ...$workload->publishedPorts()->pluck('node_cluster_id')->map(fn ($id): int => (int) $id),
+            ]));
         });
         static::deleted(function (NodeWorkload $workload): void {
-            // The routes and internal name of a deleted workload must disappear from every Node.
+            // The routes, internal name, and published ports of a deleted workload must disappear from every Node.
             NodeCluster::query()
-                ->whereKey($workload->ingressClusterIdsBeforeDelete)
+                ->whereKey($workload->networkClusterIdsBeforeDelete)
                 ->get()
                 ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster));
         });
@@ -542,6 +545,20 @@ class NodeWorkload extends BaseModel
     public function containers(): HasMany
     {
         return $this->hasMany(NodeContainer::class);
+    }
+
+    /** The ports that every Node of the cluster publishes for this workload (decision 0016). */
+    public function publishedPorts(): HasMany
+    {
+        return $this->hasMany(NodePublishedPort::class)->orderBy('protocol')->orderBy('host_port');
+    }
+
+    /** The cluster of the Nodes that run this workload, else of its stack. */
+    public function cluster(): ?NodeCluster
+    {
+        $clusterId = $this->clusterIds()[0] ?? $this->stack?->node_cluster_id;
+
+        return $clusterId === null ? null : NodeCluster::query()->find($clusterId);
     }
 
     /**
