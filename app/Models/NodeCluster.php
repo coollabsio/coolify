@@ -249,7 +249,8 @@ class NodeCluster extends BaseModel
 
     /**
      * The host ports that the Nodes of the cluster use, with what uses them (decision 0016). A
-     * published port cannot take them, on TCP or UDP. Sentinel also refuses its own ports.
+     * published port cannot take them, on TCP or UDP. Sentinel refuses the same ports, and it refuses
+     * the full firewall reconcile for one of them.
      *
      * @return array<int, string>
      */
@@ -263,7 +264,12 @@ class NodeCluster extends BaseModel
             ReconcileNodeClusterNetwork::CORROSION_GOSSIP_PORT => 'Corrosion service discovery',
             ReconcileNodeClusterNetwork::CORROSION_API_PORT => 'the Corrosion API',
             NodeRegistry::PORT => 'the cluster registry',
+            8888 => 'the Sentinel API',
         ];
+        // Sentinel moves volumes with rsync on these ports of the WireGuard address.
+        foreach (range(7800, 7899) as $port) {
+            $reserved[$port] = 'volume moves between servers';
+        }
         foreach ($this->nodes()->orderBy('id')->get(['id', 'name', 'port']) as $node) {
             $reserved[(int) $node->port] ??= "SSH on server {$node->name}";
         }
