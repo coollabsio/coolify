@@ -522,17 +522,31 @@ class ReconcileNodeClusterNetwork
         ]);
     }
 
-    /** @return list<array{source_ip: string, destination_ip: string, protocol: string, port: int}> */
+    /**
+     * The rules of the cluster. A rule from a workload also allows the previews of that workload
+     * whose pull request is not from a fork (decision 0025), from the parent link, not from copies.
+     *
+     * @return list<array{source_ip: string, destination_ip: string, protocol: string, port: int}>
+     */
     private function firewallRules(NodeCluster $cluster): array
     {
         return NodeFirewallRule::query()
-            ->with(['sourceWorkload.nodes', 'sourceNode', 'destinationWorkload.nodes'])
+            ->with([
+                'sourceWorkload.nodes',
+                'sourceWorkload.previews' => fn ($query) => $query->withoutGlobalScopes()->where('pull_request_from_fork', false),
+                'sourceWorkload.previews.nodes',
+                'sourceNode',
+                'destinationWorkload.nodes',
+            ])
             ->where('node_cluster_id', $cluster->id)
             ->get()
             ->flatMap(function (NodeFirewallRule $rule) use ($cluster) {
                 $sources = $rule->sourceNode !== null
                     ? collect([$rule->sourceNode->wireguard_ip])->filter()
-                    : self::containerAddresses($rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id));
+                    : self::containerAddresses($rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id))
+                        ->concat($rule->sourceWorkload->previews->flatMap(fn (NodeWorkload $preview) => self::containerAddresses($preview->nodes->where('node_cluster_id', $cluster->id))))
+                        ->unique()
+                        ->values();
                 $destinations = self::containerAddresses($rule->destinationWorkload->nodes->where('node_cluster_id', $cluster->id));
 
                 return $sources->crossJoin($destinations)->map(fn (array $addresses): array => [
