@@ -196,6 +196,15 @@ class MoveNodeWorkloadJob implements ShouldQueue
             $deploymentOperation = $deployments[$operation->workload->id];
             // The target runs the workload now: cleanup keeps its placement.
             $operation->update(['result' => [...($operation->refresh()->result ?? []), 'target_ready' => true]]);
+            // A published port forwards to one container (decision 0016). From now on the Nodes
+            // forward it to the target, so the removal of the source container drops no connection.
+            if ($cluster !== null && $workloads->contains(fn (NodeWorkload $workload): bool => $workload->publishedPorts()->exists())) {
+                try {
+                    ApplyNodeClusterNetworkRevision::run($cluster, $operation->requestedBy);
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            }
 
             if ($routed) {
                 Sleep::for(self::INGRESS_SETTLE_SECONDS)->seconds();

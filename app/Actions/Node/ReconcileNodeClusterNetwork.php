@@ -582,12 +582,15 @@ class ReconcileNodeClusterNetwork
      * Each published port of the cluster, with the container address of its workload on each Node
      * that runs it, by Node id in id order. The address is the one of the slot that runs (decision
      * 0022), else of the other slot. `running` is false when the inventory has no running container
-     * there, for example on the target of a move before its deploy.
+     * there, for example on the target of a move before its deploy, or on the source of a move
+     * whose target is ready.
      *
      * @return list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool}>}>
      */
     private function publishedPortTargets(NodeCluster $cluster): array
     {
+        $leaving = self::leavingPlacements();
+
         return NodePublishedPort::query()
             ->where('node_cluster_id', $cluster->id)
             ->with(['workload.nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)->orderBy('nodes.id')])
@@ -596,22 +599,46 @@ class ReconcileNodeClusterNetwork
             ->get()
             ->map(fn (NodePublishedPort $port): array => [
                 'port' => $port,
-                'addresses' => $port->workload->nodes->mapWithKeys(function (Node $node) use ($port): array {
+                'addresses' => $port->workload->nodes->mapWithKeys(function (Node $node) use ($port, $leaving): array {
                     $slot = $port->workload->containerSlotOn($node);
                     $address = $node->pivot->{$slot->addressColumn()} ?: $node->pivot->{$slot->other()->addressColumn()};
                     if (blank($address)) {
                         return [];
                     }
-                    $running = $port->workload->containers()
-                        ->where('node_id', $node->id)
-                        ->where('name', $slot->containerName($port->workload))
-                        ->where('state', 'running')
-                        ->exists();
+                    $running = ! isset($leaving[$node->id][$port->node_workload_id])
+                        && $port->workload->containers()
+                            ->where('node_id', $node->id)
+                            ->where('name', $slot->containerName($port->workload))
+                            ->where('state', 'running')
+                            ->exists();
 
                     return [$node->id => ['ip' => $address, 'running' => $running]];
                 })->all(),
             ])
             ->all();
+    }
+
+    /**
+     * The sources of the moves whose target is ready: their container is removed next, so a
+     * published port forwards to the target (decision 0016).
+     *
+     * @return array<int, array<int, true>> Workload ids by Node id.
+     */
+    private static function leavingPlacements(): array
+    {
+        $leaving = [];
+        NodeOperation::query()
+            ->where('command_type', 'workload.move.v1')
+            ->whereIn('status', NodeOperation::ACTIVE_MOVE_STATUSES)
+            ->get(['id', 'node_id', 'node_workload_id', 'request', 'result'])
+            ->filter(fn (NodeOperation $operation): bool => data_get($operation->result, 'target_ready') === true)
+            ->each(function (NodeOperation $operation) use (&$leaving): void {
+                foreach ([$operation->node_workload_id, ...$operation->groupWorkloadIds()] as $workloadId) {
+                    $leaving[$operation->node_id][$workloadId] = true;
+                }
+            });
+
+        return $leaving;
     }
 
     /**
