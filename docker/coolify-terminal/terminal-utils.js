@@ -51,36 +51,62 @@ export const TERMINAL_REJECTED_SOCKET_TERMINATE_MS = 2000;
 export const MAX_XSRF_TOKEN_CANDIDATES = 5;
 
 /**
+ * The XSRF cookie names of Coolify, with the scheme of the request that set them.
+ * When SESSION_SECURE_COOKIE is not set, Coolify gives plain HTTP its own session
+ * and XSRF cookie names (the TrustProxies middleware), because a browser does
+ * not let plain HTTP overwrite the Secure cookies of an HTTPS visit to the same host.
+ */
+const XSRF_COOKIE_SCHEMES = Object.freeze({
+    'XSRF-TOKEN': 'https',
+    'XSRF-TOKEN-HTTP': 'http',
+});
+
+/**
  * Builds the header sets that can authenticate terminal requests to Coolify, one
- * for each XSRF-TOKEN cookie. The whole browser Cookie header is forwarded, so
+ * for each XSRF cookie. The whole browser Cookie header is forwarded, so
  * Laravel finds its session cookie by its own name (SESSION_COOKIE or the slug
- * of APP_NAME).
+ * of APP_NAME). X-Forwarded-Proto tells Coolify the scheme of the XSRF cookie,
+ * so it reads the session cookie that was set together with that XSRF cookie.
  *
  * The browser sends more than one XSRF-TOKEN cookie when a Laravel app on a
  * parent domain also sets one (for example SESSION_DOMAIN=.example.com). Their
  * order in the header does not show which one is Coolify's, so the caller must
  * try each one.
  *
+ * The cookies of the page scheme (from the Origin header) come first, so a stale
+ * cookie of the other scheme cannot pick another session of the same browser.
+ *
  * @param {string | undefined} cookieHeader
- * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} empty when a required value is missing
+ * @param {string | undefined} origin the Origin header of the WebSocket upgrade
+ * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string, 'X-Forwarded-Proto': string }>} empty when a required value is missing
  */
-export function getTerminalAuthHeaders(cookieHeader) {
+export function getTerminalAuthHeaders(cookieHeader, origin) {
     if (!cookieHeader) {
         return [];
     }
 
     // parseCookie() keeps only the first cookie of a name, so parse each pair alone.
-    const xsrfTokens = cookieHeader
-        .split(';')
-        .map((pair) => parseCookie(pair)['XSRF-TOKEN'])
-        .filter(Boolean);
+    const candidates = new Map();
 
-    return [...new Set(xsrfTokens)]
-        .slice(0, MAX_XSRF_TOKEN_CANDIDATES)
-        .map((xsrfToken) => ({
-            'Cookie': cookieHeader,
-            'X-XSRF-TOKEN': xsrfToken,
-        }));
+    for (const pair of cookieHeader.split(';')) {
+        for (const [name, value] of Object.entries(parseCookie(pair))) {
+            const scheme = Object.hasOwn(XSRF_COOKIE_SCHEMES, name) ? XSRF_COOKIE_SCHEMES[name] : null;
+
+            if (scheme && value && !candidates.has(`${scheme} ${value}`)) {
+                candidates.set(`${scheme} ${value}`, {
+                    'Cookie': cookieHeader,
+                    'X-XSRF-TOKEN': value,
+                    'X-Forwarded-Proto': scheme,
+                });
+            }
+        }
+    }
+
+    const pageScheme = origin?.startsWith('https:') ? 'https' : 'http';
+
+    return [...candidates.values()]
+        .sort((a, b) => Number(b['X-Forwarded-Proto'] === pageScheme) - Number(a['X-Forwarded-Proto'] === pageScheme))
+        .slice(0, MAX_XSRF_TOKEN_CANDIDATES);
 }
 
 /**
