@@ -134,6 +134,9 @@ class Show extends Component
                     'service' => $workload->stack_service,
                     'name' => $workload->name,
                     'image' => $workload->revisions->first()?->image,
+                    'build' => $workload->buildsFromGit()
+                        ? '/'.ltrim(trim((string) $workload->base_directory, '/').'/'.($workload->dockerfile_location ?: 'Dockerfile'), '/').(filled($workload->build_target) ? " (target {$workload->build_target})" : '')
+                        : null,
                     'server' => $workload->nodes->first()?->name,
                     'status' => $container === null ? 'not deployed' : trim($container->state.' '.($container->health_status && $container->health_status !== 'unknown' ? "({$container->health_status})" : '')),
                     'statusType' => $statusType,

@@ -12,6 +12,16 @@
                 <span class="font-mono">{{ $services[0]['service'] ?? 'db' }}</span>, in
                 <span class="font-mono">{{ $stack->searchDomain() }}</span>.
             </p>
+            @if ($stack->hasGitSource())
+                <p class="mt-1 truncate text-xs text-neutral-500 dark:text-fg-dim">
+                    From <span class="font-mono">{{ $stack->git_repository }}</span>,
+                    branch <span class="font-mono">{{ $stack->git_branch }}</span>,
+                    <span class="font-mono">/{{ ltrim(trim((string) $stack->base_directory, '/').($stack->compose_location ?? ''), '/') }}</span>.
+                    @if (filled($stack->commit_sha))
+                        Commit <span class="font-mono" title="{{ $stack->commit_sha }}">{{ substr($stack->commit_sha, 0, 7) }}</span>.
+                    @endif
+                </p>
+            @endif
         </div>
         @can('update', $stack)
             <x-forms.button wire:click="deploy" :disabled="in_array($stack->deploy_status, ['queued', 'deploying'], true)">
@@ -26,7 +36,7 @@
         </x-callout>
     @elseif (in_array($stack->deploy_status, ['queued', 'deploying'], true))
         <x-callout type="info" title="Deploying" class="mb-4">
-            Each service deploys after the services it depends on.
+            {{ $stack->hasGitSource() ? 'Each service with build: builds first. Then each service deploys after the services it depends on.' : 'Each service deploys after the services it depends on.' }}
         </x-callout>
     @endif
 
@@ -38,7 +48,13 @@
                     class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                     <div class="min-w-0">
                         <h4 class="truncate text-sm font-semibold text-black dark:text-fg">{{ $service['service'] }}</h4>
-                        <p class="mt-1 truncate font-mono text-xs text-neutral-500 dark:text-fg-dim">{{ $service['image'] }}</p>
+                        @if ($service['build'] !== null)
+                            <p class="mt-1 truncate text-xs text-neutral-500 dark:text-fg-dim">
+                                Builds <span class="font-mono">{{ $service['build'] }}</span>@if ($service['image']), deployed <span class="font-mono">{{ $service['image'] }}</span>@endif
+                            </p>
+                        @else
+                            <p class="mt-1 truncate font-mono text-xs text-neutral-500 dark:text-fg-dim">{{ $service['image'] }}</p>
+                        @endif
                         @if ($service['depends_on'] !== [])
                             <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
                                 Waits for

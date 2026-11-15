@@ -17,6 +17,12 @@ enum NodeWorkloadSourceType: string
     case STATIC = 'static';
     case DOCKERFILE_INLINE = 'dockerfile_inline';
 
+    /**
+     * The "Docker Compose" choice of the Git create pages. It creates a stack (decision 0023), not
+     * one application, so it is not a source type.
+     */
+    public const COMPOSE_BUILD_PACK = 'dockercompose';
+
     /** Whether Coolify builds the image from a Git repository. */
     public function builds(): bool
     {
@@ -35,10 +41,16 @@ enum NodeWorkloadSourceType: string
         return [self::RAILPACK, self::STATIC, self::DOCKERFILE];
     }
 
-    /** @return list<array{value: string, label: string}> */
-    public static function gitBuildPackOptions(): array
+    /**
+     * @param  bool  $withCompose  Adds "Docker Compose", which only a create page offers.
+     * @return list<array{value: string, label: string}>
+     */
+    public static function gitBuildPackOptions(bool $withCompose = false): array
     {
-        return array_map(fn (self $type): array => ['value' => $type->value, 'label' => $type->label()], self::gitBuildPacks());
+        return [
+            ...array_map(fn (self $type): array => ['value' => $type->value, 'label' => $type->label()], self::gitBuildPacks()),
+            ...($withCompose ? [['value' => self::COMPOSE_BUILD_PACK, 'label' => 'Docker Compose']] : []),
+        ];
     }
 
     public function label(): string

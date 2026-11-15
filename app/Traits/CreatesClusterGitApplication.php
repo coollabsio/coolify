@@ -2,15 +2,18 @@
 
 namespace App\Traits;
 
+use App\Actions\Node\Build\CreateClusterGitStack;
 use App\Actions\Node\Build\CreateClusterGitWorkload;
 use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\ResolveGitCommit;
 use App\Enums\NodeWorkloadSourceType;
 use App\Livewire\Project\New\DockerImage;
 use App\Models\GithubApp;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Services\NodeStack\NodeStackGitSource;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -31,6 +34,8 @@ trait CreatesClusterGitApplication
     public ?string $base_directory = '/';
 
     public string $dockerfileLocation = 'Dockerfile';
+
+    public string $composeLocation = NodeStackGitSource::DEFAULT_COMPOSE_LOCATION;
 
     public array $parameters = [];
 
@@ -62,9 +67,10 @@ trait CreatesClusterGitApplication
     {
         return [
             'deploymentTarget' => ['required', 'string', 'regex:/^(cluster|node):.+$/'],
-            'build_pack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
+            'build_pack' => ['required', Rule::in(array_column(NodeWorkloadSourceType::gitBuildPackOptions(withCompose: true), 'value'))],
             'base_directory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'composeLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
         ];
     }
 
@@ -80,6 +86,23 @@ trait CreatesClusterGitApplication
         $this->authorizeClusterCredentials();
         [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
         [$cluster, $targetNode] = DockerImage::resolveClusterTarget($project, $targetType, $targetUuid);
+
+        if ($this->build_pack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
+            $this->authorize('create', NodeStack::class);
+            try {
+                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $repository, $branch, auth()->user(), $targetNode, null, $this->base_directory, $this->composeLocation, $githubApp, $privateKey);
+            } catch (Throwable $exception) {
+                $this->addError($errorField, $exception->getMessage());
+
+                return null;
+            }
+
+            return redirectRoute($this, 'project.cluster-stack.show', [
+                'environment_uuid' => $environment->uuid,
+                'project_uuid' => $project->uuid,
+                'stack_uuid' => $stack->uuid,
+            ]);
+        }
 
         try {
             $unsaved = new NodeWorkload(['team_id' => $project->team_id, 'github_app_id' => $githubApp?->id, 'private_key_id' => $privateKey?->id]);

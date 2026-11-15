@@ -39,11 +39,15 @@
             <div class="application-settings-section-body space-y-5">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <x-forms.input id="branch" label="Branch" placeholder="main" required />
-                    <x-forms.listbox id="buildPack" label="Build pack" required :options="\App\Enums\NodeWorkloadSourceType::gitBuildPackOptions()" />
+                    <x-forms.listbox id="buildPack" label="Build pack" required :options="\App\Enums\NodeWorkloadSourceType::gitBuildPackOptions(withCompose: true)" />
                 </div>
                 <div x-cloak x-show="$wire.buildPack === 'dockerfile'">
                     <x-forms.input id="dockerfileLocation" label="Dockerfile location" placeholder="Dockerfile"
                         helper="Relative to the base directory." />
+                </div>
+                <div x-cloak x-show="$wire.buildPack === '{{ \App\Enums\NodeWorkloadSourceType::COMPOSE_BUILD_PACK }}'">
+                    <x-forms.input id="composeLocation" label="Compose file location" placeholder="/docker-compose.yaml"
+                        helper="Relative to the base directory. Each service with build: builds its image on a cluster server. Each Compose service becomes an application of one stack." />
                 </div>
                 <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
                     helper="Repository directory used as the build root. Leave empty for the root. Static serves this directory on port 80, so it needs an index.html." />
