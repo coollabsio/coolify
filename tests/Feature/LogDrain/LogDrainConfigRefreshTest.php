@@ -180,7 +180,7 @@ it('changes the configuration version when the generated files change', function
     $hashes = collect([
         'newrelic' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1'],
         'axiom' => [],
-        'custom' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => "[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name p\n"],
+        'custom' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name p\n"],
     ])->map(function (array $settings) {
         $this->server->settings->update($settings);
         $scripts = startLogDrainScripts($this->server);
@@ -191,5 +191,5 @@ it('changes the configuration version when the generated files change', function
     });
 
     expect([StartLogDrain::CONFIG_VERSION, hash('sha256', $hashes->implode("\0"))])
-        ->toBe(['3', 'aa5ed6be6a5ad6d102050690a2598ce677389dfb14c96c4f6a80e0cd755009a7']);
+        ->toBe(['4', '9d8dab1d13bd0a54ccaf64e3407500f1ba2036e7e85e366034b5ae934389272e']);
 });

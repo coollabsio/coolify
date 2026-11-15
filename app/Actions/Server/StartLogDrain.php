@@ -19,7 +19,7 @@ class StartLogDrain
      * Bump when the generated files change (image, config, compose, or README), so that the
      * server checks start running log drains again with the new files.
      */
-    public const CONFIG_VERSION = '3';
+    public const CONFIG_VERSION = '4';
 
     public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
 
@@ -94,7 +94,7 @@ class StartLogDrain
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
+    Exclude log ^127\.0\.0\.1\s
 {$coolifyFieldsFilter}[OUTPUT]
     Name nrlogs
     Match *
@@ -120,7 +120,7 @@ class StartLogDrain
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
+    Exclude log ^127\.0\.0\.1\s
 {$coolifyFieldsFilter}[OUTPUT]
     Name            http
     Match           *
