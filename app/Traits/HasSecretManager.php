@@ -145,11 +145,12 @@ trait HasSecretManager
     /**
      * Decides the escaping of a variable for all paths (service .env, database environment,
      * Redis password). A variable saved before exact escaping keeps the old escaping, so its
-     * container gets the same value as before the upgrade. Saving the variable again switches
-     * it to exact escaping. Compose references that got the stored value before the upgrade
-     * (such as `FOO=${FOO:-}`) use exact escaping, so they keep getting that value. So do old
-     * .env lines that Docker Compose cannot read, because they stop the deployment. So do
-     * single-line values with edge spaces, because the old line loses them.
+     * container gets the same value as before the upgrade, also after it is saved again. Only a
+     * variable that is deleted and added again gets exact escaping. Compose references that got
+     * the stored value before the upgrade (such as `FOO=${FOO:-}`) use exact escaping, so they
+     * keep getting that value. So do old .env lines that Docker Compose cannot read, because
+     * they stop the deployment. So do single-line values with edge spaces, because the old line
+     * loses them.
      */
     public function useExactEscaping(EnvironmentVariable $environmentVariable): bool
     {
@@ -184,7 +185,10 @@ trait HasSecretManager
     /**
      * The old escaping writes JSON objects and arrays without quotes, so a JSON value with a line
      * break breaks the whole .env file (#8279). It puts other literal and multiline values in single
-     * quotes without escaping, and Docker Compose ends the value at the next quote.
+     * quotes without escaping, and Docker Compose ends the value at the next quote. Other values
+     * get no quotes, so Docker Compose ends them at the first line break, for example a plain
+     * variable that references a multiline shared variable (#4595). Trailing line breaks are not
+     * counted: Docker Compose drops them from the old line, and that line works.
      */
     private function legacyEnvFileLineIsUnreadable(EnvironmentVariable $environmentVariable): bool
     {
@@ -198,7 +202,11 @@ trait HasSecretManager
             return str_contains($value, "\n");
         }
 
-        return ($environmentVariable->is_literal || $environmentVariable->is_multiline) && str_contains($value, "'");
+        if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
+            return str_contains($value, "'");
+        }
+
+        return str_contains(rtrim($value), "\n");
     }
 
     /**
