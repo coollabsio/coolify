@@ -119,9 +119,9 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository; see NodeStackCompose::build().
-     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
+     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
      */
-    public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null): array
+    public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null, array $sharedKeys = []): array
     {
         $services = [];
         $fileBytes = 0;
@@ -135,7 +135,7 @@ class NodeStackComposeMapper
                 }
             }
         }
-        $storage = self::stackStorage($yaml);
+        $storage = self::stackStorage($yaml, $sharedKeys);
         foreach ($yaml['services'] as $name => $service) {
             $name = (string) $name;
             $service = is_array($service) ? $service : [];
@@ -445,9 +445,12 @@ class NodeStackComposeMapper
      * path, read-only with `:ro`, as Compose does.
      *
      * @param  array<string, mixed>  $yaml
-     * @return array<string, array{volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, notes: list<string>}>
+     * @return array<string, array{volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, notes: list<string>}>
      */
-    private static function stackStorage(array $yaml): array
+    /**
+     * @param  array<string, true>  $sharedKeys  Keys that stay a stack volume also when one service mounts them: the data is already in a stack volume.
+     */
+    private static function stackStorage(array $yaml, array $sharedKeys = []): array
     {
         $own = [];
         foreach ($yaml['services'] as $name => $service) {
@@ -503,12 +506,12 @@ class NodeStackComposeMapper
             $stackVolumes = [];
             $notes = $storage['notes'];
             foreach ($storage['mounts'] as $mount) {
-                if (count($users[$mount['key']]) > 1) {
+                if (count($users[$mount['key']]) > 1 || isset($sharedKeys[$mount['key']])) {
                     $stackVolumes[] = $mount;
 
                     continue;
                 }
-                $volumes[] = ['name' => $mount['name'], 'path' => $mount['path']];
+                $volumes[] = ['name' => $mount['name'], 'path' => $mount['path'], 'key' => $mount['key']];
                 if ($mount['read_only']) {
                     $notes[] = "The volume at {$mount['path']} is mounted read-write: only a volume that services share can be read-only on Nodes.";
                 }

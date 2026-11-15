@@ -120,6 +120,11 @@ add to it:
   workload UUID. `stop_during_backup` is refused for a stack volume, because Sentinel stops
   one container for a backup: the backup is crash-consistent. The backup schedule and its
   restore are on the **Backups** page of each service that mounts the volume.
+- **One mount left.** When a changed Compose file of a Git stack leaves one
+  service that mounts a stack volume, the volume stays a stack volume with one
+  mount, because its data is in the stack volume already. A volume of one
+  service does not become a stack volume: the sync refuses it, because
+  Coolify cannot move the data.
 - **Delete.** **Remove** on a service removes its mount only; the volume stays for the
   other services. A stack volume that no service mounts can be deleted on the stack page.
 

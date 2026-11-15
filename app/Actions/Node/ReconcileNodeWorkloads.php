@@ -68,7 +68,10 @@ class ReconcileNodeWorkloads
                 continue;
             }
 
-            $revision = $workload->revisions->first();
+            // A service of a stack gets new revisions from staged builds and Compose syncs, which only
+            // the stack deploy may roll out, after every build and in `depends_on` order. The
+            // reconciler keeps its deployed revision running and does not roll it forward.
+            $revision = $workload->node_stack_id === null ? $workload->revisions->first() : $workload->deployedRevision();
             if ($revision === null) {
                 continue;
             }

@@ -285,6 +285,10 @@ new. These points differ from the decision above or add to it:
   the stored file does not have, also when the file did not change. A
   delete that failed is tried again at the next deploy, and the team gets a
   notification for each failure.
+- **Reconciler.** The reconciler keeps the deployed revision of a stack
+  service running and does not roll it forward. A staged build or a sync
+  creates a newer revision, and only the stack deploy may deploy it, after
+  every build and in `depends_on` order.
 - **Timeout.** The sync can add services after the deploy is queued, so a
   deploy of a Git stack has the longest job timeout (6 hours). Each service
   still has its own wait.

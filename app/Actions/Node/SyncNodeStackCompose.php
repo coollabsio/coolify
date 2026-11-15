@@ -60,8 +60,13 @@ class SyncNodeStackCompose
             $stack = NodeStack::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($stack->id);
             $stored = $stack->variables ?? [];
             $variables = CreateClusterStack::stackVariables($cluster, $stack, $yaml, $compose, $stored);
-            $previous = NodeStackComposeMapper::services($stack->compose_parsed ?? ['services' => []], $stored, $composeDirectory);
-            $next = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory);
+            $previousYaml = $stack->compose_parsed ?? ['services' => []];
+            $sharedKeys = $this->sharedKeys($stack, [
+                NodeStackComposeMapper::services($previousYaml, $stored, $composeDirectory),
+                NodeStackComposeMapper::services($yaml, $variables, $composeDirectory),
+            ]);
+            $previous = NodeStackComposeMapper::services($previousYaml, $stored, $composeDirectory, $sharedKeys);
+            $next = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory, $sharedKeys);
             $workloads = NodeWorkload::query()->withoutGlobalScopes()
                 ->where('node_stack_id', $stack->id)
                 ->whereNotNull('stack_service')
@@ -176,6 +181,34 @@ class SyncNodeStackCompose
         }
 
         return $admin;
+    }
+
+    /**
+     * The keys of the volumes whose data is in a stack volume already (decision 0024). Such a volume
+     * stays a stack volume when only one service still mounts it, so its data is not lost.
+     *
+     * @param  list<list<array<string, mixed>>>  $mappings  The services of the previous and the next file.
+     * @return array<string, true>
+     */
+    private function sharedKeys(NodeStack $stack, array $mappings): array
+    {
+        $mounted = NodeVolumeMount::query()
+            ->whereHas('volume', fn ($volume) => $volume->where('node_stack_id', $stack->id))
+            ->with('workload:id,stack_service')
+            ->get()
+            ->mapWithKeys(fn (NodeVolumeMount $mount): array => [$mount->workload?->stack_service.'|'.$mount->mount_path => true]);
+        $keys = [];
+        foreach ($mappings as $services) {
+            foreach ($services as $service) {
+                foreach ([...$service['volumes'], ...$service['stack_volumes']] as $volume) {
+                    if ($mounted->has($service['service'].'|'.$volume['path'])) {
+                        $keys[$volume['key']] = true;
+                    }
+                }
+            }
+        }
+
+        return $keys;
     }
 
     /**
