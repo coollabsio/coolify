@@ -3873,7 +3873,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $private_key = data_get($this->application, 'private_key.private_key');
-        $this->withGitHostKeyHint(function () use ($private_key, $lsRemoteRef): void {
+        $this->withGitHints(function () use ($private_key, $lsRemoteRef): void {
             if ($private_key) {
                 $private_key = base64_encode($private_key);
                 $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$this->deployment_uuid}";
@@ -4006,7 +4006,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
         }
-        $this->withGitHostKeyHint(fn () => $this->import_repository());
+        $this->withGitHints(fn () => $this->import_repository());
         $this->save_git_ssh_known_hosts();
         $this->create_workdir();
         $this->execute_remote_command(
@@ -4026,20 +4026,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Logs the host key hint when a git command of Coolify fails because of the SSH host key. The hint is logged
-     * here and not in failed(), because a git command in the build (for example a Dockerfile RUN step) can fail the same way.
+     * Logs a hint when a git command of Coolify fails because of the SSH host key, or because the helper container
+     * cannot connect to the Git host. The hint is logged here and not in failed(), because a git command in the
+     * build (for example a Dockerfile RUN step) can fail the same way.
      */
-    private function withGitHostKeyHint(callable $runGitCommands): void
+    private function withGitHints(callable $runGitCommands): void
     {
         try {
             $runGitCommands();
         } catch (Throwable $e) {
             if (str_contains($e->getMessage(), 'Host key verification failed')) {
                 $this->application_deployment_queue->addLogEntry(self::GIT_HOST_KEY_CHANGED_HINT, 'stderr');
+            } elseif (preg_match('/ssh: connect to host \S+ port \d+: |ssh: Could not resolve hostname |Could not resolve host: |Failed to connect to \S+ port \d+/', $e->getMessage()) === 1) {
+                $this->application_deployment_queue->addLogEntry($this->gitHostUnreachableHint(), 'stderr');
             }
 
             throw $e;
         }
+    }
+
+    /**
+     * Coolify reads the Docker Compose file on the server, but the deployment runs git in the helper container,
+     * which can have a different network path to the Git host.
+     */
+    private function gitHostUnreachableHint(): string
+    {
+        $where = $this->use_build_server
+            ? "on the build server {$this->server->name}"
+            : "in the Docker network {$this->destination->network} on the server {$this->server->name}";
+
+        return "The deployment helper container {$where} cannot connect to the Git host. The helper container can reach different hosts than the server itself, so a Docker Compose file can load (Coolify reads it on the server) while the clone fails. Check that the firewall of the server and of the Git host accept connections from Docker networks to the Git host and port, and that the Git host name resolves to an address that the container can reach (Docker containers do not use the /etc/hosts file of the server).";
     }
 
     /**
