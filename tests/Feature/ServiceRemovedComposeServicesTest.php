@@ -106,3 +106,38 @@ test('parts removed from the compose file do not change the service status', fun
 
     expect($service->fresh()->status)->toBe('running:healthy');
 });
+
+const COMPOSE_WITH_MARIADB = <<<'YAML'
+services:
+  mariadb:
+    image: lscr.io/linuxserver/mariadb:latest
+YAML;
+
+test('a database image saved as an application by an older version gets no second database part', function () {
+    $service = makeServiceWithCompose(COMPOSE_WITH_MARIADB);
+    $application = $service->applications()->create(['name' => 'mariadb', 'image' => 'lscr.io/linuxserver/mariadb:latest']);
+
+    $service->parse();
+    $service->refresh();
+
+    expect($service->databases()->count())->toBe(0)
+        ->and($application->fresh()->is_removed_from_compose)->toBeFalse()
+        ->and($service->docker_compose)->toContain("coolify.service.subUuid={$application->uuid}");
+});
+
+test('a duplicate database and application part uses the database and marks the application', function () {
+    $service = makeServiceWithCompose(COMPOSE_WITH_MARIADB);
+    $application = $service->applications()->create(['name' => 'mariadb', 'image' => 'lscr.io/linuxserver/mariadb:latest']);
+    $database = $service->databases()->create(['name' => 'mariadb', 'image' => 'lscr.io/linuxserver/mariadb:latest']);
+    $application->update(['status' => 'running:healthy']);
+    $database->update(['status' => 'exited']);
+
+    $service->parse();
+    $service->refresh();
+
+    expect($service->docker_compose)->toContain("coolify.service.subUuid={$database->uuid}")
+        ->and($service->docker_compose)->not->toContain($application->uuid)
+        ->and($database->fresh()->is_removed_from_compose)->toBeFalse()
+        ->and($application->fresh()->is_removed_from_compose)->toBeTrue()
+        ->and($service->applications()->count() + $service->databases()->count())->toBe(2);
+});

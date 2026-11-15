@@ -2444,23 +2444,46 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 }
 
 /**
- * Marks the applications and databases of a service whose names are no longer in its compose file.
+ * The service application or database that a Compose service uses, created when it does not exist.
+ *
+ * A part that the user converted wins. Then the part type that the image detection gives, and for a
+ * database image an application that an older version saved.
+ */
+function resolveServicePart(Service $resource, string $serviceName, bool $isDatabaseImage): ServiceApplication|ServiceDatabase
+{
+    $application = fn () => $resource->applications()->where('name', $serviceName);
+    $database = fn () => $resource->databases()->where('name', $serviceName);
+
+    $migrated = $application()->where('is_migrated', true)->first() ?? $database()->where('is_migrated', true)->first();
+    if ($migrated) {
+        return $migrated;
+    }
+    if ($isDatabaseImage) {
+        return $database()->first() ?? $application()->first() ?? $resource->databases()->create(['name' => $serviceName]);
+    }
+
+    return $application()->first() ?? $resource->applications()->create(['name' => $serviceName]);
+}
+
+/**
+ * Marks the applications and databases of a service that its compose file no longer uses: parts whose names are
+ * not in the file, and a duplicate part that another part with the same name replaces.
  * They keep their settings, so a part that comes back under the same name is used again.
  * The service status ignores marked parts, and the user can delete them.
  *
- * @param  array<string|int, mixed>|Collection<string|int, mixed>  $services
+ * @param  Collection<int, ServiceApplication|ServiceDatabase>  $usedParts
  */
-function markServicePartsRemovedFromCompose(Service $resource, array|Collection $services): void
+function markServicePartsRemovedFromCompose(Service $resource, Collection $usedParts): void
 {
-    $serviceNames = collect($services)->keys()->map(fn ($name): string => (string) $name)->all();
-    if ($serviceNames === []) {
+    if ($usedParts->isEmpty()) {
         return;
     }
 
-    foreach ([$resource->applications(), $resource->databases()] as $parts) {
-        (clone $parts)->whereIn('name', $serviceNames)->where('is_removed_from_compose', true)
+    foreach ([[$resource->applications(), ServiceApplication::class], [$resource->databases(), ServiceDatabase::class]] as [$parts, $class]) {
+        $usedIds = $usedParts->filter(fn ($part) => $part instanceof $class)->pluck('id')->all();
+        (clone $parts)->whereIn('id', $usedIds)->where('is_removed_from_compose', true)
             ->update(['is_removed_from_compose' => false]);
-        (clone $parts)->whereNotIn('name', $serviceNames)->where('is_removed_from_compose', false)
+        (clone $parts)->whereNotIn('id', $usedIds)->where('is_removed_from_compose', false)
             ->update(['is_removed_from_compose' => true]);
     }
 }
@@ -2532,6 +2555,7 @@ function serviceParser(Service $resource): Collection
     $serviceNameEnvironments = generateDockerComposeServiceName($services);
 
     $allMagicEnvironments = collect([]);
+    $usedServiceParts = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
         // Validate service name for command injection
@@ -2547,53 +2571,15 @@ function serviceParser(Service $resource): Collection
         validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
-
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-            $savedService = $migratedApp ?: $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-            if ($isDatabase) {
-                $databaseFound = ServiceDatabase::where('name', $serviceName)->where('service_id', $resource->id)->first();
-                if ($databaseFound) {
-                    $savedService = $databaseFound;
-                } else {
-                    $savedService = ServiceDatabase::create([
-                        'name' => $serviceName,
-                        'service_id' => $resource->id,
-                    ]);
-                }
-            } else {
-                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-                if ($applicationFound) {
-                    $savedService = $applicationFound;
-                } else {
-                    $savedService = ServiceApplication::create([
-                        'name' => $serviceName,
-                        'service_id' => $resource->id,
-                    ]);
-                }
-            }
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
         // Update image if it changed
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
         }
+        $usedServiceParts->push($savedService);
     }
-    markServicePartsRemovedFromCompose($resource, $services);
+    markServicePartsRemovedFromCompose($resource, $usedServiceParts);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);
@@ -2602,49 +2588,14 @@ function serviceParser(Service $resource): Collection
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
 
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
+        // A part that the user converted keeps its type, ignoring image detection.
+        $isDatabase = $savedService->is_migrated ? $savedService instanceof ServiceDatabase : isDatabaseImage($image, $service);
 
         $containerName = "$serviceName-{$resource->uuid}";
 
         $predefinedPort = $resource->getRequiredPort();
 
-        if ($migratedApp || $migratedDb) {
-            // Use the already determined migrated service
-            $savedService = $migratedApp ?: $migratedDb;
-        } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
-        } else {
-            $savedService = ServiceApplication::firstOrCreate([
-                'name' => $serviceName,
-                'service_id' => $resource->id,
-            ], [
-                'is_gzip_enabled' => true,
-            ]);
-        }
         // Check if image changed
         if ($savedService->image !== $image) {
             $savedService->image = $image;
@@ -2973,24 +2924,9 @@ function serviceParser(Service $resource): Collection
         $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-            $savedService = $migratedApp ?: $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
+        // A part that the user converted keeps its type, ignoring image detection.
+        $isDatabase = $savedService->is_migrated ? $savedService instanceof ServiceDatabase : isDatabaseImage($image, $service);
 
         $volumesParsed = collect([]);
 
@@ -2998,25 +2934,6 @@ function serviceParser(Service $resource): Collection
 
         $predefinedPort = $resource->getRequiredPort();
 
-        if ($migratedApp || $migratedDb) {
-            // Use the already determined migrated service
-            $savedService = $migratedApp ?: $migratedDb;
-        } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
-        } else {
-            $savedService = ServiceApplication::firstOrCreate([
-                'name' => $serviceName,
-                'service_id' => $resource->id,
-            ]);
-        }
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
