@@ -173,12 +173,13 @@ class Project extends BaseModel
             $this->mongodbs()->count() == 0 &&
             $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0 &&
-            $this->nodeWorkloads()->count() == 0;
+            $this->hasManyThrough(NodeWorkload::class, Environment::class)->count() == 0;
     }
 
+    /** The cluster applications of the project, without previews (decision 0025). */
     public function nodeWorkloads()
     {
-        return $this->hasManyThrough(NodeWorkload::class, Environment::class);
+        return $this->hasManyThrough(NodeWorkload::class, Environment::class)->whereNull('node_workloads.preview_of_id');
     }
 
     public function databases(array $with = []): Collection

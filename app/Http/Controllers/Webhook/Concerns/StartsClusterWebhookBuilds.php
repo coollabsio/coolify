@@ -89,6 +89,8 @@ trait StartsClusterWebhookBuilds
         $query = NodeWorkload::query()
             ->withoutGlobalScope(VisibleThroughAccessGrants::class)
             ->whereNull('database_type')
+            // A push never deploys a preview (decision 0025); pull request events do.
+            ->whereNull('preview_of_id')
             ->where('git_branch', $branch);
         if ($githubAppId !== null) {
             $query->where('github_app_id', $githubAppId);

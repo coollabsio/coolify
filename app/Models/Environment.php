@@ -82,7 +82,7 @@ class Environment extends BaseModel
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
-            $this->nodeWorkloads()->count() == 0 &&
+            $this->hasMany(NodeWorkload::class)->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
@@ -105,9 +105,10 @@ class Environment extends BaseModel
         return $this->hasMany(Application::class);
     }
 
+    /** The cluster applications of the environment, without previews (decision 0025), which show on their parent. */
     public function nodeWorkloads(): HasMany
     {
-        return $this->hasMany(NodeWorkload::class);
+        return $this->hasMany(NodeWorkload::class)->whereNull('preview_of_id');
     }
 
     public function postgresqls()

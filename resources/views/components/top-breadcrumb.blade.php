@@ -23,7 +23,7 @@
         : null;
     $workloadUuid = request()->route('workload_uuid');
     $currentWorkload = $currentEnvironment && $workloadUuid
-        ? $currentEnvironment->nodeWorkloads()->where('uuid', $workloadUuid)->first()
+        ? \App\Models\NodeWorkload::query()->where('environment_id', $currentEnvironment->id)->where('uuid', $workloadUuid)->first()
         : null;
     $currentResource = $currentApplication ?? $currentDatabase ?? $currentService ?? $currentWorkload;
     $resourceItems = $currentEnvironment

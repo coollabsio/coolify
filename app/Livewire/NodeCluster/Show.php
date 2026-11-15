@@ -625,8 +625,10 @@ class Show extends Component
 
     private function meshWorkloads(): Builder
     {
+        // A preview gets the outbound rules of its parent (decision 0025), so it is not a rule endpoint or a listed resource.
         return NodeWorkload::query()
             ->where('team_id', $this->cluster->team_id)
+            ->whereNull('preview_of_id')
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $this->cluster->id));
     }
 

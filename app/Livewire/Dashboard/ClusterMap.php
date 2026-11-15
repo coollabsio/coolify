@@ -120,6 +120,7 @@ class ClusterMap extends Component
 
         return NodeWorkload::query()
             ->where('team_id', $teamId)
+            ->whereNull('preview_of_id')
             ->whereHas('nodes', fn ($query) => $query->whereIn('nodes.id', $nodeIds))
             ->with([
                 'environment.project',
