@@ -2670,7 +2670,7 @@ class Application extends BaseModel
         }
 
         return collect(is_array($networks) ? $networks : [])
-            ->contains(fn ($network) => filled(data_get($network, 'name')) || filled(data_get($network, 'external')));
+            ->contains(fn ($network) => filled(data_get($network, 'name')) || (bool) data_get($network, 'external'));
     }
 
     /**

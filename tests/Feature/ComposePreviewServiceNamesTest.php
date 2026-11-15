@@ -94,8 +94,8 @@ it('renames the services of a preview that joins a compose network with a fixed 
     'external' => ["  shared:\n    external: true\n"],
 ]);
 
-it('keeps the service names when the compose networks belong to the preview project', function () {
-    $this->application->update(['docker_compose_raw' => $this->application->docker_compose_raw."\nnetworks:\n  backend:\n    driver: bridge\n"]);
+it('keeps the service names when the compose networks belong to the preview project', function (string $network) {
+    $this->application->update(['docker_compose_raw' => $this->application->docker_compose_raw."\nnetworks:\n{$network}"]);
     $preview = ApplicationPreview::create([
         'application_id' => $this->application->id,
         'pull_request_id' => 685,
@@ -105,7 +105,10 @@ it('keeps the service names when the compose networks belong to the preview proj
     $services = $this->application->fresh()->parse(pull_request_id: 685, preview_id: $preview->id)->toArray()['services'];
 
     expect(array_keys($services))->toBe(['search', 'web']);
-});
+})->with([
+    'driver' => ["  backend:\n    driver: bridge\n"],
+    'external: false' => ["  backend:\n    external: false\n"],
+]);
 
 it('keeps the services that only another compose file defines', function () {
     $this->application->update(['docker_compose_raw' => <<<'YAML'
