@@ -2673,6 +2673,57 @@ class Application extends BaseModel
             ->contains(fn ($network) => filled(data_get($network, 'name')) || filled(data_get($network, 'external')));
     }
 
+    /**
+     * Warnings for a preview that shares a network with production: an environment value that uses the
+     * name of a Compose service as a hostname (`db`, `db:5432`, `postgres://user@db/app`) can reach the
+     * container of production on that network.
+     *
+     * @return list<string>
+     */
+    public function previewSharedNetworkHostnameWarnings(): array
+    {
+        if ((int) $this->compose_parsing_version < 3 || ! $this->renamesPreviewComposeServices()) {
+            return [];
+        }
+        try {
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services', []);
+        } catch (\Throwable) {
+            return [];
+        }
+        if (! is_array($services) || $services === []) {
+            return [];
+        }
+
+        $values = collect($this->environment_variables_preview()->get())
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [$variable->key => (string) $variable->value]);
+        foreach ($services as $service) {
+            $environment = data_get($service, 'environment', []);
+            foreach (is_array($environment) ? $environment : [] as $key => $value) {
+                if (is_int($key) && is_string($value) && str_contains($value, '=')) {
+                    [$key, $value] = explode('=', $value, 2);
+                }
+                if (is_string($key) && is_scalar($value)) {
+                    $values->put($key, (string) $value);
+                }
+            }
+        }
+
+        $warnings = [];
+        foreach ($values as $key => $value) {
+            foreach (array_keys($services) as $serviceName) {
+                $name = preg_quote((string) $serviceName, '/');
+                // The whole value (`db`, `db:5432`), or the host of a URL (`http://db/`, `postgres://user@db:5432/app`).
+                if (preg_match('/^'.$name.'(:\d+)?$|(\/\/|@)'.$name.'(?=[:\/?]|$)/', $value) !== 1) {
+                    continue;
+                }
+                $variable = 'SERVICE_NAME_'.str((string) $serviceName)->replace('-', '_')->replace('.', '_')->upper();
+                $warnings[] = "This preview shares a network with production. The variable {$key} uses the service name \"{$serviceName}\" as a hostname, which can reach the production container. Use \${{$variable}} as the hostname instead.";
+            }
+        }
+
+        return $warnings;
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {

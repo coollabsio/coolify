@@ -1187,6 +1187,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($this->application->composeVolumeWarnings() as $warning) {
             $this->application_deployment_queue->addLogEntry("Warning: {$warning}", 'stderr');
         }
+        if ($this->pull_request_id !== 0) {
+            foreach ($this->application->previewSharedNetworkHostnameWarnings() as $warning) {
+                $this->application_deployment_queue->addLogEntry("Warning: {$warning}", 'stderr');
+            }
+        }
 
         return $composeFile;
     }

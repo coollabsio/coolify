@@ -134,3 +134,35 @@ it('uses the same service names in production', function () {
     expect(array_keys($services))->toBe(['search', 'web'])
         ->and($services['search']['networks'])->toBe([$this->application->uuid => null]);
 });
+
+it('warns about a service name used as a hostname in a preview on a shared network', function () {
+    $this->application->settings()->update(['connect_to_docker_network' => true]);
+    $this->application->update(['docker_compose_raw' => <<<'YAML'
+services:
+  search:
+    image: getmeili/meilisearch:v1.11.3
+  web:
+    image: nginx:alpine
+    environment:
+      MEILI_URL: http://search:7700
+      SEARCH_HOST: ${SERVICE_NAME_SEARCH}
+      MODE: searching
+  worker:
+    image: nginx:alpine
+    environment:
+      - SEARCH_ADDRESS=search:7700
+      - LABEL=research
+YAML]);
+    $this->application->environment_variables_preview()->create(['key' => 'DATABASE_URL', 'value' => 'postgres://user:secret@search:5432/app', 'is_preview' => true]);
+
+    $warnings = $this->application->fresh()->previewSharedNetworkHostnameWarnings();
+
+    expect($warnings)->toHaveCount(3)
+        ->and($warnings[0])->toContain('DATABASE_URL')->toContain('${SERVICE_NAME_SEARCH}')
+        ->and($warnings[1])->toContain('MEILI_URL')
+        ->and($warnings[2])->toContain('SEARCH_ADDRESS');
+});
+
+it('does not warn about service names in a preview on its own network', function () {
+    expect($this->application->fresh()->previewSharedNetworkHostnameWarnings())->toBe([]);
+});
