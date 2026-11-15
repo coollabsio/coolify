@@ -99,6 +99,21 @@ test('http basic auth credentials can be saved through the general form', functi
         ->and((bool) $application->is_http_basic_auth_enabled)->toBeTrue();
 });
 
+test('a 64 character http basic auth password can be saved and read back', function () {
+    $application = createApplicationForHttpBasicAuth(['redirect' => 'both']);
+    $password = str_repeat('a', 64);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('httpBasicAuthPassword', $password)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $application->refresh();
+
+    expect(strlen($application->getRawOriginal('http_basic_auth_password')))->toBeGreaterThan(255)
+        ->and($application->http_basic_auth_password)->toBe($password);
+});
+
 test('disabling http basic auth is saved instantly', function () {
     $application = createApplicationForHttpBasicAuth();
 
