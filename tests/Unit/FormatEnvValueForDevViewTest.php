@@ -15,6 +15,8 @@ it('formats values so that parseEnvFormatToArray reads them back unchanged', fun
     'hash after whitespace' => ['value #not-a-comment'],
     'hash without whitespace' => ['value#hash'],
     'double quoted with suffix' => ['"Company :: App" <noreply@example.com>'],
+    'leading space' => [' secret'],
+    'trailing tab' => ["secret\t"],
 ]);
 
 it('returns null for values that the env format cannot hold', function (string $value) {

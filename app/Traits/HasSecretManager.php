@@ -148,11 +148,12 @@ trait HasSecretManager
      * container gets the same value as before the upgrade. Saving the variable again switches
      * it to exact escaping. Compose references that got the stored value before the upgrade
      * (such as `FOO=${FOO:-}`) use exact escaping, so they keep getting that value. So do old
-     * .env lines that Docker Compose cannot read, because they stop the deployment.
+     * .env lines that Docker Compose cannot read, because they stop the deployment. So do
+     * single-line values with edge spaces, because the old line loses them.
      */
     public function useExactEscaping(EnvironmentVariable $environmentVariable): bool
     {
-        if (! $environmentVariable->uses_legacy_escaping) {
+        if (! $environmentVariable->uses_legacy_escaping || self::hasSingleLineEdgeWhitespace($environmentVariable->value)) {
             return true;
         }
 
@@ -169,6 +170,15 @@ trait HasSecretManager
 
         return $parsesCompose
             && dockerComposeVariablesWithStoredValueBeforeExactEscaping($this->docker_compose_raw)->contains($environmentVariable->key);
+    }
+
+    /**
+     * Single-line values were saved without edge whitespace before #4734, so such a value is a
+     * new save. The old escaping writes it without quotes, and Docker Compose removes the spaces.
+     */
+    private static function hasSingleLineEdgeWhitespace(?string $value): bool
+    {
+        return is_string($value) && ! str_contains($value, "\n") && $value !== trim($value);
     }
 
     /**

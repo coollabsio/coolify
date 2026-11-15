@@ -830,7 +830,7 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
         }
-        $environment_variable = self::withoutEdgeWhitespace($environment_variable);
+        $environment_variable = self::withoutEdgeLineBreaks($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
@@ -883,17 +883,18 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return self::withoutEdgeWhitespace(decrypt($environment_variable));
+        return self::withoutEdgeLineBreaks(decrypt($environment_variable));
     }
 
     /**
-     * Single-line values lose their edge whitespace. Multiline content (a private key, a
-     * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
-     * without its trailing newline.
+     * Single-line values lose the line breaks at their edges, which a paste often adds. Spaces
+     * and tabs stay, because they can be part of a value such as a password (#4734). Multiline
+     * content (a private key, a certificate, a config file) is kept as it is, because tools such
+     * as OpenSSH reject a key without its trailing newline.
      */
-    private static function withoutEdgeWhitespace(string $value): string
+    private static function withoutEdgeLineBreaks(string $value): string
     {
-        $trimmed = trim($value);
+        $trimmed = trim($value, "\r\n");
 
         return str_contains($trimmed, "\n") ? $value : $trimmed;
     }
@@ -904,7 +905,7 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return encrypt(self::withoutEdgeWhitespace($environment_variable));
+        return encrypt(self::withoutEdgeLineBreaks($environment_variable));
     }
 
     protected function key(): Attribute

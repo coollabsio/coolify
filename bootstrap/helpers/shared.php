@@ -1257,10 +1257,11 @@ function parseEnvFormatToArray($env_file_contents)
                     // Found whitespace followed by #, extract comment
                     $remainder = substr($value_and_comment, $matches[0][1]);
                     $value = substr($value_and_comment, 0, $matches[0][1]);
-                    $value = rtrim($value);
                 } else {
                     $value = $value_and_comment;
                 }
+                // Like a .env file, an unquoted value loses its edge whitespace. Quotes keep it.
+                $value = trim($value);
             }
 
             // Extract comment from remainder (if any)
@@ -1300,7 +1301,7 @@ function formatEnvValueForDevView(?string $value): ?string
         return null;
     }
 
-    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1;
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1 || $value !== trim($value);
     if (! $needsQuotes) {
         return $value;
     }
