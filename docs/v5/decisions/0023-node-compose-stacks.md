@@ -193,8 +193,8 @@ new. These points differ from the decision above or add to it:
   (`--depth 1 --filter=blob:none`), then reads the one file. A symbolic link
   and a file larger than 5 MiB are refused, as in v4. `ResolveGitCommit` and
   `ReadGitComposeFile` use the same credential handling (`NodeGitProcess`).
-  The file is read once, when the stack is created. A later change of the
-  file does not change the services of the stack.
+  Coolify reads the file when it creates the stack, and again at each
+  deploy of the stack (see **Changes of the Compose file**).
 - **Source.** The stack stores `git_repository`, `git_branch`,
   `github_app_id` or `private_key_id`, `base_directory`, `compose_location`,
   and `commit_sha`. A template stack keeps them empty, so
@@ -217,9 +217,11 @@ new. These points differ from the decision above or add to it:
   `secrets` of `build:`; a top-level `include`; and `extends` with `file`.
   Other keys of `build:` are ignored, with a note. Templates still cannot use
   `build:`.
-- **Deploy.** A stack deploy resolves one commit of the branch, or uses the
-  pushed commit of a webhook. It starts the builds of all built services at
-  that commit, and these builds do not deploy (`node_builds.skip_deploy`).
+- **Deploy.** A stack deploy reads the Compose file at the head of the
+  branch. The commit of that read is the commit of the deploy. A webhook
+  commit only starts the deploy, because the head is the same commit or a
+  newer one. The deploy syncs the services with the file, then starts the
+  builds of all built services at that commit, and these builds do not deploy (`node_builds.skip_deploy`).
   Each build is a normal build, with its log on the page of its service.
   When a build fails, nothing deploys, and the stack shows the failed
   services. Then every service deploys in `depends_on` order, as in step 1.
@@ -230,3 +232,54 @@ new. These points differ from the decision above or add to it:
   service again when it is deployed and its configuration did not change,
   as `docker compose up` does, so a database does not restart for each push.
   A deploy from the stack page deploys every service.
+- **Changes of the Compose file.** When the file is different from
+  `compose_raw`, `SyncNodeStackCompose` makes the services match it before
+  the builds. `NodeStackComposeDiff` compares three versions: the services
+  of the previous file, the services of the new file, and the current
+  workloads. For each value that the file owns, it uses this rule: when the
+  current value is equal to the value of the previous file, the value of
+  the new file is taken. When it is different, the user changed it, and the
+  value of the user stays. The rule applies to:
+  - each environment variable: its value and its runtime and build-time
+    flags. A new key is added. A removed key is deleted only when the user
+    did not change it. A variable that the user deleted is not added again;
+  - the image of an image service, and the command, restart policy, and
+    files of the latest revision. A change makes a new revision. A built
+    service gets a new revision with its current image, so that the next
+    build copies the new configuration;
+  - the base directory, Dockerfile location, and build target of a built
+    service;
+  - the domains, as one list.
+
+  The health check of the file (`stack_health_check`) is always taken,
+  because the user sets an own health check in other fields. A service that
+  changes between `image:` and `build:` changes its source type and its Git
+  fields. A new service is created as at the creation of the stack. It is
+  placed on the server of its shared volumes, or else on the server of the
+  first service. A service that left the file is deleted after the sync,
+  with the normal delete of a cluster application. A new volume path makes
+  a new volume. A volume whose path left the file stays with its data, and
+  the summary lists it. A new mount of a shared volume is added, and a
+  mount that left the file is removed; the shared volume stays (decision
+  0024). The values are saved for the user of the deploy. A webhook deploy
+  has no user, so an owner or admin of the stack team is used.
+  A push deploy deploys a changed image service again, because its
+  configuration changed.
+- **Sync failures.** Coolify does all checks before it writes, and writes
+  in one transaction. When the sync fails, the deploy fails with the
+  reason, and the stack does not change. The sync fails when:
+  - the new file is not available on Nodes, or its services depend on each
+    other in a cycle;
+  - a removed service has volumes. The user deletes the service on its page
+    to delete its data, or adds the service back;
+  - a volume moves between one service and a volume that services share,
+    because Coolify cannot move the data;
+  - services that share a volume run on different servers.
+- **Summary.** `node_stacks.compose_changes` keeps the last sync: the
+  commit, the added, changed, and removed services, and the kept volumes.
+  The stack page shows it.
+- **Not synced.** A template stack (no Git source) does not change. The
+  generated `SERVICE_*` values stay; only new ones are generated. A deploy
+  with the same file does not sync. A removed service whose delete fails
+  stays, and the team gets a notification. The job timeout of a deploy
+  counts only the services that existed before the sync.
