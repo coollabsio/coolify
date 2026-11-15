@@ -101,8 +101,10 @@ services. These points differ from the decision above or add to it:
 - **When the destination changes.** A change of the published ports queues a
   network revision. A new placement (first deploy or move) queues one, as for
   ingress. A rolling deploy applies a revision before it removes the old
-  container, so the ports go to the new container first. The removal of the
-  source placement after a move queues one. The delete of a workload queues one
+  container, so the ports go to the new container first. A move does the same:
+  when the target is ready, the source no longer counts as a destination, and
+  the move applies a revision before it removes the source container. The
+  removal of the source placement after a move queues one. The delete of a workload queues one
   for the clusters of its ports. The rows go with the workload (cascade).
 - **Compose.** `ports:` makes a stack "Not available on Nodes" until every
   usable Node of the cluster reports the capability
