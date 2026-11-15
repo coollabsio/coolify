@@ -48,12 +48,17 @@ beforeEach(function () {
 });
 
 /**
- * @param  array<string, string>  $containers  container name => docker state
+ * @param  array<string, string|array<string, string>>  $containers  container name => docker state, or the `docker ps` fields
  */
 function fakeApplicationContainers(array $containers): void
 {
     $output = collect($containers)
-        ->map(fn (string $state, string $name) => json_encode(['ID' => $name, 'Names' => $name, 'Labels' => 'coolify.applicationId=1', 'State' => $state]))
+        ->map(fn (string|array $container, string $name) => json_encode([
+            'ID' => $name,
+            'Names' => $name,
+            'Labels' => 'coolify.applicationId=1',
+            ...(is_string($container) ? ['State' => $container] : $container),
+        ]))
         ->implode("\n");
 
     Process::fake(fn ($process) => str_contains(remoteProcessScript($process), 'docker ps -a --filter')
@@ -80,5 +85,44 @@ test('a scheduled task runs in the application container with the exact name', f
     (new ScheduledTaskJob($this->task->refresh()))->handle();
 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-222222222222' sh -c"));
+    expect($this->task->executions()->sole()->status)->toBe('success');
+});
+
+test('a scheduled task runs in the serving container while a rolling update keeps two running', function () {
+    $uuid = $this->application->uuid;
+    fakeApplicationContainers([
+        "{$uuid}-222222222222" => ['State' => 'running', 'CreatedAt' => '2026-09-23 16:18:53 +0000 UTC', 'Status' => 'Up 8 seconds (health: starting)'],
+        "{$uuid}-111111111111" => ['State' => 'running', 'CreatedAt' => '2026-09-23 16:00:00 +0000 UTC', 'Status' => 'Up 18 minutes (healthy)'],
+    ]);
+
+    (new ScheduledTaskJob($this->task))->handle();
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-111111111111' sh -c"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-222222222222'"));
+    expect($this->task->executions()->sole()->status)->toBe('success');
+});
+
+test('a scheduled task does not run in a stopped container it names exactly', function () {
+    $uuid = $this->application->uuid;
+    fakeApplicationContainers(["{$uuid}-111111111111" => 'exited', "{$uuid}-222222222222" => 'running']);
+    $this->task->update(['container' => "{$uuid}-111111111111"]);
+
+    (new ScheduledTaskJob($this->task->refresh()))->handle();
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-222222222222' sh -c"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "docker exec '{$uuid}-111111111111'"));
+    expect($this->task->executions()->sole()->status)->toBe('success');
+});
+
+test('a scheduled task runs in the named service of a docker compose application', function () {
+    $uuid = $this->application->uuid;
+    $this->application->update(['build_pack' => 'dockercompose']);
+    fakeApplicationContainers(["web-{$uuid}" => 'running', "worker-{$uuid}" => 'running']);
+    $this->task->update(['container' => 'worker']);
+
+    (new ScheduledTaskJob($this->task->refresh()))->handle();
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'worker-{$uuid}' sh -c"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "docker exec 'web-{$uuid}'"));
     expect($this->task->executions()->sole()->status)->toBe('success');
 });
