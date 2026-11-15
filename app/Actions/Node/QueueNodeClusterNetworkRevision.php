@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Jobs\ReconcileNodeClusterNetworkJob;
+use App\Jobs\SyncNodeClusterDnsRecordsJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\User;
@@ -22,6 +23,8 @@ class QueueNodeClusterNetworkRevision
     {
         $cluster->increment('desired_revision');
         $cluster->refresh();
+        // The domains and placements of the routes decide the managed DNS records (decision 0019).
+        SyncNodeClusterDnsRecordsJob::dispatch($cluster->id)->afterCommit();
         if (! $cluster->convergesAutomatically()) {
             return false;
         }

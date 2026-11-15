@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
+use App\Jobs\SyncNodeClusterDnsRecordsJob;
 use App\Support\DevelopmentIngressTarget;
 use App\Traits\Auditable;
 use App\Traits\HasMetrics;
@@ -34,8 +35,24 @@ class Node extends BaseModel
             if ($node->wasChanged(['is_ingress', 'node_cluster_id', 'ip']) || $node->wasRecentlyCreated) {
                 DevelopmentIngressTarget::write();
             }
+            // The managed DNS records of cluster domains point to the ingress Nodes (decision 0019).
+            if ($node->wasChanged(['is_ingress', 'node_cluster_id', 'ip']) && ($node->is_ingress || $node->getOriginal('is_ingress'))) {
+                $node->syncClusterDnsRecords([$node->node_cluster_id, $node->getOriginal('node_cluster_id')]);
+            }
         });
-        static::deleted(fn (): null => DevelopmentIngressTarget::write());
+        static::deleted(function (Node $node): void {
+            DevelopmentIngressTarget::write();
+            if ($node->is_ingress) {
+                $node->syncClusterDnsRecords([$node->node_cluster_id]);
+            }
+        });
+    }
+
+    /** @param  array<int, int|string|null>  $clusterIds */
+    private function syncClusterDnsRecords(array $clusterIds): void
+    {
+        collect($clusterIds)->filter()->unique()
+            ->each(fn ($clusterId) => SyncNodeClusterDnsRecordsJob::dispatch((int) $clusterId)->afterCommit());
     }
 
     protected function casts(): array
