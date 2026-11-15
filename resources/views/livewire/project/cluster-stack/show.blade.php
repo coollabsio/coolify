@@ -21,6 +21,16 @@
                         Commit <span class="font-mono" title="{{ $stack->commit_sha }}">{{ substr($stack->commit_sha, 0, 7) }}</span>.
                     @endif
                 </p>
+                @if (filled($composeChanges))
+                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                        Compose file changed at
+                        <span class="font-mono" title="{{ $composeChanges['commit_sha'] }}">{{ substr($composeChanges['commit_sha'], 0, 7) }}</span>@foreach ($composeChanges['parts'] as $part), {{ $part['label'] }} <span class="font-mono">{{ implode(', ', $part['services']) }}</span>@endforeach.
+                        @if ($composeChanges['kept_volumes'] !== [])
+                            Kept the volumes that left the file, with their data:
+                            <span class="font-mono">{{ implode(', ', $composeChanges['kept_volumes']) }}</span>.
+                        @endif
+                    </p>
+                @endif
             @endif
         </div>
         @can('update', $stack)

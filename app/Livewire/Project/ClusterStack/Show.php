@@ -106,7 +106,18 @@ class Show extends Component
             ->with(['node', 'copies', 'mounts.workload' => fn ($workloads) => $workloads->withoutGlobalScopes()])
             ->get();
 
+        $changes = $this->stack->compose_changes;
+
         return view('livewire.project.cluster-stack.show', [
+            'composeChanges' => $changes === null ? null : [
+                'commit_sha' => (string) ($changes['commit_sha'] ?? ''),
+                'parts' => array_values(array_filter([
+                    ['label' => 'added', 'services' => $changes['added'] ?? []],
+                    ['label' => 'changed', 'services' => $changes['changed'] ?? []],
+                    ['label' => 'removed', 'services' => $changes['removed'] ?? []],
+                ], fn (array $part): bool => $part['services'] !== [])),
+                'kept_volumes' => $changes['kept_volumes'] ?? [],
+            ],
             'volumes' => $volumes->map(fn (NodeVolume $volume): array => [
                 'uuid' => $volume->uuid,
                 'name' => $volume->name,
