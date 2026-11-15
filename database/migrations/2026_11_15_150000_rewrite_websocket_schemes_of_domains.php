@@ -72,7 +72,7 @@ return new class extends Migration
             }
         });
 
-        return $changed ? json_encode($domains) : $json;
+        return $changed ? (json_encode($domains) ?: $json) : $json;
     }
 
     private function rewriteUrls(string $urls): string
@@ -81,6 +81,6 @@ return new class extends Migration
             '~(^|,)(\s*)ws(s?)://~i',
             fn (array $match): string => $match[1].$match[2].($match[3] === '' ? 'http' : 'https').'://',
             $urls,
-        );
+        ) ?? $urls;
     }
 };
