@@ -24,6 +24,12 @@ class All extends Component
 
     public bool $showPreview = false;
 
+    /**
+     * Shows and edits only the preview variables, on the Previews tab of a cluster application
+     * (decision 0025). The production variables are not loaded, saved, or deleted.
+     */
+    public bool $previewScope = false;
+
     public ?string $variables = null;
 
     public ?string $variablesPreview = null;
@@ -93,7 +99,7 @@ class All extends Component
         $this->search = $key;
         $this->variableFilters = [];
         $this->serviceFilters = [];
-        $this->environmentFilter = 'all';
+        $this->environmentFilter = $this->previewScope ? 'preview' : 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -129,6 +135,10 @@ class All extends Component
         $hasGitRepository = filled(data_get($this->resource, 'git_repository'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && $hasGitRepository && ! $simpleDockerfile) {
             $this->showPreview = true;
+        }
+        if ($this->previewScope) {
+            $this->showPreview = true;
+            $this->environmentFilter = 'preview';
         }
         // Intentionally skip loading env vars / developer-view bulk text here.
         // loadEnvironmentVariables() is triggered from the frontend via wire:init.
@@ -297,7 +307,7 @@ class All extends Component
 
     private function supportsPreviewEnvironmentVariables(): bool
     {
-        return $this->showPreview && $this->resource instanceof Application;
+        return $this->showPreview && ($this->resource instanceof Application || $this->previewScope);
     }
 
     public function getHasEnvironmentVariablesProperty(): bool
@@ -468,7 +478,7 @@ class All extends Component
 
     public function setEnvironmentFilter(string $filter): void
     {
-        if (! in_array($filter, ['all', 'production', 'preview'], true)) {
+        if ($this->previewScope || ! in_array($filter, ['all', 'production', 'preview'], true)) {
             return;
         }
 
@@ -528,7 +538,7 @@ class All extends Component
     {
         $this->variableFilters = [];
         $this->serviceFilters = [];
-        $this->environmentFilter = 'all';
+        $this->environmentFilter = $this->previewScope ? 'preview' : 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -792,7 +802,8 @@ class All extends Component
      */
     private function previewVariableIdsWithProductionValues(Collection $variables): array
     {
-        if (! $this->supportsPreviewEnvironmentVariables()) {
+        // A preview of a cluster application resolves production values at deploy, so no row copies one.
+        if (! $this->supportsPreviewEnvironmentVariables() || ! $this->resource instanceof Application) {
             return [];
         }
 
@@ -1014,7 +1025,9 @@ class All extends Component
 
     public function getDevView()
     {
-        $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
+        if (! $this->previewScope) {
+            $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
+        }
         if ($this->showPreview) {
             $this->variablesPreview = $this->formatEnvironmentVariables($this->getEnvironmentVariables(true, false));
         }
@@ -1064,7 +1077,7 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $variables = $this->previewScope ? [] : $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
                 $previewVariables = [];
                 if ($this->showPreview) {
                     try {
@@ -1105,7 +1118,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
+        $variables = $this->previewScope ? [] : $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -1135,18 +1148,20 @@ class All extends Component
         $changesMade = false;
         $errorOccurred = false;
 
-        // Try to delete removed variables
-        $deletedCount = $this->deleteRemovedVariables(false, $variables);
-        if ($deletedCount > 0) {
-            $changesMade = true;
-        } elseif ($deletedCount < 0) {
-            $errorOccurred = true;
-        }
+        if (! $this->previewScope) {
+            // Try to delete removed variables
+            $deletedCount = $this->deleteRemovedVariables(false, $variables);
+            if ($deletedCount > 0) {
+                $changesMade = true;
+            } elseif ($deletedCount < 0) {
+                $errorOccurred = true;
+            }
 
-        // Update or create variables
-        $updatedCount = $this->updateOrCreateVariables(false, $variables);
-        if ($updatedCount > 0) {
-            $changesMade = true;
+            // Update or create variables
+            $updatedCount = $this->updateOrCreateVariables(false, $variables);
+            if ($updatedCount > 0) {
+                $changesMade = true;
+            }
         }
 
         if ($this->showPreview) {
@@ -1183,7 +1198,7 @@ class All extends Component
             return;
         }
 
-        $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
+        $maxOrder = (($data['is_preview'] ?? false) ? $this->resource->environment_variables_preview() : $this->resource->environment_variables())->max('order') ?? 0;
         $environment = $this->createEnvironmentVariable($data);
         $environment->order = $maxOrder + 1;
         $environment->save();

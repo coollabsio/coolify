@@ -243,7 +243,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
                 ->orWhere('destination_workload_id', $workload->id)
                 ->delete();
             $workload->environment_variables()->delete();
-            $workload->previewEnvironmentVariables()->delete();
+            $workload->environment_variables_preview()->delete();
             // Revisions cascade with the workload; operations and container inventory keep their
             // history with a null workload (see the node_operations and node_containers foreign keys).
             $workload->delete();

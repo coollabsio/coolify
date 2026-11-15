@@ -426,7 +426,7 @@ class NodeWorkload extends BaseModel
     }
 
     /** The preview variables of this parent (decision 0025), which the Previews tab edits. */
-    public function previewEnvironmentVariables(): MorphMany
+    public function environment_variables_preview(): MorphMany
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', true);
     }
@@ -442,7 +442,7 @@ class NodeWorkload extends BaseModel
     public function resolvedPreviewVariables(bool $fromFork): Collection
     {
         // Base collections: an Eloquent merge keys by id, so a preview value would not replace its production key.
-        $preview = $this->previewEnvironmentVariables()->orderBy('id')->get()->toBase()->keyBy('key');
+        $preview = $this->environment_variables_preview()->orderBy('id')->get()->toBase()->keyBy('key');
         if ($fromFork || $this->preview_uses_production_values === false) {
             return $preview;
         }
