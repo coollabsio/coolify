@@ -25,6 +25,7 @@ class NodeBuild extends BaseModel
         return [
             'status' => NodeBuildStatus::class,
             'source_type' => NodeWorkloadSourceType::class,
+            'skip_deploy' => 'boolean',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];
