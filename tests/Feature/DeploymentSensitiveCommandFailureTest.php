@@ -298,6 +298,24 @@ it('reports the exit code and explains a lost SSH connection when a command ends
         ->toContain('SSH connection to the server closed');
 });
 
+it('retries a command when ssh exits with 255 and prints nothing, as when sshd closes the connection before the key exchange', function () {
+    config()->set('constants.ssh.max_retries', 3);
+    config()->set('constants.ssh.retry_base_delay', 0);
+    config()->set('constants.ssh.host_key_checking', 'off');
+    [$job] = makeSensitiveCommandFailureJob();
+
+    $runs = 0;
+    Process::fake(function () use (&$runs) {
+        $runs++;
+
+        return $runs === 1 ? Process::result(exitCode: 255) : Process::result(output: 'ok');
+    });
+
+    $job->execute_remote_command(['command' => 'echo ok']);
+
+    expect($runs)->toBe(2);
+});
+
 it('does not add the SSH connection hint to failures of the remote command', function () {
     [$job] = makeSensitiveCommandFailureJob();
 
