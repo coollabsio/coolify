@@ -86,3 +86,33 @@ environment, so a PaaS must keep environment variables as the default.
   uid, gid, and mode of each secret file. Sentinel passes them to Podman with
   `--secret <name>,type=mount,uid=<uid>,gid=<gid>,mode=<mode>`.
 - Build-time secrets are decided in decision 0012.
+
+## Implementation of the amendment (2026-11-15)
+
+- **Data.** `environment_variables` has `secret_file_uid`, `secret_file_gid`,
+  and `secret_file_mode`. All are nullable. Null means the Sentinel default:
+  root and 0444. The mode is the octal text that the user typed, for example
+  `0400`.
+- **UI.** The **Edit environment variable** dialog of a cluster application
+  shows **Owner UID**, **Group GID**, and **Mode** when **Delivery** is
+  **File in /run/secrets**. The UID and the GID are 0 to 2147483647. The mode
+  has 3 or 4 octal digits (`^0?[0-7]{3}$`). The save uses the same
+  authorization as the other fields of the dialog. The developer view does not
+  show or change these fields.
+- **Revision.** `NodeWorkload::runtimeSecrets()` gives each secret file as its
+  value when no field is set. When a field is set, the entry is
+  `{value, uid?, gid?, mode?}` with only the fields that are set, and the mode
+  is an integer (`octdec`, so `0400` is 256). `node_workload_revisions.secrets`
+  and the `secrets` of `workload.deploy.v1` use this form. Flux accepts both
+  forms. A secret file without these fields has the same entry as before, so
+  the configuration hash of an existing application does not change.
+- **Capability.** A revision with an owner or a mode on a secret file needs
+  `workload.secrets.owner.v1` on the Node.
+  `CreateDeploymentOperation` and `DispatchWorkloadDeployment` refuse the
+  deploy without it, with the same message as for the other capabilities.
+  `IssueFluxCredential` grants the capability to Flux.
+- **Previews.** `DeployNodePreview` copies the three columns with the other
+  variable columns.
+- **Server transfer.** A transfer does not move cluster applications, so the
+  columns are in `ServerTransferCoverage` as not exported, like
+  `is_file_secret`.
