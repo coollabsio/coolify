@@ -289,6 +289,12 @@ instead.
    (`git fetch --depth=1 origin <head sha>`) on the base repository. Record
    the result here. Only if a provider refuses: add `git_ref` to
    `image.build` in Sentinel.
+   Result (2026-11-15): every provider sends the head commit of a pull request
+   from a fork by SHA from the base repository. Gitea 1.26 and Forgejo 17 (dev,
+   private repository) also have `refs/pull/<id>/head`. GitHub
+   (`coollabsio/coolify` PR 12310) and GitLab (`gitlab-org/gitlab-runner` MR
+   7847, also `refs/merge-requests/<id>/head`) were checked with public
+   pull requests. No Sentinel change is needed.
 2. **Schema and model.** Migration: `preview_of_id`, `pull_request_id`,
    `pull_request_url`, `pull_request_ref`, `pull_request_from_fork`,
    `pull_request_comment_id` on the preview, the four settings on the parent,
