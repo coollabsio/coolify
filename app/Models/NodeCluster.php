@@ -140,6 +140,20 @@ class NodeCluster extends BaseModel
         return $this->hasMany(Node::class);
     }
 
+    /**
+     * The CPU architectures that the builder Nodes of this cluster build for (decision 0020). A Git
+     * application is placed on a Node of one of them. Null when there is no builder yet or the
+     * architecture of one is unknown: every Node fits.
+     *
+     * @return list<string>|null
+     */
+    public function builderArchitectures(): ?array
+    {
+        $architectures = $this->nodes()->get()->filter(fn (Node $node): bool => $node->canBuild())->map(fn (Node $node): ?string => $node->cpuArchitecture());
+
+        return $architectures->isEmpty() || $architectures->contains(null) ? null : $architectures->unique()->values()->all();
+    }
+
     public function firewallRules(): HasMany
     {
         return $this->hasMany(NodeFirewallRule::class);

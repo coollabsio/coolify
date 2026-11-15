@@ -52,6 +52,8 @@ class RunImageBuild
         $local = $node->cluster?->needsRegistryServer() === false;
         $build->update([
             'node_id' => $node->id,
+            // BuildKit builds for the architecture of its Node (decision 0020).
+            'architecture' => $node->cpuArchitecture(),
             'status' => NodeBuildStatus::RUNNING,
             'started_at' => now(),
             'image' => NodeRegistry::imageReference($build->workload, $build->uuid, $local),

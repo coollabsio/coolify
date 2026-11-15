@@ -6,6 +6,7 @@ use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
 use App\Jobs\SyncNodeClusterDnsRecordsJob;
+use App\Support\CpuArchitecture;
 use App\Support\DevelopmentIngressTarget;
 use App\Traits\Auditable;
 use App\Traits\HasMetrics;
@@ -97,6 +98,15 @@ class Node extends BaseModel
     public function canBuild(): bool
     {
         return $this->is_builder !== false && ($this->role?->runsWorkloads() ?? true);
+    }
+
+    /**
+     * The CPU architecture of this Node in OCI names (`amd64`, `arm64`), from the `uname -m` that onboarding
+     * and every Flux system report record. Null when it is not known yet: such a Node fits every image.
+     */
+    public function cpuArchitecture(): ?string
+    {
+        return CpuArchitecture::normalize(data_get($this->metadata, 'arch'));
     }
 
     /** Builds that ran or run on this Node. */
