@@ -47,19 +47,23 @@ class CleanupStuckedResources extends Command
             foreach ($teams as $team) {
                 $team->delete();
             }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked teams: {$e->getMessage()}\n";
+        }
+        try {
             $servers = Server::query()->with('team.subscription')->lazyById()->filter(function ($server) {
                 return $server->isFunctional();
             });
             if (isCloud()) {
                 $servers = $servers->filter(function ($server) {
-                    return data_get($server->team->subscription, 'stripe_invoice_paid', false) === true;
+                    return data_get($server->team?->subscription, 'stripe_invoice_paid', false) === true;
                 });
             }
             foreach ($servers as $server) {
                 CleanupHelperContainersJob::dispatch($server);
             }
         } catch (\Throwable $e) {
-            echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+            echo "Error in cleaning stucked helper containers: {$e->getMessage()}\n";
         }
         try {
             $servers = Server::onlyTrashed()->lazyById();

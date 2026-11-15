@@ -100,12 +100,7 @@ class Init extends Command
         } catch (\Throwable $e) {
             echo "Error in cleanup:names command: {$e->getMessage()}\n";
         }
-        try {
-            $this->call('cleanup:stucked-resources');
-        } catch (\Throwable $e) {
-            echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
-            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
-        }
+        // Before cleanup:stucked-resources, which removes the helper containers of deployments that are not running.
         try {
             $stuckDeployments = ApplicationDeploymentQueue::whereIn('status', [
                 ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -129,6 +124,12 @@ class Init extends Command
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
         }
 
+        try {
+            $this->call('cleanup:stucked-resources');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
+        }
         try {
             $interruptedStartCount = ResourceStartActivity::failInterrupted();
 

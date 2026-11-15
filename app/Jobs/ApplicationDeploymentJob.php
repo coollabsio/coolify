@@ -77,6 +77,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private const HELPER_DOCKER_CONFIG = '/root/.docker';
 
     /**
+     * failed() runs before the finally block of handle(), which still uses the helper, so the cleanup waits.
+     */
+    private const FAILED_HELPER_CLEANUP_DELAY_MINUTES = 10;
+
+    /**
      * Name prefixes of the helpers that DatabaseBackupJob (S3 upload) and StartDatabaseImport
      * (S3 download) run on a resource network for the duration of one backup or import.
      */
@@ -6923,6 +6928,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->transitionToStatus(ApplicationDeploymentStatus::FAILED);
     }
 
+    /**
+     * A worker that kills the job (timeout, restart) skips the finally block of handle(), so the helper keeps running.
+     * The helper can be on the deployment server and on the build server.
+     */
+    private function queueHelperContainerCleanup(): void
+    {
+        try {
+            $serverIds = array_filter([$this->application_deployment_queue->server_id, $this->application_deployment_queue->build_server_id], fn ($id) => $id !== null);
+            Server::query()->whereKey($serverIds)->get()->each(
+                fn (Server $server) => CleanupHelperContainersJob::dispatch($server)->delay(now()->addMinutes(self::FAILED_HELPER_CLEANUP_DELAY_MINUTES))
+            );
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Queueing the helper container cleanup failed', $e);
+        }
+    }
+
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
@@ -6932,6 +6953,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } catch (Throwable $e) {
             $this->logStatusTransitionSideEffectFailure('Queueing the GitHub deployment sync failed', $e);
         }
+        $this->queueHelperContainerCleanup();
 
         // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
         // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written
