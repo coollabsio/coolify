@@ -93,7 +93,7 @@
                         </div>
                     </x-application.settings-section>
                     <x-application.settings-section id="server-custom-drain-section" title="Custom Fluent Bit"
-                        helper="Provide a custom Fluent Bit output and optional parser configuration.">
+                        helper="Provide a custom Fluent Bit output and optional parser configuration. To use credential or certificate files, copy them to /data/coolify/log-drains/files on the server. Fluent Bit reads them at /files, for example: google_service_credentials /files/gcp.json">
                         <div class="mb-4 max-w-sm">
                             <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCustomEnabled" label="Status"
                                 onChange="instantSave" :options="[
