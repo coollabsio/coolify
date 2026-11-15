@@ -56,7 +56,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 | L2 | DNS records of cluster domains | [0019](decisions/0019-node-dns-records.md) |
 | L3 | Owner and mode of secret files | [0008 amendment](decisions/0008-node-workload-secrets.md) |
 | L4 | Build and place by CPU architecture | [0020](decisions/0020-node-cpu-architecture.md) |
-| L5 | Preview deployments | [0011](decisions/0011-node-git-sources.md) |
+| L5 | Preview deployments. Accepted as [0025](decisions/0025-node-preview-deployments.md); build in progress. | [0011](decisions/0011-node-git-sources.md), [0025](decisions/0025-node-preview-deployments.md) |
 | L6 | Ctrl+K search entries for cluster settings pages | — |
 | L7 | ~~A clear error instead of a 500 when you create a database and the cluster network is not ready~~ Done: the create page shows the reason above the image picker. | 0010 |
 | L9 | ~~Reverse lookups of external addresses from containers get NXDOMAIN~~ | — | Fixed in Sentinel `26334ea`: the discovery DNS claims only the mesh and workload reverse zones and forwards the rest. A restart of systemd-resolved drops the routing domains and is not detected as drift (older gap). |
