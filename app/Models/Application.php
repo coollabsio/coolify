@@ -2082,6 +2082,20 @@ class Application extends BaseModel
         return '-c '.escapeshellarg("http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}");
     }
 
+    /**
+     * `git -c` options that send the token of the source with the git commands, also to submodules on the same host.
+     * Submodule URLs in SSH form (`git@host:org/repo.git`, `ssh://git@host/org/repo.git`) are changed to HTTPS too,
+     * because the token works only over HTTPS. Git does not save `-c` options in .git/config.
+     */
+    private function gitTokenUrlRewriteOptions(string $tokenBaseUrl, string $httpsBaseUrl, string $sshHost, ?string $sshUser): string
+    {
+        $sshUser = filled($sshUser) ? $sshUser : 'git';
+
+        return collect([$httpsBaseUrl, "{$sshUser}@{$sshHost}:", "ssh://{$sshUser}@{$sshHost}/"])
+            ->map(fn (string $prefix): string => '-c '.escapeshellarg("url.{$tokenBaseUrl}.insteadOf={$prefix}"))
+            ->implode(' ');
+    }
+
     private function gitHttpsCredentialOrigin(): ?string
     {
         $url = parse_url((string) $this->git_repository);
@@ -2249,8 +2263,12 @@ class Application extends BaseModel
                     $github_access_token = generateGithubInstallationToken($this->source);
                     $encodedToken = rawurlencode($github_access_token);
 
-                    // Rewrite same-host HTTPS URLs only for these git commands so submodules can authenticate without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}/");
+                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
+                        tokenBaseUrl: "{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/",
+                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}/",
+                        sshHost: $source_html_url_host,
+                        sshUser: $this->source->custom_user,
+                    );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     if ($exec_in_docker) {
@@ -2303,8 +2321,12 @@ class Application extends BaseModel
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
 
-                    // Rewrite same-host HTTPS submodule URLs to auth with the OAuth token (mirrors the GitHub path) without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
+                        tokenBaseUrl: "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/",
+                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/",
+                        sshHost: $url['host'] ?? '',
+                        sshUser: $oauthSource->custom_user,
+                    );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
