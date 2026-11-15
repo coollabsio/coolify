@@ -282,6 +282,74 @@ instead.
   snapshot).
 - Preview comments for GitLab, Gitea, and Bitbucket.
 
+## Implementation (2026-11-15)
+
+Built: steps 2 to 13. `PullRequestWebhook` (`app/Support/`) maps the actions of
+each provider to a deploy or a close. `StartsClusterWebhookBuilds` deploys or
+removes the previews, and each webhook response has one entry for each matched
+application, with its status and the reason of a skip. The **Previews** tab is
+`Project\ClusterApplication\Previews`. The comment job is
+`UpdateNodePreviewCommentJob`, and the daily job is `RemoveClosedNodePreviewsJob`.
+
+Events of each endpoint:
+
+| Endpoint | Deploy | Close | Ref | Fork check |
+| --- | --- | --- | --- | --- |
+| GitHub App, GitHub manual | `pull_request`: `opened`, `synchronize`, `reopened` | `closed` | `refs/pull/<id>/head` | head and base repository IDs (v4 `isForkPullRequest`) |
+| GitLab manual | `merge_request`: `open`, `opened`, `reopen`, `reopened`, `synchronize`, `update` | `close`, `closed`, `merge` | `refs/merge-requests/<id>/head` | source, target, and webhook project IDs |
+| Gitea and Forgejo manual (`/webhooks/source/gitea/events/manual`) | `pull_request`: `opened`, `synchronized`, `reopened` | `closed` | `refs/pull/<id>/head` | head, base, and webhook repository IDs |
+| Bitbucket manual | `pullrequest:created`, `pullrequest:updated` | `pullrequest:rejected`, `pullrequest:fulfilled` | the source branch | source, destination, and webhook repository UUIDs |
+
+These points differ from the decision above or add to it:
+
+- **Watch paths.** A cluster application has no watch paths. Push webhooks do
+  not check them either. Previews deploy for each commit.
+- **Skip markers.** The title skips a deploy for each provider. The head commit
+  message also skips it for GitHub App (an API call) and GitLab (from the
+  payload), as in v4. Gitea and Bitbucket send no commit message.
+- **Unknown repositories.** An unknown head repository counts as a fork. When
+  the base repository is not the repository of the webhook, the preview does not
+  deploy, also with previews of forks on. This is the v4 check.
+- **Ignored actions.** An action that does not deploy or close (for example
+  `labeled`) gets "Nothing to do" without a secret check when no v4 application
+  matches. It does not count as a failed secret.
+- **Manual deploy.** **Deploy pull request** uses `refs/merge-requests/<id>/head`
+  when the host of the repository contains `gitlab`, else `refs/pull/<id>/head`.
+  A self-hosted GitLab on another host name needs the webhook. Bitbucket refuses
+  a manual deploy, because it has no ref of a pull request. A manual deploy
+  keeps the pull request URL from an earlier webhook.
+- **Open pull requests.** The **Previews** tab does not list the open pull
+  requests of a GitHub App source yet.
+- **Preview variables.** The **Previews** tab shows the variables component in
+  a preview-only mode. It reads, adds, and saves only `is_preview` rows of the
+  parent. The developer view of this mode does not touch the production
+  variables. The **Environment Variables** tab of the parent shows only the
+  production variables. `previewEnvironmentVariables()` is now
+  `environment_variables_preview()`, the v4 name.
+- **Preview page.** A preview page shows a note with links to the parent and to
+  the pull request. Its **Environment Variables** tab lists the names only and
+  is read-only. Its **Webhooks** tab is hidden. The other tabs stay editable,
+  but the next deploy of the pull request copies the settings of the parent
+  again, except the domains.
+- **Comment.** The comment job checks the build and its deploy each 15 seconds
+  for up to one hour, and writes the comment when the status changes. A removed
+  preview deletes its comment, also when the user deletes it on the
+  **Previews** tab.
+- **Daily job.** It runs only when Nodes are in use. An API error keeps the
+  preview.
+
+Verified on dev (Gitea 1.26, manual webhook, one Node): a push to the branch of
+pull request 2 built and served the preview at
+`https://2.<parent uuid>.<base>` with the new commit; a close and reopen of the
+fork pull request 1 with previews of forks off was skipped with the reason;
+with them on, it built without the production values; a close removed the
+preview with its volumes; **Deploy pull request** of the fork pull request got
+the production values; a delete on the **Previews** tab removed the preview;
+with previews off, a reopen was skipped with the reason. Not verified live: the
+GitHub App and GitHub, GitLab, and Bitbucket endpoints (code reading only), the
+GitHub comment (its body and status were checked with a local call, not
+against GitHub), and the daily job.
+
 ## Build steps
 
 1. **Fetch check.** On the dev Gitea, Forgejo, a GitHub repository, and a

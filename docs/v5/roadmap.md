@@ -18,7 +18,7 @@ stable need.
 | B5 | ~~Bring the status documents up to date~~ | — | Done on 2026-11-12. |
 | B6 | ~~Merge `next` into `v5-progress`~~ | — | Done on 2026-11-12 (merge `37aefab058`). |
 | B7 | ~~Volume backups and restore~~ | [0009](decisions/0009-node-volume-backups.md) | Done (verified on dev with one Node). Restore to another Node is untested; restore from a dead Node is not built. |
-| B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews come after beta. |
+| B8 | ~~Private Git sources and webhooks~~ | [0011](decisions/0011-node-git-sources.md) | Done (verified on dev): GitHub App and deploy key; GitHub App, GitHub, GitLab, Gitea, and Bitbucket push webhooks; deploy API. Left: auto-deploy toggle, queue a push during a running build. Previews: L5. |
 | B9 | ~~Build-time secrets~~ | [0012](decisions/0012-node-build-secrets.md) | Done: plain build arguments and BuildKit secret mounts (capability `image.build.variables.v1`). A Dockerfile build does not rerun a cached step when only a secret value changes (same as v4). |
 | B10 | ~~Installer scope: control plane plus SSH workers~~ | [0002 amendment](decisions/0002-separate-legacy-upgrades-from-v5-installs.md) | Done: worker onboarding over SSH verified with a second Node; production Flux is B16. |
 | B11 | ~~Host Sentinel cluster upgrades~~ | [0013](decisions/0013-host-sentinel-upgrades.md) | Done: one Node at a time for each cluster, reconnect and capability check, SSH rollback, stop at the first failure. |
@@ -56,7 +56,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 | L2 | DNS records of cluster domains | [0019](decisions/0019-node-dns-records.md) |
 | L3 | Owner and mode of secret files | [0008 amendment](decisions/0008-node-workload-secrets.md) |
 | L4 | Build and place by CPU architecture | [0020](decisions/0020-node-cpu-architecture.md) |
-| L5 | Preview deployments. Accepted as [0025](decisions/0025-node-preview-deployments.md); build in progress. | [0011](decisions/0011-node-git-sources.md), [0025](decisions/0025-node-preview-deployments.md) |
+| L5 | ~~Preview deployments~~ Done (verified on dev with Gitea): a preview workload for each pull request from the GitHub App and the GitHub, GitLab, Gitea, and Bitbucket webhooks, the **Previews** tab, GitHub pull request comments, and a daily removal of previews of closed GitHub pull requests. Live: open, new commit, fork skip and fork deploy without production values, close, manual deploy, and delete. GitHub, GitLab, and Bitbucket are checked by code reading only. | [0011](decisions/0011-node-git-sources.md), [0025](decisions/0025-node-preview-deployments.md) |
 | L6 | Ctrl+K search entries for cluster settings pages | — |
 | L7 | ~~A clear error instead of a 500 when you create a database and the cluster network is not ready~~ Done: the create page shows the reason above the image picker. | 0010 |
 | L9 | ~~Reverse lookups of external addresses from containers get NXDOMAIN~~ | — | Fixed in Sentinel `26334ea`: the discovery DNS claims only the mesh and workload reverse zones and forwards the rest. A restart of systemd-resolved drops the routing domains and is not detected as drift (older gap). |
