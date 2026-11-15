@@ -57,7 +57,8 @@ class StartNodeBuild
                 'requested_by_user_id' => $user?->id,
                 'source_type' => $workload->source_type,
                 'git_repository' => $workload->git_repository,
-                'git_branch' => $workload->git_branch,
+                // A preview builds the ref of its pull request; its git_branch is the base branch.
+                'git_branch' => $workload->isPreview() && filled($workload->pull_request_ref) ? $workload->pull_request_ref : $workload->git_branch,
                 'commit_sha' => $commitSha,
                 'base_directory' => $workload->base_directory,
                 'dockerfile_location' => $workload->dockerfile_location,
