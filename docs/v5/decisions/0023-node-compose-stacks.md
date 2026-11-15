@@ -178,3 +178,52 @@ differ from the decision above:
 - **Images.** An image without a tag gets `:latest`, as the container
   inventory reports it. The same applies to a cluster Docker image
   application.
+
+## Implementation (step 2, 2026-11-15)
+
+Step 2 is built: Compose applications from Git. The Git create pages (public
+repository, GitHub App, and deploy key) have the build pack **Docker
+Compose**, with **Compose file location** (default `/docker-compose.yaml`)
+and the base directory. `ReadGitComposeFile`, `CreateClusterGitStack`, the
+Git source of `NodeStack`, and the build step of `DeployNodeStackJob` are
+new. These points differ from the decision above or add to it:
+
+- **Reading the file.** Coolify reads the file in its own container, not on
+  a server. It fetches the head commit of the branch without file content
+  (`--depth 1 --filter=blob:none`), then reads the one file. A symbolic link
+  and a file larger than 5 MiB are refused, as in v4. `ResolveGitCommit` and
+  `ReadGitComposeFile` use the same credential handling (`NodeGitProcess`).
+  The file is read once, when the stack is created. A later change of the
+  file does not change the services of the stack.
+- **Source.** The stack stores `git_repository`, `git_branch`,
+  `github_app_id` or `private_key_id`, `base_directory`, `compose_location`,
+  and `commit_sha`. A template stack keeps them empty, so
+  `compose_location` has no default in the database.
+- **Built services.** A service with `build:` is a Dockerfile application of
+  the same repository and credential. Its base directory is the build
+  context, and its Dockerfile location is relative to the context. The
+  context is relative to the directory of the Compose file. An `image:` next
+  to `build:` is ignored, with a note. A build arg becomes a build-time
+  variable that is not a runtime variable. A build arg with the name of an
+  environment variable of the service uses that variable, with the value of
+  the environment. `build.target` is sent as `target` in `image.build`, which
+  needs `image.build.target.v1`.
+- **First revision.** A built service has no revision until its first build.
+  The first build takes the command, restart policy, and files of the Compose
+  service from the stored Compose file of the stack.
+- **Not available on Nodes.** A context that is a URL, an absolute path, or a
+  path outside the repository; a Dockerfile outside its context (the builder
+  needs it inside); `dockerfile_inline`, `additional_contexts`, `ssh`, and
+  `secrets` of `build:`; a top-level `include`; and `extends` with `file`.
+  Other keys of `build:` are ignored, with a note. Templates still cannot use
+  `build:`.
+- **Deploy.** A stack deploy resolves one commit of the branch, or uses the
+  pushed commit of a webhook. It starts the builds of all built services at
+  that commit, and these builds do not deploy (`node_builds.skip_deploy`).
+  Each build is a normal build, with its log on the page of its service.
+  When a build fails, nothing deploys, and the stack shows the failed
+  services. Then every service deploys in `depends_on` order, as in step 1.
+  The stack stores the commit of the last successful build in `commit_sha`.
+- **Webhooks.** A push that matches a built service of a stack deploys the
+  whole stack at the pushed commit, once for each stack. A push during a
+  deploy of the stack is skipped.

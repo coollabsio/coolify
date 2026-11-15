@@ -70,7 +70,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Still open: step 2 (Compose from Git) |
+| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Still open: reload of a changed Compose file |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |
