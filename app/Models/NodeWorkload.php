@@ -441,12 +441,13 @@ class NodeWorkload extends BaseModel
      */
     public function resolvedPreviewVariables(bool $fromFork): Collection
     {
-        $preview = $this->previewEnvironmentVariables()->orderBy('id')->get()->keyBy('key');
+        // Base collections: an Eloquent merge keys by id, so a preview value would not replace its production key.
+        $preview = $this->previewEnvironmentVariables()->orderBy('id')->get()->toBase()->keyBy('key');
         if ($fromFork || $this->preview_uses_production_values === false) {
             return $preview;
         }
 
-        return $this->environment_variables()->orderBy('id')->get()->keyBy('key')->merge($preview);
+        return $this->environment_variables()->orderBy('id')->get()->toBase()->keyBy('key')->merge($preview);
     }
 
     /** The text with the runtime values of this workload hidden, like a deployment log. */
