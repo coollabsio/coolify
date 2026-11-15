@@ -226,4 +226,7 @@ new. These points differ from the decision above or add to it:
   The stack stores the commit of the last successful build in `commit_sha`.
 - **Webhooks.** A push that matches a built service of a stack deploys the
   whole stack at the pushed commit, once for each stack. A push during a
-  deploy of the stack is skipped.
+  deploy of the stack is skipped. A push deploy does not deploy an image
+  service again when it is deployed and its configuration did not change,
+  as `docker compose up` does, so a database does not restart for each push.
+  A deploy from the stack page deploys every service.

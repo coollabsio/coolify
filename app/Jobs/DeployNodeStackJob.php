@@ -90,7 +90,7 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             }
             foreach ($order as $service) {
                 $workload = $workloads->get($service);
-                if ($workload === null) {
+                if ($workload === null || $this->keepsRunningOnPush($workload)) {
                     continue;
                 }
                 $operation = $this->deploy($workload, $requestedBy, $deadline);
@@ -138,6 +138,19 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             throw new RuntimeException('The build of '.$failed->keys()->implode(', ').' failed. Nothing was deployed. See the build logs of '.($failed->count() === 1 ? 'the service' : 'each service').'.');
         }
         $stack->update(['commit_sha' => $commit]);
+    }
+
+    /**
+     * A push changes only the services that build from Git. As `docker compose up` does, a
+     * deployed image service without a configuration change keeps running, so a database does
+     * not restart for each push.
+     */
+    private function keepsRunningOnPush(NodeWorkload $workload): bool
+    {
+        return $this->commitSha !== null
+            && ! $workload->buildsFromGit()
+            && $workload->deployedRevision() !== null
+            && ! $workload->isConfigurationChanged();
     }
 
     private function deploy(NodeWorkload $workload, ?User $requestedBy, Carbon $deadline): NodeOperation
