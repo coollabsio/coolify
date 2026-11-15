@@ -1,7 +1,6 @@
 @php
-    $domainList = $workload->domains ?? [];
     // The www redirect hosts need DNS records too.
-    $dnsHosts = [...$domainList, ...array_keys(\App\Actions\Node\BuildNodeClusterIngressRoutes::wwwRedirects($domainList, $workload->www_redirect))];
+    $dnsHosts = $workload->dnsHostnames();
     $domainRoutes = $workload->domain_routes ?? [];
     $hasRows = $domainRoutes !== [];
     $hasHttpsDomains = collect($domainRoutes)->contains('scheme', 'https');
@@ -182,6 +181,8 @@
                 description="Add your first domain with the Add domain button above, or generate an sslip.io domain." icon-name="globe" />
         @endif
     </x-application.settings-section>
+
+    <livewire:project.cluster-application.domain-dns :workload="$workload" wire:key="cluster-application-domain-dns-{{ $workload->uuid }}" />
 
     @if ($hasRows)
         <x-application.settings-section id="cluster-application-domain-redirects" title="Redirects"

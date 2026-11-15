@@ -519,6 +519,7 @@ class Show extends Component
         }
         $this->loadData();
         $this->loadDomains();
+        $this->dispatch('clusterDomainsChanged')->to(DomainDns::class);
 
         return true;
     }
