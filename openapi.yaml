@@ -10145,6 +10145,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '503':
+          description: 'Database migrations are not finished yet.'
   /projects:
     get:
       tags:

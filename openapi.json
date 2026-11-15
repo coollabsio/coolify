@@ -15841,6 +15841,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "503": {
+                        "description": "Database migrations are not finished yet."
                     }
                 }
             }
