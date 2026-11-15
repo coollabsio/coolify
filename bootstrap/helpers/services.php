@@ -360,6 +360,8 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process([
                     'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
+                    // Same mode as LocalFileVolume::saveStorageOnServer(): readable for a non-root container user with any umask.
+                    "chmod a+rx -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($state === 'missing' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
