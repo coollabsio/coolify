@@ -38,8 +38,10 @@ jobs:
       - name: Plan the main build
         id: plan
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH: main
         run: |
+          gh auth setup-git
           labels="$(docker buildx imagetools inspect ghcr.io/coollabsio/coolify:main --format '{{ json (index .Image "linux/amd64").Config.Labels }}')" || labels='{}'
           MAIN_VERSION="$(jq -r '.["org.opencontainers.image.version"] // empty' <<< "$labels")"
           MAIN_REVISION="$(jq -r '.["org.opencontainers.image.revision"] // empty' <<< "$labels")"
