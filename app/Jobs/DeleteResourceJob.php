@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\DeleteScheduledDatabaseBackup;
 use App\Actions\Database\StopDatabase;
@@ -14,6 +15,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -69,6 +71,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         try {
             switch ($this->resource->type()) {
                 case 'application':
+                    $this->cancelActiveDeployments($this->resource);
                     StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
                     break;
                 case 'standalone-postgresql':
@@ -245,6 +248,47 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         return $resources->flatMap(fn ($resource) => $resource->persistentStorages()->get()
             ->concat($resource->fileStorages()->get())
             ->flatMap(fn ($storage) => $storage->scheduledBackups()->get()));
+    }
+
+    /**
+     * The deployment records go with the application, and CleanupHelperContainersJob keeps helper containers
+     * without a record. A running build would go on, on the deployment or build server, until it ends.
+     */
+    private function cancelActiveDeployments(Application $application): void
+    {
+        $teamId = $application->team()?->id;
+        if ($teamId === null) {
+            return;
+        }
+
+        $activeDeployments = ApplicationDeploymentQueue::where('application_id', $application->id)
+            ->whereIn('status', [
+                ApplicationDeploymentStatus::QUEUED->value,
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ])
+            ->get();
+
+        foreach ($activeDeployments as $deployment) {
+            $deployment->update([
+                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'finished_at' => now(),
+            ]);
+            $deployment->addLogEntry('Deployment cancelled: the application was deleted.', 'stderr');
+            try {
+                CleanupCancelledDeployment::run($deployment, $teamId);
+            } catch (\Throwable $e) {
+                Log::warning('Helper container cleanup failed while deleting application.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // The cancelled deployments free their build slots for queued deployments of other applications.
+        Server::whereTeamId($teamId)
+            ->whereKey($activeDeployments->pluck('server_id')->filter()->unique())
+            ->get()
+            ->each(fn (Server $server) => next_after_cancel($server));
     }
 
     private function deleteApplicationPreview(): void
