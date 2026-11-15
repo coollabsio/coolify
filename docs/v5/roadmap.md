@@ -52,7 +52,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 
 | # | Work | Decision |
 | --- | --- | --- |
-| L1 | TCP and UDP port publishing. Built in Coolify: the **Published Ports** page, `ports:` of stacks, and `published_ports` in the firewall reconcile for Nodes with `network.firewall.published_ports.v1`. Open: the NAT table in Sentinel, and a live test. | [0016](decisions/0016-node-port-publishing.md) |
+| L1 | ~~TCP and UDP port publishing~~ Done (verified on dev): the **Published Ports** page, `ports:` of stacks, and NAT in Sentinel `525e3be` (`network.firewall.published_ports.v1`). Live: TCP and UDP through each Node, source allow-lists, rolling deploys and moves without failed requests, drift repair, and restore after a reboot. | [0016](decisions/0016-node-port-publishing.md) |
 | L2 | DNS records of cluster domains | [0019](decisions/0019-node-dns-records.md) |
 | L3 | Owner and mode of secret files | [0008 amendment](decisions/0008-node-workload-secrets.md) |
 | L4 | Build and place by CPU architecture | [0020](decisions/0020-node-cpu-architecture.md) |
