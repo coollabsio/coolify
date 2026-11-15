@@ -44,6 +44,17 @@ class Previews extends Component
 
     public string $pullRequestNumber = '';
 
+    /**
+     * Open pull requests of a GitHub App source, as in v4. Locked: a deploy takes the link from here.
+     *
+     * @var list<array{number: int, title: string, html_url: string, from_fork: bool}>
+     */
+    #[Locked]
+    public array $pullRequests = [];
+
+    #[Locked]
+    public ?int $rateLimitRemaining = null;
+
     /** @var array<string, string> The domain field of each preview, by preview uuid. */
     public array $previewDomains = [];
 
@@ -118,6 +129,46 @@ class Previews extends Component
             $number = (int) $this->validate(['pullRequestNumber' => ['required', 'integer', 'min:1', 'max:2147483647']])['pullRequestNumber'];
             ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, $this->pullRequestRef($number), requestedBy: auth()->user());
             $this->pullRequestNumber = '';
+            $this->dispatch('success', $build->wasRecentlyCreated ? "Preview build of pull request #{$number} queued." : "A build of pull request #{$number} is already running.");
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
+    public function loadPullRequests(): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $githubApp = $this->workload->githubApp;
+            if ($githubApp === null) {
+                throw new RuntimeException('Loading pull requests is only supported for GitHub App sources.');
+            }
+            ['rate_limit_remaining' => $this->rateLimitRemaining, 'data' => $data] = githubApi(source: $githubApp, endpoint: '/repos/'.gitRepositorySlug($this->workload->git_repository).'/pulls');
+            $this->pullRequests = collect($data)
+                ->map(fn ($pullRequest): array => [
+                    'number' => (int) data_get($pullRequest, 'number'),
+                    'title' => (string) data_get($pullRequest, 'title'),
+                    'html_url' => (string) data_get($pullRequest, 'html_url'),
+                    'from_fork' => data_get($pullRequest, 'head.repo.id') !== data_get($pullRequest, 'base.repo.id'),
+                ])
+                ->sortBy('number')
+                ->values()
+                ->all();
+        } catch (Throwable $exception) {
+            $this->rateLimitRemaining = 0;
+            handleError($exception, $this);
+        }
+    }
+
+    /** Deploys a loaded pull request. Like the manual deploy, it is the decision of the user (v4). */
+    public function deployLoadedPullRequest(int $number): void
+    {
+        $this->domainError = null;
+        try {
+            $this->authorize('update', $this->workload);
+            $pullRequest = collect($this->pullRequests)->firstWhere('number', $number)
+                ?? throw new RuntimeException("Pull request #{$number} is not in the loaded list. Load the pull requests again.");
+            ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, $this->pullRequestRef($number), $pullRequest['html_url'], requestedBy: auth()->user());
             $this->dispatch('success', $build->wasRecentlyCreated ? "Preview build of pull request #{$number} queued." : "A build of pull request #{$number} is already running.");
         } catch (Throwable $exception) {
             handleError($exception, $this);

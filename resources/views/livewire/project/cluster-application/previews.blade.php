@@ -6,6 +6,68 @@
         helper="Automatic pull request deployments, who can trigger them, and preview variables.">
         @if ($canUpdate)
             <x-slot:actions>
+                @if ($workload->github_app_id !== null)
+                    <x-modal-input title="Pull requests"
+                        subtitle="Load open pull requests from GitHub, then deploy a preview."
+                        :wireIgnore="false" :isLarge="true">
+                        <x-slot:content>
+                            <x-forms.button wire:click="loadPullRequests">
+                                Load pull requests
+                            </x-forms.button>
+                        </x-slot:content>
+                        <x-slot:headerActions>
+                            @isset($rateLimitRemaining)
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">
+                                    {{ $rateLimitRemaining }} requests remaining
+                                </span>
+                            @endisset
+                            <x-forms.button wire:click="loadPullRequests">
+                                Refresh
+                            </x-forms.button>
+                        </x-slot:headerActions>
+
+                        <div class="-m-4" wire:loading wire:target="loadPullRequests">
+                            <x-skeleton.list :rows="3" label="Loading pull requests" />
+                        </div>
+
+                        <div class="-m-4" wire:loading.remove wire:target="loadPullRequests">
+                            @forelse ($pullRequests as $pullRequest)
+                                <div wire:key="pull-request-{{ $pullRequest['number'] }}"
+                                    class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center dark:border-white/[0.07]">
+                                    <div
+                                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 font-mono text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
+                                        #{{ $pullRequest['number'] }}
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
+                                            {{ $pullRequest['title'] }}
+                                        </h4>
+                                        <div class="mt-1 flex items-center gap-2 text-xs text-neutral-500 dark:text-fg-dim">
+                                            @if ($pullRequest['from_fork'])
+                                                <span class="font-semibold text-warning">From a fork</span>
+                                            @endif
+                                            <a target="_blank" rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-1 hover:text-coollabs dark:hover:text-brand-light"
+                                                href="{{ $pullRequest['html_url'] }}">
+                                                Open on GitHub
+                                                <x-external-link />
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="flex shrink-0 items-center gap-2">
+                                        <x-forms.button wire:click="deployLoadedPullRequest({{ $pullRequest['number'] }})">
+                                            Deploy preview
+                                        </x-forms.button>
+                                    </div>
+                                </div>
+                            @empty
+                                <x-empty size="sm" title="No open pull requests"
+                                    description="No open pull requests were found for this repository."
+                                    icon-name="sources" />
+                            @endforelse
+                        </div>
+                    </x-modal-input>
+                @endif
                 @if ($isPreviewDeploymentsEnabled)
                     <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments">
                         Disable preview deployments

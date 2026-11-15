@@ -318,8 +318,10 @@ These points differ from the decision above or add to it:
   A self-hosted GitLab on another host name needs the webhook. Bitbucket refuses
   a manual deploy, because it has no ref of a pull request. A manual deploy
   keeps the pull request URL from an earlier webhook.
-- **Open pull requests.** The **Previews** tab does not list the open pull
-  requests of a GitHub App source yet.
+- **Open pull requests.** For a GitHub App source, **Load pull requests** on
+  the **Previews** tab lists the open pull requests, as in v4, and marks the
+  ones from a fork. **Deploy preview** is a manual deploy. The v4 **Configure**
+  button is left out, because a preview exists only with a build.
 - **Preview variables.** The **Environment Variables** tab of the parent shows
   them as v4 shows them for an application: a **Production** and a **Preview
   deployments** group, the environment filter, and the second textarea in the
