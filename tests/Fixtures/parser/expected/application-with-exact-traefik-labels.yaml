@@ -30,6 +30,10 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
+    -
+      fs_path: /srv/web/default/logs
+      mount_path: /var/log/web
+      is_directory: true
   environment_variables:
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
@@ -157,6 +161,7 @@
           - '/data/coolify/applications/referenceapplication0001/config:/app/config:ro'
           - '/data/coolify/applications/referenceapplication0001/selinux:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh
@@ -692,6 +697,10 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
+    -
+      fs_path: /srv/web/default/logs
+      mount_path: /var/log/web
+      is_directory: true
   environment_variables:
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
@@ -830,6 +839,7 @@
           - '/data/coolify/applications/referenceapplication0001/config:/app/config:ro'
           - '/data/coolify/applications/referenceapplication0001/selinux:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh
@@ -1447,6 +1457,10 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
+    -
+      fs_path: /srv/web/default/logs
+      mount_path: /var/log/web
+      is_directory: true
   environment_variables:
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
@@ -1586,6 +1600,7 @@
           - '/data/coolify/applications/referenceapplication0001/config-pr-7:/app/config:ro'
           - '/data/coolify/applications/referenceapplication0001/selinux-pr-7:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs-pr-7:/var/log/web'
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-7
@@ -2219,6 +2234,10 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
+    -
+      fs_path: /srv/web/default/logs
+      mount_path: /var/log/web
+      is_directory: true
   environment_variables:
     BARE_PASSTHROUGH: null
     BUILD_VERSION: null
@@ -2327,6 +2346,7 @@
           - '/data/coolify/applications/referenceapplication0001/config-pr-8:/app/config:ro'
           - '/data/coolify/applications/referenceapplication0001/selinux-pr-8:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs-pr-8:/var/log/web'
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8

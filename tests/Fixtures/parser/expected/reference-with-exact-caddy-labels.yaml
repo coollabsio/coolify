@@ -54,6 +54,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -235,6 +239,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -893,6 +898,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -1074,6 +1083,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -1734,6 +1744,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       fqdn: 'https://worker-extra.example.com'
       required_port: 8080
@@ -1916,6 +1930,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh

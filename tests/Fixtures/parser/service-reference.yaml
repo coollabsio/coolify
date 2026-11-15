@@ -45,6 +45,7 @@ services:
       - web-data:/usr/share/nginx/html
       - ./config:/etc/nginx/conf.d:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /srv/web/${WEB_STAGE:-default}/logs:/var/log/web
       - type: bind
         source: ./web-init.sh
         target: /docker-entrypoint.d/init.sh

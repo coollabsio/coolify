@@ -289,18 +289,63 @@ function validateComposeContentVolumeSource(array $volume): void
 }
 
 /**
- * Replaces a `${VAR:-default}` volume source with its default, as the short volume syntax does.
- * An empty default becomes `${VAR}`. Other sources do not change.
+ * Resolves the Compose variables in a volume source as Docker Compose does: `${VAR}` is the value of VAR,
+ * and `${VAR:-default}` or `${VAR-default}` is the value of VAR or else the default. Only non-empty values count.
+ *
+ * Without $variables, or when the result with them is not a host path, a variable with a default becomes the
+ * default and a variable without one stays as written. So a named volume keeps the name that it always had,
+ * and an empty default gives `${VAR}`.
+ *
+ * @param  array<string, string>|null  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
  */
-function resolveComposeVolumeSourceDefault(string $source): string
+function resolveComposeVolumeSourceVariables(string $source, ?array $variables = null): string
 {
-    if (! preg_match('/^\$\{([^}]+)\}$/', $source, $matches) || ! str_contains($matches[1], ':-')) {
-        return $source;
+    $resolve = fn (array $values): string => preg_replace_callback(
+        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}/',
+        function (array $match) use ($values): string {
+            $value = $values[$match[1]] ?? '';
+            if ($value !== '') {
+                return $value;
+            }
+
+            return ($match[2] ?? '') !== '' ? $match[2] : '${'.$match[1].'}';
+        },
+        $source
+    );
+
+    $withoutValues = $resolve([]);
+    if ($variables === null) {
+        return $withoutValues;
     }
+    $withValues = $resolve($variables);
 
-    [$varName, $defaultValue] = explode(':-', $matches[1], 2);
+    return sourceIsLocal(str($withValues)) ? $withValues : $withoutValues;
+}
 
-    return $defaultValue !== '' ? $defaultValue : '${'.$varName.'}';
+/**
+ * The environment variables that Coolify writes to the `.env` file, where Docker Compose reads the variables of the Compose file.
+ */
+function composeEnvironmentVariablesQuery(Application|Service $resource, bool $isPreview = false): mixed
+{
+    return match (true) {
+        $resource instanceof Service => $resource->environment_variables(),
+        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
+        default => $resource->runtime_environment_variables()->where('is_runtime', true),
+    };
+}
+
+/**
+ * The values for resolveComposeVolumeSourceVariables(). A value with a variable or vault reference is left out,
+ * because only Docker Compose can resolve it.
+ *
+ * @return array<string, string>
+ */
+function composeVolumeSourceVariables(Application|Service $resource, bool $isPreview = false): array
+{
+    return composeEnvironmentVariablesQuery($resource, $isPreview)->get()
+        ->mapWithKeys(fn ($variable) => [$variable->key => (string) $variable->real_value])
+        ->reject(fn (string $value) => $value === '' || str_contains($value, '$') || RemoteSecretReferences::containsReference($value))
+        ->all();
 }
 
 /**
@@ -313,17 +358,12 @@ function resolveComposeVolumeSourceDefault(string $source): string
 function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
 {
     if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
-        return resolveComposeVolumeSourceDefault($source);
+        return resolveComposeVolumeSourceVariables($source);
     }
 
-    $variables = match (true) {
-        $resource instanceof Service => $resource->environment_variables(),
-        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
-        default => $resource->runtime_environment_variables()->where('is_runtime', true),
-    };
-    $value = $variables->where('key', $matches[1])->first()?->real_value;
+    $value = composeEnvironmentVariablesQuery($resource, $isPreview)->where('key', $matches[1])->first()?->real_value;
     if (blank($value)) {
-        return resolveComposeVolumeSourceDefault($source);
+        return resolveComposeVolumeSourceVariables($source);
     }
     // Docker Compose expands variable references in the `.env` file, and Coolify writes vault secrets to it.
     if (str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
@@ -903,33 +943,27 @@ function rejectComposeVolumeTargetVariable(string $target, string $prefix): void
     }
 }
 
-function parseDockerVolumeString(string $volumeString): array
+function parseDockerVolumeString(string $volumeString, ?array $variables = null): array
 {
     $volumeString = trim($volumeString);
     $source = null;
     $target = null;
     $mode = null;
 
-    // First, check if the source contains an environment variable with default value
-    // This needs to be done before counting colons because ${VAR:-value} contains a colon
-    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
-    $hasEnvVarWithDefault = false;
-    $envVarEndPos = 0;
+    // A Compose variable such as ${VAR:-/data} can contain a colon, so the split does not look inside variables.
+    $variableTexts = [];
+    $volumeString = preg_replace_callback('/\$\{[^}]*\}/', function (array $match) use (&$variableTexts): string {
+        $variableTexts[] = $match[0];
 
-    if (preg_match($envVarPattern, $volumeString, $matches)) {
-        $hasEnvVarWithDefault = true;
-        $envVarEndPos = strlen($matches[0]);
-    }
+        return "\0".(count($variableTexts) - 1)."\0";
+    }, $volumeString);
+    $restoreVariables = fn (?string $part): ?string => $part === null ? null : preg_replace_callback(
+        '/\0(\d+)\0/',
+        fn (array $match): string => $variableTexts[(int) $match[1]] ?? $match[0],
+        $part
+    );
 
-    // Count colons, but exclude those inside environment variables
-    $effectiveVolumeString = $volumeString;
-    if ($hasEnvVarWithDefault) {
-        // Temporarily replace the env var to count colons correctly
-        $effectiveVolumeString = substr($volumeString, $envVarEndPos);
-        $colonCount = substr_count($effectiveVolumeString, ':');
-    } else {
-        $colonCount = substr_count($volumeString, ':');
-    }
+    $colonCount = substr_count($volumeString, ':');
 
     if ($colonCount === 0) {
         // Named volume without target (unusual but valid)
@@ -939,46 +973,12 @@ function parseDockerVolumeString(string $volumeString): array
     } elseif ($colonCount === 1) {
         // Simple volume mapping
         // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
-        if ($hasEnvVarWithDefault) {
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $target = substr($remaining, 1);
-            } else {
-                $target = $remaining;
-            }
-        } else {
-            $parts = explode(':', $volumeString);
-            $source = $parts[0];
-            $target = $parts[1];
-        }
+        $parts = explode(':', $volumeString);
+        $source = $parts[0];
+        $target = $parts[1];
     } elseif ($colonCount === 2) {
-        // Volume with mode OR Windows path OR env var with mode
-        // Handle env var with mode first
-        if ($hasEnvVarWithDefault) {
-            // ${VAR:-default}:/path:mode
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
-
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $remaining = substr($remaining, 1);
-                $lastColon = strrpos($remaining, ':');
-
-                if ($lastColon !== false) {
-                    $possibleMode = substr($remaining, $lastColon + 1);
-                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                    if (in_array($possibleMode, $validModes)) {
-                        $mode = $possibleMode;
-                        $target = substr($remaining, 0, $lastColon);
-                    } else {
-                        $target = $remaining;
-                    }
-                } else {
-                    $target = $remaining;
-                }
-            }
-        } elseif (preg_match('/^[A-Za-z]:/', $volumeString)) {
+        // Volume with mode OR Windows path
+        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
             // Windows path as source (C:/, D:/, etc.)
             // Find the second colon which is the real separator
             $secondColon = strpos($volumeString, ':', 2);
@@ -1077,33 +1077,34 @@ function parseDockerVolumeString(string $volumeString): array
         }
     }
 
+    $source = $restoreVariables($source);
+    $target = $restoreVariables($target);
+    $mode = $restoreVariables($mode);
+
     if ($source) {
-        $source = resolveComposeVolumeSourceDefault((string) $source);
+        $source = resolveComposeVolumeSourceVariables((string) $source, $variables);
     }
 
     // Validate source path for command injection attempts
     // We validate the final source value after environment variable processing
     if ($source !== null) {
-        // Allow environment variables like ${VAR_NAME} or ${VAR}
-        // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
-        $sourceStr = is_string($source) ? $source : $source;
+        // A ${VAR} that is left is resolved by Docker Compose, not by a shell. The text around it must be safe.
+        try {
+            validateShellSafePath(preg_replace('/\$\{[A-Za-z_][A-Za-z0-9_]*\}/', '', $source), 'volume source');
+        } catch (Exception $e) {
+            // Re-throw with more context about the volume string
+            throw new Exception(
+                'Invalid Docker volume definition: '.$e->getMessage().
+                ' Please use safe path names without shell metacharacters.'
+            );
+        }
 
-        // Skip validation for simple environment variable references
-        // Pattern 1: ${WORD_CHARS} with no special characters inside
-        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
-        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
-        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
-
-        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
-            try {
-                validateShellSafePath($sourceStr, 'volume source');
-            } catch (Exception $e) {
-                // Re-throw with more context about the volume string
-                throw new Exception(
-                    'Invalid Docker volume definition: '.$e->getMessage().
-                    ' Please use safe path names without shell metacharacters.'
-                );
-            }
+        // Coolify creates and manages the host path, so it must know the value of each variable in it.
+        if ($variables !== null && sourceIsLocal(str($source)) && preg_match('/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/', $source, $matches)) {
+            throw new Exception(
+                "Invalid Docker volume definition: the host path {$source} uses the variable {$matches[1]}, which has no value. ".
+                "Set {$matches[1]} in the environment variables of the resource, or add a default, for example \${{$matches[1]}:-/data}."
+            );
         }
     }
 
@@ -1627,7 +1628,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource, $isPullRequest)
+                        : null);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
@@ -2987,7 +2990,9 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource)
+                        : null);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed

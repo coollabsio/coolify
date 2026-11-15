@@ -200,7 +200,10 @@ class LocalPersistentVolume extends BaseModel
 
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
-                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
+                    // A source that resolves to a host path is a bind, so it is not this volume.
+                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource instanceof Application ? $resource : $resource->service)
+                        : null);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
                     if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
