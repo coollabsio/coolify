@@ -127,11 +127,12 @@ class InviteLink extends Component
             if (is_null($user) || $user->canReceiveInvitationLoginFrom(currentTeam()->id)) {
                 $password = Str::password();
                 if (is_null($user)) {
-                    $user = User::create([
+                    $user = User::forceCreate([
                         'name' => str($this->email)->before('@'),
                         'email' => $this->email,
                         'password' => Hash::make($password),
                         'force_password_reset' => true,
+                        'created_by_invitation' => true,
                     ]);
                 } else {
                     $user->forceFill(['password' => Hash::make($password)])->save();
