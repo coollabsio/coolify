@@ -456,6 +456,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/builds/{build_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.build.show');
             Route::get('/logs', ClusterApplicationShow::class)->name('project.cluster-application.logs');
             Route::get('/servers', ClusterApplicationShow::class)->name('project.cluster-application.servers');
+            Route::get('/previews', ClusterApplicationShow::class)->name('project.cluster-application.previews');
             Route::get('/webhooks', ClusterApplicationShow::class)->name('project.cluster-application.webhooks');
             Route::get('/backups', ClusterApplicationShow::class)->name('project.cluster-application.backups');
             Route::get('/backups/{backup_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.backup.show');

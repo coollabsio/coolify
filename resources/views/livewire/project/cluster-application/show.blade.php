@@ -13,6 +13,7 @@
             'build' => 'Deployment',
             'logs' => 'Logs',
             'servers' => 'Servers',
+            'previews' => 'Previews',
             'webhooks' => 'Webhooks',
             'backups' => 'Backups',
             'scheduled-tasks' => 'Scheduled Tasks',
@@ -187,6 +188,18 @@
             <x-cluster-applications.sidebar :section="$section" :route-parameters="$routeParameters" :workload="$workload" />
 
             <div class="application-settings-form flex min-w-0 flex-col gap-6">
+                @if ($workload->isPreview() && ($previewParent = $workload->previewOf) !== null)
+                    <x-callout type="info" title="Preview of pull request #{{ $workload->pull_request_id }}">
+                        This is the preview of
+                        @if ($workload->pull_request_url)
+                            <a href="{{ $workload->pull_request_url }}" target="_blank" rel="noopener noreferrer" class="underline">pull request #{{ $workload->pull_request_id }}</a>
+                        @else
+                            pull request #{{ $workload->pull_request_id }}
+                        @endif
+                        of <a {{ wireNavigate() }} class="underline" href="{{ route('project.cluster-application.previews', [...$routeParameters, 'workload_uuid' => $previewParent->uuid]) }}">{{ $previewParent->name }}</a>.
+                        Each deploy of the pull request copies the source, build, health check, resource, and variable settings of {{ $previewParent->name }} again. Change them there. Domains that you set here stay.
+                    </x-callout>
+                @endif
                 @include('livewire.project.cluster-application.partials.'.match (true) {
                     $section === 'build' => 'deployment',
                     $section === 'general' && $workload->isDatabase() => 'database-general',

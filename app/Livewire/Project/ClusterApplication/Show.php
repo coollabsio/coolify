@@ -67,7 +67,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'ports', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'ports', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'previews', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -221,6 +221,9 @@ class Show extends Component
         $this->resetNewDomain();
         // A database has no public domain (decision 0010).
         abort_if($this->section === 'domains' && $this->workload->isDatabase(), 404);
+        // Only a Git application has previews, and a preview is not a webhook target (decision 0025).
+        abort_if($this->section === 'previews' && ! $this->workload->canHavePreviews(), 404);
+        abort_if($this->section === 'webhooks' && $this->workload->isPreview(), 404);
         $this->loadDatabase();
     }
 

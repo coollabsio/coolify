@@ -65,11 +65,12 @@
             'Deploy' => [
                 ['label' => 'Git Source', 'icon' => 'sources', 'visible' => $workload->buildsFromGit()],
                 ['key' => 'servers', 'label' => 'Servers', 'icon' => 'servers'],
-                ['label' => 'Preview Deployments', 'icon' => 'eye'],
+                ['key' => 'previews', 'label' => 'Previews', 'icon' => 'eye', 'visible' => $workload->canHavePreviews()],
             ],
             'Automation' => [
                 ['key' => 'scheduled-tasks', 'label' => 'Scheduled Tasks', 'icon' => 'calendar'],
-                ['key' => 'webhooks', 'label' => 'Webhooks', 'icon' => 'webhook'],
+                // A preview is not a webhook target (decision 0025).
+                ['key' => 'webhooks', 'label' => 'Webhooks', 'icon' => 'webhook', 'visible' => ! $workload->isPreview()],
                 ['key' => $hasVolumes ? 'backups' : null, 'label' => 'Backups', 'icon' => 'database'],
             ],
             'Operations' => [
@@ -94,6 +95,7 @@
         'logs' => 'project.cluster-application.logs',
         'deployments' => 'project.cluster-application.deployments',
         'servers' => 'project.cluster-application.servers',
+        'previews' => 'project.cluster-application.previews',
         'resource-limits' => 'project.cluster-application.resource-limits',
         'webhooks' => 'project.cluster-application.webhooks',
         'backups' => 'project.cluster-application.backups',
