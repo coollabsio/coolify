@@ -951,7 +951,7 @@ class Server extends BaseModel
         instant_remote_process(["mkdir -p $path"], $this);
         $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
         instant_remote_process([
-            dockerNetworkEnsureCommand('coolify'),
+            dockerProxyNetworkEnsureCommand('coolify'),
             "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
             // A proxy on custom networks only must still reach the error page container.
             'docker network connect coolify coolify-proxy >/dev/null 2>&1 || true',
@@ -2803,7 +2803,7 @@ $siteAddress {
         if ($isSwarm) {
             return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
         } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
+            return instant_remote_process([dockerProxyNetworkEnsureCommand('coolify')], $this, false);
         }
     }
 
