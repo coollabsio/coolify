@@ -9,6 +9,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodePublishedPort;
 use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\User;
@@ -215,6 +216,7 @@ class ReconcileNodeClusterNetwork
             $fluxProbeHost = trim((string) parse_url(rescue(fn () => (new ResolveFluxPublicUrl)->resolve(), '', report: false), PHP_URL_HOST), '[]');
             $firewallRules = $this->firewallRules($cluster);
             $stackRules = $this->stackRules($cluster);
+            $publishedPortTargets = $this->publishedPortTargets($cluster);
             $ingressRules = $this->ingressRules($cluster);
             // The registry exists once the cluster has a Git workload. Its certificate is renewed here.
             // The sync also starts zot when a second Node joins, and stops it when one Node remains.
@@ -264,6 +266,8 @@ class ReconcileNodeClusterNetwork
                         'ingress_rules' => $ingressRules,
                         // An older Sentinel ignores unknown fields; the services of a stack then cannot reach each other.
                         ...($node->supportsCapability(self::STACK_RULES_CAPABILITY) === true ? ['stack_rules' => $stackRules] : []),
+                        // An older Sentinel would ignore the field and leave the ports closed.
+                        ...($node->supportsCapability(self::PUBLISHED_PORTS_CAPABILITY) === true ? ['published_ports' => self::publishedPorts($publishedPortTargets, $node)] : []),
                         ...($registryIp !== null ? ['registry_ip' => $registryIp] : []),
                     ]);
                     $operations[] = $this->runOperation($node, $user, $attempt, 'discovery.corrosion.reconcile.v1', [
@@ -572,6 +576,73 @@ class ReconcileNodeClusterNetwork
             ->sortBy(fn (array $rule): string => "{$rule['source_ip']}|{$rule['destination_ip']}")
             ->values()
             ->all();
+    }
+
+    /**
+     * Each published port of the cluster, with the container address of its workload on each Node
+     * that runs it, by Node id in id order. The address is the one of the slot that runs (decision
+     * 0022), else of the other slot. `running` is false when the inventory has no running container
+     * there, for example on the target of a move before its deploy.
+     *
+     * @return list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool}>}>
+     */
+    private function publishedPortTargets(NodeCluster $cluster): array
+    {
+        return NodePublishedPort::query()
+            ->where('node_cluster_id', $cluster->id)
+            ->with(['workload.nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)->orderBy('nodes.id')])
+            ->orderBy('protocol')
+            ->orderBy('host_port')
+            ->get()
+            ->map(fn (NodePublishedPort $port): array => [
+                'port' => $port,
+                'addresses' => $port->workload->nodes->mapWithKeys(function (Node $node) use ($port): array {
+                    $slot = $port->workload->containerSlotOn($node);
+                    $address = $node->pivot->{$slot->addressColumn()} ?: $node->pivot->{$slot->other()->addressColumn()};
+                    if (blank($address)) {
+                        return [];
+                    }
+                    $running = $port->workload->containers()
+                        ->where('node_id', $node->id)
+                        ->where('name', $slot->containerName($port->workload))
+                        ->where('state', 'running')
+                        ->exists();
+
+                    return [$node->id => ['ip' => $address, 'running' => $running]];
+                })->all(),
+            ])
+            ->all();
+    }
+
+    /**
+     * The published ports for one Node, with one destination each: nftables forwards a port to
+     * one address. Only running containers count while one runs. The container on this Node
+     * comes first, so the client address stays. Else the container on the Node with the lowest
+     * id, over WireGuard. A port of a workload without a container address is left out.
+     *
+     * @param  list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool}>}>  $targets  See publishedPortTargets().
+     * @return list<array{protocol: string, host_port: int, destination_ip: string, container_port: int, source_cidrs: list<string>}>
+     */
+    public static function publishedPorts(array $targets, Node $node): array
+    {
+        $ports = [];
+        foreach ($targets as ['port' => $port, 'addresses' => $addresses]) {
+            $running = array_filter($addresses, fn (array $address): bool => $address['running']);
+            $candidates = $running === [] ? $addresses : $running;
+            $destination = $candidates[$node->id] ?? reset($candidates);
+            if ($destination === false) {
+                continue;
+            }
+            $ports[] = [
+                'protocol' => $port->protocol,
+                'host_port' => $port->host_port,
+                'destination_ip' => $destination['ip'],
+                'container_port' => $port->container_port,
+                'source_cidrs' => array_values($port->source_cidrs ?? []),
+            ];
+        }
+
+        return $ports;
     }
 
     /**

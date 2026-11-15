@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\ApplyNodeClusterNetworkRevision;
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\DispatchWorkloadLifecycle;
@@ -35,8 +36,8 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
     public int $tries = 1;
 
-    /** The Flux deploy request (620 s) and the health wait. */
-    public int $timeout = 1020;
+    /** The Flux deploy request (620 s), the health wait, and the network revision of published ports. */
+    public int $timeout = 1020 + ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
 
     /** @param  Carbon|null  $waitUntil  A move that runs the job inline ends the health wait at its own deadline. */
     public function __construct(public int $operationId, public ?Carbon $waitUntil = null) {}
@@ -106,6 +107,8 @@ class DeployNodeWorkloadJob implements ShouldQueue
     /**
      * Removes the container that a rolling deploy replaced, after the new one is healthy. Sentinel
      * drains its endpoint first. A failure leaves it running: the next rolling deploy replaces it.
+     * A published port forwards to one container (decision 0016), so the Nodes forward it to the
+     * new container first.
      *
      * @return array<string, mixed>
      */
@@ -114,6 +117,14 @@ class DeployNodeWorkloadJob implements ShouldQueue
         $plan = $this->rollingPlan($operation);
         if ($plan === null) {
             return [];
+        }
+        $cluster = $operation->node->cluster;
+        if ($cluster !== null && $operation->workload->publishedPorts()->exists()) {
+            try {
+                ApplyNodeClusterNetworkRevision::run($cluster, $operation->requestedBy);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
         $name = $plan['replaces']->containerName($operation->workload);
         try {

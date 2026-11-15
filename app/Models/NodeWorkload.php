@@ -139,11 +139,12 @@ class NodeWorkload extends BaseModel
 
     /**
      * Whether other containers call this workload through the cluster firewall, so a new address
-     * must be allowed on every Node before it takes traffic: ingress, or the peers of its stack.
+     * must be allowed on every Node before it takes traffic: ingress, the peers of its stack, or a
+     * published port.
      */
     public function receivesClusterTraffic(): bool
     {
-        return $this->hasIngressRoutes() || $this->node_stack_id !== null;
+        return $this->hasIngressRoutes() || $this->node_stack_id !== null || $this->publishedPorts()->exists();
     }
 
     /**
