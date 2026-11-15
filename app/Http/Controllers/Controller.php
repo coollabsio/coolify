@@ -156,6 +156,12 @@ class Controller extends BaseController
 
         [$user, $team, $invitation, $alreadyMember] = $acceptedInvitation;
 
+        // Start a new session: the browser can hold the session of another user.
+        if (Auth::check()) {
+            Auth::logout();
+        }
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         Auth::login($user);
         session(['currentTeam' => $team]);
         $this->auditInvitationAccepted($user, $invitation, $alreadyMember);
