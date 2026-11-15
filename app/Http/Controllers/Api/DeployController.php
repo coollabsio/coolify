@@ -589,7 +589,7 @@ class DeployController extends Controller
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to deploy this service.', 'deployment_uuid' => null];
                 }
-                StartService::run($resource);
+                StartService::run($resource, pullLatestImages: true);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 auditLog('api.service.deployed', [
                     'service_uuid' => $resource->uuid,

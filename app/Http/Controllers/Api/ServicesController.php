@@ -2145,7 +2145,7 @@ class ServicesController extends Controller
 
     #[OA\Post(
         summary: 'Start',
-        description: 'Start service.',
+        description: 'Start service. Pulls the latest images first.',
         path: '/services/{uuid}/start',
         operationId: 'start-service-by-uuid',
         security: [
@@ -2213,7 +2213,7 @@ class ServicesController extends Controller
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
-        StartService::dispatch($service);
+        StartService::dispatch($service, true);
 
         auditLog('api.service.deployed', [
             'team_id' => $teamId,
