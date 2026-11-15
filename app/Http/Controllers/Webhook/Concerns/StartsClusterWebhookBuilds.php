@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Actions\Node\Build\StartNodeBuild;
+use App\Jobs\DeployNodeStackJob;
 use App\Models\GithubApp;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use Closure;
@@ -15,6 +17,8 @@ use Throwable;
  * Starts builds of cluster applications from Git push webhooks (decision 0011). The
  * matching rules and secret checks are the v4 ones. Pull request events do not build
  * cluster applications yet. The controller also uses MatchesManualWebhookApplications.
+ * A matched service of a stack from Git deploys its whole stack at the pushed commit, once
+ * for each stack (decision 0023).
  */
 trait StartsClusterWebhookBuilds
 {
@@ -108,6 +112,10 @@ trait StartsClusterWebhookBuilds
             return [...$result, 'status' => 'failed', 'message' => 'This application is not placed on any server.'];
         }
 
+        if ($workload->node_stack_id !== null) {
+            return $this->startClusterWebhookStackDeploy($workload, $commit, $provider, $mode);
+        }
+
         try {
             $build = StartNodeBuild::run($workload, null, $commit);
         } catch (Throwable $exception) {
@@ -127,5 +135,38 @@ trait StartsClusterWebhookBuilds
         ]);
 
         return [...$result, 'status' => 'success', 'message' => 'Build queued.', 'build_uuid' => $build->uuid];
+    }
+
+    /**
+     * Queues one deploy of the stack of the service. The other matched services of the stack
+     * find it queued and are skipped.
+     *
+     * @return array<string, mixed>
+     */
+    private function startClusterWebhookStackDeploy(NodeWorkload $workload, ?string $commit, string $provider, string $mode): array
+    {
+        $stack = NodeStack::query()->withoutGlobalScopes()->find($workload->node_stack_id);
+        if ($stack === null) {
+            return ['application_uuid' => $workload->uuid, 'application_name' => $workload->name, 'status' => 'failed', 'message' => 'The stack of this application does not exist.'];
+        }
+        $result = ['stack_uuid' => $stack->uuid, 'stack_name' => $stack->name];
+        $queued = NodeStack::query()->withoutGlobalScopes()
+            ->whereKey($stack->id)
+            ->where(fn ($query) => $query->whereNull('deploy_status')->orWhereNotIn('deploy_status', ['queued', 'deploying']))
+            ->update(['deploy_status' => 'queued', 'deploy_error' => null]);
+        if ($queued === 0) {
+            return [...$result, 'status' => 'skipped', 'message' => 'A deployment of this stack is already queued or running.'];
+        }
+        DeployNodeStackJob::dispatch($stack->id, null, $commit);
+        auditLog('webhook.stack_deploy.queued', [
+            'provider' => $provider,
+            'mode' => $mode,
+            'stack_uuid' => $stack->uuid,
+            'stack_name' => $stack->name,
+            'workload_uuid' => $workload->uuid,
+            'commit' => $commit,
+        ]);
+
+        return [...$result, 'status' => 'success', 'message' => 'Stack deployment queued. Each service with build: builds first.'];
     }
 }
