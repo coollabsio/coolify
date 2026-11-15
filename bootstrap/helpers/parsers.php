@@ -379,6 +379,34 @@ function isSafeComposeNetworkVariableOperand(string $operator, string $operand):
 }
 
 /**
+ * Tells if Coolify sets this variable itself. A reference to it in the compose file must not create a
+ * resource variable, because a resource variable with the same key replaces the value of Coolify.
+ */
+function isCoolifyProvidedComposeVariable(string $key): bool
+{
+    return in_array($key, [
+        'COOLIFY_RESOURCE_UUID',
+        'COOLIFY_CONTAINER_NAME',
+        'COOLIFY_BRANCH',
+        'COOLIFY_URL',
+        'COOLIFY_FQDN',
+        'COOLIFY_APP_NAME',
+        'COOLIFY_PROJECT_NAME',
+        'COOLIFY_ENVIRONMENT_NAME',
+        'COOLIFY_SERVER_IP',
+    ], true);
+}
+
+/**
+ * Tells if a compose value starts with a reference to a variable that Coolify sets, for example `${COOLIFY_RESOURCE_UUID:-x}`.
+ */
+function composeValueReferencesCoolifyProvidedVariable(string $value): bool
+{
+    return preg_match('/\A\$\{?([A-Za-z_][A-Za-z0-9_]*)/', $value, $matches) === 1
+        && isCoolifyProvidedComposeVariable($matches[1]);
+}
+
+/**
  * Creates a resource environment variable for each top-level network `name:` that is one Compose
  * variable, like variables in `environment:`, so users can see and change it. The compose file keeps
  * the variable and Compose resolves it from the deployment `.env`. The default from the compose file
@@ -392,7 +420,7 @@ function ensureComposeNetworkNameVariables(Application|Service $resource, iterab
     foreach ($networks as $network) {
         $name = data_get($network, 'name');
         $variable = is_string($name) ? composeNetworkNameVariable($name) : null;
-        if ($variable === null) {
+        if ($variable === null || isCoolifyProvidedComposeVariable($variable['variable'])) {
             continue;
         }
         if ($variable['default'] !== null && ! ValidationPatterns::isValidDockerNetwork($variable['default'])) {
@@ -1833,7 +1861,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
-            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value())) {
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value()) && ! isCoolifyProvidedComposeVariable($key->value())) {
                 $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
@@ -1845,7 +1873,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 continue;
             }
             extractDockerComposeEnvironmentVariableReferences($value->value())
-                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_'))
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_') || isCoolifyProvidedComposeVariable($reference))
                 ->each(function (string $reference) use ($resource): void {
                     $environmentVariable = $resource->environment_variables()->firstOrCreate([
                         'key' => $reference,
@@ -1874,7 +1902,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                 continue;
             }
-            if (! $value->startsWith('$')) {
+            if (! $value->startsWith('$') || composeValueReferencesCoolifyProvidedVariable($value->value())) {
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
@@ -3235,7 +3263,7 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
-            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value())) {
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value()) && ! isCoolifyProvidedComposeVariable($key->value())) {
                 $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
@@ -3251,7 +3279,7 @@ function serviceParser(Service $resource): Collection
             $primaryReference = $referenceContent === null ? null : splitOnOperatorOutsideNested($referenceContent['content']);
             extractDockerComposeEnvironmentVariableReferences($value->value())
                 ->reject(fn (string $reference): bool => $value->startsWith('$') && $reference === ($primaryReference['variable'] ?? null) && str_contains($primaryReference['operator'], '?'))
-                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_'))
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_') || isCoolifyProvidedComposeVariable($reference))
                 ->each(function (string $reference) use ($resource): void {
                     $environmentVariable = $resource->environment_variables()->firstOrCreate([
                         'key' => $reference,
@@ -3281,7 +3309,7 @@ function serviceParser(Service $resource): Collection
 
                 continue;
             }
-            if (! $value->startsWith('$')) {
+            if (! $value->startsWith('$') || composeValueReferencesCoolifyProvidedVariable($value->value())) {
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {

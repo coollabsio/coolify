@@ -4706,6 +4706,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
                     }
                 }
+            } elseif (! $forBuildTime && $this->deployedPreviewVariables()->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                // The parser sets it in each Compose service; Docker Compose reads it from .env for ${COOLIFY_RESOURCE_UUID} in the file.
+                $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
             }
 
             // Runtime only, so a project or server change does not break the Docker build cache
@@ -4753,6 +4756,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
                     }
                 }
+            } elseif (! $forBuildTime && $this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                // The parser sets it in each Compose service; Docker Compose reads it from .env for ${COOLIFY_RESOURCE_UUID} in the file.
+                $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
             }
 
             // Runtime only, so a project or server change does not break the Docker build cache

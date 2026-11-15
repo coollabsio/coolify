@@ -1706,6 +1706,10 @@ class Service extends BaseModel
         }
 
         $envs_from_coolify = $this->environment_variables()->get();
+        // So that Docker Compose can resolve ${COOLIFY_RESOURCE_UUID} in the compose file
+        if ($envs_from_coolify->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $envs->push("COOLIFY_RESOURCE_UUID={$this->uuid}");
+        }
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
                 return 1;
