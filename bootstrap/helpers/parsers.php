@@ -82,6 +82,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['target'])) {
                         $target = $volume['target'];
                         if (is_string($target)) {
+                            rejectComposeVolumeTargetVariable($target, 'Invalid Docker volume definition (array syntax)');
                             try {
                                 validateShellSafePath($target, 'volume target');
                             } catch (Exception $e) {
@@ -861,6 +862,21 @@ function validateVolumeStringForInjection(string $volumeString): void
     parseDockerVolumeString($volumeString);
 }
 
+/**
+ * Rejects a Compose variable in the container path of a volume with a message that tells the user what to do.
+ * Coolify stores the container path and uses it in backups, file storages, and transfers, so it must be a literal path.
+ *
+ * @throws Exception If the target contains a variable
+ */
+function rejectComposeVolumeTargetVariable(string $target, string $prefix): void
+{
+    if (str_contains($target, '${')) {
+        throw new Exception(
+            "{$prefix}: the container path {$target} contains a variable. Coolify does not support variables in the container path of a volume. Write the path without variables, for example /app/data."
+        );
+    }
+}
+
 function parseDockerVolumeString(string $volumeString): array
 {
     $volumeString = trim($volumeString);
@@ -1071,6 +1087,7 @@ function parseDockerVolumeString(string $volumeString): array
         // Target paths in containers are typically absolute paths, so we validate them too
         // but they're less likely to be dangerous since they're not used in host commands
         // Still, defense in depth is important
+        rejectComposeVolumeTargetVariable($targetStr, 'Invalid Docker volume definition');
         try {
             validateShellSafePath($targetStr, 'volume target');
         } catch (Exception $e) {
