@@ -280,6 +280,11 @@ new. These points differ from the decision above or add to it:
   The stack page shows it.
 - **Not synced.** A template stack (no Git source) does not change. The
   generated `SERVICE_*` values stay; only new ones are generated. A deploy
-  with the same file does not sync. A removed service whose delete fails
-  stays, and the team gets a notification. The job timeout of a deploy
-  counts only the services that existed before the sync.
+  with the same file does not sync.
+- **Removed services.** Each deploy of a Git stack deletes the services that
+  the stored file does not have, also when the file did not change. A
+  delete that failed is tried again at the next deploy, and the team gets a
+  notification for each failure.
+- **Timeout.** The sync can add services after the deploy is queued, so a
+  deploy of a Git stack has the longest job timeout (6 hours). Each service
+  still has its own wait.

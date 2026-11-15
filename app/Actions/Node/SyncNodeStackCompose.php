@@ -41,6 +41,8 @@ class SyncNodeStackCompose
             throw new RuntimeException('Only a stack from Git reads its Compose file again.');
         }
         if ($compose === $stack->compose_raw) {
+            $this->deleteRemovedServices($stack, $requestedBy);
+
             return null;
         }
         $cluster = NodeCluster::query()->findOrFail($stack->node_cluster_id);
@@ -54,7 +56,7 @@ class SyncNodeStackCompose
         $actor = $this->actor($stack, $requestedBy);
         $registryIsNew = ! $cluster->registry()->exists();
 
-        [$summary, $removed] = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor): array {
+        $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor): array {
             $stack = NodeStack::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($stack->id);
             $stored = $stack->variables ?? [];
             $variables = CreateClusterStack::stackVariables($cluster, $stack, $yaml, $compose, $stored);
@@ -113,12 +115,10 @@ class SyncNodeStackCompose
                 'compose_changes' => $summary,
             ]);
 
-            return [$summary, $diff->removed];
+            return $summary;
         });
 
-        foreach ($removed as $workload) {
-            DeleteNodeWorkloadJob::dispatch($workload->id, $requestedBy?->id);
-        }
+        $this->deleteRemovedServices($stack, $requestedBy);
         // The next network revision starts zot and BuildKit on the Nodes.
         if ($registryIsNew && $cluster->registry()->exists()) {
             QueueNodeClusterNetworkRevision::run($cluster);
@@ -176,6 +176,20 @@ class SyncNodeStackCompose
         }
 
         return $admin;
+    }
+
+    /**
+     * Deletes every service of the stack that the stored Compose file does not have. It runs at each
+     * deploy, so a delete that failed before is tried again. A delete that runs is not queued twice.
+     */
+    private function deleteRemovedServices(NodeStack $stack, ?User $requestedBy): void
+    {
+        $services = array_map('strval', array_keys($stack->refresh()->compose_parsed['services'] ?? []));
+        NodeWorkload::query()->withoutGlobalScopes()
+            ->where('node_stack_id', $stack->id)
+            ->whereNotIn('stack_service', $services)
+            ->pluck('id')
+            ->each(fn (int $id) => DeleteNodeWorkloadJob::dispatch($id, $requestedBy?->id));
     }
 
     private function shortCommit(string $commitSha): string

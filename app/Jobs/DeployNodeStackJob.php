@@ -58,6 +58,13 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(public int $stackId, public ?int $requestedById = null, public ?string $commitSha = null)
     {
+        // The sync of a stack from Git can add services after the job is queued, so it gets the
+        // longest time. The deadline is only a ceiling: each service still has its own wait.
+        if (NodeStack::query()->withoutGlobalScopes()->whereKey($stackId)->whereNotNull('git_repository')->exists()) {
+            $this->timeout = self::MAX_TIMEOUT;
+
+            return;
+        }
         $sourceTypes = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stackId)->pluck('source_type');
         $builds = $sourceTypes->filter(fn (NodeWorkloadSourceType $type): bool => $type->builds())->count();
         $buildSeconds = $builds * (int) config('constants.node.build_timeout_minutes') * 60;
