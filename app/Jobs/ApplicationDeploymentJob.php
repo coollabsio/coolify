@@ -1997,20 +1997,110 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Reads the Compose file from the repository again (also for pull request previews). If the file is not
-     * safe to use, the deployment stops here with a visible log line, before a command uses the file.
+     * Reads the Compose file from the repository again. A preview reads the file of its pull request when it can
+     * (usesPullRequestComposeFile()), otherwise the file of the base branch. If the file is not safe to use, the
+     * deployment stops here with a visible log line, before a command uses the file.
      */
     private function loadComposeFileForDeployment(): void
     {
+        if ($this->usesPullRequestComposeFile()) {
+            $this->loadPullRequestComposeFile();
+
+            return;
+        }
+        if ($this->pull_request_id !== 0) {
+            $reason = $this->application->settings->is_raw_compose_deployment_enabled
+                ? 'raw Compose deployments are on'
+                : 'public PR deployments are on, and a pull request from a fork could add host mounts to it';
+            $this->application_deployment_queue->addLogEntry("This preview uses the Docker Compose file of the {$this->application->git_branch} branch, because {$reason}.");
+        }
+
         try {
             $this->application->loadComposeFile(isInit: false);
         } catch (DeploymentException $e) {
             // Deployment logs escape HTML themselves, so undo the escaping that error toasts need.
-            $message = 'Deployment stopped: '.lcfirst(html_entity_decode($e->getMessage(), ENT_QUOTES | ENT_HTML5));
-            $this->application_deployment_queue->addLogEntry($message, 'stderr');
-
-            throw DeploymentException::alreadyLogged($message, previous: $e);
+            $this->stopComposeDeployment(lcfirst(html_entity_decode($e->getMessage(), ENT_QUOTES | ENT_HTML5)), $e);
         }
+    }
+
+    /**
+     * Without public PR deployments, only branches of the repository deploy as previews, so the Compose file
+     * of the pull request is as trusted as the file of the base branch. A fork could add host mounts or
+     * privileged services, so public previews use the file of the base branch.
+     */
+    private function usesPullRequestComposeFile(): bool
+    {
+        return $this->pull_request_id !== 0
+            && ! $this->application->settings->is_pr_deployments_public_enabled
+            && ! $this->application->settings->is_raw_compose_deployment_enabled;
+    }
+
+    /**
+     * Reads the Compose file from the checkout of the pull request. The file is used only by this deployment:
+     * it is set on the model of the job and marked as unchanged, so a save keeps the file of the base branch,
+     * and the parser does not write the Compose fields of the application for a preview.
+     *
+     * @throws DeploymentException
+     */
+    private function loadPullRequestComposeFile(): void
+    {
+        $displayPath = rtrim((string) $this->application->base_directory, '/').$this->docker_compose_location;
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, self::pullRequestComposeFileReadCommand("{$this->workdir}{$this->docker_compose_location}", $this->basedir)),
+            'hidden' => true,
+            'save' => 'pull_request_compose_file',
+        ]);
+        $compose = trim((string) $this->saved_outputs->get('pull_request_compose_file'));
+
+        $problem = match ($compose) {
+            '' => 'is empty. Check that the file in the pull request has content.',
+            '__COOLIFY_COMPOSE_NOT_FOUND__' => 'does not exist. Check if you used the right extension (.yaml or .yml) in the compose file name.',
+            '__COOLIFY_COMPOSE_SYMLINK__' => 'is a symbolic link. Coolify reads only regular files from the repository. Commit the file itself instead of a link to it.',
+            '__COOLIFY_COMPOSE_TOO_LARGE__' => 'exceeds the 5 MiB size limit.',
+            default => null,
+        };
+        if ($problem === null) {
+            try {
+                validateDockerComposeForInjection($compose);
+            } catch (Exception $e) {
+                $problem = "is not safe to use, so Coolify did not load it. {$e->getMessage()}";
+            }
+        }
+        if ($problem !== null) {
+            $this->stopComposeDeployment("the Docker Compose file at {$displayPath} (pull request #{$this->pull_request_id}) {$problem}");
+        }
+
+        $this->application->docker_compose_raw = $compose;
+        $this->application->syncOriginalAttribute('docker_compose_raw');
+        $this->application_deployment_queue->addLogEntry("Using the Docker Compose file at {$displayPath} of pull request #{$this->pull_request_id}.");
+    }
+
+    /**
+     * Prints the content of a regular file inside the repository, or a marker when the file is missing, a
+     * symbolic link (also through a linked directory), or larger than the size limit.
+     */
+    private static function pullRequestComposeFileReadCommand(string $path, string $repositoryRoot): string
+    {
+        return implode(' ', [
+            'file='.escapeshellarg($path).'; root='.escapeshellarg(rtrim($repositoryRoot, '/')).';',
+            'if [ -L "$file" ]; then echo __COOLIFY_COMPOSE_SYMLINK__;',
+            'elif [ ! -f "$file" ]; then echo __COOLIFY_COMPOSE_NOT_FOUND__;',
+            'else case "$(realpath "$file")" in',
+            '"$root"/*) if [ "$(stat -c %s "$file")" -gt '.Application::MAX_DOCKER_COMPOSE_SIZE_BYTES.' ]; then echo __COOLIFY_COMPOSE_TOO_LARGE__; else cat "$file"; fi ;;',
+            '*) echo __COOLIFY_COMPOSE_SYMLINK__ ;;',
+            'esac; fi',
+        ]);
+    }
+
+    /**
+     * @throws DeploymentException
+     */
+    private function stopComposeDeployment(string $reason, ?Throwable $previous = null): never
+    {
+        $message = "Deployment stopped: {$reason}";
+        $this->application_deployment_queue->addLogEntry($message, 'stderr');
+
+        throw DeploymentException::alreadyLogged($message, previous: $previous);
     }
 
     /**

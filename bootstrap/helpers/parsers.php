@@ -2414,7 +2414,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     });
 
     $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
-    $resource->docker_compose = $cleanedCompose;
+    // A preview parse keeps the Compose fields of the application: a preview can use the Compose file of its pull request.
+    if (! $isPullRequest) {
+        $resource->docker_compose = $cleanedCompose;
+    }
 
     // Update docker_compose_raw to remove content: from volumes only
     // This keeps the original user input clean while preventing content reapplication
@@ -2436,7 +2439,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        if ($originalYaml !== $originalYamlBeforeCleanup) {
+        if (! $isPullRequest && $originalYaml !== $originalYamlBeforeCleanup) {
             $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($originalCompose, $originalYaml, ['content', 'isDirectory', 'is_directory']);
         }
     } catch (Exception) {
