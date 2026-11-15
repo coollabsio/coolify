@@ -15,6 +15,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GiteaApp;
 use App\Services\ServerTransfer\TransferFinishChecklist;
+use App\Support\PullRequestWebhook;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -428,12 +429,25 @@ class Gitea extends Controller
                 }
             }
             if ($x_gitea_event === 'pull_request') {
+                $from_fork = $this->isPreviewDeploymentFromFork(
+                    data_get($payload, 'pull_request.head.repo.id'),
+                    data_get($payload, 'pull_request.base.repo.id'),
+                    data_get($payload, 'repository.id'),
+                );
+                $pull_request = PullRequestWebhook::forAction('gitea', $action, $pull_request_id, $base_branch, $commit, "refs/pull/{$pull_request_id}/head",
+                    $pull_request_html_url, $from_fork ?? true, $skip_deploy_pr, $from_fork === null ? 'The base repository of the pull request is not the repository of the webhook.' : null);
+                if ($pull_request !== null) {
+                    $return_payloads = $this->startManualWebhookClusterPreviews('gitea', $full_name, $pull_request,
+                        fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)));
+                }
                 if ($action !== 'closed') {
                     $applications->where('git_branch', $base_branch);
                 }
                 $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                    return $pull_request === null
+                        ? response("Nothing to do. Action '$action' is not supported.")
+                        : $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }
             }
             foreach ($applications as $application) {

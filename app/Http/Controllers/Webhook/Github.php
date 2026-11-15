@@ -21,6 +21,7 @@ use App\Models\PrivateKey;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
 use App\Services\ServerTransfer\TransferFinishChecklist;
+use App\Support\PullRequestWebhook;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
@@ -105,9 +106,18 @@ class Github extends Controller
                 $applications->where('git_branch', $matched_branch);
             }
             $applications = $this->manualWebhookApplications($applications, $full_name);
+            $secret_matches = fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret));
             if ($x_github_event === 'push') {
-                $return_payloads = $this->startManualWebhookClusterBuilds('github', $full_name, $branch, $commit, $skip_deploy_commits,
-                    fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)));
+                $return_payloads = $this->startManualWebhookClusterBuilds('github', $full_name, $branch, $commit, $skip_deploy_commits, $secret_matches);
+            }
+            if ($x_github_event === 'pull_request') {
+                $pull_request = $this->clusterPullRequest($action, $pull_request_id, $base_branch, $commit_sha, $pull_request_html_url, $is_fork_pull_request, $pull_request_title);
+                if ($pull_request === null && $applications->isEmpty()) {
+                    return response("Nothing to do. Action '$action' is not supported.");
+                }
+                if ($pull_request !== null) {
+                    $return_payloads = $this->startManualWebhookClusterPreviews('github', $full_name, $pull_request, $secret_matches);
+                }
             }
             if ($applications->isEmpty()) {
                 return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
@@ -502,12 +512,18 @@ class Github extends Controller
                 }
             }
             if ($x_github_event === 'pull_request') {
+                $pull_request = $this->clusterPullRequest($action, $pull_request_id, $base_branch, $commit_sha, $pull_request_html_url, $is_fork_pull_request, $pull_request_title);
+                if ($pull_request !== null) {
+                    $return_payloads = $this->startGithubAppClusterPreviews($github_app, $full_name, $pull_request);
+                }
                 if ($action !== 'closed') {
                     $applications->where('git_branch', $base_branch);
                 }
                 $applications = $applications->get();
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with branch '$base_branch'.");
+                    return $return_payloads->isEmpty()
+                        ? response("Nothing to do. No applications found with branch '$base_branch'.")
+                        : response($return_payloads);
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -687,6 +703,13 @@ class Github extends Controller
             'commit_sha' => $head_sha ?? 'HEAD',
             'is_fork_pull_request' => $this->isForkPullRequest($payload),
         ];
+    }
+
+    /** The pull request for the previews of cluster applications, or null for an action without a preview change. */
+    private function clusterPullRequest(string $action, int $pullRequestId, ?string $baseBranch, string $commitSha, string $url, bool $fromFork, ?string $title): ?PullRequestWebhook
+    {
+        return PullRequestWebhook::forAction('github', $action, $pullRequestId, $baseBranch, $commitSha === 'HEAD' ? null : $commitSha,
+            "refs/pull/{$pullRequestId}/head", $url, $fromFork, self::shouldSkipDeployAny([$title]));
     }
 
     /**

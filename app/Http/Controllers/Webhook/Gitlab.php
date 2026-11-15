@@ -15,6 +15,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
 use App\Services\ServerTransfer\TransferFinishChecklist;
+use App\Support\PullRequestWebhook;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -453,12 +454,25 @@ class Gitlab extends Controller
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
+                $from_fork = $this->isPreviewDeploymentFromFork(
+                    data_get($payload, 'object_attributes.source_project_id'),
+                    data_get($payload, 'object_attributes.target_project_id'),
+                    data_get($payload, 'project.id'),
+                );
+                $pull_request = PullRequestWebhook::forAction('gitlab', $action, $pull_request_id, $base_branch, $commit, "refs/merge-requests/{$pull_request_id}/head",
+                    $pull_request_html_url, $from_fork ?? true, $skip_deploy_pr, $from_fork === null ? 'The target project of the merge request is not the project of the webhook.' : null);
+                if ($pull_request !== null) {
+                    $return_payloads = $return_payloads->merge($this->startManualWebhookClusterPreviews('gitlab', $full_name, $pull_request,
+                        fn (string $secret): bool => hash_equals($secret, $x_gitlab_token)));
+                }
                 if (! in_array($action, ['closed', 'close', 'merge'])) {
                     $applications->where('git_branch', $base_branch);
                 }
                 $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+                    return $pull_request === null
+                        ? response("Nothing to do. Action '$action' is not supported.")
+                        : $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }
             }
             foreach ($applications as $application) {

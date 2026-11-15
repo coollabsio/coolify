@@ -13,6 +13,7 @@ use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Services\ServerTransfer\TransferFinishChecklist;
+use App\Support\PullRequestWebhook;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -93,10 +94,29 @@ class Bitbucket extends Controller
                 $applications->where('git_branch', $branch);
             }
             $applications = $this->manualWebhookApplications($applications, $full_name);
+            $bitbucket_secret_matches = fn (string $secret): bool => str_starts_with($x_bitbucket_token, 'sha256=')
+                && hash_equals(Str::after($x_bitbucket_token, 'sha256='), hash_hmac('sha256', $request->getContent(), $secret));
+            if ($x_bitbucket_event !== 'repo:push') {
+                // Bitbucket has no ref of a pull request, so a preview builds the source branch,
+                // which is not in the repository for a pull request from a fork (decision 0025).
+                $from_fork = $this->isPreviewDeploymentFromFork(
+                    data_get($payload, 'pullrequest.source.repository.uuid'),
+                    data_get($payload, 'pullrequest.destination.repository.uuid'),
+                    data_get($payload, 'repository.uuid'),
+                );
+                $pull_request = PullRequestWebhook::forAction('bitbucket', $x_bitbucket_event, $pull_request_id, $branch, $commit, (string) $base_branch,
+                    $pull_request_html_url, $from_fork ?? true, $skip_deploy_pr, match (true) {
+                        $from_fork === null => 'The destination repository of the pull request is not the repository of the webhook.',
+                        $from_fork => 'Bitbucket pull requests from forks cannot have previews.',
+                        blank($base_branch) => 'The pull request has no source branch.',
+                        default => null,
+                    });
+                if ($pull_request !== null) {
+                    $return_payloads = $this->startManualWebhookClusterPreviews('bitbucket', $full_name, $pull_request, $bitbucket_secret_matches);
+                }
+            }
             if ($x_bitbucket_event === 'repo:push') {
-                $return_payloads = $this->startManualWebhookClusterBuilds('bitbucket', $full_name, $branch, $commit, $skip_deploy_commits,
-                    fn (string $secret): bool => str_starts_with($x_bitbucket_token, 'sha256=')
-                        && hash_equals(Str::after($x_bitbucket_token, 'sha256='), hash_hmac('sha256', $request->getContent(), $secret)));
+                $return_payloads = $this->startManualWebhookClusterBuilds('bitbucket', $full_name, $branch, $commit, $skip_deploy_commits, $bitbucket_secret_matches);
             }
             if ($applications->isEmpty()) {
                 return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);

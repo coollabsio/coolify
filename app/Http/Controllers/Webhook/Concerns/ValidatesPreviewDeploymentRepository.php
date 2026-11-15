@@ -26,4 +26,18 @@ trait ValidatesPreviewDeploymentRepository
 
         return hash_equals($sourceRepository, $targetRepository) || $publicPreviewsEnabled;
     }
+
+    /**
+     * Whether a pull request is from a fork, with the identities of the v4 check: null when the
+     * target repository is unknown or is not the repository of the webhook, so no preview deploys.
+     * An unknown source repository, like a deleted fork, counts as a fork (decision 0025).
+     */
+    protected function isPreviewDeploymentFromFork(mixed $sourceRepository, mixed $targetRepository, mixed $webhookRepository): ?bool
+    {
+        if (! $this->isPreviewDeploymentRepositoryTrusted($targetRepository, $targetRepository, $webhookRepository, false)) {
+            return null;
+        }
+
+        return ! $this->isPreviewDeploymentRepositoryTrusted($sourceRepository, $targetRepository, $webhookRepository, false);
+    }
 }
