@@ -1081,6 +1081,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
+            if ($this->force_rebuild && ! preg_match('/(?:^|\s)--no-cache(?=[\s=]|$)/', $build_command)) {
+                $build_command = injectDockerComposeBuildArgs($build_command, '--no-cache');
+            }
+
             try {
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$build_command}"), 'hidden' => true],

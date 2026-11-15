@@ -2265,6 +2265,35 @@ YAML;
     'preview' => 42,
 ]);
 
+it('turns off the build cache of a custom Compose build command for a forced rebuild', function (bool $forceRebuild, string $customBuildCommand, string $expectedBuild) {
+    $compose = "services:\n  app:\n    build: .\n";
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'remote_secrets_cache' => [],
+        'force_rebuild' => $forceRebuild,
+        'docker_compose_location' => '/docker-compose.yaml',
+        'docker_compose_custom_build_command' => $customBuildCommand,
+        'build_args' => collect(),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'build_docker_compose_images', parseDockerComposeYaml($compose), collect());
+
+    $buildCommand = collect($job->recordedCommands)->flatten()->first(fn (mixed $command): bool => is_string($command) && str_contains($command, 'docker compose'));
+
+    expect($buildCommand)->toContain($expectedBuild)
+        ->and(substr_count($buildCommand, '--no-cache'))->toBe(str_contains($expectedBuild, '--no-cache') ? 1 : 0);
+})->with([
+    'forced rebuild' => [true, 'docker compose build app', ' build --no-cache app'],
+    'forced rebuild with --no-cache already set' => [true, 'docker compose build --no-cache app', ' build --no-cache app'],
+    'regular deployment' => [false, 'docker compose build app', ' build app'],
+]);
+
 it('passes port-suffixed compose service URL variables to production and preview deployments', function (int $pullRequestId) {
     $compose = <<<'YAML'
 services:
