@@ -64,7 +64,7 @@ class CreateClusterStack
         }
         $yaml = NodeStackCompose::parse($compose);
         $composeDirectory = $git?->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory);
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts());
         if ($reason !== null) {
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }
@@ -102,6 +102,10 @@ class CreateClusterStack
             $stack->update(['variables' => $variables]);
 
             $services = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory);
+            $conflict = self::portConflict($cluster, array_column($services, 'published_ports', 'service'));
+            if ($conflict !== null) {
+                throw new RuntimeException("This stack is not available on Nodes. {$conflict}");
+            }
             $workloads = [];
             foreach ($services as $service) {
                 $workloads[$service['service']] = self::createService($stack, $node, $service, $requestedBy);
@@ -170,8 +174,41 @@ class CreateClusterStack
         if ($service['routes'] !== []) {
             UpdateNodeWorkloadDomains::run($workload, $service['routes'], $requestedBy);
         }
+        if ($service['published_ports'] !== []) {
+            PublishNodeWorkloadPort::replace(NodeCluster::query()->findOrFail($stack->node_cluster_id), $workload, $service['published_ports']);
+        }
 
         return $workload;
+    }
+
+    /**
+     * Why the services cannot publish their ports in the cluster (decision 0016), or null: a
+     * port that a Node uses, that another application publishes, or that two services publish.
+     *
+     * @param  array<string, list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>>  $portsByService
+     * @param  list<int>  $replacedWorkloadIds  The workloads of the stack whose ports these lists replace.
+     */
+    public static function portConflict(NodeCluster $cluster, array $portsByService, array $replacedWorkloadIds = []): ?string
+    {
+        $owners = [];
+        foreach ($portsByService as $service => $ports) {
+            foreach ($ports as $port) {
+                $label = PublishNodeWorkloadPort::label($port);
+                $owner = $owners[$port['protocol'].'/'.$port['host_port']] ?? null;
+                if ($owner !== null) {
+                    return $owner === $service
+                        ? "The service {$service} publishes {$label} twice."
+                        : "The services {$owner} and {$service} both publish {$label}.";
+                }
+                $owners[$port['protocol'].'/'.$port['host_port']] = (string) $service;
+                $reason = PublishNodeWorkloadPort::unavailableReason($cluster, $port, $replacedWorkloadIds);
+                if ($reason !== null) {
+                    return "The service {$service} publishes {$label}. {$reason}";
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

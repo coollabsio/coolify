@@ -119,7 +119,7 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository; see NodeStackCompose::build().
-     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
+     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, published_ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
      */
     public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null, array $sharedKeys = []): array
     {
@@ -167,6 +167,9 @@ class NodeStackComposeMapper
                 $fileCount++;
             }
 
+            ['ports' => $publishedPorts, 'notes' => $portNotes] = self::publishedPorts($service, $variables);
+            array_push($notes, ...$portNotes);
+
             $build = null;
             if ($gitComposeDirectory !== null && filled($service['build'] ?? null)) {
                 $build = NodeStackCompose::build($service['build'], $gitComposeDirectory);
@@ -189,6 +192,7 @@ class NodeStackComposeMapper
                 'command' => $command,
                 'environment' => $environment,
                 'routes' => self::routes($service, $variables),
+                'published_ports' => $publishedPorts,
                 'health_check' => self::healthCheck($service['healthcheck'] ?? null, $variables),
                 'restart_policy' => in_array($name, $oneTime, true) ? 'no' : self::restartPolicy($service['restart'] ?? null),
                 'volumes' => $volumes,
@@ -437,6 +441,70 @@ class NodeStackComposeMapper
         }
 
         return array_values($routes);
+    }
+
+    /**
+     * The `ports:` of a service as published ports (decision 0016): `HOST:CONTAINER[/PROTOCOL]`, or
+     * the long syntax with `target`, `published`, and `protocol`. An entry with a host address,
+     * without a host port, or with a range is not published, with a note. `0.0.0.0` is every
+     * address, as without a host address. Sorted by protocol and host port.
+     *
+     * @param  array<string, mixed>  $service
+     * @param  array<string, string>  $variables
+     * @return array{ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, notes: list<string>}
+     */
+    private static function publishedPorts(array $service, array $variables): array
+    {
+        $ports = [];
+        $notes = [];
+        foreach ((array) ($service['ports'] ?? []) as $entry) {
+            $value = fn (mixed $part): string => trim(self::interpolate((string) $part, $variables));
+            if (is_array($entry)) {
+                $label = 'target '.$value($entry['target'] ?? '');
+                $hostIp = $value($entry['host_ip'] ?? '');
+                $hostPort = $value($entry['published'] ?? '');
+                $containerPort = $value($entry['target'] ?? '');
+                $protocol = strtolower($value($entry['protocol'] ?? 'tcp'));
+            } else {
+                $label = $value($entry);
+                [$mapping, $protocol] = str_contains($label, '/') ? explode('/', $label, 2) : [$label, 'tcp'];
+                $protocol = strtolower($protocol);
+                $parts = str_starts_with($mapping, '[') ? [substr($mapping, 0, (int) strpos($mapping, ']') + 1), '', ''] : explode(':', $mapping);
+                [$hostIp, $hostPort, $containerPort] = match (count($parts)) {
+                    1 => ['', '', $parts[0]],
+                    2 => ['', $parts[0], $parts[1]],
+                    default => [implode(':', array_slice($parts, 0, -2)), $parts[count($parts) - 2], $parts[count($parts) - 1]],
+                };
+            }
+            $reason = match (true) {
+                ! in_array($hostIp, ['', '0.0.0.0'], true) => "it binds the host address {$hostIp}, and every server of the cluster publishes on all its addresses",
+                str_contains($hostPort.$containerPort, '-') => 'it is a port range',
+                $hostPort === '' => 'it has no host port',
+                ! in_array($protocol, ['tcp', 'udp'], true) => "the protocol {$protocol} is not TCP or UDP",
+                ! self::isPort($hostPort) || ! self::isPort($containerPort) => 'it is not a port between 1 and 65535',
+                default => null,
+            };
+            if ($reason !== null) {
+                $notes[] = "The port {$label} is not published: {$reason}.";
+
+                continue;
+            }
+            $ports["{$protocol}/{$hostPort}/{$containerPort}"] = [
+                'protocol' => $protocol,
+                'host_port' => (int) $hostPort,
+                'container_port' => (int) $containerPort,
+                'source_cidrs' => [],
+            ];
+        }
+        $ports = array_values($ports);
+        usort($ports, fn (array $a, array $b): int => [$a['protocol'], $a['host_port']] <=> [$b['protocol'], $b['host_port']]);
+
+        return ['ports' => $ports, 'notes' => $notes];
+    }
+
+    private static function isPort(string $value): bool
+    {
+        return ctype_digit($value) && (int) $value >= 1 && (int) $value <= 65535;
     }
 
     /**

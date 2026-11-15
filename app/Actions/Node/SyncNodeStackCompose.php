@@ -48,7 +48,7 @@ class SyncNodeStackCompose
         $cluster = NodeCluster::query()->findOrFail($stack->node_cluster_id);
         $yaml = NodeStackCompose::parse($compose);
         $composeDirectory = $stack->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory);
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts());
         if ($reason !== null) {
             throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} is not available on Nodes. {$reason}");
         }
@@ -56,7 +56,8 @@ class SyncNodeStackCompose
         $actor = $this->actor($stack, $requestedBy);
         $registryIsNew = ! $cluster->registry()->exists();
 
-        $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor): array {
+        $portsChanged = false;
+        $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor, &$portsChanged): array {
             $stack = NodeStack::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($stack->id);
             $stored = $stack->variables ?? [];
             $variables = CreateClusterStack::stackVariables($cluster, $stack, $yaml, $compose, $stored);
@@ -75,13 +76,24 @@ class SyncNodeStackCompose
                 ->get()
                 ->keyBy('stack_service');
             $diff = NodeStackComposeDiff::between($stack, $previous, $next, $workloads);
+            $portConflict = CreateClusterStack::portConflict($cluster, $diff->publishedPorts($workloads), $workloads->pluck('id')->all());
+            if ($portConflict !== null) {
+                throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} is not available on Nodes. {$portConflict}");
+            }
+            // A removed service is deleted after the commit; its ports are free at once.
+            foreach ($diff->removed as $workload) {
+                $portsChanged = $workload->publishedPorts()->delete() > 0 || $portsChanged;
+            }
+            $portsChanged = $portsChanged
+                || collect($diff->changed)->contains(fn (NodeStackServiceChange $change): bool => $change->publishedPorts !== null)
+                || collect($diff->added)->contains(fn (array $service): bool => $service['published_ports'] !== []);
 
             NodeVolumeMount::query()->whereKey(array_keys($diff->removedMounts))->delete();
             foreach ($diff->updatedMounts as $id => $mount) {
                 NodeVolumeMount::query()->whereKey($id)->update(['mount_path' => $mount['mount_path'], 'read_only' => $mount['read_only']]);
             }
             foreach ($diff->changed as $change) {
-                $this->applyChange($change, $actor);
+                $this->applyChange($cluster, $change, $actor);
             }
 
             $all = $workloads->all();
@@ -124,15 +136,15 @@ class SyncNodeStackCompose
         });
 
         $this->deleteRemovedServices($stack, $requestedBy);
-        // The next network revision starts zot and BuildKit on the Nodes.
-        if ($registryIsNew && $cluster->registry()->exists()) {
+        // The next network revision starts zot and BuildKit on the Nodes, and opens and closes the published ports.
+        if (($registryIsNew && $cluster->registry()->exists()) || $portsChanged) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
 
         return $summary;
     }
 
-    private function applyChange(NodeStackServiceChange $change, User $actor): void
+    private function applyChange(NodeCluster $cluster, NodeStackServiceChange $change, User $actor): void
     {
         $workload = $change->workload;
         foreach ($change->variables as $key => $variable) {
@@ -158,6 +170,9 @@ class SyncNodeStackCompose
         }
         foreach ($change->volumes as $volume) {
             CreateNodeVolume::run($workload, $volume['name'], $volume['path']);
+        }
+        if ($change->publishedPorts !== null) {
+            PublishNodeWorkloadPort::replace($cluster, $workload, $change->publishedPorts);
         }
     }
 

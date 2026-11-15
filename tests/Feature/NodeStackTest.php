@@ -219,7 +219,7 @@ describe('availability', function () {
         'network_mode' => ["    network_mode: host\n", 'sets network_mode'],
         'pid' => ["    pid: host\n", 'shares a PID namespace (pid)'],
         'sysctls' => ["    sysctls: {net.core.somaxconn: 1024}\n", 'sets kernel parameters (sysctls)'],
-        'ports' => ["    ports: ['8080:80']\n", 'publishes ports (decision 0016)'],
+        'ports' => ["    ports: ['8080:80']\n", 'publishes ports, which needs Sentinel with network.firewall.published_ports.v1 on every server of the cluster'],
     ]);
 
     it('shows Not available on Nodes in the template picker when a cluster is the destination', function () {

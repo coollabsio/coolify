@@ -24,7 +24,7 @@ class NodeStackCompose
         'network_mode' => 'sets network_mode',
         'pid' => 'shares a PID namespace (pid)',
         'sysctls' => 'sets kernel parameters (sysctls)',
-        'ports' => 'publishes ports (decision 0016)',
+        'ports' => 'publishes ports, which needs Sentinel with network.firewall.published_ports.v1 on every server of the cluster',
         'build' => 'builds an image (build)',
     ];
 
@@ -63,8 +63,9 @@ class NodeStackCompose
      *
      * @param  array<string, mixed>  $yaml
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository. Only a file from Git can `build:`.
+     * @param  bool  $publishedPorts  Every server of the cluster publishes ports (decision 0016), so `ports:` can run.
      */
-    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false): ?string
     {
         if ($gitComposeDirectory !== null && filled($yaml['include'] ?? null)) {
             return 'The Compose file includes other Compose files (include).';
@@ -72,7 +73,7 @@ class NodeStackCompose
         $services = $yaml['services'] ?? [];
         foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -135,16 +136,17 @@ class NodeStackCompose
      *
      * @return array<string, string>
      */
-    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false): array
+    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false): array
     {
         $templates ??= get_service_templates();
         $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
+        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '');
 
-        return Cache::remember('node-stack-template-availability:'.($underscoreNames ? 'underscore:' : '').md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames): array {
+        return Cache::remember('node-stack-template-availability:'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts): array {
             $reasons = [];
             foreach ($composes as $key => $encoded) {
                 try {
-                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames);
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts);
                 } catch (RuntimeException $exception) {
                     $reason = $exception->getMessage();
                 }
@@ -230,7 +232,7 @@ class NodeStackCompose
     }
 
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory = null): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts): ?string
     {
         if (! self::validServiceName($name, $underscoreNames)) {
             return $underscoreNames || ! self::validServiceName($name, true)
@@ -240,7 +242,7 @@ class NodeStackCompose
         $builds = $gitComposeDirectory !== null && filled($service['build'] ?? null);
         foreach (self::UNSUPPORTED_KEYS as $key => $reason) {
             $value = $service[$key] ?? null;
-            if ($key === 'build' && $builds) {
+            if (($key === 'build' && $builds) || ($key === 'ports' && $publishedPorts)) {
                 continue;
             }
             if ($value !== null && $value !== false && $value !== [] && $value !== '') {

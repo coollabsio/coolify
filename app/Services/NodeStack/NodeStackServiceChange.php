@@ -20,6 +20,7 @@ final readonly class NodeStackServiceChange
      * @param  ?list<array{scheme: string, host: string, port: int|string|null, path: string, noindex: bool}>  $routes  The new domains, or null when they stay.
      * @param  list<array{name: string, path: string}>  $volumes  Own volumes to create.
      * @param  list<string>  $keptVolumes  Paths of own volumes that left the file. Their data stays.
+     * @param  ?list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>  $publishedPorts  The new published ports, or null when they stay.
      */
     public function __construct(
         public NodeWorkload $workload,
@@ -32,6 +33,7 @@ final readonly class NodeStackServiceChange
         public ?array $routes = null,
         public array $volumes = [],
         public array $keptVolumes = [],
+        public ?array $publishedPorts = null,
     ) {}
 
     public function isEmpty(): bool
@@ -42,6 +44,7 @@ final readonly class NodeStackServiceChange
             && $this->attributes === []
             && $this->routes === null
             && $this->volumes === []
-            && $this->keptVolumes === [];
+            && $this->keptVolumes === []
+            && $this->publishedPorts === null;
     }
 }

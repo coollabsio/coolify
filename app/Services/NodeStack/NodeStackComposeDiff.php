@@ -5,6 +5,7 @@ namespace App\Services\NodeStack;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Enums\NodeWorkloadSourceType;
 use App\Models\EnvironmentVariable;
+use App\Models\NodePublishedPort;
 use App\Models\NodeStack;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeMount;
@@ -99,6 +100,30 @@ final readonly class NodeStackComposeDiff
     }
 
     /**
+     * The published ports of every service of the stack after the change, by service.
+     *
+     * @param  Collection<string, NodeWorkload>  $workloads  The workloads of the stack, by service.
+     * @return array<string, list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>>
+     */
+    public function publishedPorts(Collection $workloads): array
+    {
+        $removed = array_map(fn (NodeWorkload $workload): string => (string) $workload->stack_service, $this->removed);
+        $ports = $workloads->except($removed)
+            ->map(fn (NodeWorkload $workload): array => $workload->publishedPorts()->get()->map(fn (NodePublishedPort $port): array => $port->spec())->all())
+            ->all();
+        foreach ($this->changed as $change) {
+            if ($change->publishedPorts !== null) {
+                $ports[(string) $change->workload->stack_service] = $change->publishedPorts;
+            }
+        }
+        foreach ($this->added as $service) {
+            $ports[$service['service']] = $service['published_ports'];
+        }
+
+        return $ports;
+    }
+
+    /**
      * The existing services that change: a changed field, or a mount of a shared volume.
      *
      * @return list<string>
@@ -183,6 +208,10 @@ final readonly class NodeStackComposeDiff
         $currentRoutes = $routes($workload->domain_routes ?? []);
         $nextRoutes = $take($currentRoutes, $routes($previous['routes'] ?? []), $routes($next['routes']));
 
+        // The whole list is one value: a user who changed one port keeps the whole list.
+        $currentPorts = $workload->publishedPorts()->get()->map(fn (NodePublishedPort $port): array => $port->spec())->all();
+        $nextPorts = $take($currentPorts, $previous['published_ports'] ?? [], $next['published_ports']);
+
         $stackPaths = array_flip(array_column($next['stack_volumes'], 'path'));
         $ownPaths = $workload->volumes()->whereNull('detached_at')->pluck('mount_path')->flip();
         $volumes = [];
@@ -208,6 +237,7 @@ final readonly class NodeStackComposeDiff
             self::same($nextRoutes, $currentRoutes) ? null : $nextRoutes,
             array_values($volumes),
             $keptVolumes,
+            self::same($nextPorts, $currentPorts) ? null : $nextPorts,
         );
     }
 
