@@ -1,6 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.3
+ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.0.3@sha256:72189e423ff5e4e1acf5ced07cec52b6dfac3c7db80c542c97f160eb80744f20
 ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.10.3
@@ -27,7 +27,7 @@ ARG GIT_SHA
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
+FROM ${BASE_IMAGE} AS base
 
 USER root
 
@@ -74,7 +74,7 @@ RUN npm run build
 # =================================================================
 # Stage 3: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+FROM ${BASE_IMAGE} AS terminal-dependencies
 
 USER root
 
@@ -95,7 +95,7 @@ COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${BASE_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -214,7 +214,7 @@ RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \
     chmod -R 755 /etc/nginx
 
-ARG SERVERSIDEUP_PHP_VERSION
+ARG BASE_IMAGE
 ARG DISTRO
 ARG CREATED
 ARG GIT_SHA
@@ -230,7 +230,8 @@ LABEL org.opencontainers.image.title="Coolify" \
     org.opencontainers.image.url="https://coolify.io" \
     org.opencontainers.image.documentation="https://coolify.io/docs" \
     org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
-    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    org.opencontainers.image.base.name="${BASE_IMAGE%@*}" \
+    org.opencontainers.image.base.digest="${BASE_IMAGE#*@}" \
     io.coolify.image.version="${COOLIFY_VERSION}" \
     io.coolify.image.distro="${DISTRO}" \
     io.coolify.image.variant="runtime" \

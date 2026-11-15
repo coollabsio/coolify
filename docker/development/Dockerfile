@@ -1,6 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.3
+ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.0.3@sha256:72189e423ff5e4e1acf5ced07cec52b6dfac3c7db80c542c97f160eb80744f20
 ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.10.3
@@ -20,7 +20,7 @@ FROM ghcr.io/coollabsio/mx:0.1.0 AS minio-client
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${BASE_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -117,7 +117,7 @@ RUN mkdir -p /etc/nginx/conf.d && \
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-ARG SERVERSIDEUP_PHP_VERSION
+ARG BASE_IMAGE
 ARG DISTRO
 ARG COOLIFY_VERSION
 ARG CREATED
@@ -134,7 +134,8 @@ LABEL org.opencontainers.image.title="Coolify Development" \
     org.opencontainers.image.url="https://coolify.io" \
     org.opencontainers.image.documentation="https://github.com/coollabsio/coolify/blob/main/CONTRIBUTING.md" \
     org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
-    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    org.opencontainers.image.base.name="${BASE_IMAGE%@*}" \
+    org.opencontainers.image.base.digest="${BASE_IMAGE#*@}" \
     io.coolify.image.version="${COOLIFY_VERSION}" \
     io.coolify.image.distro="${DISTRO}" \
     io.coolify.image.variant="development" \
