@@ -38,9 +38,12 @@ class Create extends Component
     #[Locked]
     public ?string $databaseImage = null;
 
-    /** Why a stack from a one-click service could not be created on a cluster (decision 0023). */
+    /** Why a database or a stack from a one-click service could not be created on a cluster. */
     #[Locked]
-    public ?string $stackError = null;
+    public ?string $clusterError = null;
+
+    #[Locked]
+    public string $clusterErrorTitle = '';
 
     public function mount()
     {
@@ -82,7 +85,15 @@ class Create extends Component
             [$cluster, $targetNode] = request()->filled('server')
                 ? DockerImage::resolveClusterTarget($project, 'node', (string) request()->query('server'))
                 : DockerImage::resolveClusterTarget($project, 'cluster', (string) request()->query('cluster'));
-            $workload = CreateClusterDatabaseWorkload::run($project, $environment, $cluster, $databaseType, auth()->user(), $targetNode, $database_image);
+            try {
+                $workload = CreateClusterDatabaseWorkload::run($project, $environment, $cluster, $databaseType, auth()->user(), $targetNode, $database_image);
+            } catch (\RuntimeException $exception) {
+                // The picker renders below the reason.
+                $this->clusterErrorTitle = 'The database could not be created';
+                $this->clusterError = $exception->getMessage();
+
+                return;
+            }
 
             return redirect()->route('project.cluster-application.show', [
                 'project_uuid' => $project->uuid,
@@ -103,7 +114,8 @@ class Create extends Component
                 $stack = CreateClusterStack::run($project, $environment, $cluster, $compose, auth()->user(), $targetNode, template: $template);
             } catch (\RuntimeException|ValidationException $exception) {
                 // The picker renders below the reason.
-                $this->stackError = $exception->getMessage();
+                $this->clusterErrorTitle = 'The stack could not be created';
+                $this->clusterError = $exception->getMessage();
 
                 return;
             }

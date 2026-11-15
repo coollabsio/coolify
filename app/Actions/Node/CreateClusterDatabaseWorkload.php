@@ -44,7 +44,7 @@ class CreateClusterDatabaseWorkload
             throw new RuntimeException('The user cannot create resources for this project team.');
         }
         if (! in_array($cluster->network_status, ['active', 'degraded'], true)) {
-            throw new RuntimeException('The cluster network is not ready.');
+            throw new RuntimeException('The cluster network is not ready. Wait until the cluster shows the network as active, then try again.');
         }
         $image = filled($image) ? trim($image) : $type->defaultImage();
 
