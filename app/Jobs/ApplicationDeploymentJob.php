@@ -3831,12 +3831,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $commitMessage = ApplicationDeploymentQueue::query()
             ->where('application_id', $this->application->id)
             ->where('commit', $this->commit)
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
             ->whereNotNull('commit_message')
             ->where('commit_message', '!=', '')
             ->latest('id')
             ->value('commit_message');
 
-            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
         if (filled($commitMessage)) {
             $this->application_deployment_queue->update(['commit_message' => $commitMessage]);
         }
