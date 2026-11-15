@@ -21,6 +21,7 @@ use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -39,7 +40,11 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
     /** Exception code of a failure that `handle()` already reported to the team. */
     private const REPORTED_FAILURE = 1;
 
-    public int $tries = 1;
+    /** How long a removal waits for a running deploy or lifecycle action of the application. */
+    private const WAIT_FOR_OPERATIONS_SECONDS = 1800;
+
+    /** Waiting for an active operation releases the job; any exception fails it. */
+    public int $maxExceptions = 1;
 
     /** Removals run one server after another, so every server gets the lifecycle job budget. */
     public int $timeout = 900;
@@ -65,13 +70,24 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueFor(): int
     {
-        return $this->timeout + 60;
+        return $this->timeout + self::WAIT_FOR_OPERATIONS_SECONDS + 60;
+    }
+
+    public function retryUntil(): Carbon
+    {
+        return now()->addSeconds(self::WAIT_FOR_OPERATIONS_SECONDS);
     }
 
     public function handle(): void
     {
         $workload = NodeWorkload::query()->with('nodes')->find($this->workloadId);
         if ($workload === null) {
+            return;
+        }
+        // A close event of a pull request can follow its push at once, so the removal waits for the deploy.
+        if (! $this->deleteFromCoolifyOnly && $this->hasActiveOperation($workload)) {
+            $this->release(15);
+
             return;
         }
         $requestedBy = $this->requestedById === null ? null : User::query()->find($this->requestedById);
@@ -91,6 +107,16 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
 
         $this->deleteBackupSchedules($workload);
         $this->deleteRecords($workload, $requestedBy);
+    }
+
+    /** Whether a deploy or lifecycle action of the application or of one of its previews still runs. */
+    private function hasActiveOperation(NodeWorkload $workload): bool
+    {
+        return NodeOperation::query()
+            ->whereIn('node_workload_id', $workload->previews()->withoutGlobalScopes()->pluck('id')->push($workload->id))
+            ->whereIn('command_type', ['workload.deploy.v1', 'workload.lifecycle.v1'])
+            ->whereIn('status', [NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED, NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING, NodeOperationStatus::UNCERTAIN])
+            ->exists();
     }
 
     /**
