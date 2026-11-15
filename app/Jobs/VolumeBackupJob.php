@@ -166,6 +166,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $warning = null;
+            $uploadFailed = false;
             $s3Uploaded = false;
             $s3CleanupPending = false;
             $localStorageDeleted = $streamToS3;
@@ -176,6 +177,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execution->refreshS3Summary();
                 $this->execution->update(['s3_cleanup_pending' => false]);
             } elseif ($this->backup->save_s3 && $destinations->isEmpty()) {
+                $uploadFailed = true;
                 $warning = 'Storage upload failed: The selected backup storage no longer exists.';
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
@@ -186,6 +188,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if ($s3Uploaded) {
                     $s3CleanupPending = false;
                 } else {
+                    $uploadFailed = true;
                     $warning = 'Storage upload failed: '.implode(' ', $uploadErrors);
 
                     try {
@@ -274,7 +277,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             BackupCreated::dispatch($team->id);
         }
 
-        $team->notify(new BackupSuccess($this->backup, $warning));
+        $team->notify(new BackupSuccess($this->backup, $warning, $uploadFailed));
         if ($warning === null) {
             $this->notifyIfRecovered($team);
         }
