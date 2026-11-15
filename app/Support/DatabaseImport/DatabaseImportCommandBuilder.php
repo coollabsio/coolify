@@ -337,7 +337,13 @@ SH;
     {
         $commandPattern = escapeshellarg(self::MYSQL_CLIENT_COMMAND_PATTERN);
         $namedCommandPattern = escapeshellarg(self::MYSQL_NAMED_CLIENT_COMMAND_PATTERN);
-        $preflight = <<<SH
+        // MariaDB images also read the MYSQL_ variables, and some service images (for example
+        // linuxserver.io) set only those.
+        $variables = $prefix === 'MYSQL' ? '' : implode('', array_map(
+            fn (string $name): string => ": \"\${{$prefix}_{$name}:=\${MYSQL_{$name}:-}}\"\n",
+            ['USER', 'PASSWORD', 'DATABASE', 'ROOT_PASSWORD'],
+        ));
+        $preflight = $variables.<<<SH
 if is_tar; then
   extract_tar
   use_single_tar_member || fail 'A tar backup must contain exactly one SQL dump. Nothing was changed.'

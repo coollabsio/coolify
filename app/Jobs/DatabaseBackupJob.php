@@ -89,6 +89,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $mongo_root_password = null;
 
+    /**
+     * The MySQL or MariaDB account that a service database accepts, as user and password.
+     *
+     * @var array{0: string, 1: ?string}|null
+     */
+    public ?array $mysql_account = null;
+
     public $timeout = 3600 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?string $backup_log_uuid = null;
@@ -210,12 +217,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
-                    $rootPassword = $envs->filter(function ($env) {
-                        return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
-                    })->first();
-                    if ($rootPassword) {
-                        $this->database->mysql_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
-                    }
+                    $this->resolveServiceMysqlAccount($envs, 'mysql', ['MYSQL']);
 
                     $db = $envs->filter(function ($env) {
                         return str($env)->startsWith('MYSQL_DATABASE=');
@@ -234,19 +236,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $commands[] = "docker exec {$escapedContainerName} env";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
-                    $rootPassword = $envs->filter(function ($env) {
-                        return str($env)->startsWith('MARIADB_ROOT_PASSWORD=');
-                    })->first();
-                    if ($rootPassword) {
-                        $this->database->mariadb_root_password = str($rootPassword)->after('MARIADB_ROOT_PASSWORD=')->value();
-                    } else {
-                        $rootPassword = $envs->filter(function ($env) {
-                            return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
-                        })->first();
-                        if ($rootPassword) {
-                            $this->database->mariadb_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
-                        }
-                    }
+                    $this->resolveServiceMysqlAccount($envs, 'mariadb', ['MARIADB', 'MYSQL']);
 
                     $db = $envs->first(fn ($env) => str($env)->startsWith('MARIADB_DATABASE='))
                         ?? $envs->first(fn ($env) => str($env)->startsWith('MYSQL_DATABASE='));
@@ -769,21 +759,79 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Service images create their MySQL and MariaDB accounts in different ways: MYSQL_RANDOM_ROOT_PASSWORD
+     * hides the root password, and linuxserver.io images keep root@localhost without a password next to
+     * root@% with MYSQL_ROOT_PASSWORD. The backup uses the first account that the container accepts:
+     * root with its password, root without a password, then the application user. When no account is
+     * accepted, it uses the first one, so the dump shows the error of the database.
+     *
+     * @param  Collection<int, string>  $envs
+     * @param  list<string>  $prefixes  Variable prefixes in the order of preference, for example MARIADB and MYSQL.
+     */
+    private function resolveServiceMysqlAccount(Collection $envs, string $client, array $prefixes): void
+    {
+        $value = function (string $name) use ($envs, $prefixes): ?string {
+            foreach ($prefixes as $prefix) {
+                $line = $envs->first(fn ($env) => str_starts_with((string) $env, "{$prefix}_{$name}="));
+                $found = $line === null ? null : str($line)->after('=')->value();
+                if (filled($found)) {
+                    return $found;
+                }
+            }
+
+            return null;
+        };
+
+        $accounts = collect([
+            ['root', $value('ROOT_PASSWORD')],
+            ['root', null],
+            [$value('USER'), $value('PASSWORD')],
+        ])->filter(fn (array $account) => filled($account[0]))->unique()->values();
+
+        $escapedContainerName = escapeshellarg($this->container_name);
+        $this->mysql_account = $accounts->first(function (array $account) use ($client, $escapedContainerName): bool {
+            $login = $this->mysqlLoginArguments(...$account);
+            $output = instant_remote_process(["docker exec {$escapedContainerName} {$client} {$login} -N -e 'SELECT 1' >/dev/null 2>&1 && echo ok"], $this->server, false, false, null, disableMultiplexing: true);
+
+            return trim((string) $output) === 'ok';
+        }) ?? $accounts->first();
+    }
+
+    private function mysqlLoginArguments(string $user, ?string $password): string
+    {
+        $arguments = '-u '.($user === 'root' ? 'root' : escapeshellarg($user));
+
+        return filled($password) ? $arguments.' -p'.escapeshellarg($password) : $arguments;
+    }
+
+    /**
+     * Without the PROCESS privilege, which an application user does not have, mysqldump fails
+     * on the tablespaces unless it skips them.
+     */
+    private function mysqlDumpLoginArguments(?string $rootPassword): string
+    {
+        [$user, $password] = $this->mysql_account ?? ['root', $rootPassword];
+        $arguments = $this->mysqlLoginArguments($user, $password);
+
+        return $user === 'root' ? $arguments : $arguments.' --no-tablespaces';
+    }
+
     private function backup_standalone_mysql(string $database): void
     {
         try {
             $commands = $this->backupDirectoryCommands();
-            $escapedPassword = escapeshellarg($this->database->mysql_root_password);
+            $login = $this->mysqlDumpLoginArguments($this->database->mysql_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
-                $dumpCommand = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $dumpCommand = "docker exec {$escapedContainerName} mysqldump {$login} --all-databases --single-transaction --quick --lock-tables=false";
                 $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
+                $commands[] = "docker exec {$escapedContainerName} mysqldump {$login} $escapedDatabase > {$escapedBackupLocation}";
             }
             $this->runBackupCommands($commands);
         } catch (Throwable $e) {
@@ -796,17 +844,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $commands = $this->backupDirectoryCommands();
-            $escapedPassword = escapeshellarg($this->database->mariadb_root_password);
+            $login = $this->mysqlDumpLoginArguments($this->database->mariadb_root_password);
             $escapedContainerName = escapeshellarg($this->container_name);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
-                $dumpCommand = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $dumpCommand = "docker exec {$escapedContainerName} mariadb-dump {$login} --all-databases --single-transaction --quick --lock-tables=false";
                 $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
+                $commands[] = "docker exec {$escapedContainerName} mariadb-dump {$login} $escapedDatabase > {$escapedBackupLocation}";
             }
             $this->runBackupCommands($commands);
         } catch (Throwable $e) {
