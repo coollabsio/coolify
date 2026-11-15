@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Actions\Node\Build\CancelNodeBuild;
+use App\Jobs\DeleteNodePreviewCommentJob;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Models\NodeBuild;
 use App\Models\NodeWorkload;
@@ -13,8 +14,9 @@ use RuntimeException;
 
 /**
  * Removes the preview of a pull request (decision 0025): it cancels the build, then deletes the
- * preview with its containers, volumes, domains, DNS name, and routes on every Node. A close event
- * passes no user; a delete on the Previews tab passes the user.
+ * preview with its containers, volumes, domains, DNS name, and routes on every Node, and deletes its
+ * comment on a GitHub pull request. A close event passes no user; a delete on the Previews tab
+ * passes the user.
  */
 class RemoveNodePreview
 {
@@ -29,6 +31,9 @@ class RemoveNodePreview
             Gate::forUser($requestedBy)->authorize('delete', $preview);
         }
         self::cancelBuilds($preview);
+        if ($preview->github_app_id !== null && $preview->pull_request_comment_id !== null) {
+            DeleteNodePreviewCommentJob::dispatch($preview->github_app_id, gitRepositorySlug($preview->git_repository), $preview->pull_request_comment_id);
+        }
         DeleteNodeWorkloadJob::dispatch($preview->id, $requestedBy?->id, deleteVolumes: true);
     }
 

@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Actions\Node\Build\CancelNodeBuild;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Enums\NodeWorkloadDesiredState;
+use App\Jobs\UpdateNodePreviewCommentJob;
 use App\Models\EnvironmentVariable;
 use App\Models\Node;
 use App\Models\NodeBuild;
@@ -125,7 +126,12 @@ class DeployNodePreview
             QueueNodeClusterNetworkRevision::run($cluster, $requestedBy);
         }
 
-        return ['preview' => $preview, 'build' => $this->build($preview, $commitSha, $requestedBy), 'domain_error' => $domainError];
+        $build = $this->build($preview, $commitSha, $requestedBy);
+        if ($build->wasRecentlyCreated) {
+            UpdateNodePreviewCommentJob::dispatchFor($preview, $build);
+        }
+
+        return ['preview' => $preview, 'build' => $build, 'domain_error' => $domainError];
     }
 
     /**

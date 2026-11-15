@@ -22,6 +22,7 @@ use App\Jobs\ReconcileGithubRunnersJob;
 use App\Jobs\RecoverStaleNodeOperationsJob;
 use App\Jobs\RefreshConnectedNodesJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\RemoveClosedNodePreviewsJob;
 use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
@@ -88,6 +89,10 @@ class Kernel extends ConsoleKernel
             ->onOneServer();
         $this->scheduleInstance->job(new DeleteExpiredNodeVolumeCopiesJob)
             ->hourly()
+            ->onOneServer()
+            ->when(fn () => nodesInUse());
+        $this->scheduleInstance->job(new RemoveClosedNodePreviewsJob)
+            ->daily()
             ->onOneServer()
             ->when(fn () => nodesInUse());
         $this->scheduleInstance->job(new InspectNodeClusterNetworksJob)
