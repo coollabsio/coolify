@@ -82,7 +82,12 @@ class ManageNodeWorkloadJob implements ShouldQueue
     /** @return array{converged: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string} */
     private function verify(NodeOperation $operation): array
     {
-        FetchContainers::run($operation->node);
+        try {
+            FetchContainers::run($operation->node);
+        } catch (ConnectionException|RequestException) {
+            // Sentinel runs one command at a time, so the inventory read can time out behind a
+            // long command. The stored inventory is older; the next attempt reads again.
+        }
 
         return VerifyWorkloadLifecycleConvergence::run($operation);
     }

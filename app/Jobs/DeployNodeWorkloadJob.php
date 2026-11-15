@@ -157,7 +157,15 @@ class DeployNodeWorkloadJob implements ShouldQueue
     /** @return array<string, mixed> */
     private function verify(NodeOperation $operation): array
     {
-        FetchContainers::run($operation->node);
+        try {
+            FetchContainers::run($operation->node);
+        } catch (ConnectionException|RequestException) {
+            // Sentinel runs one command at a time, so the inventory read can time out behind a
+            // long command, such as a drain and stop. The result is not known yet: poll again.
+            $verification = VerifyDeploymentConvergence::run($operation);
+
+            return $verification['converged'] ? $verification : [...$verification, 'pending' => true];
+        }
 
         return VerifyDeploymentConvergence::run($operation);
     }
