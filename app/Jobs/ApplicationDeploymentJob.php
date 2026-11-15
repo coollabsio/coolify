@@ -1044,6 +1044,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function build_docker_compose_images(mixed $composeFile, ?Collection $buildEnvironment): void
     {
+        $this->ensure_compose_build_contexts_inside_repository($composeFile);
         // Modify Dockerfiles for ARGs and build secrets
         $this->modify_dockerfiles_for_compose($composeFile);
         // Build new container to limit downtime.
@@ -6494,6 +6495,69 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         return str_starts_with($dockerfile, '/') ? $dockerfile : rtrim($context, '/').'/'.$dockerfile;
+    }
+
+    /**
+     * Returns the build context of a Compose service when it points outside the cloned repository,
+     * otherwise null. Docker Compose runs in the base directory, so a relative context resolves from
+     * there, not from the directory of the Compose file. Remote, variable, and absolute contexts are
+     * not checked.
+     */
+    private function composeBuildContextOutsideRepository(mixed $build, string $baseDirectory): ?string
+    {
+        $context = is_string($build) ? $build : (is_array($build) ? data_get($build, 'context') : null);
+        if (! is_string($context) || $context === '' || str_starts_with($context, '/') || str_contains($context, '$')
+            || preg_match('~^[a-z][a-z0-9+.-]*://|^git@~i', $context) === 1) {
+            return null;
+        }
+
+        $depth = 0;
+        foreach (explode('/', trim($baseDirectory, '/').'/'.$context) as $segment) {
+            if ($segment === '..') {
+                $depth--;
+                if ($depth < 0) {
+                    return $context;
+                }
+            } elseif ($segment !== '' && $segment !== '.') {
+                $depth++;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Stops the deployment before the build when a build context points outside the cloned
+     * repository. Such a build always fails, and Docker only reports an unclear `lstat` error.
+     *
+     * @throws DeploymentException
+     */
+    private function ensure_compose_build_contexts_inside_repository(mixed $composeFile): void
+    {
+        // A custom build command with its own project directory resolves the contexts from there.
+        if (str_contains((string) $this->application->docker_compose_custom_build_command, '--project-directory')) {
+            return;
+        }
+
+        $baseDirectory = '/'.trim((string) $this->application->base_directory, '/');
+        foreach (data_get($composeFile, 'services', []) as $serviceName => $service) {
+            $context = $this->composeBuildContextOutsideRepository(data_get($service, 'build'), $baseDirectory);
+            if ($context === null) {
+                continue;
+            }
+
+            $message = "The build context \"{$context}\" of service \"{$serviceName}\" is outside the repository. Coolify runs Docker Compose in the base directory ({$baseDirectory}), not in the directory of the Compose file, so relative paths resolve from the base directory.";
+            $composeDirectory = trim(dirname($this->docker_compose_location), '/');
+            if ($composeDirectory !== '') {
+                $newBaseDirectory = rtrim($baseDirectory, '/').'/'.$composeDirectory;
+                $newLocation = '/'.basename($this->docker_compose_location);
+                $message .= " If the paths in the file are relative to the Compose file, set Base Directory to {$newBaseDirectory} and Docker Compose Location to {$newLocation}.";
+            } else {
+                $message .= ' Change the build context so that it stays inside the repository.';
+            }
+
+            throw new DeploymentException($message);
+        }
     }
 
     /**
