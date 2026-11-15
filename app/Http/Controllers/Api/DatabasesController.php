@@ -3104,7 +3104,7 @@ class DatabasesController extends Controller
             // Delete all execution files (locally and optionally from S3)
             foreach ($executions as $execution) {
                 if ($execution->filename) {
-                    deleteBackupsLocally($execution->filename, $database->destination->server);
+                    deleteBackupsLocally($execution->filename, $database->destination->server, throwError: true);
 
                 }
 
@@ -3240,7 +3240,7 @@ class DatabasesController extends Controller
 
         try {
             if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $database->destination->server);
+                deleteBackupsLocally($execution->filename, $database->destination->server, throwError: true);
 
             }
 

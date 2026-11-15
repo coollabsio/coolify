@@ -371,14 +371,23 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
     }
 }
 
+/**
+ * Applies the retention settings. When the server cannot delete the local files, their executions stay and the error
+ * is thrown after the S3 retention ran, so the next run tries again.
+ */
 function removeOldBackups($backup): void
 {
-    // When local backups are disabled, retain the local file until an S3 copy is available.
-    $localBackupsToDelete = deleteOldBackupsLocally($backup);
-    if ($localBackupsToDelete->isNotEmpty()) {
-        $backup->executions()
-            ->whereIn('id', $localBackupsToDelete->pluck('id'))
-            ->update(['local_storage_deleted' => true]);
+    $localDeletionError = null;
+    try {
+        // When local backups are disabled, retain the local file until an S3 copy is available.
+        $localBackupsToDelete = deleteOldBackupsLocally($backup);
+        if ($localBackupsToDelete->isNotEmpty()) {
+            $backup->executions()
+                ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                ->update(['local_storage_deleted' => true]);
+        }
+    } catch (Throwable $e) {
+        $localDeletionError = $e;
     }
 
     if ($backup->save_s3) {
@@ -390,10 +399,16 @@ function removeOldBackups($backup): void
         ->where('local_storage_deleted', true)
         ->withoutLiveS3Copies()
         ->delete();
+
+    if ($localDeletionError) {
+        throw $localDeletionError;
+    }
 }
 
 /**
- * Successful executions that fall outside the retention settings, newest execution first.
+ * Successful executions that fall outside the retention settings, newest execution first. The amount and the days
+ * apply to each database of the schedule. The storage limit applies to all databases together and keeps the newest
+ * backup of each database.
  *
  * @param  Collection<int, ScheduledDatabaseBackupExecution>  $executions  Sorted newest first.
  * @return Collection<int, ScheduledDatabaseBackupExecution>
@@ -405,29 +420,30 @@ function backupExecutionsOutsideRetention(Collection $executions, ?int $retentio
     }
 
     $backupsToDelete = collect();
+    $executionsByDatabase = $executions->groupBy(fn (ScheduledDatabaseBackupExecution $execution) => (string) $execution->database_name);
 
-    if ($retentionAmount > 0) {
-        $backupsToDelete = $backupsToDelete->merge($executions->skip($retentionAmount));
-    }
+    foreach ($executionsByDatabase as $databaseExecutions) {
+        if ($retentionAmount > 0) {
+            $backupsToDelete = $backupsToDelete->merge($databaseExecutions->skip($retentionAmount));
+        }
 
-    if ($retentionDays > 0) {
-        $oldestAllowedDate = $executions->first()->created_at->clone()->utc()->subDays($retentionDays);
-        $backupsToDelete = $backupsToDelete->merge(
-            $executions->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate)
-        );
+        if ($retentionDays > 0) {
+            $oldestAllowedDate = $databaseExecutions->first()->created_at->clone()->utc()->subDays($retentionDays);
+            $backupsToDelete = $backupsToDelete->merge(
+                $databaseExecutions->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate)
+            );
+        }
     }
 
     if ($maxStorageGB > 0) {
         $maxStorageBytes = $maxStorageGB * pow(1024, 3);
+        $newestIds = $executionsByDatabase->map(fn (Collection $databaseExecutions) => $databaseExecutions->first()->id);
         $totalSize = 0;
 
-        foreach ($executions->skip(1) as $backupExecution) {
+        foreach ($executions->reject(fn ($execution) => $newestIds->contains($execution->id)) as $backupExecution) {
             $totalSize += (int) $backupExecution->size;
             if ($totalSize > $maxStorageBytes) {
-                $backupsToDelete = $backupsToDelete->merge($executions->filter(
-                    fn ($b) => $b->created_at->utc() <= $backupExecution->created_at->utc()
-                )->skip(1));
-                break;
+                $backupsToDelete->push($backupExecution);
             }
         }
     }
@@ -482,7 +498,7 @@ function deleteOldBackupsLocally($backup): Collection
         return collect();
     }
 
-    deleteBackupsLocally($filesToDelete, $server);
+    deleteBackupsLocally($filesToDelete, $server, throwError: true);
 
     return $backupsToDelete;
 }

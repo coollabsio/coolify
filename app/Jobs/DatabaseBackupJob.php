@@ -319,6 +319,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
             $runHadProblem = false;
+            $anyLocalBackupSucceeded = false;
             foreach ($databasesToBackup as $database) {
                 // Reset per-database state, so a failure before this database's execution exists
                 // does not mark the previous database's execution failed or delete its backup file.
@@ -448,7 +449,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
                     // Verify local backup succeeded
                     if ($size > 0) {
-                        $localBackupSucceeded = true;
+                        $localBackupSucceeded = $anyLocalBackupSucceeded = true;
                     } else {
                         throw new \Exception('Local backup file is empty or was not created');
                     }
@@ -540,7 +541,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            if ($this->backup_log && $this->backup_log->status === 'success') {
+            if ($anyLocalBackupSucceeded) {
                 $this->removeExpiredBackups();
             }
             if (! $runHadProblem) {
