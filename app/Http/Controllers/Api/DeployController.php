@@ -267,7 +267,7 @@ class DeployController extends Controller
             // Mark deployment as cancelled
             $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
                 ->whereIn('status', $cancellableStatuses)
-                ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+                ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value, 'finished_at' => now()]);
 
             if ($updated !== 1) {
                 $deployment->refresh();

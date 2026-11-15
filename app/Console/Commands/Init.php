@@ -108,6 +108,7 @@ class Init extends Command
             ])->get(['id', 'application_id', 'parent_deployment_uuid']);
             $updatedCount = ApplicationDeploymentQueue::whereKey($stuckDeployments->modelKeys())->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
+                'finished_at' => Carbon::now(),
             ]);
 
             if ($updatedCount > 0) {

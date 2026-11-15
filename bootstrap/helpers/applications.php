@@ -232,7 +232,7 @@ function cancel_superseded_deployments(ApplicationDeploymentQueue $deployment, A
         ->whereKey($old->getKey())
         ->where('status', $old->status)
         ->whereNull('deploy_started_at')
-        ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]) === 1);
+        ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value, 'finished_at' => now()]) === 1);
     [$building, $queued] = $cancelled->partition(fn (ApplicationDeploymentQueue $old) => $old->status === ApplicationDeploymentStatus::IN_PROGRESS->value);
     $cancelled->each(fn (ApplicationDeploymentQueue $old) => $old->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
 
@@ -417,7 +417,7 @@ function fail_unattended_deployment(ApplicationDeploymentQueue $deployment, stri
     $failed = ApplicationDeploymentQueue::query()
         ->whereKey($deployment->id)
         ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
-        ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+        ->update(['status' => ApplicationDeploymentStatus::FAILED->value, 'finished_at' => now()]);
 
     if ($failed === 0) {
         return false;

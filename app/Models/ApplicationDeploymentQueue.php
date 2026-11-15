@@ -106,6 +106,15 @@ class ApplicationDeploymentQueue extends Model
             ]);
         });
 
+        // A worker that kills the job at the timeout skips the finally block of handle(), which records the end time.
+        static::saving(function (ApplicationDeploymentQueue $deployment): void {
+            if ($deployment->isDirty('status')
+                && $deployment->finished_at === null
+                && ApplicationDeploymentStatus::tryFrom((string) $deployment->status)?->isFinal()) {
+                $deployment->finished_at = now();
+            }
+        });
+
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
             if (! $deployment->wasChanged('status')) {
                 return;

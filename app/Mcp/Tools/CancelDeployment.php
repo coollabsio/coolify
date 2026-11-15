@@ -72,7 +72,7 @@ class CancelDeployment extends Tool
 
         $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
             ->whereIn('status', $cancellable)
-            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value, 'finished_at' => now()]);
 
         if ($updated !== 1) {
             $deployment->refresh();

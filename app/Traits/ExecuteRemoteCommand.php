@@ -154,6 +154,7 @@ trait ExecuteRemoteCommand
                         ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
                         ->update([
                             'status' => ApplicationDeploymentStatus::FAILED->value,
+                            'finished_at' => now(),
                         ]);
                 }
                 throw $lastError;
