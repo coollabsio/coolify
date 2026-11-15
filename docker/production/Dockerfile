@@ -153,7 +153,7 @@ RUN install-php-extensions uv-${PHP_UV_VERSION}
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \
-    echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
+    echo "alias logs='tail -F storage/logs/laravel-\$(date -u +%F).log'" >> /etc/profile
 
 # Install Cloudflared based on architecture
 RUN mkdir -p /usr/local/bin && \
