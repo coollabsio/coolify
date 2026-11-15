@@ -52,7 +52,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 
 | # | Work | Decision |
 | --- | --- | --- |
-| L1 | TCP and UDP port publishing | [0016](decisions/0016-node-port-publishing.md) |
+| L1 | TCP and UDP port publishing. Built in Coolify: the **Published Ports** page, `ports:` of stacks, and `published_ports` in the firewall reconcile for Nodes with `network.firewall.published_ports.v1`. Open: the NAT table in Sentinel, and a live test. | [0016](decisions/0016-node-port-publishing.md) |
 | L2 | DNS records of cluster domains | [0019](decisions/0019-node-dns-records.md) |
 | L3 | Owner and mode of secret files | [0008 amendment](decisions/0008-node-workload-secrets.md) |
 | L4 | Build and place by CPU architecture | [0020](decisions/0020-node-cpu-architecture.md) |
@@ -80,7 +80,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Each deploy of a Git stack reads the Compose file again and adds, changes, and removes services (three-way rule for values that the user changed). Still open: Docker socket access, `ports` (L1), and the placement of stack services on several Nodes when the stack is created. |
+| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Each deploy of a Git stack reads the Compose file again and adds, changes, and removes services (three-way rule for values that the user changed). `ports:` is published when every Node of the cluster reports `network.firewall.published_ports.v1` (L1). Still open: Docker socket access, and the placement of stack services on several Nodes when the stack is created. |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |

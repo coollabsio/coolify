@@ -68,3 +68,56 @@ replace or add to the decision above:
   published, with a note. A port that another application of the cluster
   publishes makes the stack "Not available on Nodes".
 - **IPv4 only.** IPv6 Node addresses do not publish ports.
+
+## Implementation (2026-11-15)
+
+Built: `node_published_ports` (cluster, workload, protocol, host port, container
+port, source CIDRs; unique on cluster, protocol, and host port),
+`PublishNodeWorkloadPort`, `RemoveNodePublishedPort`, the **Published Ports**
+page of a cluster application and a cluster database, and `ports:` of stack
+services. These points differ from the decision above or add to it:
+
+- **Reserved ports.** `NodeCluster::reservedHostPorts()` lists them. Each value
+  comes from the data or from one constant: the SSH port (`nodes.port`) of each
+  Node of the cluster, 53, 80, 443, `node_clusters.wireguard_port`, the
+  Corrosion gossip port 8787 and API port 8080
+  (`ReconcileNodeClusterNetwork::CORROSION_*`, the values that Sentinel writes
+  to the Corrosion configuration), and the registry port 5443
+  (`NodeRegistry::PORT`). A reserved port is refused for TCP and for UDP.
+- **Source CIDRs.** An address without a prefix becomes `/32`. A CIDR with host
+  bits becomes its network (`10.0.0.5/24` is `10.0.0.0/24`). At most 64. IPv4
+  only.
+- **Payload.** `network.firewall.reconcile` has `published_ports` only for
+  Nodes that report `network.firewall.published_ports.v1`. Each entry has
+  `protocol`, `host_port`, `destination_ip`, `container_port`, and
+  `source_cidrs` (empty is every source). Coolify does not add the ports to
+  `ingress_rules`: Sentinel must allow the translated traffic in the forward
+  chain, with the source CIDRs.
+- **Destination.** One container for each port and Node. Coolify uses only
+  running containers when one runs. The container on the receiving Node comes
+  first, else the container on the Node with the lowest id. The address is the
+  address of the running slot of a rolling deploy. A workload without a
+  container address is left out.
+- **When the destination changes.** A change of the published ports queues a
+  network revision. A new placement (first deploy or move) queues one, as for
+  ingress. A rolling deploy applies a revision before it removes the old
+  container, so the ports go to the new container first. The removal of the
+  source placement after a move queues one. The delete of a workload queues one
+  for the clusters of its ports. The rows go with the workload (cascade).
+- **Compose.** `ports:` makes a stack "Not available on Nodes" until every
+  usable Node of the cluster reports the capability
+  (`NodeCluster::supportsPublishedPorts()`, also in the template cache key).
+  With it and `discovery.names.underscore.v1`, 47 templates are unavailable,
+  not 85. 38 templates are added, not 27. Short
+  syntax `HOST:CONTAINER[/PROTOCOL]` and the long syntax (`target`,
+  `published`, `protocol`, `host_ip`) are read after interpolation with the
+  stack variables. A host address other than `0.0.0.0`, an entry without a
+  host port, a range, or a protocol other than TCP and UDP is not published,
+  with a note on the service. A port that a Node uses, that another
+  application publishes, or that two services publish stops the creation of the
+  stack and the Compose sync, with the reason.
+- **Compose sync.** The published ports of a service are one value of the
+  three-way rule: when the user changed one port, the service keeps its whole
+  list. The ports of a removed service are freed in the sync transaction.
+- **Not done.** IPv6 Node addresses, a port on a subset of Nodes, ranges, and
+  an edit of a published port (remove it and publish it again).
