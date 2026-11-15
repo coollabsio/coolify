@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Traits\Auditable;
+use App\Traits\ClearsGlobalSearchCache;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 
 class NodeCluster extends BaseModel
 {
-    use Auditable, HasFactory;
+    use Auditable, ClearsGlobalSearchCache, HasFactory;
 
     protected $attributes = [
         'cpu_pressure_threshold' => 95,

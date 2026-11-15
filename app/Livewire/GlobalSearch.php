@@ -8,6 +8,7 @@ use App\Models\CloudProviderToken;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\IntegrationToken;
+use App\Models\Node;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -21,6 +22,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Services\Access\AccessResolver;
+use App\Support\ClusterSearchItems;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -172,6 +174,7 @@ class GlobalSearch extends Component
             // Quick Actions
             'new project' => 'project',
             'new server' => 'server',
+            'new cluster server' => 'cluster-server',
             'new team' => 'team',
             'new storage' => 'storage',
             'new s3' => 'storage',
@@ -242,6 +245,10 @@ class GlobalSearch extends Component
             return true;
         }
 
+        if ($type === 'cluster-server') {
+            return nodesEnabled() && $user->can('create', Node::class) && $this->actorCoversWholeTeam();
+        }
+
         if ($type === 'source') {
             return $user->can('create', GithubApp::class);
         }
@@ -271,6 +278,8 @@ class GlobalSearch extends Component
         $resources = $teamWide
             ? Cache::remember(self::getCacheKey(auth()->user()->currentTeam()->id), 300, fn () => $this->searchableResources(includeServers: true))
             : $this->searchableResources(includeServers: false);
+
+        $resources = ClusterSearchItems::visibleTo($resources, auth()->user(), auth()->user()->currentTeam()->id);
 
         // Navigation depends on the user's permissions, so it is not part of the team-wide cache
         $this->allSearchableItems = $this->navigationItems($teamWide)->merge($resources)->values()->all();
@@ -656,6 +665,10 @@ class GlobalSearch extends Component
             ->merge($projects)
             ->merge($environments);
 
+        if (nodesEnabled()) {
+            $items = $items->merge(ClusterSearchItems::resources(auth()->user()->currentTeam()->id, includeClusters: $includeServers));
+        }
+
         return $items->toArray();
     }
 
@@ -676,9 +689,9 @@ class GlobalSearch extends Component
             [
                 'name' => 'Servers',
                 'type' => 'navigation',
-                'description' => 'View all servers',
+                'description' => nodesEnabled() ? 'View all servers and clusters' : 'View all servers',
                 'link' => route('server.index'),
-                'search_text' => 'servers all list view',
+                'search_text' => 'servers all list view'.(nodesEnabled() ? ' clusters cluster servers nodes' : ''),
             ],
             [
                 'name' => 'Projects',
@@ -1184,6 +1197,17 @@ class GlobalSearch extends Component
                 'type' => 'server',
                 'category' => 'Quick Actions',
                 'component' => 'server.create',
+            ]);
+        }
+
+        if ($this->canCreateResource('cluster-server')) {
+            $items->push([
+                'name' => 'Cluster Server',
+                'description' => 'Add a server to a cluster to run cluster applications',
+                'quickcommand' => '(type: new cluster server)',
+                'type' => 'cluster-server',
+                'category' => 'Quick Actions',
+                'route' => 'node.onboarding',
             ]);
         }
 

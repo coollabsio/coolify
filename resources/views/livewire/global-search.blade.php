@@ -18,6 +18,8 @@
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
     vulnerabilitiesUrl: @js(route('vulnerabilities')),
+    // The settings pages of cluster entries, by entry type (App\Support\ClusterSearchItems).
+    clusterPages: @js(nodesEnabled() ? \App\Support\ClusterSearchItems::pageRegistry() : []),
 
     get showServerTimingCommand() {
         if (!this.developerCommandsEnabled) return false;
@@ -100,10 +102,26 @@
 
         const query = this.searchQuery.toLowerCase().trim();
 
-        const results = this.allSearchableItems.filter(item => {
+        const matches = this.allSearchableItems.filter(item => {
             if (!item.search_text) return false;
             return item.search_text.toLowerCase().includes(query);
-        }).slice(0, 20);
+        });
+        // The settings pages of a cluster entry, like nginx > Domains, match its name or the page words
+        // and follow the resources. The pages of the entry named exactly like the query come first.
+        const pages = this.allSearchableItems.flatMap(item => (item.pages ?? []).map(key => {
+            const page = this.clusterPages[item.type]?.[key];
+            return page ? {
+                name: `${item.name} > ${page.label}`,
+                exact: item.name.toLowerCase() === query,
+                type: 'navigation',
+                link: item.link + page.path,
+                project: item.project,
+                environment: item.environment,
+                search_text: `${item.name} ${page.label} ${page.keywords}`.toLowerCase(),
+            } : null;
+        })).filter(page => page && page.search_text.includes(query))
+            .sort((a, b) => b.exact - a.exact);
+        const results = [...matches, ...pages].slice(0, 20);
 
         // A vulnerability ID opens the Security page with that search (resources/js/vulnerability-search.js).
         const vulnerability = window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl);
@@ -261,7 +279,7 @@
             }
 
             const exactMatchCommands = [
-                'new project', 'new server', 'new team', 'new storage', 'new s3',
+                'new project', 'new server', 'new cluster server', 'new team', 'new storage', 'new s3',
                 'new private key', 'new privatekey', 'new key',
                 'new github app', 'new github', 'new source', 'new canvas',
                 'new public', 'new public git', 'new public repo', 'new public repository',
@@ -717,6 +735,7 @@
                                                 <span x-show="result.type === 'server'">Server</span>
                                                 <span x-show="result.type === 'project'">Project</span>
                                                 <span x-show="result.type === 'environment'">Environment</span>
+                                                <span x-show="result.badge" x-text="result.badge"></span>
                                             </span>
                                         </div>
                                         <template x-if="result.project && result.environment">

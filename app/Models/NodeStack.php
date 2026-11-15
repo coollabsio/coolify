@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\NodeStack\NodeStackComposeMapper;
 use App\Services\NodeStack\NodeStackGitSource;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ use RuntimeException;
  */
 class NodeStack extends BaseModel
 {
-    use HasFactory, ScopedByAccessGrants;
+    use ClearsGlobalSearchCache, HasFactory, ScopedByAccessGrants;
 
     /** Namespaces that Sentinel and Coolify use for other names. */
     public const RESERVED_LABELS = ['default', 'nodes', 'cluster'];

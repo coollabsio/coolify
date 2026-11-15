@@ -5,6 +5,9 @@ namespace App\Traits;
 use App\Livewire\GlobalSearch;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\Node;
+use App\Models\NodeStack;
+use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -65,6 +68,12 @@ trait ClearsGlobalSearchCache
                 $searchableFields[] = 'docker_compose_domains';
             } elseif ($this instanceof Server) {
                 $searchableFields[] = 'ip';
+            } elseif ($this instanceof Node) {
+                array_push($searchableFields, 'ip', 'node_cluster_id');
+            } elseif ($this instanceof NodeWorkload) {
+                array_push($searchableFields, 'docker_registry_image_name', 'git_repository', 'source_type', 'database_type', 'environment_id');
+            } elseif ($this instanceof NodeStack) {
+                array_push($searchableFields, 'template', 'git_repository', 'environment_id', 'node_cluster_id');
             } elseif ($this instanceof Service) {
                 // Services don't have direct fqdn, but name and description are covered
             } elseif ($this instanceof Project || $this instanceof Environment) {
@@ -91,9 +100,9 @@ trait ClearsGlobalSearchCache
     private function getTeamIdForCache()
     {
         try {
-            // For Project models (has direct team_id)
-            if ($this instanceof Project) {
-                return $this->team_id ?? null;
+            // For models with a team_id column (projects, servers, the Node models)
+            if (array_key_exists('team_id', $this->getAttributes())) {
+                return $this->team_id;
             }
 
             // For Environment models (get team_id through project)

@@ -11,6 +11,7 @@ use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\HealthCheckCommand;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -26,7 +27,7 @@ use RuntimeException;
 
 class NodeWorkload extends BaseModel
 {
-    use HasFactory, ReleasesManagedDnsRecords, ScopedByAccessGrants;
+    use ClearsGlobalSearchCache, HasFactory, ReleasesManagedDnsRecords, ScopedByAccessGrants;
 
     protected $guarded = [];
 

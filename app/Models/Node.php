@@ -9,6 +9,7 @@ use App\Jobs\SyncNodeClusterDnsRecordsJob;
 use App\Support\CpuArchitecture;
 use App\Support\DevelopmentIngressTarget;
 use App\Traits\Auditable;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,7 +24,7 @@ use RuntimeException;
 
 class Node extends BaseModel
 {
-    use Auditable, HasFactory, HasMetrics;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics;
 
     protected $guarded = [];
 
