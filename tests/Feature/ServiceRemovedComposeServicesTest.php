@@ -141,3 +141,16 @@ test('a duplicate database and application part uses the database and marks the 
         ->and($application->fresh()->is_removed_from_compose)->toBeTrue()
         ->and($service->applications()->count() + $service->databases()->count())->toBe(2);
 });
+
+test('a database part keeps its record when its image changes to an image that is not detected as a database', function () {
+    $service = makeServiceWithCompose(COMPOSE_WITHOUT_EXTRA_PARTS);
+    $service->parse();
+    $database = $service->databases()->where('name', 'db')->sole();
+
+    $service = reparseWithCompose($service, str_replace('postgres:16', 'ghcr.io/example/custom-postgres:16', COMPOSE_WITHOUT_EXTRA_PARTS));
+
+    expect($service->databases()->sole()->only(['id', 'image', 'is_removed_from_compose']))
+        ->toBe(['id' => $database->id, 'image' => 'ghcr.io/example/custom-postgres:16', 'is_removed_from_compose' => false])
+        ->and($service->applications()->pluck('name')->all())->toBe(['web'])
+        ->and($service->docker_compose)->toContain("coolify.service.subUuid={$database->uuid}");
+});

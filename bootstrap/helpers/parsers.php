@@ -2455,8 +2455,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 /**
  * The service application or database that a Compose service uses, created when it does not exist.
  *
- * A part that the user converted wins. Then the part type that the image detection gives, and for a
- * database image an application that an older version saved.
+ * A part that the user converted wins. Then the part type that the image detection gives, and then the
+ * other part type. An image change does not replace an existing part, so its settings and backups stay.
  */
 function resolveServicePart(Service $resource, string $serviceName, bool $isDatabaseImage): ServiceApplication|ServiceDatabase
 {
@@ -2471,7 +2471,7 @@ function resolveServicePart(Service $resource, string $serviceName, bool $isData
         return $database()->first() ?? $application()->first() ?? $resource->databases()->create(['name' => $serviceName]);
     }
 
-    return $application()->first() ?? $resource->applications()->create(['name' => $serviceName]);
+    return $application()->first() ?? $database()->first() ?? $resource->applications()->create(['name' => $serviceName]);
 }
 
 /**
