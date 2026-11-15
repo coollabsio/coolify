@@ -30,6 +30,8 @@ class NodeStack extends BaseModel
     {
         return [
             'compose_parsed' => 'array',
+            // The summary of the last change of the Compose file from Git; see SyncNodeStackCompose.
+            'compose_changes' => 'array',
             // The generated SERVICE_* values, created once for the stack (passwords, users, URLs).
             'variables' => 'encrypted:array',
         ];

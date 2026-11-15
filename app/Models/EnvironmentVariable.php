@@ -911,7 +911,7 @@ class EnvironmentVariable extends BaseModel
      * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
      * without its trailing newline.
      */
-    private static function withoutEdgeWhitespace(string $value): string
+    public static function withoutEdgeWhitespace(string $value): string
     {
         $trimmed = trim($value);
 
