@@ -29,7 +29,7 @@ class PublishBuiltRevision
             // A local build has no registry digest; its tag is unique to the build.
             $workload->createRevision(
                 NodeRegistry::isLocalImage($build->image) ? $build->image : NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
-                $current?->configuration ?? ['restart_policy' => 'unless-stopped'],
+                $current?->configuration ?? $workload->firstRevisionConfiguration(),
                 $current?->environment ?? [],
                 $current?->secrets ?? [],
             );
@@ -41,6 +41,9 @@ class PublishBuiltRevision
         $revision = PrepareNodeWorkloadRevision::run($workload);
         $build->update(['image_digest' => $digest, 'node_workload_revision_id' => $revision->id]);
 
+        if ($build->skip_deploy) {
+            return $revision;
+        }
         foreach ($build->workload->nodes()->get() as $node) {
             $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing');
             if ($deployment['created']) {

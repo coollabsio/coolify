@@ -2,9 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\Build\IssueNodeGitCredential;
+use App\Actions\Node\Build\ResolveGitCommit;
+use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadSourceType;
+use App\Models\NodeBuild;
 use App\Models\NodeOperation;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
@@ -13,6 +19,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Sleep;
 use RuntimeException;
 use Throwable;
@@ -27,6 +34,10 @@ use Throwable;
  *
  * DeployNodeWorkloadJob waits for exactly that: a running container after its settle time, a
  * healthy container when it has a health check, and an exit code of 0 for restart policy `no`.
+ *
+ * A stack from Git (step 2) first builds every service with `build:` at one commit of its branch
+ * (the pushed commit of a webhook, or the head), without deploying them. Each build is a normal
+ * build of its service, with its logs on the service page. When one fails, nothing deploys.
  */
 class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 {
@@ -42,10 +53,12 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 1200;
 
-    public function __construct(public int $stackId, public ?int $requestedById = null)
+    public function __construct(public int $stackId, public ?int $requestedById = null, public ?string $commitSha = null)
     {
-        $services = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stackId)->count();
-        $this->timeout = min(max($this->timeout, $services * self::SERVICE_WAIT_SECONDS + 120), self::MAX_TIMEOUT);
+        $sourceTypes = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stackId)->pluck('source_type');
+        $builds = $sourceTypes->filter(fn (NodeWorkloadSourceType $type): bool => $type->builds())->count();
+        $buildSeconds = $builds * (int) config('constants.node.build_timeout_minutes') * 60;
+        $this->timeout = min(max($this->timeout, $sourceTypes->count() * self::SERVICE_WAIT_SECONDS + $buildSeconds + 120), self::MAX_TIMEOUT);
     }
 
     public function uniqueId(): string
@@ -72,6 +85,9 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             $order = $stack->deployOrder($dependencies);
             $workloads = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stack->id)->get()->keyBy('stack_service');
             $deadline = now()->addSeconds($this->timeout - 60);
+            if ($stack->hasGitSource()) {
+                $this->build($stack, $workloads, $requestedBy, $deadline);
+            }
             foreach ($order as $service) {
                 $workload = $workloads->get($service);
                 if ($workload === null) {
@@ -91,6 +107,37 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         } catch (Throwable $exception) {
             $stack->update(['deploy_status' => 'failed', 'deploy_error' => mb_substr($exception->getMessage(), 0, 2000)]);
         }
+    }
+
+    /**
+     * Builds every service with `build:` at one commit and waits for the builds.
+     *
+     * @param  Collection<string, NodeWorkload>  $workloads
+     */
+    private function build(NodeStack $stack, Collection $workloads, ?User $requestedBy, Carbon $deadline): void
+    {
+        $built = $workloads->filter(fn (NodeWorkload $workload): bool => $workload->buildsFromGit());
+        if ($built->isEmpty()) {
+            return;
+        }
+        $commit = $this->commitSha ?? ResolveGitCommit::run(
+            (string) $stack->git_repository,
+            (string) $stack->git_branch,
+            IssueNodeGitCredential::run(new NodeWorkload(['team_id' => $stack->team_id, 'github_app_id' => $stack->github_app_id, 'private_key_id' => $stack->private_key_id])),
+        );
+        // A running build of a service is reused: the service has at most one active build.
+        $builds = $built->map(fn (NodeWorkload $workload): NodeBuild => StartNodeBuild::run($workload, $requestedBy, $commit, skipDeploy: true));
+        while ($builds->contains(fn (NodeBuild $build): bool => ! $build->refresh()->status->isFinal())) {
+            if (now()->gte($deadline)) {
+                throw new RuntimeException('The builds of '.$builds->filter(fn (NodeBuild $build): bool => ! $build->status->isFinal())->keys()->implode(', ').' did not finish in time. Nothing was deployed.');
+            }
+            Sleep::for(3)->seconds();
+        }
+        $failed = $builds->filter(fn (NodeBuild $build): bool => $build->status !== NodeBuildStatus::SUCCEEDED);
+        if ($failed->isNotEmpty()) {
+            throw new RuntimeException('The build of '.$failed->keys()->implode(', ').' failed. Nothing was deployed. See the build logs of '.($failed->count() === 1 ? 'the service' : 'each service').'.');
+        }
+        $stack->update(['commit_sha' => $commit]);
     }
 
     private function deploy(NodeWorkload $workload, ?User $requestedBy, Carbon $deadline): NodeOperation

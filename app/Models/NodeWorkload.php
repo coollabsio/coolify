@@ -290,7 +290,23 @@ class NodeWorkload extends BaseModel
             $this->usesPrivateGitSource() ? NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY : null,
             $this->environment_variables()->where('is_buildtime', true)->exists() ? NodeRegistry::BUILD_VARIABLES_CAPABILITY : null,
             $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeRegistry::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
+            filled($this->build_target) ? NodeRegistry::BUILD_TARGET_CAPABILITY : null,
         ]));
+    }
+
+    /**
+     * The configuration of the revision that the first build creates. A service of a stack keeps
+     * the command, restart policy, and files of its Compose service.
+     *
+     * @return array<string, mixed>
+     */
+    public function firstRevisionConfiguration(): array
+    {
+        $stack = $this->node_stack_id === null ? null : NodeStack::query()->withoutGlobalScopes()->find($this->node_stack_id);
+
+        return $stack === null || $this->stack_service === null
+            ? ['restart_policy' => 'unless-stopped']
+            : $stack->serviceConfiguration($this->stack_service);
     }
 
     /**

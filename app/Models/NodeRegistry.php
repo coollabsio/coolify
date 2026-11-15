@@ -48,6 +48,9 @@ class NodeRegistry extends BaseModel
     /** Builds the `dockerfile_content` of `image.build` without a repository. */
     public const INLINE_DOCKERFILE_BUILD_CAPABILITY = 'image.build.inline_dockerfile.v1';
 
+    /** Builds the stage `target` of `image.build` instead of the last stage (Compose `build.target`). */
+    public const BUILD_TARGET_CAPABILITY = 'image.build.target.v1';
+
     protected $guarded = [];
 
     protected $hidden = ['ca_private_key_pem', 'private_key_pem', 'push_password', 'pull_password', 'htpasswd'];

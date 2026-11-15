@@ -71,6 +71,7 @@ class IssueFluxCredential
             'image.build.external_push.v1',
             'image.build.variables.v1',
             'image.build.inline_dockerfile.v1',
+            'image.build.target.v1',
             'workload.registry_auth.v1',
             'builder.reconcile.v1',
             'registry.reconcile.v1',

@@ -17,15 +17,16 @@ use RuntimeException;
  * Queues a build of the workload's Git source or inline Dockerfile. A workload has at most one
  * active build; asking again returns it. A webhook passes the pushed commit;
  * without one, the build resolves the head of the branch. A rollback passes an earlier build,
- * whose source and commit the new build copies.
+ * whose source and commit the new build copies. A stack deploy builds without deploying
+ * (`$skipDeploy`), then deploys its services in `depends_on` order.
  */
 class StartNodeBuild
 {
     use AsAction;
 
-    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null, ?NodeBuild $rebuildOf = null): NodeBuild
+    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null, ?NodeBuild $rebuildOf = null, bool $skipDeploy = false): NodeBuild
     {
-        $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf): NodeBuild {
+        $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf, $skipDeploy): NodeBuild {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             if ($rebuildOf !== null) {
                 if ($workload->builds()->active()->exists()) {
@@ -61,6 +62,7 @@ class StartNodeBuild
                 'base_directory' => $workload->base_directory,
                 'dockerfile_location' => $workload->dockerfile_location,
                 'dockerfile' => $workload->dockerfile,
+                'skip_deploy' => $skipDeploy,
                 'status' => NodeBuildStatus::QUEUED,
             ]);
         });

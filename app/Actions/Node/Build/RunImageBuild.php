@@ -68,6 +68,7 @@ class RunImageBuild
             ] : []),
             'image' => $build->image,
             'dockerfile_path' => '',
+            ...(filled($build->workload->build_target) ? ['target' => (string) $build->workload->build_target] : []),
             ...$source,
             ...$credential,
             ...$push,
