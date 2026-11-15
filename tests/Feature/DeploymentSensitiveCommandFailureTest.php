@@ -443,16 +443,20 @@ it('starts the helper with its own DOCKER_CONFIG after build secret HOME and DOC
         ->and(strrpos($helperCommands[0], '-e DOCKER_CONFIG=/root/.docker'))->toBeGreaterThan(strpos($helperCommands[0], '/app/.docker'));
 });
 
-it('mounts the server CA bundle into the helper so the Docker CLI can fetch registry tokens', function (string $detectedBundle, ?string $expectedMount) {
+it('makes the helper trust the server CA bundle for the Docker CLI, Git LFS, git, and curl', function (string $detectedBundle, ?string $expectedMount) {
     [$job, $reflection] = makeSensitiveCommandFailureJob();
     $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
     setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
 
     $helperCommands = [];
-    Process::fake(function (PendingProcess $process) use (&$helperCommands, $detectedBundle) {
+    $helperExecCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, &$helperExecCommands, $detectedBundle) {
         $script = remoteProcessScript($process);
         if (str_contains($script, 'docker run -d')) {
             $helperCommands[] = $script;
+        }
+        if (str_contains($script, 'docker exec')) {
+            $helperExecCommands[] = $script;
         }
 
         return Process::result(output: match (true) {
@@ -464,11 +468,14 @@ it('mounts the server CA bundle into the helper so the Docker CLI can fetch regi
 
     invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
 
+    $appendToOpenSslBundle = 'cat /etc/ssl/certs/coolify-host-ca-certificates.crt >> /etc/ssl/certs/ca-certificates.crt';
     expect($helperCommands)->toHaveCount(1);
     if ($expectedMount === null) {
-        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt');
+        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt')
+            ->and(implode("\n", $helperExecCommands))->not->toContain($appendToOpenSslBundle);
     } else {
-        expect($helperCommands[0])->toContain($expectedMount);
+        expect($helperCommands[0])->toContain($expectedMount)
+            ->and($helperExecCommands[0])->toContain($appendToOpenSslBundle);
     }
 })->with([
     'Debian and Ubuntu bundle' => ['/etc/ssl/certs/ca-certificates.crt', '--mount type=bind,source=/etc/ssl/certs/ca-certificates.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],

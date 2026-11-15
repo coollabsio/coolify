@@ -102,10 +102,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     ];
 
     /**
-     * Go programs in the helper (the Docker CLI, which fetches registry tokens for BuildKit) read every file
-     * in /etc/ssl/certs, so this file adds the server CAs to the helper CAs. OpenSSL (git, curl) ignores it.
+     * Go programs in the helper (the Docker CLI, which fetches registry tokens for BuildKit, and Git LFS) read every
+     * file in /etc/ssl/certs, so this file adds the server CAs to the helper CAs. OpenSSL (git, curl) reads only
+     * HELPER_CA_BUNDLE_PATH, so the helper start appends this file to it.
      */
     private const HELPER_HOST_CA_BUNDLE_PATH = '/etc/ssl/certs/coolify-host-ca-certificates.crt';
+
+    private const HELPER_CA_BUNDLE_PATH = '/etc/ssl/certs/ca-certificates.crt';
 
     private const NIXPACKS_PLAN_PATH = '/artifacts/thegameplan.json';
 
@@ -3517,20 +3520,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // "docker stop" returns before the --rm auto-removal frees the name, so the "docker run" below can conflict with it.
         $this->removeContainerWithTimeout($this->deployment_uuid);
-        $this->execute_remote_command(
+        $helperCommands = [
             [
                 $runCommand,
                 'hidden' => true,
                 'skip_command_log' => filled($secretEnvFlags),
             ],
-            [
-                'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
-            ],
-            [
-                'command' => executeInDocker($this->deployment_uuid, gitSshSetupCommand($this->deployment_uuid, $this->application->git_ssh_known_hosts)),
+        ];
+        if ($hostCaBundleVolume !== '') {
+            // git and curl use OpenSSL, which reads only the helper bundle
+            $helperCommands[] = [
+                'command' => executeInDocker($this->deployment_uuid, 'cat '.self::HELPER_HOST_CA_BUNDLE_PATH.' >> '.self::HELPER_CA_BUNDLE_PATH),
                 'hidden' => true,
-            ],
-        );
+            ];
+        }
+        $helperCommands[] = [
+            'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
+        ];
+        $helperCommands[] = [
+            'command' => executeInDocker($this->deployment_uuid, gitSshSetupCommand($this->deployment_uuid, $this->application->git_ssh_known_hosts)),
+            'hidden' => true,
+        ];
+        $this->execute_remote_command(...$helperCommands);
         $this->run_pre_deployment_command();
     }
 
