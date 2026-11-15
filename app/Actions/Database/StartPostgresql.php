@@ -303,6 +303,14 @@ class StartPostgresql
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
+        // The image reads these only when it creates the data directory on the first start.
+        if (filled($this->database->postgres_initdb_args) && ! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_INITDB_ARGS')) {
+            $environment_variables->push("POSTGRES_INITDB_ARGS={$this->database->postgres_initdb_args}");
+        }
+        if (filled($this->database->postgres_host_auth_method) && ! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_HOST_AUTH_METHOD')) {
+            $environment_variables->push("POSTGRES_HOST_AUTH_METHOD={$this->database->postgres_host_auth_method}");
+        }
+
         $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
