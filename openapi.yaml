@@ -2903,6 +2903,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Application deleted.'
@@ -5268,6 +5276,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Database deleted.'
@@ -14638,6 +14654,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'

@@ -4354,6 +4354,16 @@
                             "type": "boolean",
                             "default": true
                         }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -8103,6 +8113,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -23305,6 +23325,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
