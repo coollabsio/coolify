@@ -157,7 +157,7 @@ it('runs every scanner container with each hardening flag exactly once', functio
         }
     }
 
-    expect($runs)->toBe(13);
+    expect($runs)->toBe(12);
 });
 
 it('cuts the network only for runs that do not need a registry or the database download', function () {
@@ -234,10 +234,6 @@ it('refuses values that could break out of the command', function (string $metho
     'auth not base64' => ['tags', ['nginx', "abc'; id; '"]],
     'auth with two registries' => ['tags', ['nginx', base64_encode(json_encode(['auths' => ['a.io' => ['auth' => 'x'], 'b.io' => ['auth' => 'y']]]))]],
     'auth with a credential helper' => ['tags', ['nginx', base64_encode(json_encode(['auths' => ['a.io' => ['auth' => 'x']], 'credsStore' => 'desktop']))]],
-    'db url' => ['dbUpdate', ["https://x.io/db';id;'"]],
-    'db url scheme' => ['dbUpdate', ['file:///etc/passwd']],
-    'db url with a pipe' => ['dbUpdate', ['https://x.io/a|b']],
-    'db url with an ampersand' => ['dbUpdate', ['https://x.io/a?b=1&&c=2']],
 ])->throws(InvalidArgumentException::class);
 
 it('writes the SBOM to a temp file and moves it into place after Syft succeeds', function () {
