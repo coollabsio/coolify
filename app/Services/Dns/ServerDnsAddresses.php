@@ -2,6 +2,7 @@
 
 namespace App\Services\Dns;
 
+use App\Models\Node;
 use App\Models\Server;
 use App\Support\DnsRecordHints;
 
@@ -34,6 +35,14 @@ final class ServerDnsAddresses
         $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
 
         return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], $server->id === 0);
+    }
+
+    /** A cluster Node (v5) has one address, like a v4 server that does not run Coolify. */
+    public static function forNode(Node $node): self
+    {
+        $resolved = resolveServerIpAddress($node->ip);
+
+        return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], false);
     }
 
     /**

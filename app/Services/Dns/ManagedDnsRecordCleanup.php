@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
+use App\Models\NodeWorkload;
 use App\Models\ServiceApplication;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,8 +19,8 @@ use Throwable;
 
 /**
  * Releases resource references to managed DNS records and deletes a provider record only when
- * Coolify owns it, no resource references it and no application, preview or service application
- * (in any team) still uses its hostname.
+ * Coolify owns it, no resource references it and no application, preview, service application or
+ * cluster application (in any team) still uses its hostname.
  */
 class ManagedDnsRecordCleanup
 {
@@ -350,7 +351,8 @@ class ManagedDnsRecordCleanup
     }
 
     /**
-     * Live applications, previews and service applications (any team) that use the hostname, except the given resource keys.
+     * Live applications, previews, service applications and cluster applications (any team) that use the hostname, except the given resource keys.
+     * A cluster application also uses the www hostname of its www redirect.
      *
      * @param  array<int, string>  $exceptKeys  "morph-class|id" keys
      * @return Collection<int, Model>
@@ -367,6 +369,8 @@ class ManagedDnsRecordCleanup
             ->concat(Application::query()->where($matchesFqdnOrCompose)->get())
             ->concat(ApplicationPreview::query()->where($matchesFqdnOrCompose)->get())
             ->concat(ServiceApplication::query()->whereRaw('LOWER(fqdn) LIKE ?', [$pattern])->get())
+            ->concat(NodeWorkload::query()->withoutGlobalScopes()->whereNotNull('domains')
+                ->whereRaw('LOWER(CAST(domains AS TEXT)) LIKE ?', ['%'.preg_replace('/^www\./', '', $hostname).'%'])->get())
             ->reject(fn (Model $resource): bool => in_array($resource->getMorphClass().'|'.$resource->getKey(), $exceptKeys, true))
             ->filter(fn (Model $resource): bool => in_array($hostname, $this->hostnamesOf($resource), true))
             ->values();
@@ -377,6 +381,10 @@ class ManagedDnsRecordCleanup
      */
     public function hostnamesOf(Model $resource): array
     {
+        if ($resource instanceof NodeWorkload) {
+            return $resource->dnsHostnames();
+        }
+
         $attributes = $resource->getAttributes();
         $values = $this->splitUrls($attributes['fqdn'] ?? null);
 
@@ -415,6 +423,7 @@ class ManagedDnsRecordCleanup
         $teamId = match (true) {
             $resource instanceof ApplicationPreview => data_get($resource, 'application.environment.project.team_id'),
             $resource instanceof ServiceApplication => data_get($resource, 'service.environment.project.team_id'),
+            $resource instanceof NodeWorkload => $resource->team_id,
             default => data_get($resource, 'environment.project.team_id'),
         };
 

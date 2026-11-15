@@ -189,10 +189,12 @@ class CloudflareDnsProvider
      * creates the record again when the release deleted it.
      *
      * @param  array<int, Model>  $additionalResources  Other resources that use the hostname and also reference the record.
+     * @param  bool  $roundRobin  The resource has one record per address (cluster ingress Nodes): records that Coolify
+     *                            created for the same resource are not a conflict, and a new record is added next to them.
      *
      * @throws LockTimeoutException when another change for the hostname does not finish in time
      */
-    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = [], ?bool $proxied = null): ManagedDnsRecord
+    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = [], ?bool $proxied = null, bool $roundRobin = false): ManagedDnsRecord
     {
         $this->assertResourcesManagedHere([$resource, ...$additionalResources]);
         $hostname = strtolower(rtrim($hostname, '.'));
@@ -200,8 +202,8 @@ class CloudflareDnsProvider
         return $this->hostnameLock->run(
             (int) $zone->integrationToken->team_id,
             $hostname,
-            function () use ($zone, $hostname, $content, $resource, $additionalResources, $proxied): ManagedDnsRecord {
-                $record = $this->createRecordLocked($zone, $hostname, $content, $resource, $proxied);
+            function () use ($zone, $hostname, $content, $resource, $additionalResources, $proxied, $roundRobin): ManagedDnsRecord {
+                $record = $this->createRecordLocked($zone, $hostname, $content, $resource, $proxied, $roundRobin);
                 foreach ($additionalResources as $additionalResource) {
                     $record->addReference($additionalResource);
                 }
@@ -211,7 +213,7 @@ class CloudflareDnsProvider
         );
     }
 
-    private function createRecordLocked(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource, ?bool $proxied): ManagedDnsRecord
+    private function createRecordLocked(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource, ?bool $proxied, bool $roundRobin = false): ManagedDnsRecord
     {
         $type = $this->recordType($content);
         $remoteRecords = $this->conflictingRecords($zone, $hostname, $type);
@@ -225,6 +227,9 @@ class CloudflareDnsProvider
             $this->auditDnsRecord('adopted', $zone, $hostname, $resource);
 
             return $record;
+        }
+        if ($roundRobin && $resource !== null) {
+            $remoteRecords = array_values(array_filter($remoteRecords, fn (array $remote): bool => ! $this->isOwnedRecordOf($zone, $remote, $resource)));
         }
         if (count($remoteRecords) > 1) {
             throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
@@ -257,6 +262,26 @@ class CloudflareDnsProvider
         $this->auditDnsRecord('created', $zone, $hostname, $resource);
 
         return $record;
+    }
+
+    /**
+     * Whether Coolify created the remote record for this resource: an owned row of the zone that the resource
+     * references, and the provider comment still proves the ownership.
+     *
+     * @param  array{id: string, comment: string|null}  $remote
+     */
+    private function isOwnedRecordOf(DnsProviderZone $zone, array $remote, Model $resource): bool
+    {
+        $record = ManagedDnsRecord::query()
+            ->where('dns_provider_zone_id', $zone->id)
+            ->where('provider_record_id', $remote['id'])
+            ->where('owned', true)
+            ->whereHas('references', fn ($query) => $query
+                ->where('resource_type', $resource->getMorphClass())
+                ->where('resource_id', $resource->getKey()))
+            ->first();
+
+        return $record !== null && $remote['comment'] === $record->ownershipComment();
     }
 
     /**

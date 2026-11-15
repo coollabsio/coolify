@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\BuildNodeClusterIngressRoutes;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeContainerSlot;
 use App\Enums\NodeDatabaseType;
@@ -10,6 +11,7 @@ use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\HealthCheckCommand;
+use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,7 +26,7 @@ use RuntimeException;
 
 class NodeWorkload extends BaseModel
 {
-    use HasFactory, ScopedByAccessGrants;
+    use HasFactory, ReleasesManagedDnsRecords, ScopedByAccessGrants;
 
     protected $guarded = [];
 
@@ -144,6 +146,18 @@ class NodeWorkload extends BaseModel
     public static function servesHttps(?array $certificate): bool
     {
         return (int) ($certificate['not_after'] ?? 0) > now()->timestamp;
+    }
+
+    /**
+     * The hostnames that point to the ingress Nodes: the domains and the sources of the www redirect.
+     *
+     * @return list<string>
+     */
+    public function dnsHostnames(): array
+    {
+        $domains = array_values(array_map(fn (string $domain): string => strtolower(rtrim($domain, '.')), $this->domains ?? []));
+
+        return array_values(array_unique([...$domains, ...array_keys(BuildNodeClusterIngressRoutes::wwwRedirects($domains, $this->www_redirect))]));
     }
 
     /** Whether ingress Nodes route public HTTP traffic to this workload. */
