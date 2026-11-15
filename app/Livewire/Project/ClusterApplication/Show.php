@@ -1025,6 +1025,7 @@ class Show extends Component
             ...($this->section === 'ports' ? $this->publishedPortsData() : []),
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
+            'imageArchitectureWarning' => ReadImageArchitectures::warning($this->workload),
             'registryCredentialOptions' => $this->section === 'general' ? $this->registryCredentialOptions() : [],
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentHistory() : null,
             'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentFilterOptions() : null,

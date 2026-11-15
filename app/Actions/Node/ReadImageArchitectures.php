@@ -45,6 +45,12 @@ class ReadImageArchitectures
 
     private const MAX_REDIRECTS = 3;
 
+    /** How long the application page shows that the last read failed, unless a later read succeeds. */
+    private const WARNING_TTL = 604_800;
+
+    /** Why the last read failed, or null after a read that worked. */
+    public ?string $lastError = null;
+
     private string $registry;
 
     private string $repository;
@@ -67,10 +73,13 @@ class ReadImageArchitectures
         [$this->registry, $this->repository, $reference] = self::parse($image);
         $this->login = $login;
         $this->authorization = null;
+        $this->lastError = null;
         $identity = $login === null ? 'anonymous' : hash_hmac('sha256', $login['username']."\0".$login['password'], (string) config('app.key'));
         $referenceKey = 'image-architectures:ref:'.hash('sha256', "{$this->registry}/{$this->repository}@{$reference}\0{$identity}");
         $cached = Cache::get($referenceKey);
         if (is_array($cached)) {
+            $this->lastError = $cached['error'] ?? null;
+
             return $cached['architectures'];
         }
 
@@ -82,8 +91,9 @@ class ReadImageArchitectures
                 'error' => mb_substr($exception->getMessage(), 0, 300),
             ]);
             $architectures = null;
+            $this->lastError = mb_substr($exception->getMessage(), 0, 300);
         }
-        Cache::put($referenceKey, ['architectures' => $architectures], $architectures === null ? self::FAILURE_TTL : self::REFERENCE_TTL);
+        Cache::put($referenceKey, ['architectures' => $architectures, 'error' => $this->lastError], $architectures === null ? self::FAILURE_TTL : self::REFERENCE_TTL);
 
         return $architectures;
     }
@@ -102,7 +112,33 @@ class ReadImageArchitectures
             $login = null;
         }
 
-        return self::run($revision->image, $login);
+        $reader = app(self::class);
+        $architectures = $reader->handle($revision->image, $login);
+        if ($workload !== null) {
+            $reader->lastError === null
+                ? Cache::forget(self::warningKey($workload))
+                : Cache::put(self::warningKey($workload), ['image' => $revision->image, 'error' => $reader->lastError], self::WARNING_TTL);
+        }
+
+        return $architectures;
+    }
+
+    /**
+     * Why Coolify could not read the CPU architectures of the image of the workload at the last
+     * check, for the warning on the application page. Reads only the cache.
+     *
+     * @return array{image: string, error: string}|null
+     */
+    public static function warning(NodeWorkload $workload): ?array
+    {
+        $warning = Cache::get(self::warningKey($workload));
+
+        return is_array($warning) ? $warning : null;
+    }
+
+    private static function warningKey(NodeWorkload $workload): string
+    {
+        return "image-architectures:warning:{$workload->id}";
     }
 
     /**

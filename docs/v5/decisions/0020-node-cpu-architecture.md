@@ -36,6 +36,9 @@ architecture open. Emulation with QEMU is slow.
   a Node with a null architecture fits every image. Thus an old Node, a
   registry that is down, or a private image without a login does not stop a
   deploy. Coolify writes a warning to the log when it cannot read an image.
+  The application page also shows a warning with the image and the reason
+  (`ReadImageArchitectures::warning()`). The page reads only the cache. A
+  later read that works removes the warning, and it ends after 7 days.
 - A build records the architecture of its builder Node in
   `node_builds.architecture`. The migration sets this column for earlier
   builds from their builder Node. A built image (`registry.cluster…@digest`
