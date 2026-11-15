@@ -92,7 +92,8 @@ class DeployNodePreview
             }
             $values = [
                 ...$parent->only(self::COPIED_COLUMNS),
-                'pull_request_url' => $url,
+                // A manual deploy has no URL; it keeps the URL from an earlier webhook.
+                'pull_request_url' => $url ?? $preview?->pull_request_url,
                 'pull_request_ref' => $ref,
                 'pull_request_from_fork' => $fromFork,
             ];
