@@ -93,6 +93,7 @@ RUN mkdir -p /usr/local/bin && \
 
 # Configure PHP
 COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
 ENV PHP_OPCACHE_ENABLE=0
 
 # Install terminal WebSocket server dependencies
