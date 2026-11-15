@@ -3831,6 +3831,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ->latest('id')
             ->value('commit_message');
 
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
         if (filled($commitMessage)) {
             $this->application_deployment_queue->update(['commit_message' => $commitMessage]);
         }
@@ -3863,7 +3864,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = $this->trimmedSavedOutput('commit_message');
             $this->application_deployment_queue->commit_message = $commit_message->value();
-            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
+            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->update(
                 ['commit_message' => $commit_message->value()]
             );
         }
