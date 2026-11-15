@@ -417,6 +417,30 @@ class NodeWorkload extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', false);
     }
 
+    /** The preview variables of this parent (decision 0025), which the Previews tab edits. */
+    public function previewEnvironmentVariables(): MorphMany
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', true);
+    }
+
+    /**
+     * The variables that a preview of a pull request of this parent gets, by key (decision 0025):
+     * the preview variables, over the production values only when "Use production values in
+     * previews" is on and the pull request is not from a fork, as in v4. Build-time variables
+     * follow the same rule, so a fork preview gets no production build secret.
+     *
+     * @return Collection<string, EnvironmentVariable>
+     */
+    public function resolvedPreviewVariables(bool $fromFork): Collection
+    {
+        $preview = $this->previewEnvironmentVariables()->orderBy('id')->get()->keyBy('key');
+        if ($fromFork || $this->preview_uses_production_values === false) {
+            return $preview;
+        }
+
+        return $this->environment_variables()->orderBy('id')->get()->keyBy('key')->merge($preview);
+    }
+
     /** The text with the runtime values of this workload hidden, like a deployment log. */
     public function redactLogText(string $text): string
     {
