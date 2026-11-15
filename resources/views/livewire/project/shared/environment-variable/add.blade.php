@@ -51,6 +51,13 @@
                 ['value' => true, 'label' => 'Available in the container'],
                 ['value' => false, 'label' => 'Not available in the container'],
             ]" helper="Make this variable available in the running container at runtime." />
+            @if ($showPreview && $resource instanceof \App\Models\NodeWorkload)
+                <x-forms.listbox id="is_preview" label="Environment" :options="[
+                    ['value' => false, 'label' => 'Production'],
+                    ['value' => true, 'label' => 'Preview deployments'],
+                ]"
+                    helper="A preview variable goes only to the previews of pull requests. It applies at the next deploy of a preview." />
+            @endif
             @if ($canLeavePreviewValueEmpty)
                 <x-forms.listbox id="copy_value_to_preview" label="Preview value" :options="[
                     ['value' => true, 'label' => 'Copy production value'],

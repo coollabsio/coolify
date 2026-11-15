@@ -320,12 +320,21 @@ These points differ from the decision above or add to it:
   keeps the pull request URL from an earlier webhook.
 - **Open pull requests.** The **Previews** tab does not list the open pull
   requests of a GitHub App source yet.
-- **Preview variables.** The **Previews** tab shows the variables component in
-  a preview-only mode. It reads, adds, and saves only `is_preview` rows of the
-  parent. The developer view of this mode does not touch the production
-  variables. The **Environment Variables** tab of the parent shows only the
-  production variables. `previewEnvironmentVariables()` is now
-  `environment_variables_preview()`, the v4 name.
+- **Preview variables.** The **Environment Variables** tab of the parent shows
+  them as v4 shows them for an application: a **Production** and a **Preview
+  deployments** group, the environment filter, and the second textarea in the
+  developer view. It shows them for every Git cluster application, also with
+  previews off, as v4 does. v4 copies each new production variable to the
+  previews; a cluster application does not, so the add modal has an
+  **Environment** listbox to add a preview variable. `previewEnvironmentVariables()`
+  is now `environment_variables_preview()`, the v4 name.
+- **Previews tab.** It follows the v4 layout: the toggle button, **PR deployment
+  access**, **Production values** in the place of the v4 **New preview
+  variables** listbox, the URL template, a manual deploy by number, and one card
+  per preview with an editable **Domains** field and the **Links**, **Logs**, and
+  **Actions** menus (Redeploy, Start, Stop, Delete). A deploy sets the domains
+  only when it creates the preview, so an edited domain stays. Builds have no
+  no-cache option, so there is no **Force deploy without cache**.
 - **Preview page.** A preview page shows a note with links to the parent and to
   the pull request. Its **Environment Variables** tab lists the names only and
   is read-only. Its **Webhooks** tab is hidden. The other tabs stay editable,
@@ -408,8 +417,8 @@ against GitHub), and the daily job.
     Files: `app/Http/Controllers/Webhook/Github.php`, `Gitlab.php`,
     `Gitea.php`, `Bitbucket.php`,
     `app/Http/Controllers/Webhook/Concerns/StartsClusterWebhookBuilds.php`.
-11. **UI.** The **Previews** tab on the parent (settings, preview variables,
-    list, **Deploy pull request**, delete), and a link to the parent on the
+11. **UI.** The **Previews** tab on the parent (settings, URL template, manual
+    deploy, preview cards), preview variables on its **Environment Variables** tab, and a link to the parent on the
     page of a preview. Files: `app/Livewire/Project/ClusterApplication/`,
     `resources/views/livewire/project/cluster-application/`, `routes/web.php`.
 12. **GitHub App.** Pull request comments, the list of open pull requests, and

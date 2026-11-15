@@ -24,12 +24,6 @@ class All extends Component
 
     public bool $showPreview = false;
 
-    /**
-     * Shows and edits only the preview variables, on the Previews tab of a cluster application
-     * (decision 0025). The production variables are not loaded, saved, or deleted.
-     */
-    public bool $previewScope = false;
-
     public ?string $variables = null;
 
     public ?string $variablesPreview = null;
@@ -99,7 +93,7 @@ class All extends Component
         $this->search = $key;
         $this->variableFilters = [];
         $this->serviceFilters = [];
-        $this->environmentFilter = $this->previewScope ? 'preview' : 'all';
+        $this->environmentFilter = 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -136,9 +130,9 @@ class All extends Component
         if (str($this->resourceClass)->contains($resourceWithPreviews) && $hasGitRepository && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
-        if ($this->previewScope) {
+        // A Git cluster application has preview variables (decision 0025), shown like v4 shows them for an application.
+        if ($this->resource instanceof NodeWorkload && $this->resource->canHavePreviews()) {
             $this->showPreview = true;
-            $this->environmentFilter = 'preview';
         }
         // Intentionally skip loading env vars / developer-view bulk text here.
         // loadEnvironmentVariables() is triggered from the frontend via wire:init.
@@ -307,7 +301,7 @@ class All extends Component
 
     private function supportsPreviewEnvironmentVariables(): bool
     {
-        return $this->showPreview && ($this->resource instanceof Application || $this->previewScope);
+        return $this->showPreview && ($this->resource instanceof Application || $this->resource instanceof NodeWorkload);
     }
 
     public function getHasEnvironmentVariablesProperty(): bool
@@ -478,7 +472,7 @@ class All extends Component
 
     public function setEnvironmentFilter(string $filter): void
     {
-        if ($this->previewScope || ! in_array($filter, ['all', 'production', 'preview'], true)) {
+        if (! in_array($filter, ['all', 'production', 'preview'], true)) {
             return;
         }
 
@@ -538,7 +532,7 @@ class All extends Component
     {
         $this->variableFilters = [];
         $this->serviceFilters = [];
-        $this->environmentFilter = $this->previewScope ? 'preview' : 'all';
+        $this->environmentFilter = 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -1025,9 +1019,7 @@ class All extends Component
 
     public function getDevView()
     {
-        if (! $this->previewScope) {
-            $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
-        }
+        $this->variables = $this->formatEnvironmentVariables($this->getEnvironmentVariables(false, false));
         if ($this->showPreview) {
             $this->variablesPreview = $this->formatEnvironmentVariables($this->getEnvironmentVariables(true, false));
         }
@@ -1077,7 +1069,7 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $variables = $this->previewScope ? [] : $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
                 $previewVariables = [];
                 if ($this->showPreview) {
                     try {
@@ -1118,7 +1110,7 @@ class All extends Component
 
     private function updateOrder()
     {
-        $variables = $this->previewScope ? [] : $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
+        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $order = 1;
         foreach ($variables as $key => $value) {
             $env = $this->resource->environment_variables()->where('key', $key)->first();
@@ -1148,20 +1140,18 @@ class All extends Component
         $changesMade = false;
         $errorOccurred = false;
 
-        if (! $this->previewScope) {
-            // Try to delete removed variables
-            $deletedCount = $this->deleteRemovedVariables(false, $variables);
-            if ($deletedCount > 0) {
-                $changesMade = true;
-            } elseif ($deletedCount < 0) {
-                $errorOccurred = true;
-            }
+        // Try to delete removed variables
+        $deletedCount = $this->deleteRemovedVariables(false, $variables);
+        if ($deletedCount > 0) {
+            $changesMade = true;
+        } elseif ($deletedCount < 0) {
+            $errorOccurred = true;
+        }
 
-            // Update or create variables
-            $updatedCount = $this->updateOrCreateVariables(false, $variables);
-            if ($updatedCount > 0) {
-                $changesMade = true;
-            }
+        // Update or create variables
+        $updatedCount = $this->updateOrCreateVariables(false, $variables);
+        if ($updatedCount > 0) {
+            $changesMade = true;
         }
 
         if ($this->showPreview) {

@@ -2,7 +2,7 @@
     {{-- Each deploy of the pull request writes these from the parent (decision 0025), so they are read-only here. --}}
     @php $previewVariables = $workload->environment_variables()->orderBy('key')->get(['key', 'is_buildtime', 'is_runtime']); @endphp
     <x-application.settings-section id="environment-variables-section" title="Environment variables" :flush="$previewVariables->isNotEmpty()"
-        helper="The preview variables of the parent application, and its production values when the parent allows them. Edit them on the Previews tab of the parent. They apply at the next deploy of the pull request.">
+        helper="The preview variables of the parent application, and its production values when the parent allows them. Edit them on the Environment Variables tab of the parent. They apply at the next deploy of the pull request.">
         @if ($previewVariables->isEmpty())
             <p class="text-[13px] text-neutral-500 dark:text-fg-dim">This preview has no variables.</p>
         @else

@@ -425,7 +425,7 @@ class NodeWorkload extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', false);
     }
 
-    /** The preview variables of this parent (decision 0025), which the Previews tab edits. */
+    /** The preview variables of this parent (decision 0025), which the Environment Variables tab edits. */
     public function environment_variables_preview(): MorphMany
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')->where('is_preview', true);

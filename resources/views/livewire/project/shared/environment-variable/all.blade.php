@@ -1,27 +1,24 @@
 @php
     // Preview and production variables are split into labelled groups instead of a
     // shared "Type" column, so the column is dropped and rows are headed by scope.
-    $groupByScope = $showPreview && ! $previewScope;
+    $groupByScope = $showPreview;
     $showEnvironmentType = false;
-    $activeFilterCount = count($variableFilters) + count($serviceFilters) + ($environmentFilter !== 'all' && ! $previewScope ? 1 : 0);
+    $activeFilterCount = count($variableFilters) + count($serviceFilters) + ($environmentFilter !== 'all' ? 1 : 0);
     $filterLabels = [
         'managed' => 'Managed', 'user' => 'User-defined', 'buildtime' => 'Buildtime',
         'runtime' => 'Runtime', 'multiline' => 'Multiline', 'literal' => 'Literal',
     ];
     $activeFilterLabels = collect($variableFilters)->map(fn ($filter) => $filterLabels[$filter] ?? $filter);
     $activeFilterLabels = $activeFilterLabels->merge($serviceFilters);
-    if ($environmentFilter !== 'all' && ! $previewScope) {
+    if ($environmentFilter !== 'all') {
         $activeFilterLabels->push(str($environmentFilter)->headline()->toString());
     }
     $activeFilterText = $activeFilterLabels->implode(', ');
 @endphp
 <div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables"
     x-on:focus-compose-environment-variable.window="const key = $event.detail.key; const focus = () => { const row = document.querySelector(`[data-env-key='${CSS.escape(key)}']`); if (!row) return false; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.querySelector('[data-env-settings-trigger]')?.click(); return true; }; if (!focus()) { $wire.focusComposeEnvironmentVariable(key).then(() => requestAnimationFrame(focus)); }">
-    <x-application.settings-section id="environment-variables-section"
-        :title="$previewScope ? 'Preview variables' : 'Environment variables'"
-        :helper="$previewScope
-            ? 'Each preview gets these variables. A preview of a pull request that is not from a fork also gets the production value of each other key when Use production values is on.'
-            : 'Environment variables (secrets) for this resource.'">
+    <x-application.settings-section id="environment-variables-section" title="Environment variables"
+        helper="Environment variables (secrets) for this resource.">
         @can('manageEnvironment', $resource)
             <x-slot:actions>
                 <x-forms.button wire:click='switch' wire:loading.attr="disabled"
@@ -30,7 +27,7 @@
                 </x-forms.button>
             </x-slot:actions>
         @endcan
-        @if ($view === 'normal' && ! $previewScope)
+        @if ($view === 'normal')
             <div class="flex w-full flex-col gap-4">
                 @if ($resourceClass === 'App\Models\Application')
                     <div class="grid w-full items-end gap-4 sm:grid-cols-2">
@@ -79,7 +76,7 @@
                     </div>
                 @endif
             </div>
-        @elseif ($view !== 'normal')
+        @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)
                     <x-callout type="info" title="Note">
@@ -87,20 +84,16 @@
                         To set flags, put <code class="font-mono"># coolify: literal buildtime=false runtime=false</code>
                         directly above a variable line. Without this line, the flags of a variable do not change.
                     </x-callout>
-                    @unless ($previewScope)
-                        <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
-                            wire:model="variables" label="Production"></x-forms.textarea>
-                    @endunless
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
+                        wire:model="variables" label="Production"></x-forms.textarea>
                     @if ($showPreview)
                         <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview deployments"
                             id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
                     @endif
                     <x-unsaved-bar action="submit" />
                 @else
-                    @unless ($previewScope)
-                        <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
-                            wire:model="variables" label="Production" disabled></x-forms.textarea>
-                    @endunless
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
+                        wire:model="variables" label="Production" disabled></x-forms.textarea>
                     @if ($showPreview)
                         <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview deployments"
                             id="variablesPreview" wire:model="variablesPreview" disabled></x-forms.textarea>
@@ -146,7 +139,7 @@
                                 </span>
                             </button>
                         @endforeach
-                        @if ($showPreview && ! $previewScope)
+                        @if ($showPreview)
                             <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
                             @foreach (['all' => 'All environments', 'production' => 'Production', 'preview' => 'Preview'] as $value => $label)
                                 <button type="button" class="listbox-option" wire:click="setEnvironmentFilter('{{ $value }}')" @click="open = false">
@@ -203,7 +196,7 @@
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
-                    <x-modal-input :title="$previewScope ? 'New Preview Variable' : 'New Environment Variable'" :closeOutside="false">
+                    <x-modal-input title="New Environment Variable" :closeOutside="false">
                         <x-slot:content>
                             <button type="button"
                                 class="button button-highlighted">
@@ -211,7 +204,7 @@
                                 Add
                             </button>
                         </x-slot:content>
-                        <livewire:project.shared.environment-variable.add :resource="$resource" :showPreview="$showPreview && ! $previewScope" :is_preview="$previewScope" />
+                        <livewire:project.shared.environment-variable.add :resource="$resource" :showPreview="$showPreview" />
                     </x-modal-input>
                 @endcan
         </x-table.toolbar>

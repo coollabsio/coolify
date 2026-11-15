@@ -255,6 +255,7 @@ class Add extends Component
         $this->key = '';
         $this->value = '';
         $this->is_multiline = false;
+        $this->is_preview = false;
         $this->is_literal = false;
         $this->is_runtime = true;
         $this->is_buildtime = true;
