@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
-    description: 'Project model',
+    description: 'Application deployment model',
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],

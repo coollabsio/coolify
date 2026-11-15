@@ -7726,13 +7726,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Application'
+                properties:
+                  count: { description: 'Total number of deployments of the application.', type: integer }
+                  deployments: { type: array, items: { $ref: '#/components/schemas/ApplicationDeploymentQueue' } }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -18510,7 +18513,7 @@ components:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
     ApplicationDeploymentQueue:
-      description: 'Project model'
+      description: 'Application deployment model'
       properties:
         id:
           type: integer
