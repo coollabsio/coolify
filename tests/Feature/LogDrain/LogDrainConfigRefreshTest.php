@@ -126,6 +126,22 @@ it('labels the log drain container with the current configuration version', func
         ->toContain(StartLogDrain::CONFIG_VERSION_LABEL.'='.StartLogDrain::CONFIG_VERSION);
 });
 
+it('mounts the user files directory read-only, so that a custom drain can read a credentials file', function () {
+    $this->server->settings->update([
+        'is_logdrain_axiom_enabled' => false,
+        'is_logdrain_custom_enabled' => true,
+        'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stackdriver\n    Match *\n    google_service_credentials /files/gcp.json\n",
+    ]);
+    $scripts = startLogDrainScripts($this->server);
+    $compose = Yaml::parse(generatedLogDrainFile($scripts, 'docker-compose.yml'));
+    $script = $scripts->implode("\n");
+    $filesDirectory = config('constants.coolify.base_config_path').'/log-drains/files';
+
+    expect($compose['services']['coolify-log-drain']['volumes'])->toContain('./files:/files:ro')
+        ->and(strpos($script, "mkdir -p {$filesDirectory}"))->toBeInt()
+        ->toBeLessThan(strpos($script, 'docker-compose.yml up -d'));
+});
+
 it('pulls the new image before it removes the running log drain', function () {
     $script = startLogDrainScripts($this->server)->implode("\n");
 
@@ -175,5 +191,5 @@ it('changes the configuration version when the generated files change', function
     });
 
     expect([StartLogDrain::CONFIG_VERSION, hash('sha256', $hashes->implode("\0"))])
-        ->toBe(['2', '4f4ceaf642f0de8009e256b54f2bbe2f842190297bbf2da92f2b31dd0a9baf3d']);
+        ->toBe(['3', 'aa5ed6be6a5ad6d102050690a2598ce677389dfb14c96c4f6a80e0cd755009a7']);
 });

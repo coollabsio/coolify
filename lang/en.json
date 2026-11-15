@@ -45,6 +45,8 @@
     "resource.delete_volumes": "Permanently delete all volumes associated with this resource.",
     "resource.delete_connected_networks": "Permanently delete all non-predefined networks associated with this resource.",
     "resource.delete_configurations": "Permanently delete all configuration files from the server.",
+    "resource.delete_backups": "Permanently delete all database and storage backups of this resource, on the server and on S3.",
+    "resource.keep_backups": "The database and storage backups of this resource stay on the server and on S3. Coolify no longer manages them, so you must delete them yourself.",
     "database.delete_backups_locally": "All backups will be permanently deleted from local storage.",
     "warning.sslipdomain": "Your configuration is saved, but sslip domain with https is <span class='dark:text-red-500 text-red-500 font-bold'>NOT</span> recommended, because Let's Encrypt servers with this public domain are rate limited (SSL certificate validation will fail). <br><br>Use your own domain instead."
 }

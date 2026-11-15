@@ -1165,6 +1165,8 @@ paths:
           description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
+        '429':
+          description: 'GitHub API rate limit exceeded. The message tells when to try again.'
         '409':
           description: 'Domain conflicts detected.'
           content:
@@ -2903,6 +2905,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Application deleted.'
@@ -5268,6 +5278,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Database deleted.'
@@ -10129,6 +10147,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '503':
+          description: 'Database migrations are not finished yet.'
   /projects:
     get:
       tags:
@@ -13306,6 +13326,14 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: remove_resources_from_server
+          in: query
+          description: 'With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '403':
           description: 'The token needs the deploy permission to delete the resources or the cloud server.'
@@ -14638,6 +14666,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'

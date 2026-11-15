@@ -35,6 +35,8 @@ enum ImageScanErrorCode: string
             self::DbTooOld => "The vulnerability database is {$n} days old. {$server} cannot reach grype.anchore.io.",
             self::DbMissing => "The vulnerability database is not on {$server} yet. Wait for the first update to finish or check that {$server} can reach grype.anchore.io.",
             self::Timeout => match ($context['step'] ?? null) {
+                'db-status' => "The check of the vulnerability database took too long and was stopped. Grype reads the whole database file, which is slow on a slow disk. Raise the Grype time limit on the Vulnerabilities page of {$server}.",
+                'save' => "Docker took too long to export the image and was stopped. Raise the Syft time limit on the Vulnerabilities page of {$server}.",
                 'sbom' => "Syft took too long and was stopped. Raise the Syft time limit on the Vulnerabilities page of {$server}.",
                 'grype' => "Grype took too long and was stopped. Raise the Grype time limit on the Vulnerabilities page of {$server}.",
                 default => 'The scan took too long and was stopped.',

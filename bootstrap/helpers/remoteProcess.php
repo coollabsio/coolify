@@ -163,13 +163,22 @@ function runSshProcess(string $sshCommand, int $timeout, ?string $input = null):
  */
 function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
 {
-    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    instant_remote_process_with_input($server, ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null', $content, $throwError);
+}
+
+/**
+ * Run one command on a server with content on its stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. The command is not passed
+ * through the sudo parser: add `sudo` for non-root servers yourself.
+ */
+function instant_remote_process_with_input(Server $server, string $remoteCommand, string $input, bool $throwError = true): void
+{
     $timeout = (int) config('constants.ssh.command_timeout');
 
     SshRetryHandler::retry(
-        function () use ($server, $remoteCommand, $content, $timeout) {
+        function () use ($server, $remoteCommand, $input, $timeout) {
             $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
-            $process = runSshProcess($sshCommand, $timeout, $content);
+            $process = runSshProcess($sshCommand, $timeout, $input);
             SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             if ($process->exitCode() !== 0) {
@@ -178,8 +187,8 @@ function instant_remote_write_file(Server $server, string $path, string $content
         },
         [
             'server' => $server->ip,
-            'dest' => $path,
-            'function' => 'instant_remote_write_file',
+            'command_preview' => substr($remoteCommand, 0, 100),
+            'function' => 'instant_remote_process_with_input',
         ],
         $throwError
     );

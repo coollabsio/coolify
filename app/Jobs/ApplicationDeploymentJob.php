@@ -35,6 +35,7 @@ use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -74,6 +75,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * Set explicitly, because a build-time HOME variable would otherwise move it.
      */
     private const HELPER_DOCKER_CONFIG = '/root/.docker';
+
+    /**
+     * failed() runs before the finally block of handle(), which still uses the helper, so the cleanup waits.
+     */
+    private const FAILED_HELPER_CLEANUP_DELAY_MINUTES = 10;
 
     /**
      * Name prefixes of the helpers that DatabaseBackupJob (S3 upload) and StartDatabaseImport
@@ -255,7 +261,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private string $serverUserHomeDir = '/root';
 
-    private string $dockerConfigFileExists = 'NOK';
+    private ?string $dockerConfigPath = null;
 
     private int $customPort = 22;
 
@@ -2065,17 +2071,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return RemoteSecretValueFormatter::dotenv($value);
     }
 
+    /**
+     * Order variables like the Environment Variables page does, so a variable
+     * written to the .env file can reference the variables listed before it.
+     */
+    private function orderEnvironmentVariables(MorphMany $query): MorphMany
+    {
+        if ($this->application->settings->is_env_sorting_enabled) {
+            return $query->orderBy('key');
+        }
+
+        return $query->orderBy('order')->orderBy('id');
+    }
+
     private function generate_runtime_environment_variables()
     {
         $envs = collect([]);
-        $sort = $this->application->settings->is_env_sorting_enabled;
-        if ($sort) {
-            $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('key');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('key');
-        } else {
-            $sorted_environment_variables = $this->application->runtime_environment_variables->sortBy('id');
-            $sorted_environment_variables_preview = $this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues())->get()->sortBy('id');
-        }
+        $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->runtime_environment_variables())->get();
+        $sorted_environment_variables_preview = $this->orderEnvironmentVariables($this->application->runtime_environment_variables_preview()->whereNotIn('id', $this->previewVariableIdsWithProductionValues()))->get();
         if ($this->build_pack === 'dockercompose') {
             $sorted_environment_variables = $sorted_environment_variables->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
             $sorted_environment_variables_preview = $sorted_environment_variables_preview->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
@@ -2508,10 +2521,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)
         if ($this->pull_request_id === 0) {
-            $sorted_environment_variables = $this->application->environment_variables()
+            $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->environment_variables()
                 ->withoutBuildpackControlVariables()
-                ->where('is_buildtime', true)  // ONLY build-time variables
-                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->where('is_buildtime', true))  // ONLY build-time variables
                 ->get();
             $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
@@ -2571,11 +2583,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } else {
-            $sorted_environment_variables = $this->application->environment_variables_preview()
+            $sorted_environment_variables = $this->orderEnvironmentVariables($this->application->environment_variables_preview()
                 ->whereNotIn('id', $this->previewVariableIdsWithProductionValues())
                 ->withoutBuildpackControlVariables()
-                ->where('is_buildtime', true)  // ONLY build-time variables
-                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->where('is_buildtime', true))  // ONLY build-time variables
                 ->get();
             $sorted_environment_variables = $this->withoutLegacyEnvironmentVariableKeys($sorted_environment_variables);
 
@@ -3442,6 +3453,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return " --mount type=bind,source={$bundle},target=".self::HELPER_HOST_CA_BUNDLE_PATH.',readonly';
     }
 
+    /**
+     * The Docker config with the registry logins that the helper container mounts. It is the config of the SSH user.
+     * On a non-root server without that config, it is the config of root, where `sudo docker login` saves the login.
+     * Host pulls use the same order (serverDockerConfigPrefix), so both pull with the same credentials.
+     */
+    private function dockerConfigPath(): ?string
+    {
+        $candidates = ["{$this->serverUserHomeDir}/.docker/config.json"];
+        if ($this->server->isNonRoot()) {
+            $candidates[] = '/root/.docker/config.json';
+        }
+
+        foreach ($candidates as $path) {
+            if (instant_remote_process(["test -f {$path} && echo 'OK' || echo 'NOK'"], $this->server) === 'OK') {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
     private function prepare_builder_image(bool $firstTry = true)
     {
         $this->checkForCancellation();
@@ -3450,7 +3482,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         instant_remote_process(["mkdir -p {$this->serverUserHomeDir}/.docker/buildx"], $this->server);
-        $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
+        $this->dockerConfigPath = $this->dockerConfigPath();
 
         // Build secrets put user variables such as HOME or DOCKER_CONFIG into the helper environment.
         // DOCKER_CONFIG comes after them, so the Docker CLI keeps its plugins. Without build secrets the
@@ -3462,16 +3494,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
         $hostCaBundleVolume = $this->hostCaBundleMount();
         if ($this->use_build_server) {
-            if ($this->dockerConfigFileExists === 'NOK') {
-                throw new DeploymentException("Docker config file (~/.docker/config.json) of the SSH user ({$this->server->user}) not found on the build server ({$this->server->name}). Log in to your registry under Server → Docker Registries on the build server. On a non-root server, a login made with \"sudo docker login\" is saved for root and is not used for builds.");
+            if ($this->dockerConfigPath === null) {
+                throw new DeploymentException("Docker config file (~/.docker/config.json) of the SSH user ({$this->server->user}) not found on the build server ({$this->server->name}). Log in to your registry under Server → Docker Registries on the build server.");
             }
-            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->dockerConfigPath}:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             // docker compose runs in this helper and reads seccomp profile files from the custom Docker options
             $seccompMounts = $this->pull_request_id === 0 ? seccompProfileMountFlags($this->application->custom_docker_run_options) : '';
-            if ($this->dockerConfigFileExists === 'OK') {
+            if ($this->dockerConfigPath !== null) {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->dockerConfigPath}:/root/.docker/config.json:ro {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
                 $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume}{$hostCaBundleVolume} -v /var/run/docker.sock:/var/run/docker.sock {$seccompMounts} {$helperImage}";
@@ -3820,6 +3852,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $commitMessage = ApplicationDeploymentQueue::query()
             ->where('application_id', $this->application->id)
             ->where('commit', $this->commit)
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
             ->whereNotNull('commit_message')
             ->where('commit_message', '!=', '')
             ->latest('id')
@@ -3857,7 +3890,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->saved_outputs->get('commit_message')) {
             $commit_message = $this->trimmedSavedOutput('commit_message');
             $this->application_deployment_queue->commit_message = $commit_message->value();
-            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
+            ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->update(
                 ['commit_message' => $commit_message->value()]
             );
         }
@@ -5726,11 +5759,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     // The gate pulled and scanned the pinned image.
                     $this->execute_remote_command($up);
                 } else {
-                    $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
-                    $this->execute_remote_command(
-                        [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->composeProjectName()} --project-directory {$this->workdir} pull"), 'hidden' => true],
-                        $up,
-                    );
+                    $this->pull_docker_image();
+                    $this->execute_remote_command($up);
                 }
             } else {
                 if ($this->use_build_server) {
@@ -5748,6 +5778,33 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('New container started.');
         } catch (Exception $e) {
             throw new DeploymentException("Failed to start container: {$e->getMessage()}", $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * An image that is only on the server (built there, or loaded with `docker load`) cannot be pulled. When the pull
+     * fails, the deployment starts the image that is on the server. Without that image, the pull error stops it.
+     */
+    private function pull_docker_image(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling latest images from the registry.');
+
+        try {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-name {$this->composeProjectName()} --project-directory {$this->workdir} pull"), 'hidden' => true],
+            );
+        } catch (DeploymentException $e) {
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, 'docker image inspect --format '.escapeshellarg('{{.Id}}').' '.escapeshellarg($this->production_image_name).' 2>/dev/null || true'),
+                'hidden' => true,
+                'save' => 'local_docker_image',
+                'append' => false,
+            ]);
+            if (str($this->saved_outputs->get('local_docker_image'))->isEmpty()) {
+                throw $e;
+            }
+
+            $this->application_deployment_queue->addLogEntry("Could not pull the image ({$this->production_image_name}) from the registry. Using the image that is already on the server.", 'stderr');
         }
     }
 
@@ -6916,6 +6973,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->transitionToStatus(ApplicationDeploymentStatus::FAILED);
     }
 
+    /**
+     * A worker that kills the job (timeout, restart) skips the finally block of handle(), so the helper keeps running.
+     * The helper can be on the deployment server and on the build server.
+     */
+    private function queueHelperContainerCleanup(): void
+    {
+        try {
+            $serverIds = array_filter([$this->application_deployment_queue->server_id, $this->application_deployment_queue->build_server_id], fn ($id) => $id !== null);
+            Server::query()->whereKey($serverIds)->get()->each(
+                fn (Server $server) => CleanupHelperContainersJob::dispatch($server)->delay(now()->addMinutes(self::FAILED_HELPER_CLEANUP_DELAY_MINUTES))
+            );
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Queueing the helper container cleanup failed', $e);
+        }
+    }
+
     public function failed(Throwable $exception): void
     {
         $this->failDeployment();
@@ -6925,6 +6998,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } catch (Throwable $e) {
             $this->logStatusTransitionSideEffectFailure('Queueing the GitHub deployment sync failed', $e);
         }
+        $this->queueHelperContainerCleanup();
 
         // failed() runs on a fresh job instance, so remote secrets fetched during the deployment are not loaded here.
         // Every entry still passes through ApplicationDeploymentQueue::redactLogText(); raw stack traces are not written

@@ -298,6 +298,24 @@ it('reports the exit code and explains a lost SSH connection when a command ends
         ->toContain('SSH connection to the server closed');
 });
 
+it('retries a command when ssh exits with 255 and prints nothing, as when sshd closes the connection before the key exchange', function () {
+    config()->set('constants.ssh.max_retries', 3);
+    config()->set('constants.ssh.retry_base_delay', 0);
+    config()->set('constants.ssh.host_key_checking', 'off');
+    [$job] = makeSensitiveCommandFailureJob();
+
+    $runs = 0;
+    Process::fake(function () use (&$runs) {
+        $runs++;
+
+        return $runs === 1 ? Process::result(exitCode: 255) : Process::result(output: 'ok');
+    });
+
+    $job->execute_remote_command(['command' => 'echo ok']);
+
+    expect($runs)->toBe(2);
+});
+
 it('does not add the SSH connection hint to failures of the remote command', function () {
     [$job] = makeSensitiveCommandFailureJob();
 
@@ -457,6 +475,48 @@ it('mounts the server CA bundle into the helper so the Docker CLI can fetch regi
     'RHEL bundle' => ['/etc/pki/tls/certs/ca-bundle.crt', '--mount type=bind,source=/etc/pki/tls/certs/ca-bundle.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
     'no bundle' => ['', null],
     'unknown output' => ['/root:/x -v /', null],
+]);
+
+it('mounts the Docker config with the registry logins into the helper', function (string $user, string $home, array $existingConfigs, bool $useBuildServer, ?string $expectedConfig) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    $server->user = $user;
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'destination' => $server->standaloneDockers()->firstOrFail(),
+        'use_build_server' => $useBuildServer,
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, $home, $existingConfigs) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'docker run -d')) {
+            $helperCommands[] = $script;
+        }
+        $testedConfig = collect(["{$home}/.docker/config.json", '/root/.docker/config.json'])
+            ->first(fn (string $path) => str_contains($script, "test -f {$path}"));
+
+        return Process::result(output: match (true) {
+            str_contains($script, 'echo $HOME') => $home,
+            $testedConfig !== null => in_array($testedConfig, $existingConfigs, true) ? 'OK' : 'NOK',
+            default => '',
+        });
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    expect($helperCommands)->toHaveCount(1);
+    if ($expectedConfig === null) {
+        expect($helperCommands[0])->not->toContain('config.json');
+    } else {
+        expect($helperCommands[0])->toContain("-v {$expectedConfig}:/root/.docker/config.json:ro");
+    }
+})->with([
+    'root user config' => ['root', '/root', ['/root/.docker/config.json'], false, '/root/.docker/config.json'],
+    'root without config' => ['root', '/root', [], false, null],
+    'non-root user config' => ['coolify', '/home/coolify', ['/home/coolify/.docker/config.json', '/root/.docker/config.json'], false, '/home/coolify/.docker/config.json'],
+    'non-root sudo docker login' => ['coolify', '/home/coolify', ['/root/.docker/config.json'], false, '/root/.docker/config.json'],
+    'non-root without config' => ['coolify', '/home/coolify', [], false, null],
+    'build server with sudo docker login' => ['coolify', '/home/coolify', ['/root/.docker/config.json'], true, '/root/.docker/config.json'],
 ]);
 
 it('shows the helper container command when no build secrets are passed', function () {
@@ -684,8 +744,7 @@ it('tells how to log in when the build server has no Docker config for the SSH u
 
     expect($exception->getMessage())
         ->toContain('of the SSH user (coolify) not found on the build server (build-1)')
-        ->toContain('Server → Docker Registries')
-        ->toContain('"sudo docker login" is saved for root');
+        ->toContain('Server → Docker Registries');
     Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker run -d'));
 });
 

@@ -123,7 +123,7 @@ final class SecurityCard
         }
         foreach ($statusOwners as $owner) {
             if ($isService && ! $scans->contains(fn (ImageScan $scan): bool => $scan->resource instanceof Model && $scan->resource->is($owner))) {
-                $entries[] = ['key' => 'owner-'.$owner->getAttribute('uuid'), 'scan' => null, 'owner' => $owner, 'ref' => trim((string) $owner->getAttribute('image')), 'name' => self::ownerName($owner), 'security' => $notChecked];
+                $entries[] = ['key' => 'owner-'.$owner->getAttribute('uuid'), 'scan' => null, 'owner' => $owner, 'ref' => ResourceScans::configuredImage($owner), 'name' => self::ownerName($owner), 'security' => $notChecked];
             }
         }
         foreach (ResourceScans::uncheckedComposeRefs($resource, $scans) as $image) {

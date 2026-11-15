@@ -1747,6 +1747,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "429": {
+                        "description": "GitHub API rate limit exceeded. The message tells when to try again."
+                    },
                     "409": {
                         "description": "Domain conflicts detected.",
                         "content": {
@@ -4353,6 +4356,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -8103,6 +8116,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -15821,6 +15844,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "503": {
+                        "description": "Database migrations are not finished yet."
                     }
                 }
             }
@@ -21167,6 +21193,16 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "remove_resources_from_server",
+                        "in": "query",
+                        "description": "With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
                     }
                 ],
                 "responses": {
@@ -23305,6 +23341,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],

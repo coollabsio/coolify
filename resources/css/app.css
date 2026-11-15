@@ -1631,9 +1631,10 @@ html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
    so components fall back to hardcoded neutrals. Remap the dominant light
    surface/border utilities to the tinted custom vars so the color reaches the
    whole UI, not just design-system classes. A light sidebar on a dark page
-   gets the same remap. */
-html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]),
-html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]) {
+   gets the same remap. Checkbox boxes keep their own colors: the !important
+   remap would hide their peer-checked fill. */
+html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]):not([class~="peer-checked:bg-coollabs"]),
+html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]):not([class~="peer-checked:bg-coollabs"]) {
     background-color: var(--coollabs-elevated) !important;
 }
 
@@ -1652,8 +1653,8 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
     border-color: var(--coollabs-hairline) !important;
 }
 
-html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
-html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
+html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]):not([class~="peer-checked:border-coollabs"]),
+html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]):not([class~="peer-checked:border-coollabs"]) {
     border-color: var(--coollabs-line) !important;
 }
 

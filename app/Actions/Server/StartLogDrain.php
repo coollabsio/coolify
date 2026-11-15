@@ -19,7 +19,7 @@ class StartLogDrain
      * Bump when the generated files change (image, config, compose, or README), so that the
      * server checks start running log drains again with the new files.
      */
-    public const CONFIG_VERSION = '2';
+    public const CONFIG_VERSION = '3';
 
     public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
 
@@ -171,6 +171,7 @@ services:
     volumes:
       - ./fluent-bit.conf:/fluent-bit.conf:ro
       - ./parsers.conf:/parsers.conf:ro
+      - ./files:/files:ro
     ports:
       - 127.0.0.1:24224:24224
     labels:
@@ -190,6 +191,7 @@ Files:
 - `fluent-bit.conf` - configuration file for Fluent Bit
 - `docker-compose.yml` - docker-compose file to run Fluent Bit
 - `.env` - environment variables for Fluent Bit
+- `files/` - your own files, such as credentials or certificates. Coolify does not overwrite them. Fluent Bit reads them at `/files`.
 ");
             $license_key = $server->settings->logdrain_newrelic_license_key;
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
@@ -217,6 +219,8 @@ Files:
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
+                "mkdir -p $config_path/files",
+                "chmod 700 $config_path/files",
                 "echo '{$parsers}' | base64 -d | tee $parsers_config > /dev/null",
                 "echo '{$config}' | base64 -d | tee $fluent_bit_config > /dev/null",
                 "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",

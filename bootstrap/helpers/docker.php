@@ -2010,36 +2010,32 @@ function stripCoolifyCustomFields(array $yamlCompose): array
     return $yamlCompose;
 }
 
-function validateComposeFile(string $compose, int $server_id): string|Throwable
+/**
+ * Check a Compose file with `docker compose config` on the server. The file goes to the command on
+ * stdin, so no temporary file is written and large files are not limited by the argument length.
+ * Relative paths (such as `extends.file`) resolve in $projectDirectory, as in the deployment.
+ *
+ * @throws RuntimeException With the exit code of the check when Docker Compose rejects the file (255: SSH failure)
+ */
+function checkComposeFileOnServer(string $compose, Server $server, ?string $projectDirectory = null): void
 {
-    $uuid = Str::random(18);
-    $server = Server::ownedByCurrentTeam()->find($server_id);
+    $yamlCompose = stripCoolifyCustomFields(parseDockerComposeYaml($compose));
+    $projectDirectoryOption = filled($projectDirectory) ? '--project-directory '.escapeshellarg($projectDirectory).' ' : '';
+    $command = ($server->isNonRoot() ? 'sudo ' : '')."docker compose {$projectDirectoryOption}-f - config --no-interpolate --no-path-resolution -q";
+    instant_remote_process_with_input($server, $command, Yaml::dump($yamlCompose, 10, 2));
+}
+
+/**
+ * @return string 'OK', or the error of checkComposeFileOnServer()
+ */
+function validateComposeFile(string $compose, Server $server, ?string $projectDirectory = null): string
+{
     try {
-        if (! $server) {
-            throw new Exception('Server not found');
-        }
-        $yaml_compose = parseDockerComposeYaml($compose);
-
-        // Remove Coolify's custom fields before Docker validation
-        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
-
-        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
-        instant_remote_process([
-            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "chmod 600 /tmp/{$uuid}.yml",
-            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
-            "rm /tmp/{$uuid}.yml",
-        ], $server);
+        checkComposeFileOnServer($compose, $server, $projectDirectory);
 
         return 'OK';
     } catch (Throwable $e) {
         return $e->getMessage();
-    } finally {
-        if (filled($server)) {
-            instant_remote_process([
-                "rm /tmp/{$uuid}.yml",
-            ], $server, throwError: false);
-        }
     }
 }
 

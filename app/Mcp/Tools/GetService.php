@@ -16,7 +16,7 @@ class GetService extends Tool
 {
     protected string $name = 'get_service';
 
-    protected string $description = 'Get full details for a single service (multi-container stack) by UUID.';
+    protected string $description = 'Get full details for a single service (multi-container stack) by UUID. The compose files (docker_compose_raw, docker_compose) need read:sensitive.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -48,8 +48,11 @@ class GetService extends Tool
         $service->setRelations([]);
         $service->makeHidden(['server', 'destination', 'source', 'environment', 'applications', 'databases', 'serviceApplications', 'serviceDatabases']);
 
+        $visibleSensitiveKeys = $this->canReadSensitiveData($request) ? Service::COMPOSE_ATTRIBUTES : [];
+        $service->makeVisible($visibleSensitiveKeys);
+
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($service->toArray()),
+            $this->scrubSensitive($service->toArray(), $visibleSensitiveKeys),
             $this->actionsForService($uuid, $service->status ?? null),
         ), ['resource_uuid' => $uuid]);
     }

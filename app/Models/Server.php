@@ -305,7 +305,7 @@ class Server extends BaseModel
                 $updated = ApplicationDeploymentQueue::query()
                     ->whereKey($deployment->id)
                     ->where('status', ApplicationDeploymentStatus::QUEUED->value)
-                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value, 'finished_at' => now()]);
 
                 if ($updated > 0) {
                     $deployment->addLogEntry('The server was deleted.', 'stderr');

@@ -110,21 +110,22 @@ trait ExecuteRemoteCommand
             $lastError = null;
             $commandExecuted = false;
 
-            while ($attempt < $maxRetries && ! $commandExecuted) {
+            while (! $commandExecuted) {
                 try {
                     $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log, $input);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
+                    $attemptLimit = $this->sshAttemptLimit($e, $maxRetries);
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $attemptLimit - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
-                            $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+                            $this->addRetryLogEntry($attempt, $attemptLimit, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
                             if (! $skip_cancellation_check) {
@@ -154,6 +155,7 @@ trait ExecuteRemoteCommand
                         ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
                         ->update([
                             'status' => ApplicationDeploymentStatus::FAILED->value,
+                            'finished_at' => now(),
                         ]);
                 }
                 throw $lastError;
@@ -254,7 +256,8 @@ trait ExecuteRemoteCommand
                 // This prevents premature status changes during retryable SSH errors
                 $error = $process_result->errorOutput();
                 if (empty($error)) {
-                    $error = $process_result->output() ?: 'Command failed with no error output';
+                    // At LogLevel=ERROR, ssh prints nothing when sshd closes the connection before the key exchange (MaxStartups, PerSourcePenalties).
+                    $error = $process_result->output() ?: ($process_result->exitCode() === 255 ? 'SSH command failed with exit code: 255' : 'Command failed with no error output');
                 }
                 throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
             }

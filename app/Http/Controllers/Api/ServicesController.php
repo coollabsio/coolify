@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Exceptions\ComposeRejectedException;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
@@ -25,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -781,6 +783,18 @@ class ServicesController extends Controller
             $service->save();
 
             $service->parse(isNew: true);
+            try {
+                $service->ensureDockerComposeAccepted();
+            } catch (ComposeRejectedException $e) {
+                $service->delete();
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
 
             if ($request->has('urls') && is_array($request->urls)) {
                 $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
@@ -1026,6 +1040,7 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_backups', in: 'query', required: false, description: 'Delete the database and storage backups, on the server and on S3.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1090,6 +1105,7 @@ class ServicesController extends Controller
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteBackups: $request->boolean('delete_backups', false),
         );
 
         auditLog('api.service.deleted', [
@@ -1338,9 +1354,23 @@ class ServicesController extends Controller
             $service->include_coolify_default_variables = $request->boolean('include_coolify_default_variables');
         }
         $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
-        $service->save();
-
-        $service->parse();
+        $isComposeChanged = $service->isDirty('docker_compose_raw');
+        try {
+            DB::transaction(function () use ($service, $isComposeChanged) {
+                $service->save();
+                $service->parse();
+                if ($isComposeChanged) {
+                    $service->ensureDockerComposeAccepted();
+                }
+            });
+        } catch (ComposeRejectedException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'docker_compose_raw' => $e->getMessage(),
+                ],
+            ], 422);
+        }
 
         $urlResult = null;
         if ($request->has('urls') && is_array($request->urls)) {

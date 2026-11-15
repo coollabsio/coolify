@@ -111,7 +111,6 @@ Thank you so much!
 * [American Cloud](https://americancloud.com) - US-based cloud infrastructure services
 * [Greptile](https://www.greptile.com) - The AI Code Reviewer
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
-* [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
 * [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
@@ -163,6 +162,7 @@ Thank you so much!
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
 <a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
 <a href="https://bragly.io"><img width="60px" alt="Bragly" src="https://cdn.coollabs.io/sponsors/bragly.png"/></a>
+<a href="https://github.com/vaultbase-sh"><img width="60px" alt="vaultbase.sh" src="https://github.com/vaultbase-sh.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
