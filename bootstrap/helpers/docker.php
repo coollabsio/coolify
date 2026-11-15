@@ -1047,9 +1047,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {
-        // Not named `gzip`: containers that are not redeployed still declare the old `gzip`
-        // definition, and Traefik drops a middleware with conflicting definitions (#5076).
-        $labels->push('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream');
+        $labels->push('traefik.http.middlewares.'.TRAEFIK_GZIP_MIDDLEWARE.'.compress.excludedcontenttypes='.implode(',', TRAEFIK_GZIP_EXCLUDED_CONTENT_TYPES));
     }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
     // Every container declares the shared middleware, so a permanent variant needs its own name.
@@ -1165,7 +1163,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1193,7 +1191,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1258,7 +1256,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1287,7 +1285,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
