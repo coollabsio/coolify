@@ -385,5 +385,8 @@ class StartMongodb
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js > /dev/null";
+        // The entrypoint lists and reads the init directory as the mongodb user; a strict server umask hides it.
+        $this->commands[] = "chmod 755 $this->configuration_dir/docker-entrypoint-initdb.d";
+        $this->commands[] = "chmod 644 $this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js";
     }
 }

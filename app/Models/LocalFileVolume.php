@@ -393,7 +393,8 @@ class LocalFileVolume extends BaseModel
             } else {
                 $commands->push("touch {$escapedPath}");
             }
-            $commands->push("chmod +x {$escapedPath}");
+            // a+rx instead of +x: +x follows the server umask, so a strict umask leaves the file unreadable for a non-root container user.
+            $commands->push("chmod a+rx {$escapedPath}");
             if ($chown) {
                 $commands->push('chown -- '.escapeshellarg($chown)." {$escapedPath}");
             }

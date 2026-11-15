@@ -350,6 +350,8 @@ class StartPostgresql
             $escaped_target = escapeshellarg($target_path);
             $content_base64 = base64_encode($content);
             $this->commands[] = "echo '{$content_base64}' | base64 -d | tee {$escaped_target} > /dev/null";
+            // The entrypoint runs init scripts as the postgres user; a strict server umask leaves the file unreadable.
+            $this->commands[] = "chmod 644 {$escaped_target}";
             $this->init_scripts[] = $target_path;
         }
     }
