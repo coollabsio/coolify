@@ -295,6 +295,15 @@
                                 <div x-show="!useCustomWebhookEndpoint">
                                     <x-forms.listbox id="webhook_endpoint" label="Instance endpoint"
                                         :options="$endpointOptions" x-model="webhookEndpoint" />
+                                    @if (!$this->hasPublicWebhookEndpoint())
+                                        <x-callout type="warning" title="No public endpoint" class="mt-2">
+                                            This instance has no domain and no public IP, so GitHub cannot send
+                                            webhooks to it. Set the <code>URL</code> or the
+                                            <code>Instance public IPv4</code> in
+                                            <a href="{{ route('settings.index') }}" class="font-medium underline">Settings</a>,
+                                            or use a custom endpoint.
+                                        </x-callout>
+                                    @endif
                                 </div>
                                 <div x-cloak x-show="useCustomWebhookEndpoint">
                                     <x-forms.input canGate="create" :canResource="$github_app"

@@ -6,6 +6,7 @@ use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
+use App\Support\DnsRecordHints;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -378,6 +379,23 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Whether GitHub can reach one of the instance endpoints. APP_URL stays http://localhost on a default install.
+     */
+    public function hasPublicWebhookEndpoint(): bool
+    {
+        if (filled($this->fqdn) || filled($this->ipv4) || filled($this->ipv6)) {
+            return true;
+        }
+
+        $host = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST), '[]'));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost')) {
+            return false;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP) === false || DnsRecordHints::isPublicAddress($host);
     }
 
     public function getGithubAppNameUpdatePath()
