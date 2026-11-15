@@ -28,6 +28,17 @@ class NodeStackCompose
         'build' => 'builds an image (build)',
     ];
 
+    /** Keys of `build:` that the Node builder cannot use. The first one found is the reason. */
+    private const UNSUPPORTED_BUILD_KEYS = [
+        'dockerfile_inline' => 'has an inline Dockerfile (build.dockerfile_inline)',
+        'additional_contexts' => 'uses additional build contexts (build.additional_contexts)',
+        'ssh' => 'forwards SSH to the build (build.ssh)',
+        'secrets' => 'uses build secrets (build.secrets)',
+    ];
+
+    /** Keys of `build:` that the Node builder uses. Other keys are ignored with a note. */
+    private const SUPPORTED_BUILD_KEYS = ['context', 'dockerfile', 'args', 'target'];
+
     /**
      * @return array<string, mixed> The parsed Compose file.
      *
@@ -51,13 +62,17 @@ class NodeStackCompose
      * Why the Compose file cannot run on Nodes, or null when it can.
      *
      * @param  array<string, mixed>  $yaml
+     * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository. Only a file from Git can `build:`.
      */
-    public static function unavailableReason(array $yaml, bool $underscoreNames = false): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null): ?string
     {
+        if ($gitComposeDirectory !== null && filled($yaml['include'] ?? null)) {
+            return 'The Compose file includes other Compose files (include).';
+        }
         $services = $yaml['services'] ?? [];
         foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -142,21 +157,106 @@ class NodeStackCompose
         });
     }
 
+    /**
+     * The `build:` of a service from Git, resolved in the repository. The context is relative to
+     * the directory of the Compose file, and the Dockerfile to the context, as in Compose. The
+     * Node builder clones the repository and builds `context` with `dockerfile`, which must be
+     * inside the context.
+     *
+     * @param  string  $composeDirectory  The directory of the Compose file in the repository, `` for the root.
+     * @return array{context: string, dockerfile: string, args: mixed, target: ?string, notes: list<string>} `context` is relative to the root of the repository, `` for the root.
+     *
+     * @throws RuntimeException With the reason, which follows "The service <name>", when the builder cannot build it.
+     */
+    public static function build(mixed $build, string $composeDirectory): array
+    {
+        $build = is_string($build) ? ['context' => $build] : $build;
+        if (! is_array($build)) {
+            throw new RuntimeException('has a build that is not a path or a map');
+        }
+        foreach (self::UNSUPPORTED_BUILD_KEYS as $key => $reason) {
+            if (filled($build[$key] ?? null)) {
+                throw new RuntimeException($reason);
+            }
+        }
+        $context = trim((string) ($build['context'] ?? '.'));
+        $context = $context === '' ? '.' : $context;
+        if (preg_match('/\A[a-z][a-z0-9+.-]*:\/\//i', $context) === 1 || preg_match('/\A[^\/]+@[^\/:]+:/', $context) === 1 || str_starts_with($context, 'git@')) {
+            throw new RuntimeException("builds from a remote context ({$context})");
+        }
+        if (str_starts_with($context, '/') || str_starts_with($context, '~') || str_contains($context, '$')) {
+            throw new RuntimeException("builds from a context outside the repository ({$context})");
+        }
+        $contextPath = self::normalizedPath($composeDirectory.'/'.$context)
+            ?? throw new RuntimeException("builds from a context outside the repository ({$context})");
+        $dockerfile = trim((string) ($build['dockerfile'] ?? 'Dockerfile'));
+        $dockerfile = $dockerfile === '' ? 'Dockerfile' : $dockerfile;
+        $dockerfilePath = str_starts_with($dockerfile, '/') ? null : self::normalizedPath($contextPath.'/'.$dockerfile);
+        $insideContext = filled($dockerfilePath) && ($contextPath === '' || str_starts_with($dockerfilePath, $contextPath.'/'));
+        if (! $insideContext) {
+            throw new RuntimeException("has a Dockerfile outside its build context ({$dockerfile}). The Node builder needs it inside the context");
+        }
+        $ignored = array_diff(array_keys($build), self::SUPPORTED_BUILD_KEYS);
+
+        return [
+            'context' => $contextPath,
+            'dockerfile' => $contextPath === '' ? $dockerfilePath : substr($dockerfilePath, strlen($contextPath) + 1),
+            'args' => $build['args'] ?? [],
+            'target' => filled($build['target'] ?? null) ? (string) $build['target'] : null,
+            'notes' => $ignored === [] ? [] : ['build.'.implode(', build.', $ignored).' '.(count($ignored) === 1 ? 'is' : 'are').' not supported on Nodes and ignored.'],
+        ];
+    }
+
+    /** `a/./b/../c` becomes `a/c`; null when the path goes above the root. */
+    private static function normalizedPath(string $path): ?string
+    {
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                if ($segments === []) {
+                    return null;
+                }
+                array_pop($segments);
+
+                continue;
+            }
+            $segments[] = $segment;
+        }
+
+        return implode('/', $segments);
+    }
+
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory = null): ?string
     {
         if (! self::validServiceName($name, $underscoreNames)) {
             return $underscoreNames || ! self::validServiceName($name, true)
                 ? 'has a name that is not a DNS label (letters, digits, and -)'
                 : 'has a name with _, which needs Sentinel with discovery.names.underscore.v1 on every server of the cluster';
         }
+        $builds = $gitComposeDirectory !== null && filled($service['build'] ?? null);
         foreach (self::UNSUPPORTED_KEYS as $key => $reason) {
             $value = $service[$key] ?? null;
+            if ($key === 'build' && $builds) {
+                continue;
+            }
             if ($value !== null && $value !== false && $value !== [] && $value !== '') {
                 return $reason;
             }
         }
-        if (blank($service['image'] ?? null)) {
+        if ($gitComposeDirectory !== null && is_array($service['extends'] ?? null) && filled($service['extends']['file'] ?? null)) {
+            return 'extends a service of another Compose file (extends.file)';
+        }
+        if ($builds) {
+            try {
+                self::build($service['build'], $gitComposeDirectory);
+            } catch (RuntimeException $exception) {
+                return $exception->getMessage();
+            }
+        } elseif (blank($service['image'] ?? null)) {
             return 'has no image';
         }
         foreach (self::mounts($service) as $mount) {

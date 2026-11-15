@@ -113,11 +113,15 @@ class NodeStackComposeMapper
      * `volumes_from`, is a stack volume (decision 0024): each of these services lists it in
      * `stack_volumes` with its own path and mode, keyed by `key`. Other volumes are in `volumes`.
      *
+     * A service with `build:` (only in a Compose file from Git) has no image: `build` says what the
+     * Node builder builds, with its args resolved like the environment.
+     *
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
-     * @return list<array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
+     * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository; see NodeStackCompose::build().
+     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
      */
-    public static function services(array $yaml, array $variables): array
+    public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null): array
     {
         $services = [];
         $fileBytes = 0;
@@ -163,9 +167,25 @@ class NodeStackComposeMapper
                 $fileCount++;
             }
 
+            $build = null;
+            if ($gitComposeDirectory !== null && filled($service['build'] ?? null)) {
+                $build = NodeStackCompose::build($service['build'], $gitComposeDirectory);
+                array_push($notes, ...$build['notes']);
+                if (filled($service['image'] ?? null)) {
+                    $notes[] = 'The image name is ignored: Coolify builds the image and names it itself.';
+                }
+                $args = [];
+                foreach (self::environment(['environment' => $build['args']]) as $key => $value) {
+                    $args[$key] = $value === null ? ($variables[$key] ?? '') : self::interpolate((string) $value, $variables);
+                }
+                ksort($args);
+                $build = ['context' => $build['context'], 'dockerfile' => $build['dockerfile'], 'args' => $args, 'target' => $build['target'] === null ? null : self::interpolate($build['target'], $variables)];
+            }
+
             $services[] = [
                 'service' => $name,
-                'image' => CreateClusterDockerImageWorkload::qualifiedImage(self::interpolate((string) $service['image'], $variables)),
+                'image' => $build !== null ? null : CreateClusterDockerImageWorkload::qualifiedImage(self::interpolate((string) $service['image'], $variables)),
+                'build' => $build,
                 'command' => $command,
                 'environment' => $environment,
                 'routes' => self::routes($service, $variables),
@@ -183,6 +203,21 @@ class NodeStackComposeMapper
         }
 
         return $services;
+    }
+
+    /**
+     * The configuration of the first revision of a service: its command, restart policy, and files.
+     *
+     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>}  $service  One service of services().
+     * @return array<string, mixed>
+     */
+    public static function revisionConfiguration(array $service): array
+    {
+        return array_filter([
+            'command' => $service['command'],
+            'restart_policy' => $service['restart_policy'],
+            'files' => $service['files'],
+        ], fn ($value): bool => $value !== []);
     }
 
     /**

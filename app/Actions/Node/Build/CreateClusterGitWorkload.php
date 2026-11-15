@@ -93,7 +93,7 @@ class CreateClusterGitWorkload
      * The source must belong to the project team, and the stored URL never carries a credential:
      * a token reads an https:// URL, a deploy key an SSH URL.
      */
-    private static function ensureSource(Project $project, string $repository, ?GithubApp $githubApp, ?PrivateKey $privateKey): void
+    public static function ensureSource(Project $project, string $repository, ?GithubApp $githubApp, ?PrivateKey $privateKey): void
     {
         if ($githubApp !== null && $privateKey !== null) {
             throw new RuntimeException('Choose a GitHub App or a deploy key, not both.');

@@ -2,6 +2,8 @@
 
 namespace App\Actions\Node;
 
+use App\Actions\Node\Build\CreateClusterGitWorkload;
+use App\Actions\Node\Build\EnsureNodeRegistry;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
 use App\Models\Environment;
@@ -15,6 +17,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
 use App\Services\NodeStack\NodeStackComposeMapper;
+use App\Services\NodeStack\NodeStackGitSource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -24,6 +27,10 @@ use RuntimeException;
  * Creates a stack from a Compose file on one server of a cluster (decision 0023): one stopped
  * cluster application for each Compose service, with its image, command, variables, domains,
  * health check, volumes, and files. Like a v4 service, it starts with Deploy.
+ *
+ * A Compose file from Git (step 2) keeps its source on the stack. A service with `build:` is a
+ * Dockerfile application of the same repository: it has no revision until its first build, and
+ * the first one of a cluster creates the registry, as for a Git application.
  */
 class CreateClusterStack
 {
@@ -38,6 +45,7 @@ class CreateClusterStack
         ?Node $targetNode = null,
         ?string $name = null,
         ?string $template = null,
+        ?NodeStackGitSource $git = null,
     ): NodeStack {
         if ($environment->project_id !== $project->id) {
             throw new RuntimeException('The environment does not belong to this project.');
@@ -48,17 +56,22 @@ class CreateClusterStack
         if (! $requestedBy->isAdminOfTeam($project->team_id)) {
             throw new RuntimeException('The user cannot create resources for this project team.');
         }
+        if ($git !== null) {
+            CreateClusterGitWorkload::ensureSource($project, $git->repository, $git->githubApp, $git->privateKey);
+        }
         if (! in_array($cluster->network_status, ['active', 'degraded'], true)) {
             throw new RuntimeException('The cluster network is not ready.');
         }
         $yaml = NodeStackCompose::parse($compose);
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames());
+        $composeDirectory = $git?->composeDirectory();
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory);
         if ($reason !== null) {
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }
-        $name = filled($name) ? trim($name) : ($template ?? 'stack');
+        $name = filled($name) ? trim($name) : ($template ?? ($git !== null ? CreateClusterGitWorkload::defaultName($git->repository) : 'stack'));
+        $registryIsNew = ! $cluster->registry()->exists();
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template): NodeStack {
+        $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory): NodeStack {
             $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode);
             NodeCluster::query()->whereKey($cluster->id)->lockForUpdate()->first();
             $stack = NodeStack::query()->create([
@@ -72,6 +85,15 @@ class CreateClusterStack
                 'compose_raw' => $compose,
                 'compose_parsed' => $yaml,
                 'variables' => [],
+                ...($git === null ? [] : [
+                    'git_repository' => $git->repository,
+                    'git_branch' => $git->branch,
+                    'github_app_id' => $git->githubApp?->id,
+                    'private_key_id' => $git->privateKey?->id,
+                    'base_directory' => NodeStackGitSource::repositoryPath($git->baseDirectory),
+                    'compose_location' => '/'.NodeStackGitSource::repositoryPath($git->composeLocation),
+                    'commit_sha' => $git->commitSha,
+                ]),
             ]);
             // Fails before any workload exists.
             $stack->deployOrder();
@@ -83,24 +105,34 @@ class CreateClusterStack
             $variables = NodeStackComposeMapper::variables($yaml, [], $stack->uuid, (string) $base, $cluster->supportsIngressTls() ? 'https' : 'http');
             $stack->update(['variables' => $variables]);
 
-            $services = NodeStackComposeMapper::services($yaml, $variables);
+            $services = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory);
             $workloads = [];
             foreach ($services as $service) {
                 $workloads[$service['service']] = $this->createService($stack, $node, $service, $requestedBy);
             }
             $this->createStackVolumes($stack, $services, $workloads);
             EnsureNodeWorkloadDnsNames::run($node);
+            if (in_array(true, array_map(fn (array $service): bool => $service['build'] !== null, $services), true)) {
+                EnsureNodeRegistry::run($cluster);
+            }
 
             return $stack->refresh();
         });
+        // The next network revision starts zot and BuildKit on the Nodes.
+        if ($registryIsNew && $cluster->registry()->exists()) {
+            QueueNodeClusterNetworkRevision::run($cluster);
+        }
+
+        return $stack;
     }
 
     /**
-     * @param  array{service: string, image: string, command: list<string>, environment: array<string, string>, routes: list<array<string, mixed>>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array<string, mixed>>, depends_on: array<string, string>, notes: list<string>}  $service
+     * @param  array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array<string, mixed>>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array<string, mixed>>, depends_on: array<string, string>, notes: list<string>}  $service
      */
     private function createService(NodeStack $stack, Node $node, array $service, User $requestedBy): NodeWorkload
     {
         $environment = Environment::query()->findOrFail($stack->environment_id);
+        $build = $service['build'];
         $workload = NodeWorkload::query()->create([
             'team_id' => $stack->team_id,
             'project_id' => $stack->project_id,
@@ -108,23 +140,33 @@ class CreateClusterStack
             'node_stack_id' => $stack->id,
             'stack_service' => $service['service'],
             'name' => CreateClusterDockerImageWorkload::uniqueName($environment, Str::limit($stack->name, 100, '').'-'.$service['service']),
-            'source_type' => NodeWorkloadSourceType::IMAGE,
             'desired_state' => NodeWorkloadDesiredState::STOPPED,
             'stack_health_check' => $service['health_check'],
             'description' => $service['notes'] === [] ? null : mb_substr(implode(' ', array_unique($service['notes'])), 0, 255),
+            ...($build === null ? ['source_type' => NodeWorkloadSourceType::IMAGE] : [
+                // The first build creates the first revision, with NodeStack::serviceConfiguration().
+                'source_type' => NodeWorkloadSourceType::DOCKERFILE,
+                'git_repository' => $stack->git_repository,
+                'git_branch' => $stack->git_branch,
+                'github_app_id' => $stack->github_app_id,
+                'private_key_id' => $stack->private_key_id,
+                'base_directory' => $build['context'] === '' ? null : $build['context'],
+                'dockerfile_location' => $build['dockerfile'],
+                'build_target' => $build['target'],
+            ]),
         ]);
-        $workload->createRevision($service['image'], array_filter([
-            'command' => $service['command'],
-            'restart_policy' => $service['restart_policy'],
-            'files' => $service['files'],
-        ], fn ($value): bool => $value !== []));
-        foreach ($service['environment'] as $key => $value) {
+        if ($build === null) {
+            $workload->createRevision((string) $service['image'], NodeStackComposeMapper::revisionConfiguration($service));
+        }
+        // A build arg with the name of an environment variable is that variable, also at build time.
+        $buildArgs = $build['args'] ?? [];
+        foreach ([...$service['environment'], ...array_diff_key($buildArgs, $service['environment'])] as $key => $value) {
             $workload->environment_variables()->create([
                 'key' => $key,
                 'value' => $value,
                 'is_literal' => true,
-                'is_runtime' => true,
-                'is_buildtime' => false,
+                'is_runtime' => array_key_exists($key, $service['environment']),
+                'is_buildtime' => array_key_exists($key, $buildArgs),
                 'is_preview' => false,
             ]);
         }

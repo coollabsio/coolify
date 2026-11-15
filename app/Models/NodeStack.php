@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\NodeStack\NodeStackComposeMapper;
+use App\Services\NodeStack\NodeStackGitSource;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,6 +33,39 @@ class NodeStack extends BaseModel
             // The generated SERVICE_* values, created once for the stack (passwords, users, URLs).
             'variables' => 'encrypted:array',
         ];
+    }
+
+    /** Whether the Compose file comes from a Git repository (step 2 of decision 0023), not from a template. */
+    public function hasGitSource(): bool
+    {
+        return filled($this->git_repository);
+    }
+
+    /**
+     * The directory of the Compose file in the repository, without leading or trailing `/`. A
+     * build context is relative to it.
+     */
+    public function composeDirectory(): string
+    {
+        return NodeStackGitSource::composeDirectoryOf($this->base_directory, $this->compose_location);
+    }
+
+    /**
+     * The configuration of the first revision of a service that builds its image: its command,
+     * restart policy, and files, as CreateClusterStack stores them for an image service.
+     *
+     * @return array<string, mixed>
+     */
+    public function serviceConfiguration(string $service): array
+    {
+        $services = NodeStackComposeMapper::services($this->compose_parsed, $this->variables ?? [], $this->hasGitSource() ? $this->composeDirectory() : null);
+        foreach ($services as $mapped) {
+            if ($mapped['service'] === $service) {
+                return NodeStackComposeMapper::revisionConfiguration($mapped);
+            }
+        }
+
+        return ['restart_policy' => 'unless-stopped'];
     }
 
     /** `<label>.coolify.internal`, the DNS search domain of every service of the stack. */
@@ -117,6 +151,16 @@ class NodeStack extends BaseModel
     public function cluster(): BelongsTo
     {
         return $this->belongsTo(NodeCluster::class, 'node_cluster_id');
+    }
+
+    public function githubApp(): BelongsTo
+    {
+        return $this->belongsTo(GithubApp::class);
+    }
+
+    public function privateKey(): BelongsTo
+    {
+        return $this->belongsTo(PrivateKey::class);
     }
 
     public function workloads(): HasMany
