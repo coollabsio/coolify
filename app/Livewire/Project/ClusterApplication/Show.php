@@ -16,6 +16,8 @@ use App\Actions\Node\DeleteNodeVolumeData;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\NotifyNodeReachability;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
+use App\Actions\Node\PublishNodeWorkloadPort;
+use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\RollbackNodeWorkload;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
@@ -38,6 +40,7 @@ use App\Models\NodeBuildLogLine;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
+use App\Models\NodePublishedPort;
 use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
@@ -64,7 +67,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'ports', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -160,6 +163,16 @@ class Show extends Component
     public bool $forceHttps = true;
 
     public bool $permanentRedirect = true;
+
+    public string $newPortProtocol = 'tcp';
+
+    public string $newPortContainerPort = '';
+
+    /** Empty publishes the container port. */
+    public string $newPortHostPort = '';
+
+    /** One IPv4 address or CIDR on each line. Empty allows every source. */
+    public string $newPortSources = '';
 
     public string $newVolumeName = '';
 
@@ -505,6 +518,40 @@ class Show extends Component
         $this->loadDomains();
 
         return true;
+    }
+
+    public function publishPort(): void
+    {
+        $this->authorize('update', $this->workload);
+        try {
+            $port = PublishNodeWorkloadPort::run($this->workload, [
+                'protocol' => $this->newPortProtocol,
+                'container_port' => $this->newPortContainerPort,
+                'host_port' => $this->newPortHostPort,
+                'source_cidrs' => $this->newPortSources,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $fields = ['protocol' => 'newPortProtocol', 'container_port' => 'newPortContainerPort', 'host_port' => 'newPortHostPort', 'source_cidrs' => 'newPortSources'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? 'newPortHostPort', $messages[0]);
+            }
+
+            return;
+        }
+        $this->reset('newPortProtocol', 'newPortContainerPort', 'newPortHostPort', 'newPortSources');
+        $this->dispatch('close-modal');
+        $this->dispatch('success', 'Port '.PublishNodeWorkloadPort::label($port->spec()).' published. The servers of the cluster open it without a redeploy.');
+    }
+
+    public function removePublishedPort(string $portUuid): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            RemoveNodePublishedPort::run($this->workload->publishedPorts()->where('uuid', $portUuid)->firstOrFail(), auth()->user());
+            $this->dispatch('success', 'Port removed. The servers of the cluster close it without a redeploy.');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+        }
     }
 
     public function addVolume(): void
@@ -967,6 +1014,7 @@ class Show extends Component
             'databaseUrl' => $this->section === 'general' ? $this->databaseInternalUrl($this->workload->internal_dns_name ? $this->workload->internal_dns_name.'.default.coolify.internal' : null) : null,
             ...($this->section === 'domains' ? $this->ingressData() : []),
             ...($this->section === 'storage' ? $this->storageData() : []),
+            ...($this->section === 'ports' ? $this->publishedPortsData() : []),
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
             'registryCredentialOptions' => $this->section === 'general' ? $this->registryCredentialOptions() : [],
@@ -993,6 +1041,37 @@ class Show extends Component
             'ingressRoutesV2' => $this->node?->cluster === null || $this->node->cluster->supportsIngressRoutesV2(),
             'domainCertificates' => $this->workload->domainCertificates(),
             'suggestedDomain' => $this->suggestedDomain(),
+        ];
+    }
+
+    /**
+     * The published ports, and the servers whose addresses serve them: every server of the cluster.
+     *
+     * @return array{publishedPorts: list<array{uuid: string, label: string, protocol: string, hostPort: int, containerPort: int, sources: list<string>}>, publishedPortServers: list<array{name: string, ip: string, runsApplication: bool}>, publishedPortsSupported: bool}
+     */
+    private function publishedPortsData(): array
+    {
+        $cluster = $this->workload->cluster();
+        $placements = $this->workload->nodes->pluck('id')->all();
+
+        return [
+            'publishedPorts' => $this->workload->publishedPorts()->get()->map(fn (NodePublishedPort $port): array => [
+                'uuid' => $port->uuid,
+                'label' => PublishNodeWorkloadPort::label($port->spec()),
+                'protocol' => strtoupper($port->protocol),
+                'hostPort' => $port->host_port,
+                'containerPort' => $port->container_port,
+                'sources' => array_values($port->source_cidrs ?? []),
+            ])->all(),
+            'publishedPortServers' => $cluster === null ? [] : $cluster->nodes()
+                ->where('team_id', $this->workload->team_id)
+                ->orderBy('name')
+                ->get()
+                ->filter(fn (Node $node): bool => filter_var($node->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false)
+                ->map(fn (Node $node): array => ['name' => $node->name, 'ip' => $node->ip, 'runsApplication' => in_array($node->id, $placements, true)])
+                ->values()
+                ->all(),
+            'publishedPortsSupported' => $cluster?->supportsPublishedPorts() ?? false,
         ];
     }
 

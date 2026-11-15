@@ -12,6 +12,7 @@
         ? [
             'Settings' => [
                 ['key' => 'general', 'label' => 'General', 'icon' => 'settings'],
+                ['key' => 'ports', 'label' => 'Published Ports', 'icon' => 'network'],
                 ['key' => 'environment-variables', 'label' => 'Environment Variables', 'icon' => 'variables'],
                 ['key' => 'storage', 'label' => 'Persistent Storage', 'icon' => 'storages'],
                 ['key' => 'healthcheck', 'label' => 'Healthcheck', 'icon' => 'feedback'],
@@ -46,6 +47,7 @@
             'Settings' => [
                 ['key' => 'general', 'label' => 'General', 'icon' => 'settings'],
                 ['key' => 'domains', 'label' => 'Domains', 'icon' => 'globe'],
+                ['key' => 'ports', 'label' => 'Published Ports', 'icon' => 'network'],
                 ['key' => 'environment-variables', 'label' => 'Environment Variables', 'icon' => 'variables'],
                 ['key' => 'storage', 'label' => 'Persistent Storage', 'icon' => 'storages'],
                 ['label' => 'Advanced', 'icon' => 'grid'],
@@ -85,6 +87,7 @@
     $sectionRoutes = [
         'general' => 'project.cluster-application.show',
         'domains' => 'project.cluster-application.domains',
+        'ports' => 'project.cluster-application.ports',
         'environment-variables' => 'project.cluster-application.environment-variables',
         'storage' => 'project.cluster-application.storage',
         'healthcheck' => 'project.cluster-application.healthcheck',

@@ -3,6 +3,7 @@
         $sectionTitles = [
             'general' => 'General',
             'domains' => 'Domains',
+            'ports' => 'Published Ports',
             'environment-variables' => 'Environment Variables',
             'storage' => 'Persistent Storage',
             'healthcheck' => 'Healthcheck',

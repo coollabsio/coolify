@@ -446,6 +446,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::prefix('cluster-application/{workload_uuid}')->group(function () {
             Route::get('/', ClusterApplicationShow::class)->name('project.cluster-application.show');
             Route::get('/domains', ClusterApplicationShow::class)->name('project.cluster-application.domains');
+            Route::get('/ports', ClusterApplicationShow::class)->name('project.cluster-application.ports');
             Route::get('/environment-variables', ClusterApplicationShow::class)->name('project.cluster-application.environment-variables');
             Route::get('/storage', ClusterApplicationShow::class)->name('project.cluster-application.storage');
             Route::get('/healthcheck', ClusterApplicationShow::class)->name('project.cluster-application.healthcheck');
