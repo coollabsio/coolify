@@ -51,7 +51,8 @@ class DeployNodePreview
     /** The variable columns that a preview copies from the resolved variables of its parent. */
     private const VARIABLE_COLUMNS = [
         'value', 'comment', 'order', 'is_multiline', 'is_literal', 'is_runtime', 'is_buildtime',
-        'is_shown_once', 'is_required', 'is_file_secret', 'uses_legacy_escaping', 'preserve_compose_null',
+        'is_shown_once', 'is_required', 'is_file_secret', 'secret_file_uid', 'secret_file_gid', 'secret_file_mode',
+        'uses_legacy_escaping', 'preserve_compose_null',
     ];
 
     /**

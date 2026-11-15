@@ -29,6 +29,9 @@ class DispatchWorkloadDeployment
     /** Sentinel writes Compose `content:` files and mounts them (decision 0023). */
     public const FILES_CAPABILITY = 'workload.files.v1';
 
+    /** Sentinel sets the uid, gid, and mode of a secret file (decision 0008 amendment). */
+    public const SECRET_OWNER_CAPABILITY = 'workload.secrets.owner.v1';
+
     /** @return array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
     public function handle(NodeOperation $operation): array
     {
@@ -59,6 +62,10 @@ class DispatchWorkloadDeployment
         if ($secrets !== []) {
             // An older Sentinel ignores unknown fields and would start the container without its secret files.
             $operation->node->ensureReportedCapability('workload.secrets.v1');
+            if ($operation->revision->setsSecretFileOwner()) {
+                // An older Sentinel would mount the file as root with mode 0444.
+                $operation->node->ensureReportedCapability(self::SECRET_OWNER_CAPABILITY);
+            }
         }
         // A Git application deploys its build from the cluster registry; its credential is for the push.
         $login = $operation->workload->buildsFromSource() ? null : IssueNodeRegistryCredential::run($operation->workload, $operation->revision->image);

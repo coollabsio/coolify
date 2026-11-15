@@ -107,6 +107,9 @@ class EnvironmentVariable extends BaseModel
         'is_shared',
         'is_required',
         'is_file_secret',
+        'secret_file_uid',
+        'secret_file_gid',
+        'secret_file_mode',
 
         // Metadata
         'version',
@@ -124,6 +127,8 @@ class EnvironmentVariable extends BaseModel
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'is_file_secret' => 'boolean',
+        'secret_file_uid' => 'integer',
+        'secret_file_gid' => 'integer',
         'uses_legacy_escaping' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
@@ -684,6 +689,24 @@ class EnvironmentVariable extends BaseModel
         $available = array_intersect_key($resource->resolvedSecretManagerValuesForRedaction(), array_flip(RemoteSecretReferences::referencedKeys($value)));
 
         return [...self::remoteSecretLogRedactionValues(array_values($available)), ...$variable->logRedactionValues($sharedVariables)];
+    }
+
+    /**
+     * The secret entry of a `workload.deploy.v1` revision (decision 0008 amendment): the bare value when
+     * the file keeps the Sentinel default (root, 0444), so the configuration hash of such a revision
+     * does not change, else the value with the fields that are set. The mode is an integer.
+     *
+     * @return string|array{value: string, uid?: int, gid?: int, mode?: int}
+     */
+    public function secretFileEntry(string $value): string|array
+    {
+        $owner = array_filter([
+            'uid' => $this->secret_file_uid,
+            'gid' => $this->secret_file_gid,
+            'mode' => filled($this->secret_file_mode) ? (int) octdec($this->secret_file_mode) : null,
+        ], fn (?int $field): bool => $field !== null);
+
+        return $owner === [] ? $value : ['value' => $value, ...$owner];
     }
 
     /**

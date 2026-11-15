@@ -88,6 +88,13 @@ class Show extends Component
     /** A cluster application reads the value from /run/secrets/<key> instead of its environment. */
     public bool $is_file_secret = false;
 
+    /** The owner and the mode of the secret file (decision 0008 amendment). Empty keeps root and 0444. */
+    public ?string $secret_file_uid = null;
+
+    public ?string $secret_file_gid = null;
+
+    public ?string $secret_file_mode = null;
+
     public bool $is_required = false;
 
     public bool $is_really_required = false;
@@ -137,6 +144,9 @@ class Show extends Component
             'is_runtime' => 'required|boolean',
             'is_buildtime' => 'required|boolean',
             'is_file_secret' => 'required|boolean',
+            'secret_file_uid' => 'nullable|integer|between:0,2147483647',
+            'secret_file_gid' => 'nullable|integer|between:0,2147483647',
+            'secret_file_mode' => ['nullable', 'regex:/^0?[0-7]{3}$/'],
             'real_value' => 'nullable',
             'newLockedValue' => 'nullable|string',
             'is_required' => 'required|boolean',
@@ -145,7 +155,12 @@ class Show extends Component
 
     protected function messages(): array
     {
-        return ValidationPatterns::environmentVariableKeyMessages('key');
+        return [
+            ...ValidationPatterns::environmentVariableKeyMessages('key'),
+            'secret_file_uid.*' => 'The owner UID must be a number from 0 to 2147483647.',
+            'secret_file_gid.*' => 'The group GID must be a number from 0 to 2147483647.',
+            'secret_file_mode.regex' => 'The mode must be 3 or 4 octal digits, for example 0400.',
+        ];
     }
 
     public function mount()
@@ -261,6 +276,9 @@ class Show extends Component
                 // Only cluster applications can deliver a variable as a file.
                 if ($this->env->resourceable_type === NodeWorkload::class) {
                     $this->env->is_file_secret = $this->is_file_secret;
+                    $this->env->secret_file_uid = filled($this->secret_file_uid) ? (int) $this->secret_file_uid : null;
+                    $this->env->secret_file_gid = filled($this->secret_file_gid) ? (int) $this->secret_file_gid : null;
+                    $this->env->secret_file_mode = filled($this->secret_file_mode) ? $this->secret_file_mode : null;
                 }
             }
             $this->env->key = $this->key;
@@ -289,6 +307,9 @@ class Show extends Component
             $this->is_buildtime = (bool) ($this->env->is_buildtime ?? true);
             $this->is_required = (bool) ($this->env->is_required ?? false);
             $this->is_file_secret = (bool) ($this->env->getAttributes()['is_file_secret'] ?? false);
+            $this->secret_file_uid = $this->env->secret_file_uid === null ? null : (string) $this->env->secret_file_uid;
+            $this->secret_file_gid = $this->env->secret_file_gid === null ? null : (string) $this->env->secret_file_gid;
+            $this->secret_file_mode = $this->env->secret_file_mode;
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
             $this->isValueHidden = $this->valuesHiddenForUser();

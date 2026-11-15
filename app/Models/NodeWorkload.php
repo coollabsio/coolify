@@ -390,7 +390,7 @@ class NodeWorkload extends BaseModel
     /**
      * @param  array<string, mixed>  $configuration
      * @param  array<string, string>  $environment
-     * @param  array<string, string>  $secrets  Files in /run/secrets, keyed by file name.
+     * @param  array<string, string|array{value: string, uid?: int, gid?: int, mode?: int}>  $secrets  Files in /run/secrets, keyed by file name.
      */
     public function createRevision(string $image, array $configuration, array $environment = [], array $secrets = []): NodeWorkloadRevision
     {
@@ -408,7 +408,7 @@ class NodeWorkload extends BaseModel
      *
      * @param  array<string, mixed>  $configuration
      * @param  array<string, string>  $environment
-     * @param  array<string, string>  $secrets
+     * @param  array<string, string|array{value: string, uid?: int, gid?: int, mode?: int}>  $secrets
      */
     public static function configurationHash(string $image, array $configuration, array $environment, array $secrets = []): string
     {
@@ -513,13 +513,17 @@ class NodeWorkload extends BaseModel
 
     /**
      * Runtime variables that the container reads as files at /run/secrets/<key> instead of
-     * from its environment (decision 0008), resolved like runtimeEnvironment().
+     * from its environment (decision 0008), resolved like runtimeEnvironment(). An entry is
+     * the value, or the value with the owner and the mode of the file when they are set.
      *
-     * @return array<string, string>
+     * @return array<string, string|array{value: string, uid?: int, gid?: int, mode?: int}>
      */
     public function runtimeSecrets(): array
     {
-        $secrets = $this->resolvedRuntimeValues($this->environment_variables()->where('is_file_secret', true)->get());
+        $variables = $this->environment_variables()->where('is_file_secret', true)->get()->keyBy('key');
+        $secrets = collect($this->resolvedRuntimeValues($variables))
+            ->map(fn (string $value, int|string $key): string|array => $variables[$key]->secretFileEntry($value))
+            ->all();
         ksort($secrets);
 
         return $secrets;

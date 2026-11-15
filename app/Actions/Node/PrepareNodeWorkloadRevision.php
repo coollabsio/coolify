@@ -36,7 +36,8 @@ class PrepareNodeWorkloadRevision
 
             $secrets = $workload->runtimeSecrets();
             // Sentinel mounts each secret as /run/secrets/<key>, and Podman stores 1 byte to 512 kB.
-            foreach ($secrets as $key => $value) {
+            foreach ($secrets as $key => $entry) {
+                $value = is_array($entry) ? $entry['value'] : $entry;
                 if (preg_match('/\A(?!\.{1,2}\z)[A-Za-z0-9_.-]{1,255}\z/', (string) $key) !== 1) {
                     throw new RuntimeException("The secret file {$key} cannot be used. A file name has 1 to 255 letters, digits, _, . or -.");
                 }

@@ -81,6 +81,9 @@ class CreateDeploymentOperation
 
             if (filled($revision->secrets)) {
                 $node->ensureReportedCapability('workload.secrets.v1');
+                if ($revision->setsSecretFileOwner()) {
+                    $node->ensureReportedCapability(DispatchWorkloadDeployment::SECRET_OWNER_CAPABILITY);
+                }
             }
 
             if (filled(data_get($revision->configuration, 'health_check'))) {

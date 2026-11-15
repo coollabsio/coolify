@@ -296,6 +296,9 @@ final class ServerTransferCoverage
             'resourceable_type' => self::LINKED,
             'resourceable_id' => self::LINKED,
             'is_file_secret' => 'Only cluster applications use it, and a transfer does not move them.',
+            'secret_file_uid' => 'Only cluster applications use it, and a transfer does not move them.',
+            'secret_file_gid' => 'Only cluster applications use it, and a transfer does not move them.',
+            'secret_file_mode' => 'Only cluster applications use it, and a transfer does not move them.',
         ],
         LocalPersistentVolume::class => [
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,

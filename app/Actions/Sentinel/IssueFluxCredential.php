@@ -60,6 +60,7 @@ class IssueFluxCredential
             'workload.healthcheck.v1',
             'workload.healthcheck.exec.v1',
             'workload.secrets.v1',
+            'workload.secrets.owner.v1',
             'workload.rolling_deploy.v1',
             'workload.dns_search.v1',
             'workload.files.v1',

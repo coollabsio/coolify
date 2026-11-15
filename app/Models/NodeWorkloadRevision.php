@@ -24,6 +24,12 @@ class NodeWorkloadRevision extends BaseModel
         ];
     }
 
+    /** Whether a secret file has an owner or a mode, which an older Sentinel ignores (decision 0008 amendment). */
+    public function setsSecretFileOwner(): bool
+    {
+        return collect($this->secrets ?? [])->contains(fn (string|array $entry): bool => is_array($entry));
+    }
+
     public function workload(): BelongsTo
     {
         return $this->belongsTo(NodeWorkload::class, 'node_workload_id');

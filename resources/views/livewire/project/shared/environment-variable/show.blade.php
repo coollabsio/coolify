@@ -259,13 +259,27 @@
                                     :disabled="! $canUpdate" />
                             @endif
                             @if ($showFileSecret)
-                                <x-forms.listbox id="is_file_secret" label="Delivery" :options="[
+                                <x-forms.listbox id="is_file_secret" label="Delivery" :live="true" :options="[
                                     ['value' => false, 'label' => 'Environment variable'],
                                     ['value' => true, 'label' => 'File in /run/secrets'],
                                 ]"
                                     helper="A file is safer for passwords and keys: the value is not in the environment of the container, so child processes, crash reports, and container details do not show it. The application reads /run/secrets/NAME. Takes effect after the next deploy."
                                     :disabled="! $canUpdate" />
                             @endif
+                        </div>
+                    @endif
+
+                    @if ($showFileSecret && $is_file_secret)
+                        <div class="grid gap-4 sm:grid-cols-3" data-secret-file-owner>
+                            <x-forms.input id="secret_file_uid" label="Owner UID" placeholder="0" inputmode="numeric"
+                                helper="The user ID that owns /run/secrets/{{ $env->key }}. Empty means root (0). Use the user ID of the image, for example 999 for postgres, so that only this user can read a file with mode 0400."
+                                :disabled="! $canUpdate" />
+                            <x-forms.input id="secret_file_gid" label="Group GID" placeholder="0" inputmode="numeric"
+                                helper="The group ID of the file. Empty means root (0)."
+                                :disabled="! $canUpdate" />
+                            <x-forms.input id="secret_file_mode" label="Mode" placeholder="0444"
+                                helper="The octal permission bits of the file, for example 0400. Empty means 0444: every user in the container can read the file. Some programs refuse a key file that the group or other users can read, for example SSH and the ssl_key_file of PostgreSQL. Set the owner and 0400 or 0600 for such a file. Takes effect after the next deploy."
+                                :disabled="! $canUpdate" />
                         </div>
                     @endif
 
