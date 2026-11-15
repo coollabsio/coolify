@@ -508,6 +508,15 @@ function dockerRemoveCommand(string $container): string
 }
 
 /**
+ * The `docker run` option that mounts a host file read-only. Unlike `-v`, `--mount` fails when Docker cannot see
+ * the source, so a missing file does not become an empty directory on the host and in the container.
+ */
+function dockerReadOnlyFileMountOption(string $source, string $target): string
+{
+    return '--mount '.escapeshellarg("type=bind,source={$source},target={$target},readonly");
+}
+
+/**
  * Lists the containers of a Compose project, one JSON object per line, for composeContainersWithRemovedVolumes().
  */
 function composeProjectMountsCommand(string $projectName): string

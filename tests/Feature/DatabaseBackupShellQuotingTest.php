@@ -104,7 +104,7 @@ it('quotes the container name, the database name, and the backup paths in the ba
         ->not->toContain("docker exec {$database->uuid} ");
 });
 
-it('quotes the backup file in the mount of the S3 upload container', function () {
+it('mounts the backup file in the S3 upload container with --mount, which fails instead of creating a directory', function () {
     $storage = S3Storage::create([
         'name' => 'Destination',
         'region' => 'us-east-1',
@@ -132,8 +132,8 @@ it('quotes the backup file in the mount of the S3 upload container', function ()
 
     $file = ScheduledDatabaseBackupExecution::query()->sole()->filename;
     expect($this->commands->first(fn (string $command) => str_contains($command, 'docker run -d')))
-        ->toContain(' -v '.escapeshellarg("{$file}:{$file}:ro").' ')
-        ->not->toContain(" -v {$file}:");
+        ->toContain(' --mount '.escapeshellarg("type=bind,source={$file},target={$file},readonly").' ')
+        ->not->toContain("{$file}:{$file}:ro");
 });
 
 it('backs up a service database with a supported container name', function () {

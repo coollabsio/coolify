@@ -1025,8 +1025,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             // Remove a leftover helper in the same batch, so a replayed batch does not fail with a name conflict.
             $commands[] = "docker rm -f backup-of-{$this->backup_log_uuid} >/dev/null 2>&1 || true";
-            $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
-            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientEnvOptions()} -v {$mount} {$fullImageName}";
+            $mount = dockerReadOnlyFileMountOption($this->backupMountSource(), $this->backup_location);
+            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientEnvOptions()} {$mount} {$fullImageName}";
 
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
             if ($s3->usesCurlTransfer()) {
@@ -1060,7 +1060,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function uploadWithRclone(S3Storage $storage, string $network): void
     {
         $transfer = new RcloneTransfer($storage, $this->server, "backup-of-{$this->backup_log_uuid}");
-        $transfer->start([$this->backupMountSource().':'.$this->backup_location.':ro'], $network, $this->commandTimeout());
+        $transfer->start([$this->backupMountSource() => $this->backup_location], $network, $this->commandTimeout());
         $transfer->upload($this->backup_location, $this->backup_location, $this->commandTimeout());
     }
 

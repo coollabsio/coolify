@@ -476,7 +476,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         if (! $s3->isS3()) {
             $transfer = new RcloneTransfer($s3, $server, $containerName);
             try {
-                $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
+                $transfer->start([$backupLocation => $backupLocation], timeout: $this->timeout);
                 $transfer->upload($backupLocation, $backupLocation, $this->timeout);
             } finally {
                 instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
@@ -489,8 +489,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' -v '
-                    .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' '
+                    .dockerReadOnlyFileMountOption($backupLocation, $backupLocation).' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
             if ($s3->usesCurlTransfer()) {
                 $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, ltrim($backupDirectory, '/').'/'.basename($backupLocation));
