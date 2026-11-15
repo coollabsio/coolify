@@ -202,6 +202,11 @@ class StartPostgresql
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
         if (count($command) > 1) {
+            // The Supabase image keeps its config (listen_addresses, preloaded extensions) in /etc/postgresql and starts
+            // with "postgres -D /etc/postgresql". Keep that directory when this command replaces the image CMD.
+            if (blank($this->database->postgres_conf) && str($this->database->image)->contains('supabase/postgres')) {
+                array_splice($command, 1, 0, ['-D', '/etc/postgresql']);
+            }
             $docker_compose['services'][$container_name]['command'] = $command;
         }
 
