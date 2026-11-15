@@ -16,12 +16,12 @@ class CancelNodeBuild
 {
     use AsAction;
 
-    public function handle(NodeBuild $build): void
+    public function handle(NodeBuild $build, string $reason = 'Cancelled by a user.'): void
     {
         $cancelled = NodeBuild::query()
             ->whereKey($build->id)
             ->whereIn('status', NodeBuildStatus::activeValues())
-            ->update(['status' => NodeBuildStatus::CANCELLED, 'finished_at' => now(), 'error' => 'Cancelled by a user.']);
+            ->update(['status' => NodeBuildStatus::CANCELLED, 'finished_at' => now(), 'error' => $reason]);
         if ($cancelled === 0) {
             return;
         }

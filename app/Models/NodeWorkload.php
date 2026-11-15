@@ -344,12 +344,20 @@ class NodeWorkload extends BaseModel
 
     /**
      * The configuration of the revision that the first build creates. A service of a stack keeps
-     * the command, restart policy, and files of its Compose service.
+     * the command, restart policy, and files of its Compose service. A preview takes the latest
+     * configuration of its parent at each build (decision 0025), without the mounts and the
+     * health check, which the preview has of its own.
      *
      * @return array<string, mixed>
      */
     public function firstRevisionConfiguration(): array
     {
+        if ($this->isPreview()) {
+            $configuration = $this->previewOf?->revisions()->latest('id')->first()?->configuration;
+            unset($configuration['volumes'], $configuration['health_check'], $configuration['ports']);
+
+            return $configuration ?: ['restart_policy' => 'unless-stopped'];
+        }
         $stack = $this->node_stack_id === null ? null : NodeStack::query()->withoutGlobalScopes()->find($this->node_stack_id);
 
         return $stack === null || $this->stack_service === null

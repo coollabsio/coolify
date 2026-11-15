@@ -29,7 +29,8 @@ class PublishBuiltRevision
             // A local build has no registry digest; its tag is unique to the build.
             $workload->createRevision(
                 NodeRegistry::isLocalImage($build->image) ? $build->image : NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
-                $current?->configuration ?? $workload->firstRevisionConfiguration(),
+                // A preview follows the configuration of its parent at each build (decision 0025).
+                $workload->isPreview() ? $workload->firstRevisionConfiguration() : ($current?->configuration ?? $workload->firstRevisionConfiguration()),
                 $current?->environment ?? [],
                 $current?->secrets ?? [],
             );
