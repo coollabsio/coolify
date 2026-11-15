@@ -224,7 +224,7 @@ class Heading extends Component
 
                 return;
             }
-            if (data_get($this->application, 'settings.is_build_server_enabled') && str($this->application->docker_registry_image_name)->isEmpty()) {
+            if ($this->application->isBuildServerEnabled() && str($this->application->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
 
                 return;

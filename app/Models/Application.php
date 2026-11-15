@@ -1143,8 +1143,23 @@ class Application extends BaseModel
      */
     public function mustBuildOnBuildServer(Server $server): bool
     {
-        return ! $server->canBuildApplications()
-            && ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+        return ! $server->canBuildApplications() && $this->supportsBuildServer();
+    }
+
+    /**
+     * Docker image applications build nothing, and Compose applications do not support build servers.
+     */
+    public function supportsBuildServer(): bool
+    {
+        return ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+    }
+
+    /**
+     * The build server setting stays saved when the build pack changes, so it only counts for build packs that support it.
+     */
+    public function isBuildServerEnabled(): bool
+    {
+        return $this->supportsBuildServer() && (bool) data_get($this, 'settings.is_build_server_enabled');
     }
 
     /**
@@ -1160,7 +1175,7 @@ class Application extends BaseModel
         if ($pullsImage) {
             return collect();
         }
-        if (! $this->mustBuildOnBuildServer($server) && ! data_get($this, 'settings.is_build_server_enabled')) {
+        if (! $this->mustBuildOnBuildServer($server) && ! $this->isBuildServerEnabled()) {
             return collect();
         }
         $teamId = $this->team()?->id;

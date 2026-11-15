@@ -204,10 +204,8 @@ class DockerRegistryLogins
                 if ($deploymentServer === null || $deploymentServer->is($buildServer)) {
                     return false;
                 }
-                $mustBuildElsewhere = ! $deploymentServer->canBuildApplications()
-                    && ! in_array($application->build_pack, ['dockerimage', 'dockercompose'], true);
 
-                return $mustBuildElsewhere || (bool) data_get($application, 'settings.is_build_server_enabled');
+                return $application->mustBuildOnBuildServer($deploymentServer) || $application->isBuildServerEnabled();
             })
             ->values();
     }

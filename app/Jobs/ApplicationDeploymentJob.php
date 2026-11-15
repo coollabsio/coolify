@@ -586,7 +586,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // the first builds nothing and the second does not support build servers.
         $mustBuildElsewhere = $this->application->mustBuildOnBuildServer($this->server);
 
-        if (! $mustBuildElsewhere && ! data_get($this->application, 'settings.is_build_server_enabled')) {
+        if (! $mustBuildElsewhere && ! $this->application->isBuildServerEnabled()) {
             return;
         }
 
