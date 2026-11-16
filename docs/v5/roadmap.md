@@ -1,6 +1,6 @@
 # Coolify v5 Roadmap
 
-**Last reviewed:** 2026-11-15
+**Last reviewed:** 2026-11-16
 
 This list sorts the open v5 work. Every item in "Build" has an accepted
 decision. The accepted decisions are in [decisions/README.md](decisions/README.md).
@@ -41,11 +41,11 @@ stable need.
 ## Sentinel versions
 
 Until the first release, Coolify uses Sentinel `main-<sha>` images, not
-releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-ef18b60`
-by digest (Nodes 1 and 3 of the dev cluster run `sentinel-host` `main-ef18b60`). `upstream.json` takes only release versions, so a
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-5d8337f`
+by digest (Nodes 1 and 3 of the dev cluster run `sentinel-host` `main-5d8337f`). `upstream.json` takes only release versions, so a
 new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 `image.build.target.v1`, no read lane for fast commands (Sentinel
-`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), no external image storage (Sentinel `8e040d0`), and no `user:` for stack services (Sentinel `99c9629`). Install the `main-<sha>` `sentinel-host` on it by hand with
+`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), no external image storage (Sentinel `8e040d0`), no `user:` for stack services (Sentinel `99c9629`), and no image cleanup (Sentinel `5d8337f`). Install the `main-<sha>` `sentinel-host` on it by hand with
 `InstallSentinel`.
 
 ## Build when there is time
