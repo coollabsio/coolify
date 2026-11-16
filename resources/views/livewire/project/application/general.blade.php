@@ -175,7 +175,7 @@
             </x-application.settings-section>
 
             <x-application.settings-section id="build-pipeline-section" title="Build & deploy" helper="How Coolify builds the application, where it pushes the image, and the commands it runs around each deployment.">
-            @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
+            @if (!$application->dockerfile && $application->build_pack !== 'dockerimage' && !$application->is_archive_source)
                 <div class="application-build-pack-options mb-5 border-b border-neutral-200 pb-5 dark:border-white/[0.07]">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="buildPack" label="Build strategy" live :options="[
@@ -210,6 +210,29 @@
             <div class="flex flex-col gap-5">
                 @if ($application->build_pack === 'dockerimage')
                     <p class="text-sm text-neutral-500 dark:text-fg-dim">Nothing to build. This application deploys a prebuilt Docker image.</p>
+                @elseif ($application->is_archive_source)
+                    <div id="site-archive-section" class="flex flex-col gap-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-black dark:text-fg">Site archive</h3>
+                            <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">
+                                @if (preg_match('/^[0-9a-f]{40}$/', (string) $application->git_commit_sha))
+                                    Current version <span class="font-mono text-black dark:text-fg">{{ substr($application->git_commit_sha, 0, 7) }}</span>.
+                                @else
+                                    No archive uploaded yet.
+                                @endif
+                                Coolify serves the files of the archive with nginx. A redeploy of the same version reuses its image.
+                            </p>
+                        </div>
+                        @if (auth()->user()->can('update', $application) && auth()->user()->can('deploy', $application))
+                            <x-static-archive-dropzone action="deployUpload" :applicationUuid="$application->uuid"
+                                message="Drop a new .tar / .tar.gz / .tgz to deploy" />
+                        @endif
+                        <div class="w-full sm:w-96">
+                            <x-forms.checkbox instantSave id="isSpa" label="Single-page application"
+                                helper="Serve index.html for paths that do not match a file, for client-side routing."
+                                x-bind:disabled="!canUpdate" />
+                        </div>
+                    </div>
                 @else
                     <div class="flex flex-col gap-5">
                         @if ($buildPack === 'dockercompose')
