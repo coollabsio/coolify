@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Enums\NodeContainerSlot;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Enums\NodeWorkloadDesiredState;
@@ -13,6 +14,7 @@ use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
+use App\Models\NodeWorkloadSetEntry;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Throwable;
 
@@ -61,10 +63,24 @@ class ReconcileNodeWorkloads
                     ->whereHas('executions', fn ($executions) => $executions->where('status', 'running')))
                 ->pluck('node_workload_id'));
         $operationCount = 0;
+        // Sentinel converges the workloads of its desired set itself (decision 0026).
+        $convergesHere = $node->supportsCapability(SyncNodeWorkloadSet::CAPABILITY) === true;
+        $inSet = $convergesHere
+            ? NodeWorkloadSetEntry::query()->where('node_id', $node->id)->pluck('node_workload_id')
+            : collect();
+        $adopted = [];
 
         foreach ($workloads as $workload) {
+            if ($inSet->contains($workload->id)) {
+                continue;
+            }
             // An uncertain operation stays here until the stale operation recovery or a manual Recover closes it.
             if ($busyWorkloadIds->contains($workload->id)) {
+                continue;
+            }
+            if ($convergesHere && $this->adopt($node, $workload)) {
+                $adopted[] = $workload->id;
+
                 continue;
             }
 
@@ -84,7 +100,51 @@ class ReconcileNodeWorkloads
             }
         }
 
+        if ($adopted !== []) {
+            try {
+                SyncNodeWorkloadSet::run($node, $adopted);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
         return $operationCount;
+    }
+
+    /**
+     * Gives a workload of the command path to Sentinel when its deployed revision runs here and
+     * Sentinel can converge it (decision 0026). Sentinel adopts the running container; no operation
+     * is created.
+     */
+    private function adopt(Node $node, NodeWorkload $workload): bool
+    {
+        $revision = $workload->deployedRevision();
+        // A newer revision that did not deploy yet stays with the command path until a deploy.
+        if ($revision === null || $revision->id !== $workload->revisions->first()?->id
+            || $workload->desired_state !== NodeWorkloadDesiredState::RUNNING
+            || ! SyncNodeWorkloadSet::converges($node, $workload, $revision->configuration)) {
+            return false;
+        }
+        $container = $workload->containers
+            ->where('node_workload_revision_id', $revision->id)
+            ->where('state', 'running')
+            ->first();
+        $slot = $container === null ? null : collect(NodeContainerSlot::cases())
+            ->first(fn (NodeContainerSlot $slot): bool => $slot->containerName($workload) === $container->name);
+        if ($slot === null) {
+            return false;
+        }
+        NodeWorkloadSetEntry::query()->firstOrCreate(
+            ['node_id' => $node->id, 'node_workload_id' => $workload->id],
+            [
+                'node_workload_revision_id' => $revision->id,
+                'desired_state' => NodeWorkloadDesiredState::RUNNING,
+                'container_slot' => $slot,
+                'pull_policy' => 'missing',
+            ],
+        );
+
+        return true;
     }
 
     private function reconcileWorkload(

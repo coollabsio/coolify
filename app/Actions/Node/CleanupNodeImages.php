@@ -9,6 +9,7 @@ use App\Models\NodeBuild;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
+use App\Models\NodeWorkloadSetEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -115,7 +116,9 @@ class CleanupNodeImages
     /**
      * The images that the cleanup keeps: for each workload that has or had a placement on the Node,
      * the revision that runs there, the 2 revisions before it, and the newest revision; then the pinned
-     * builder image and the Sentinel host image of the last install.
+     * builder image and the Sentinel host image of the last install. Sentinel with
+     * `workload.reconcile.v1` keeps the images of its desired set itself (decision 0026), so the
+     * revision of a set entry is not in the list; its earlier revisions stay for a rollback.
      *
      * @return list<string>
      */
@@ -129,6 +132,9 @@ class CleanupNodeImages
                 ->orWhereIn('id', $node->operations()->whereNotNull('node_workload_id')->select('node_workload_id')))
             ->pluck('id');
 
+        $inSet = $node->supportsCapability(SyncNodeWorkloadSet::CAPABILITY) === true
+            ? NodeWorkloadSetEntry::query()->where('node_id', $node->id)->pluck('node_workload_revision_id', 'node_workload_id')
+            : collect();
         $keep = collect();
         foreach ($workloadIds as $workloadId) {
             $deployedRevisionId = $node->operations()
@@ -138,7 +144,8 @@ class CleanupNodeImages
                 ->whereNotNull('node_workload_revision_id')
                 ->latest('id')
                 ->value('node_workload_revision_id');
-            $revisions = NodeWorkloadRevision::query()->where('node_workload_id', $workloadId)->whereNotNull('image');
+            $revisions = NodeWorkloadRevision::query()->where('node_workload_id', $workloadId)->whereNotNull('image')
+                ->when($inSet->has($workloadId), fn ($query) => $query->whereKeyNot($inSet->get($workloadId)));
             $keep->push((clone $revisions)->latest('id')->value('image'));
             if ($deployedRevisionId !== null) {
                 $keep = $keep->merge((clone $revisions)

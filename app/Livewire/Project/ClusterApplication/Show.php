@@ -47,6 +47,7 @@ use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
+use App\Models\NodeWorkloadEvent;
 use App\Models\Project;
 use App\Models\RegistryCredential;
 use App\Rules\DockerImageFormat;
@@ -1157,7 +1158,8 @@ class Show extends Component
     {
         $deployments = $this->deploymentQuery()->toBase()->select(['id', 'created_at'])->selectRaw("'deployment' as kind");
         $builds = $this->buildTimelineQuery()->toBase()->select(['id', 'created_at'])->selectRaw("'build' as kind");
-        $timeline = fn () => $deployments->newQuery()->fromSub($deployments->clone()->unionAll($builds), 'timeline');
+        $events = $this->eventTimelineQuery()->toBase()->select(['id', 'observed_at as created_at'])->selectRaw("'event' as kind");
+        $timeline = fn () => $deployments->newQuery()->fromSub($deployments->clone()->unionAll($builds)->unionAll($events), 'timeline');
 
         $total = $timeline()->count();
         $lastPage = max(1, (int) ceil($total / self::DEPLOYMENTS_PER_PAGE));
@@ -1175,11 +1177,15 @@ class Show extends Component
             ->findMany($page->where('kind', 'deployment')->pluck('id'))->keyBy('id');
         $buildRows = NodeBuild::query()
             ->findMany($page->where('kind', 'build')->pluck('id'))->keyBy('id');
+        $eventRows = NodeWorkloadEvent::query()->with(['node', 'revision'])
+            ->findMany($page->where('kind', 'event')->pluck('id'))->keyBy('id');
         $latestImage = $this->workload->revisions()->latest('id')->value('image');
         $rows = $page
-            ->map(fn (object $row): array => $row->kind === 'build'
-                ? $this->buildTimelineRow($buildRows[$row->id])
-                : $this->deploymentTimelineRow($operations[$row->id], $latestImage))
+            ->map(fn (object $row): array => match ($row->kind) {
+                'build' => $this->buildTimelineRow($buildRows[$row->id]),
+                'event' => $this->eventTimelineRow($eventRows[$row->id]),
+                default => $this->deploymentTimelineRow($operations[$row->id], $latestImage),
+            })
             ->values()
             ->all();
 
@@ -1352,6 +1358,21 @@ class Show extends Component
                     : 'The volumes were switched to the target server.');
             }
         }
+        // The status events of Sentinel when it converges the workload (decision 0026).
+        foreach ((array) data_get($operation->result, 'sentinel_events', []) as $event) {
+            $text = trim((string) data_get($event, 'reason'));
+            $add(
+                data_get($event, 'at') ?? $operation->updated_at,
+                'Sentinel: '.match ((string) data_get($event, 'status')) {
+                    'healthy' => 'the container is healthy.',
+                    'failed' => 'the revision failed.',
+                    'stopped' => 'the container is stopped.',
+                    'removed' => 'the containers are removed.',
+                    default => 'in progress.',
+                }.($text === '' ? '' : " {$text}"),
+                data_get($event, 'status') === 'failed',
+            );
+        }
         $verification = data_get($operation->result, 'verification');
         if (is_array($verification)) {
             $containerName = data_get($operation->result, 'name', 'The container');
@@ -1452,6 +1473,54 @@ class Show extends Component
             },
             'node' => null,
         ];
+    }
+
+    /**
+     * A change that Sentinel made alone, such as a start after a crash or a reboot (decision 0026).
+     *
+     * @return array<string, mixed>
+     */
+    private function eventTimelineRow(NodeWorkloadEvent $event): array
+    {
+        return [
+            'kind' => 'event',
+            'uuid' => $event->event_id,
+            'href' => null,
+            'status' => ($event->reason ?: ucfirst($event->status)),
+            'statusType' => match ($event->status) {
+                'healthy' => 'success',
+                'failed' => 'error',
+                default => 'warning',
+            },
+            'source' => 'Sentinel',
+            'revision' => $event->revision ? substr($event->revision->uuid, 0, 7) : null,
+            'image' => $event->revision?->image,
+            'imageTitle' => $event->reason,
+            'createdAt' => $event->observed_at,
+            'duration' => '-',
+            'node' => $event->node?->name,
+        ];
+    }
+
+    /**
+     * The events of Sentinel for this application. A status filter or a search hides them; a server
+     * filter shows the events of those servers.
+     *
+     * @return Builder<NodeWorkloadEvent>
+     */
+    private function eventTimelineQuery(): Builder
+    {
+        $filtered = collect($this->deploymentFilters)->contains(fn (string $filter): bool => str_starts_with($filter, 'status:'))
+            || trim($this->deploymentSearch) !== '';
+        $serverUuids = collect($this->deploymentFilters)
+            ->filter(fn (string $filter): bool => str_starts_with($filter, 'server:'))
+            ->map(fn (string $filter): string => substr($filter, 7))
+            ->values();
+
+        return NodeWorkloadEvent::query()
+            ->where('node_workload_id', $this->workload->id)
+            ->when($filtered, fn (Builder $query) => $query->whereRaw('1 = 0'))
+            ->when($serverUuids->isNotEmpty(), fn (Builder $query) => $query->whereHas('node', fn (Builder $node) => $node->whereIn('uuid', $serverUuids->all())));
     }
 
     /**

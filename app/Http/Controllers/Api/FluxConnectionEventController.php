@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\QueueNodeNetworkConvergence;
+use App\Actions\Node\RecordNodeWorkloadStatus;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Actions\Sentinel\ResolveFluxTrustBundle;
 use App\Http\Controllers\Controller;
 use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\RefreshNodeContainersJob;
+use App\Jobs\SyncNodeWorkloadSetJob;
 use App\Models\FluxCaRotation;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -30,17 +32,29 @@ class FluxConnectionEventController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'event' => ['required', 'in:connected,heartbeat,disconnected,runtime_changed'],
+            'event' => ['required', 'in:connected,heartbeat,disconnected,runtime_changed,workload_status'],
             'server_id' => ['required', 'string', 'max:255'],
             'connection_id' => ['required', 'uuid'],
             'sentinel_version' => ['required_if:event,connected', 'nullable', 'string', 'max:100'],
             'protocol_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
             'trust_bundle_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
             'transport' => ['required_if:event,connected', 'nullable', 'in:tls,plaintext'],
-            'capabilities' => ['nullable', 'array', 'max:64'],
+            'capabilities' => ['nullable', 'array', 'max:128'],
             'capabilities.*' => ['required', 'string', 'max:100', 'distinct'],
             'observed_at_unix_ms' => ['nullable', 'integer', 'min:0'],
-            'event_id' => ['required_if:event,runtime_changed', 'nullable', 'string', 'max:255'],
+            'event_id' => ['required_if:event,runtime_changed', 'required_if:event,workload_status', 'nullable', 'string', 'max:255'],
+            'workload_generation' => ['nullable', 'integer', 'min:0'],
+            'workload_set_hash' => ['nullable', 'string', 'max:64'],
+            'workload' => ['required_if:event,workload_status', 'nullable', 'array'],
+            'workload.workload_id' => ['required_with:workload', 'string', 'max:64'],
+            'workload.revision_id' => ['nullable', 'string', 'max:64'],
+            'workload.operation_id' => ['nullable', 'string', 'max:64'],
+            'workload.status' => ['required_with:workload', 'string', 'in:progressing,healthy,failed,stopped,removed'],
+            'workload.reason' => ['nullable', 'string', 'max:4000'],
+            'workload.generation' => ['nullable', 'integer', 'min:0'],
+            'workload.container_name' => ['nullable', 'string', 'max:255'],
+            'workload.runtime_id' => ['nullable', 'string', 'max:128'],
+            'workload.autonomous' => ['nullable', 'boolean'],
         ]);
         if ($validator->fails()) {
             abort(422, $validator->errors()->first());
@@ -55,6 +69,18 @@ class FluxConnectionEventController extends Controller
                 && data_get($current, 'connection_id') === $data['connection_id']) {
                 RefreshNodeContainersJob::dispatch($node->id);
             }
+
+            return response()->noContent();
+        }
+
+        if ($data['event'] === 'workload_status') {
+            // Flux acknowledges the event to Sentinel only after this response, so a failure here
+            // makes Sentinel send it again.
+            RecordNodeWorkloadStatus::run($node, [
+                ...$data['workload'],
+                'event_id' => $data['event_id'],
+                'observed_at_unix_ms' => $data['observed_at_unix_ms'] ?? null,
+            ]);
 
             return response()->noContent();
         }
@@ -92,6 +118,9 @@ class FluxConnectionEventController extends Controller
             'transport' => $data['transport'] ?? data_get($current, 'transport'),
             'endpoint' => $fluxUrl,
             'capabilities' => $data['capabilities'] ?? data_get($current, 'capabilities'),
+            // The desired set of Sentinel (decision 0026), from `Hello` and each heartbeat.
+            'workload_generation' => $data['workload_generation'] ?? null,
+            'workload_set_hash' => $data['workload_set_hash'] ?? null,
         ], fn ($value) => $value !== null), now()->addMinutes(5));
         $reconnected = $data['event'] === 'connected' || ! $node->is_reachable;
         if (! $node->is_reachable) {
@@ -113,6 +142,16 @@ class FluxConnectionEventController extends Controller
         }
         if ($reconnected) {
             rescue(fn () => QueueNodeNetworkConvergence::run($node->refresh()));
+        }
+        if (array_key_exists('workload_generation', $data) && $data['workload_generation'] !== null) {
+            $matches = (int) $data['workload_generation'] === (int) $node->workload_set_generation
+                && (string) ($data['workload_set_hash'] ?? '') === (string) $node->workload_set_hash;
+            if ($data['event'] === 'connected' || ! $matches) {
+                // A later Hello or heartbeat carries the state after an earlier change: check again
+                // after a short delay instead of sending the full set for a change in flight.
+                rescue(fn () => SyncNodeWorkloadSetJob::dispatch($node->id, $data['event'] === 'connected')
+                    ->delay($data['event'] === 'connected' ? 0 : 15));
+            }
         }
 
         return response()->noContent();

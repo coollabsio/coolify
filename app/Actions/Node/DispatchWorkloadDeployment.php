@@ -42,6 +42,55 @@ class DispatchWorkloadDeployment
     /** @return array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
     public function handle(NodeOperation $operation): array
     {
+        $prepared = $this->prepare($operation);
+        $plan = $prepared['plan'];
+        $name = $prepared['name'];
+        $url = config('constants.flux.internal_url');
+        $token = config('constants.flux.internal_token');
+        if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
+            throw new RuntimeException('Flux internal API configuration is incomplete.');
+        }
+        if ($plan['replaces'] !== null && $operation->node->containers()->where('node_workload_id', $operation->workload->id)->where('name', $name)->exists()) {
+            // A leftover of an earlier deploy can still get traffic. Podman would stop it without the drain.
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-clear", $name, NodeWorkloadAction::REMOVE);
+        }
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->connectTimeout(10)
+            ->timeout(620)
+            ->post(rtrim($url, '/').'/v1/commands/workload.deploy', [
+                'server_id' => $operation->node->uuid,
+                'command_id' => $operation->uuid,
+                ...$prepared['payload'],
+            ]);
+        $response->throw();
+
+        $validator = Validator::make($response->json(), [
+            'command_id' => ['required', 'string', 'in:'.$operation->uuid],
+            'observed_at_unix_ms' => ['required', 'integer', 'min:1'],
+            'runtime_id' => ['required', 'string', 'max:128'],
+            'name' => ['required', 'string', 'in:'.$name],
+            'image' => ['required', 'string', 'max:2048'],
+        ]);
+        if ($validator->fails()) {
+            throw new RuntimeException('Flux returned an invalid deployment result.');
+        }
+
+        /** @var array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
+        return $validator->validated();
+    }
+
+    /**
+     * Builds the container of a deployment, for `workload.deploy` and for an entry of the desired set
+     * that Sentinel converges (decision 0026): it pins the volumes, assigns the workload address, and
+     * applies the network revision that a new address needs. Each step is idempotent, so the full set
+     * builds it again. `network_revision` is the revision that the container needs before it starts,
+     * or 0.
+     *
+     * @return array{payload: array<string, mixed>, name: string, plan: array{slot: NodeContainerSlot, replaces: ?NodeContainerSlot}, network_revision: int}
+     */
+    public function prepare(NodeOperation $operation): array
+    {
         $operation->loadMissing(['node', 'workload.project', 'workload.environment', 'revision']);
         if ($operation->command_type !== 'workload.deploy.v1' || $operation->workload === null || $operation->revision === null) {
             throw new RuntimeException('The deployment operation is incomplete.');
@@ -49,12 +98,6 @@ class DispatchWorkloadDeployment
         // A replayed or late deployment must not recreate a container on a server that lost the placement (failed move, removal).
         if (! $operation->node->workloads()->whereKey($operation->workload->id)->exists()) {
             throw new RuntimeException('The workload is no longer assigned to this server.');
-        }
-
-        $url = config('constants.flux.internal_url');
-        $token = config('constants.flux.internal_token');
-        if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
-            throw new RuntimeException('Flux internal API configuration is incomplete.');
         }
 
         $configuration = $this->validatedConfiguration([
@@ -113,6 +156,7 @@ class DispatchWorkloadDeployment
         }
         $plan = self::containerPlan($operation, $mounts);
         $containerIp = null;
+        $networkRevision = 0;
         if ($operation->node->node_cluster_id !== null) {
             $hadAddress = filled($operation->node->workloads()->whereKey($operation->workload->id)->first()?->pivot->{$plan['slot']->addressColumn()});
             $hadDnsName = filled($operation->workload->internal_dns_name);
@@ -126,69 +170,47 @@ class DispatchWorkloadDeployment
                     // The new container gets traffic as soon as it is healthy, so its firewall allow must be in place.
                     // The peers of a stack service call it at once, and it calls them.
                     ApplyNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
+                    $networkRevision = (int) $operation->node->cluster->fresh()?->desired_revision;
                 } else {
                     QueueNodeClusterNetworkRevision::run($operation->node->cluster, $operation->requestedBy);
                 }
             }
         }
         $name = $plan['slot']->containerName($operation->workload);
-        if ($plan['replaces'] !== null && $operation->node->containers()->where('node_workload_id', $operation->workload->id)->where('name', $name)->exists()) {
-            // A leftover of an earlier deploy can still get traffic. Podman would stop it without the drain.
-            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-clear", $name, NodeWorkloadAction::REMOVE);
-        }
-        $response = Http::withToken($token)
-            ->acceptJson()
-            ->connectTimeout(10)
-            ->timeout(620)
-            ->post(rtrim($url, '/').'/v1/commands/workload.deploy', [
-                'server_id' => $operation->node->uuid,
-                'command_id' => $operation->uuid,
-                'name' => $name,
-                'image' => $operation->revision->image,
-                'command' => $configuration['command'] ?? [],
-                'environment' => $environment === [] ? (object) [] : $environment,
-                'ports' => [],
-                'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
-                'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
-                'pull_policy' => data_get($operation->request, 'pull_policy', 'missing'),
-                'network_name' => $containerIp === null ? '' : 'coolify-'.$operation->node->uuid,
-                'network_subnet' => $operation->node->workload_cidr ?? '',
-                'container_ip' => $containerIp ?? '',
-                'dns_server' => $containerIp === null ? '' : ($operation->node->wireguard_ip ?? ''),
-                'cpu_limit' => $resources['cpu_limit'] ?? null,
-                'cpu_reservation' => $resources['cpu_reservation'] ?? null,
-                'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
-                'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
-                ...($mounts === [] ? [] : ['mounts' => $mounts]),
-                ...($secrets === [] ? [] : ['secrets' => $secrets]),
-                ...($files === [] ? [] : ['files' => $files]),
-                ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
-                ...($user === '' ? [] : ['user' => $user]),
-                ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
-                ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
-                ...($healthCheck === null ? [] : ['health_check' => [
-                    'command' => $healthCheck['command'],
-                    'interval_seconds' => $healthCheck['interval_seconds'],
-                    'timeout_seconds' => $healthCheck['timeout_seconds'],
-                    'retries' => $healthCheck['retries'],
-                    'start_period_seconds' => $healthCheck['start_period_seconds'],
-                ]]),
-            ]);
-        $response->throw();
+        $payload = [
+            'name' => $name,
+            'image' => $operation->revision->image,
+            'command' => $configuration['command'] ?? [],
+            'environment' => $environment === [] ? (object) [] : $environment,
+            'ports' => [],
+            'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
+            'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
+            'pull_policy' => data_get($operation->request, 'pull_policy', 'missing'),
+            'network_name' => $containerIp === null ? '' : 'coolify-'.$operation->node->uuid,
+            'network_subnet' => $operation->node->workload_cidr ?? '',
+            'container_ip' => $containerIp ?? '',
+            'dns_server' => $containerIp === null ? '' : ($operation->node->wireguard_ip ?? ''),
+            'cpu_limit' => $resources['cpu_limit'] ?? null,
+            'cpu_reservation' => $resources['cpu_reservation'] ?? null,
+            'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
+            'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
+            ...($mounts === [] ? [] : ['mounts' => $mounts]),
+            ...($secrets === [] ? [] : ['secrets' => $secrets]),
+            ...($files === [] ? [] : ['files' => $files]),
+            ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
+            ...($user === '' ? [] : ['user' => $user]),
+            ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
+            ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
+            ...($healthCheck === null ? [] : ['health_check' => [
+                'command' => $healthCheck['command'],
+                'interval_seconds' => $healthCheck['interval_seconds'],
+                'timeout_seconds' => $healthCheck['timeout_seconds'],
+                'retries' => $healthCheck['retries'],
+                'start_period_seconds' => $healthCheck['start_period_seconds'],
+            ]]),
+        ];
 
-        $validator = Validator::make($response->json(), [
-            'command_id' => ['required', 'string', 'in:'.$operation->uuid],
-            'observed_at_unix_ms' => ['required', 'integer', 'min:1'],
-            'runtime_id' => ['required', 'string', 'max:128'],
-            'name' => ['required', 'string', 'in:'.$name],
-            'image' => ['required', 'string', 'max:2048'],
-        ]);
-        if ($validator->fails()) {
-            throw new RuntimeException('Flux returned an invalid deployment result.');
-        }
-
-        /** @var array{command_id: string, observed_at_unix_ms: int, runtime_id: string, name: string, image: string} */
-        return $validator->validated();
+        return ['payload' => $payload, 'name' => $name, 'plan' => $plan, 'network_revision' => $networkRevision];
     }
 
     /**

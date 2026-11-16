@@ -5,10 +5,14 @@ namespace App\Jobs;
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadLifecycle;
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\SyncNodeWorkloadSet;
 use App\Actions\Node\TransitionOperation;
 use App\Actions\Node\VerifyWorkloadLifecycleConvergence;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkloadSetEntry;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -31,6 +35,15 @@ class ManageNodeWorkloadJob implements ShouldQueue
     {
         $operation = NodeOperation::query()->with(['node', 'workload', 'revision'])->findOrFail($this->operationId);
         if ($operation->status->isFinal()) {
+            return;
+        }
+
+        $entry = NodeWorkloadSetEntry::query()->where('node_id', $operation->node_id)->where('node_workload_id', $operation->node_workload_id)->first();
+        $action = NodeWorkloadAction::tryFrom((string) data_get($operation->request, 'action'));
+        if ($entry !== null && in_array($action, [NodeWorkloadAction::STOP, NodeWorkloadAction::START, NodeWorkloadAction::REMOVE], true)
+            && $operation->node->supportsCapability(SyncNodeWorkloadSet::CAPABILITY) === true) {
+            $this->converge($operation, $entry, $action);
+
             return;
         }
 
@@ -76,6 +89,55 @@ class ManageNodeWorkloadJob implements ShouldQueue
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'Flux rejected the workload lifecycle command with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}"));
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+        }
+    }
+
+    /**
+     * Sentinel converges the workload (decision 0026): a stop or a start changes the desired state of
+     * its entry, and a removal removes the entry. The status events of Sentinel end the operation;
+     * the job waits for them, so a move that runs it inline gets the result.
+     */
+    private function converge(NodeOperation $operation, NodeWorkloadSetEntry $entry, NodeWorkloadAction $action): void
+    {
+        try {
+            if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+                return;
+            }
+            if ($action === NodeWorkloadAction::REMOVE) {
+                $entry->delete();
+            } else {
+                $entry->update([
+                    'desired_state' => $action === NodeWorkloadAction::STOP ? NodeWorkloadDesiredState::STOPPED : NodeWorkloadDesiredState::RUNNING,
+                    'node_operation_id' => $operation->id,
+                    'redeploy' => false,
+                ]);
+            }
+            $sync = SyncNodeWorkloadSet::run($operation->node, [$operation->node_workload_id]);
+            $operation->refresh();
+            $result = [...($operation->result ?? []), 'command_id' => $operation->uuid, 'converged_by' => 'sentinel', 'workload_set_generation' => $sync['generation']];
+            if (! $sync['sent']) {
+                if (! $operation->status->isFinal()) {
+                    TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, result: $result, error: 'Sentinel is not connected. It applies the change when it connects again.');
+                }
+
+                return;
+            }
+            if ($operation->status === NodeOperationStatus::DISPATCHED) {
+                $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING, result: $result);
+            }
+            $deadline = now()->addSeconds($this->timeout - 30);
+            while (! $operation->refresh()->status->isFinal() && now()->lt($deadline)) {
+                Sleep::for(1)->seconds();
+            }
+        } catch (RequestException $exception) {
+            $reason = trim(mb_substr($exception->response->body(), 0, 2000));
+            if (! $operation->refresh()->status->isFinal()) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'Flux rejected the desired set with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}"));
+            }
+        } catch (Throwable $exception) {
+            if (! $operation->refresh()->status->isFinal()) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+            }
         }
     }
 

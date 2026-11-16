@@ -74,7 +74,8 @@
 
                 @foreach ($deploymentHistory['rows'] as $deployment)
                     @php
-                        $rowLink = new \Illuminate\View\ComponentAttributeBag(['href' => $deployment['href'], 'data-select-deployment' => $deployment['uuid']]);
+                        // A Sentinel event (decision 0026) has no log page.
+                        $rowLink = new \Illuminate\View\ComponentAttributeBag($deployment['href'] === null ? [] : ['href' => $deployment['href'], 'data-select-deployment' => $deployment['uuid']]);
                     @endphp
                     <div wire:key="cluster-app-{{ $deployment['kind'] }}-{{ $deployment['uuid'] }}" @class([
                         'data-table-row deployment-table-row deployment-table-grid group relative border-b border-neutral-200 text-[13px] text-neutral-600 hover:text-neutral-950 dark:border-white/[0.08] dark:text-fg-dim dark:hover:text-white',

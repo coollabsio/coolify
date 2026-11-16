@@ -7,12 +7,15 @@ use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\DispatchWorkloadLifecycle;
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\SyncNodeWorkloadSet;
 use App\Actions\Node\TransitionOperation;
 use App\Actions\Node\VerifyDeploymentConvergence;
 use App\Enums\NodeContainerSlot;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkloadSetEntry;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -48,6 +51,14 @@ class DeployNodeWorkloadJob implements ShouldQueue
         if ($operation->status->isFinal()) {
             return;
         }
+
+        if (SyncNodeWorkloadSet::converges($operation->node, $operation->workload, $operation->revision?->configuration)) {
+            $this->converge($operation);
+
+            return;
+        }
+        // The command path deploys it now, so Sentinel must not converge it to an older entry.
+        rescue(fn () => SyncNodeWorkloadSet::release($operation->node, $operation->workload));
 
         try {
             if ($operation->status === NodeOperationStatus::UNCERTAIN) {
@@ -92,6 +103,71 @@ class DeployNodeWorkloadJob implements ShouldQueue
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: $message.$this->discardNew($operation));
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000).$this->discardNew($operation));
+        }
+    }
+
+    /**
+     * Sentinel converges the workload (decision 0026): the deploy is an entry of the desired set of
+     * the Node. Sentinel deploys it without downtime, judges the health and crash loops, and removes
+     * the replaced container. Its status events update this operation. The job waits for the end, so
+     * a move or a stack deploy that runs it inline gets the result.
+     */
+    private function converge(NodeOperation $operation): void
+    {
+        try {
+            if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+                return;
+            }
+            $prepared = DispatchWorkloadDeployment::make()->prepare($operation);
+            NodeWorkloadSetEntry::query()->updateOrCreate(
+                ['node_id' => $operation->node_id, 'node_workload_id' => $operation->node_workload_id],
+                [
+                    'node_workload_revision_id' => $operation->node_workload_revision_id,
+                    'node_operation_id' => $operation->id,
+                    'desired_state' => NodeWorkloadDesiredState::RUNNING,
+                    'container_slot' => $prepared['plan']['slot'],
+                    'replaces_slot' => $prepared['plan']['replaces'],
+                    'network_revision' => $prepared['network_revision'],
+                    'pull_policy' => data_get($operation->request, 'pull_policy', 'missing'),
+                    'redeploy' => true,
+                ],
+            );
+            $sync = SyncNodeWorkloadSet::run($operation->node, [$operation->node_workload_id], [$operation->node_workload_id => $prepared]);
+            $operation->refresh();
+            $result = [...($operation->result ?? []), 'command_id' => $operation->uuid, 'converged_by' => 'sentinel', 'workload_set_generation' => $sync['generation'], 'name' => $prepared['name']];
+            if (! $sync['sent']) {
+                if (! $operation->status->isFinal()) {
+                    TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, result: $result, error: 'Sentinel is not connected. It deploys the revision when it connects again.');
+                }
+
+                return;
+            }
+            if ($operation->status === NodeOperationStatus::DISPATCHED) {
+                $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING, result: $result);
+            }
+            $this->waitForSentinel($operation, now()->addSeconds($this->healthWaitSeconds($operation) + 600));
+        } catch (RequestException $exception) {
+            $reason = trim(mb_substr($exception->response->body(), 0, 2000));
+            $operation->refresh();
+            if (! $operation->status->isFinal()) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'Flux rejected the desired set with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}"));
+            }
+        } catch (Throwable $exception) {
+            $operation->refresh();
+            if (! $operation->status->isFinal()) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+            }
+        }
+    }
+
+    /** Waits until the status events of Sentinel end the operation, or until the deadline. */
+    private function waitForSentinel(NodeOperation $operation, Carbon $deadline): void
+    {
+        if ($this->waitUntil !== null && $this->waitUntil->lt($deadline)) {
+            $deadline = $this->waitUntil;
+        }
+        while (! $operation->refresh()->status->isFinal() && now()->lt($deadline)) {
+            Sleep::for(self::POLL_SECONDS)->seconds();
         }
     }
 
