@@ -111,8 +111,9 @@ class RunImageBuild
             : null;
         $digest = is_array($result) ? ($result['digest'] ?? null) : null;
         if (! is_string($digest) || preg_match('/^sha256:[0-9a-f]{64}$/', $digest) !== 1) {
-            $pushError = $push === [] ? null : $build->logLines()->where('line', 'like', 'error: the push to %')->latest('id')->value('line');
-            throw new RuntimeException(is_string($pushError) ? ucfirst(substr($pushError, strlen('error: '))) : 'The build failed. See the build log for the reason.');
+            // The builder and BuildKit write the reason as the last `error: ` line, for example a failed push.
+            $reason = $build->logLines()->where('line', 'like', 'error: %')->latest('id')->value('line');
+            throw new RuntimeException(is_string($reason) ? ucfirst(substr($reason, strlen('error: '))) : 'The build failed. See the build log for the reason.');
         }
         if ($local) {
             self::flux('image.load', [

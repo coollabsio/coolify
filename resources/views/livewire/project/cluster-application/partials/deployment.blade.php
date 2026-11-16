@@ -200,7 +200,7 @@
                                         data-log-line data-log-content="{{ $line['timestamp'].' '.$line['line'] }}"
                                         class="log-line logs-viewer-line">
                                         <span x-show="showTimestamps" class="logs-viewer-timestamp">{{ $line['timestamp'] }}</span>
-                                        <span class="logs-viewer-line-text">{{ $line['line'] }}</span>
+                                        <span @class(['logs-viewer-line-text', 'text-red-500' => $line['stderr']])>{{ $line['line'] }}</span>
                                     </div>
                                 @empty
                                     <span class="font-logs text-neutral-400">{{ $build['isActive'] ? 'Waiting for the build to start…' : 'This build wrote no output.' }}</span>

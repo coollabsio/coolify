@@ -1196,12 +1196,7 @@ class Show extends Component
                 // Open while it is the interesting part: the build page, or a build that deployed nothing.
                 'open' => $this->section === 'build' || $operation === null,
                 'duration' => $build->started_at && $build->finished_at ? calculateDuration($build->started_at, $build->finished_at) : null,
-                'lines' => $build->logLines()->orderBy('id')->get()
-                    ->map(fn (NodeBuildLogLine $line): array => [
-                        'timestamp' => $line->logged_at->format('Y-M-d H:i:s'),
-                        'line' => $line->line,
-                        'stderr' => false,
-                    ])->all(),
+                'lines' => $this->buildLogLines($build),
             ] : null,
             'status' => $operation?->status->label() ?? $build->status->deploymentLabel(),
             'statusType' => $operation?->status->badgeType() ?? $build->status->badgeType(),
@@ -1220,6 +1215,31 @@ class Show extends Component
             },
             'lines' => $operation ? $this->deploymentLogLines($operation) : [],
         ];
+    }
+
+    /**
+     * The build log like the v4 deployment log: error lines of the builder and BuildKit are red, and a failed
+     * build ends with its reason.
+     *
+     * @return list<array{timestamp: string, line: string, stderr: bool}>
+     */
+    private function buildLogLines(NodeBuild $build): array
+    {
+        $lines = $build->logLines()->orderBy('id')->get()
+            ->map(fn (NodeBuildLogLine $line): array => [
+                'timestamp' => $line->logged_at->format('Y-M-d H:i:s'),
+                'line' => $line->line,
+                'stderr' => preg_match('/^(error: |#\d+ ERROR: )/', $line->line) === 1,
+            ])->all();
+        if ($build->status === NodeBuildStatus::FAILED && filled($build->error)) {
+            $lines[] = [
+                'timestamp' => ($build->finished_at ?? $build->updated_at)->format('Y-M-d H:i:s'),
+                'line' => 'Build failed: '.$build->error,
+                'stderr' => true,
+            ];
+        }
+
+        return $lines;
     }
 
     /**
