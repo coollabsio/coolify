@@ -52,7 +52,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             return;
         }
 
-        if (SyncNodeWorkloadSet::converges($operation->node, $operation->workload, $operation->revision?->configuration)) {
+        if (SyncNodeWorkloadSet::converges($operation->node, $operation->workload)) {
             $this->converge($operation);
 
             return;

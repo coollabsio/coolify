@@ -122,7 +122,7 @@ class ReconcileNodeWorkloads
         // A newer revision that did not deploy yet stays with the command path until a deploy.
         if ($revision === null || $revision->id !== $workload->revisions->first()?->id
             || $workload->desired_state !== NodeWorkloadDesiredState::RUNNING
-            || ! SyncNodeWorkloadSet::converges($node, $workload, $revision->configuration)) {
+            || ! SyncNodeWorkloadSet::converges($node, $workload)) {
             return false;
         }
         $container = $workload->containers

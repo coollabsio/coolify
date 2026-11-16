@@ -31,19 +31,14 @@ class SyncNodeWorkloadSet
     public const CAPABILITY = 'workload.reconcile.v1';
 
     /**
-     * Whether Sentinel converges this workload on this Node. The rest keeps the command path.
-     * Stateful workloads, stack services, and published ports follow in later steps.
+     * Whether Sentinel converges this workload on this Node. The rest keeps the command path. A
+     * published port forwards to one container (decision 0016): the Nodes must forward it to the new
+     * container before the old one goes, so a workload with published ports keeps the command path.
+     * Volumes, databases, and stack services converge; DeployNodeStackJob keeps the `depends_on` order.
      */
-    public static function converges(Node $node, NodeWorkload $workload, ?array $configuration = null): bool
+    public static function converges(Node $node, NodeWorkload $workload): bool
     {
-        if ($node->supportsCapability(self::CAPABILITY) !== true) {
-            return false;
-        }
-        $configuration ??= $workload->revisions()->latest('id')->value('configuration') ?? [];
-
-        return $workload->node_stack_id === null
-            && ! $workload->isDatabase()
-            && ($configuration['volumes'] ?? []) === []
+        return $node->supportsCapability(self::CAPABILITY) === true
             && ! $workload->publishedPorts()->exists();
     }
 
@@ -209,6 +204,8 @@ class SyncNodeWorkloadSet
                 'operation_id' => $entry->operation?->uuid ?? '',
                 'entry_hash' => $entry->entry_hash,
                 'redeploy' => (bool) $entry->redeploy,
+                // A stop of a move or a restore gives a database time to flush its data.
+                'stop_timeout_seconds' => data_get($entry->operation?->request, 'stop_timeout_seconds'),
             ];
         })->values()->all();
     }
