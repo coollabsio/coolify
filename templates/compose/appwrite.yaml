@@ -226,22 +226,6 @@ services:
       retries: 6
       start_period: 120s
 
-  appwrite-console:
-    image: appwrite/new:1.2.97-self-hosted
-    environment:
-      - SERVICE_URL_APPWRITE_3000=/
-      - VITE_CONSOLE_PROFILE=self-hosted
-      - VITE_APPWRITE_VERSION=2.6.1
-      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
-    depends_on:
-      appwrite:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-
   appwrite-realtime:
     image: appwrite/appwrite:2.6.1
     entrypoint: realtime
@@ -296,6 +280,24 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -s localhost > /dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  # appwrite-console must stay after appwrite and appwrite-realtime: the last SERVICE_URL_APPWRITE declaration
+  # sets SERVICE_FQDN_APPWRITE, and _APP_DOMAIN needs the host of the console, not the /v1 path of the API.
+  appwrite-console:
+    image: appwrite/new:1.2.97-self-hosted
+    environment:
+      - SERVICE_URL_APPWRITE_3000=/
+      - VITE_CONSOLE_PROFILE=self-hosted
+      - VITE_APPWRITE_VERSION=2.6.1
+      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
+    depends_on:
+      appwrite:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 20s
       timeout: 5s
       retries: 3
