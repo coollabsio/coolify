@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\DeployNodePreview;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
@@ -656,8 +657,11 @@ class DeployController extends Controller
         } catch (AuthorizationException) {
             return ['message' => 'Unauthorized to deploy this application.', 'deployment_uuid' => null];
         }
-        if ($pr !== 0 || $dockerTag !== null) {
-            return ['message' => 'Cluster applications have no preview deployments yet.', 'deployment_uuid' => null];
+        if ($dockerTag !== null) {
+            return ['message' => 'Cluster applications do not support docker_tag.', 'deployment_uuid' => null];
+        }
+        if ($pr !== 0) {
+            return $this->deployClusterPreview($workload, $pr);
         }
         $nodes = $workload->nodes()->orderBy('nodes.id')->get();
         if ($nodes->isEmpty()) {
@@ -697,6 +701,38 @@ class DeployController extends Controller
         ]);
 
         return ['message' => "Application {$workload->name} deployment queued.", 'deployment_uuid' => $operationUuid];
+    }
+
+    /**
+     * Deploys a pull request like "Deploy" on the Previews tab (decision 0025): the caller trusts the pull
+     * request, as in v4, so a pull request from a fork deploys too. A new preview needs the update level.
+     *
+     * @return array{message: string, deployment_uuid: ?string}
+     */
+    private function deployClusterPreview(NodeWorkload $workload, int $pr): array
+    {
+        try {
+            ['build' => $build] = DeployNodePreview::run($workload, $pr, null, DeployNodePreview::manualRef($workload, $pr), requestedBy: auth()->user());
+        } catch (AuthorizationException) {
+            return ['message' => 'Unauthorized to create a preview of this application.', 'deployment_uuid' => null];
+        } catch (Throwable $exception) {
+            return ['message' => $exception->getMessage(), 'deployment_uuid' => null];
+        }
+
+        auditLog('api.deployment.triggered', [
+            'resource_type' => 'cluster-application',
+            'workload_uuid' => $workload->uuid,
+            'workload_name' => $workload->name,
+            'pull_request_id' => $pr,
+            'deployment_uuid' => $build->uuid,
+        ]);
+
+        return [
+            'message' => $build->wasRecentlyCreated
+                ? "Preview of pull request #{$pr} of {$workload->name} queued."
+                : "A build of pull request #{$pr} is already running.",
+            'deployment_uuid' => $build->uuid,
+        ];
     }
 
     /**

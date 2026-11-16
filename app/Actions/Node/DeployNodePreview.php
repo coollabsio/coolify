@@ -183,6 +183,18 @@ class DeployNodePreview
         return $admin instanceof User ? $admin : throw new RuntimeException('The team has no owner or admin to set the domains of the preview.');
     }
 
+    /** The ref of a pull request for a deploy by hand or through the API, which has no head SHA. */
+    public static function manualRef(NodeWorkload $parent, int $number): string
+    {
+        $host = strtolower((string) (parse_url((string) preg_replace('#\A[^@/]+@([^:/]+):#', 'ssh://$1/', (string) $parent->git_repository), PHP_URL_HOST) ?? ''));
+
+        return match (true) {
+            str_contains($host, 'bitbucket') => throw new RuntimeException('Bitbucket has no ref of a pull request. Its previews deploy from the pull request webhook.'),
+            str_contains($host, 'gitlab') => "refs/merge-requests/{$number}/head",
+            default => "refs/pull/{$number}/head",
+        };
+    }
+
     private function ensureDeployable(NodeWorkload $parent, int $pullRequestId, ?string $commitSha, string $ref, bool $fromFork): void
     {
         $error = match (true) {
@@ -256,7 +268,7 @@ class DeployNodePreview
             return $active;
         }
         if ($active !== null) {
-            CancelNodeBuild::run($active, 'Cancelled by a newer commit of the pull request.');
+            CancelNodeBuild::run($active, $commitSha === null ? 'Cancelled by a new deploy of the pull request.' : 'Cancelled by a newer commit of the pull request.');
         }
 
         return StartNodeBuild::run($preview, $requestedBy, $commitSha);

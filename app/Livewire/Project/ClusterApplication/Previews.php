@@ -127,7 +127,7 @@ class Previews extends Component
         try {
             $this->authorize('update', $this->workload);
             $number = (int) $this->validate(['pullRequestNumber' => ['required', 'integer', 'min:1', 'max:2147483647']])['pullRequestNumber'];
-            ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, $this->pullRequestRef($number), requestedBy: auth()->user());
+            ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, DeployNodePreview::manualRef($this->workload, $number), requestedBy: auth()->user());
             $this->pullRequestNumber = '';
             $this->dispatch('success', $build->wasRecentlyCreated ? "Preview build of pull request #{$number} queued." : "A build of pull request #{$number} is already running.");
         } catch (Throwable $exception) {
@@ -168,7 +168,7 @@ class Previews extends Component
             $this->authorize('update', $this->workload);
             $pullRequest = collect($this->pullRequests)->firstWhere('number', $number)
                 ?? throw new RuntimeException("Pull request #{$number} is not in the loaded list. Load the pull requests again.");
-            ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, $this->pullRequestRef($number), $pullRequest['html_url'], requestedBy: auth()->user());
+            ['build' => $build, 'domain_error' => $this->domainError] = DeployNodePreview::run($this->workload, $number, null, DeployNodePreview::manualRef($this->workload, $number), $pullRequest['html_url'], requestedBy: auth()->user());
             $this->dispatch('success', $build->wasRecentlyCreated ? "Preview build of pull request #{$number} queued." : "A build of pull request #{$number} is already running.");
         } catch (Throwable $exception) {
             handleError($exception, $this);
@@ -184,7 +184,7 @@ class Previews extends Component
                 $this->workload,
                 (int) $preview->pull_request_id,
                 null,
-                $preview->pull_request_ref ?: $this->pullRequestRef((int) $preview->pull_request_id),
+                $preview->pull_request_ref ?: DeployNodePreview::manualRef($this->workload, (int) $preview->pull_request_id),
                 $preview->pull_request_url,
                 (bool) $preview->pull_request_from_fork,
                 auth()->user(),
@@ -297,17 +297,6 @@ class Previews extends Component
      * Bitbucket has no ref of a pull request, so its previews deploy only from webhooks, which
      * send the source branch. GitLab names the ref after merge requests.
      */
-    private function pullRequestRef(int $number): string
-    {
-        $host = strtolower((string) (parse_url((string) preg_replace('#\A[^@/]+@([^:/]+):#', 'ssh://$1/', (string) $this->workload->git_repository), PHP_URL_HOST) ?? ''));
-
-        return match (true) {
-            str_contains($host, 'bitbucket') => throw new RuntimeException('Bitbucket has no ref of a pull request. Its previews deploy from the pull request webhook.'),
-            str_contains($host, 'gitlab') => "refs/merge-requests/{$number}/head",
-            default => "refs/pull/{$number}/head",
-        };
-    }
-
     /**
      * @return list<array{uuid: string, number: int, url: ?string, fromFork: bool, removing: bool, state: ?NodeWorkloadState, status: string, statusType: string, containerPresent: bool, domains: string, firstDomain: ?string, latestBuildUuid: ?string}>
      */

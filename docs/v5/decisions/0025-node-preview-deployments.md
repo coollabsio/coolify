@@ -318,6 +318,12 @@ These points differ from the decision above or add to it:
   A self-hosted GitLab on another host name needs the webhook. Bitbucket refuses
   a manual deploy, because it has no ref of a pull request. A manual deploy
   keeps the pull request URL from an earlier webhook.
+- **API.** `POST /api/v1/deploy` with `uuid` of the parent and `pr` is a manual
+  deploy with the same ref (`DeployNodePreview::manualRef`), as `pr` is in v4. The
+  token needs the `deploy` ability. The user needs the deploy level on the parent
+  for an existing preview and the update level for a new one. `docker_tag` is
+  refused for cluster applications. A manual deploy has no head SHA, so a second
+  call cancels the running build and starts a new one.
 - **Open pull requests.** For a GitHub App source, **Load pull requests** on
   the **Previews** tab lists the open pull requests, as in v4, and marks the
   ones from a fork. **Deploy preview** is a manual deploy. The v4 **Configure**
