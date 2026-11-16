@@ -25702,6 +25702,319 @@
                 ]
             }
         },
+        "\/applications\/archive\/uploads": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Upload static site archive",
+                "description": "Upload a .tar, .tar.gz, or .tgz archive of a static site in DropZone chunks (dzuuid, dzchunkindex, dztotalchunkcount, dzchunkbyteoffset, dztotalfilesize). Send the same upload_id with every chunk. The last chunk validates the archive: at most 1 GiB, 5 GiB extracted, 100,000 entries, and only regular files and directories with relative paths. The upload is kept for 24 hours. Without application_uuid, the token user must be able to create applications.",
+                "operationId": "upload-static-site-archive",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart\/form-data": {
+                            "schema": {
+                                "required": [
+                                    "upload_id",
+                                    "file"
+                                ],
+                                "properties": {
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A UUID that the client generates for this upload."
+                                    },
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "The archive, or one chunk of it."
+                                    },
+                                    "application_uuid": {
+                                        "type": "string",
+                                        "description": "The archive site that this upload is a new version of."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Chunk received."
+                    },
+                    "201": {
+                        "description": "Upload completed and validated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "upload_id": {
+                                            "type": "string"
+                                        },
+                                        "size": {
+                                            "type": "integer",
+                                            "description": "The size of the archive in bytes."
+                                        },
+                                        "sha": {
+                                            "type": "string",
+                                            "description": "The site version: the first 40 hex characters of the SHA-256 of the archive."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token user cannot create applications or update and deploy the application."
+                    },
+                    "404": {
+                        "description": "Application not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/archive": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create (static site from an archive)",
+                "description": "Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed unless instant_deploy is false. Deploying needs a token with the deploy ability.",
+                "operationId": "create-static-site-archive-application",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "project_uuid",
+                                    "server_uuid"
+                                ],
+                                "properties": {
+                                    "project_uuid": {
+                                        "type": "string",
+                                        "description": "The project UUID."
+                                    },
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "The server UUID."
+                                    },
+                                    "environment_name": {
+                                        "type": "string",
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string",
+                                        "description": "The destination UUID. Required when the server has more than one destination."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The application name."
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The application description."
+                                    },
+                                    "domains": {
+                                        "type": "string",
+                                        "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Generate a domain when domains is empty."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use the domains even when another resource uses them."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Serve index.html for unknown paths (single-page application)."
+                                    },
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A completed upload from POST \/applications\/archive\/uploads."
+                                    },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "Deploy the uploaded archive. The default is true when upload_id is set."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Application created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "domains": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "deployment_uuid": {
+                                            "type": "string",
+                                            "description": "Set when a deployment was queued."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Set when the deployment could not be queued."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to deploy the archive."
+                    },
+                    "404": {
+                        "description": "Project, environment, server, or upload not found."
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/archive": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Deploy static site archive",
+                "description": "Make an uploaded archive the current version of a static site that is deployed from archives, and deploy it. Needs a token with the write and deploy abilities.",
+                "operationId": "deploy-static-site-archive",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "upload_id"
+                                ],
+                                "properties": {
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A completed upload from POST \/applications\/archive\/uploads."
+                                    },
+                                    "force_rebuild": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Build the image even when an image of this version exists."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Deployment queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "deployment_uuid": {
+                                            "type": "string"
+                                        },
+                                        "sha": {
+                                            "type": "string",
+                                            "description": "The site version."
+                                        },
+                                        "domains": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
+                    },
+                    "404": {
+                        "description": "Application or upload not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "description": "The archive is stored, but the deployment queue is full."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/tags": {
             "get": {
                 "tags": [
@@ -28914,6 +29227,10 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Dockerfile content. Used for dockerfile build pack."
+                    },
+                    "is_archive_source": {
+                        "type": "boolean",
+                        "description": "The static site is deployed from uploaded archives instead of a Git repository."
                     },
                     "dockerfile_location": {
                         "type": "string",

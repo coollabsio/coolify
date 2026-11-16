@@ -7,10 +7,15 @@ use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
+use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 /**
  * A static site archive (a plain tar or a gzip tar) that a user uploads.
@@ -166,6 +171,38 @@ final class StaticSiteArchive
         }
 
         return new self(substr(hash_file('sha256', $path), 0, 40), $isGzip, $stripComponents, $fileCount, $totalBytes);
+    }
+
+    /**
+     * Receives one DropZone chunk of an archive upload for the team. The last chunk validates the
+     * archive and stages it. The upload ID is the DropZone file UUID (dzuuid) when it is not sent.
+     */
+    public static function receiveUpload(Request $request, int $teamId): JsonResponse
+    {
+        $uploadId = (string) $request->input('upload_id', $request->input('dzuuid', ''));
+        $request->merge(['upload_id' => $uploadId, 'dzuuid' => $request->input('dzuuid', $uploadId)]);
+        $validator = Validator::make($request->all(), ['upload_id' => ['required', 'uuid'], 'file' => ['required', 'file']]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+        if ((int) $request->input('dzTotalFilesize', 0) > self::MAX_COMPRESSED_BYTES) {
+            return response()->json(['message' => 'The archive is larger than 1 GiB.', 'errors' => ['file' => ['The archive is larger than 1 GiB.']]], 422);
+        }
+
+        $save = (new FileReceiver('file', $request, HandlerFactory::classFromRequest($request)))->receive();
+        if (! $save->isFinished()) {
+            return response()->json(['upload_id' => $uploadId, 'done' => $save->handler()->getPercentageDone(), 'status' => true]);
+        }
+
+        $file = $save->getFile();
+        $size = $file->getSize();
+        try {
+            $archive = self::stage($file, $teamId, $uploadId);
+        } catch (ValidationException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+        }
+
+        return response()->json(['upload_id' => strtolower($uploadId), 'size' => $size, 'sha' => $archive->sha], 201);
     }
 
     /**

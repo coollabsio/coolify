@@ -13,7 +13,7 @@ class CleanupDatabaseImportUploads extends Command
 
     protected $signature = 'cleanup:database-import-uploads';
 
-    protected $description = 'Delete staged API database import uploads that were not imported within a day';
+    protected $description = 'Delete staged database import and static site archive uploads that were not used within a day';
 
     /**
      * Uploads are staged at upload/imports/{team}/{database uuid}/{upload id}/restore. Starting an import
@@ -38,6 +38,18 @@ class CleanupDatabaseImportUploads extends Command
         }
 
         $this->info("Deleted {$deleted} staged database import upload(s).");
+
+        // Static site archives are staged at upload/static-archives/{team}/{upload id}/archive. Publishing one renames it away.
+        $deletedArchives = 0;
+        foreach (Storage::directories('upload/static-archives') as $teamDirectory) {
+            foreach (Storage::directories($teamDirectory) as $uploadDirectory) {
+                if ($this->lastModified($uploadDirectory) < $cutoff && Storage::deleteDirectory($uploadDirectory)) {
+                    $deletedArchives++;
+                }
+            }
+            $this->deleteIfEmpty($teamDirectory);
+        }
+        $this->info("Deleted {$deletedArchives} staged static site archive upload(s).");
 
         return self::SUCCESS;
     }

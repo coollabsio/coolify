@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Api\ServiceDatabasesController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\SharedEnvironmentVariablesController;
+use App\Http\Controllers\Api\StaticSiteArchivesController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
@@ -267,6 +268,9 @@ Route::group([
     Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive/uploads', [StaticSiteArchivesController::class, 'upload'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive', [StaticSiteArchivesController::class, 'create'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/archive', [StaticSiteArchivesController::class, 'deploy'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'application'])->middleware(['api.ability:read']);

@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Support\DatabaseBackupFileValidator;
+use App\Support\StaticSiteArchive;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
@@ -65,6 +68,29 @@ class UploadController extends BaseController
             'done' => $handler->getPercentageDone(),
             'status' => true,
         ]);
+    }
+
+    /**
+     * A chunk of a static site archive. With application_uuid, it is a new version of that archive site,
+     * staged for the team of the application. Without, it is for a new site in the current team.
+     */
+    public function uploadStaticArchive(Request $request): JsonResponse
+    {
+        $applicationUuid = $request->input('application_uuid');
+        if (filled($applicationUuid)) {
+            $application = Application::ownedByCurrentTeam()->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
+            $this->authorize('update', $application);
+            $this->authorize('deploy', $application);
+            $teamId = (int) $application->team()->id;
+        } else {
+            $this->authorize('create', Application::class);
+            $teamId = (int) auth()->user()->currentTeam()->id;
+        }
+
+        return StaticSiteArchive::receiveUpload($request, $teamId);
     }
 
     protected function saveFile(UploadedFile $file, string $resourceIdentifier)
