@@ -416,6 +416,19 @@ test('a swarm server gets only the destinations of the bundle', function () {
         ->and($server->swarmDockers()->pluck('network')->all())->toBe(['swarm-overlay']);
 });
 
+test('the public IPs of the server move with it', function () {
+    $this->server->settings->forceFill(['public_ipv4' => '95.217.1.10', 'public_ipv6' => '2a01:4f8::10'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server->fresh());
+    $serverUuid = $this->server->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Server::where('uuid', $serverUuid)->firstOrFail()->settings)
+        ->public_ipv4->toBe('95.217.1.10')
+        ->public_ipv6->toBe('2a01:4f8::10');
+});
+
 test('variables with a legacy key that new variables cannot use move unchanged', function () {
     $variable = EnvironmentVariable::create(['key' => 'LEGACY_KEY', 'value' => 'legacy', 'resourceable_type' => $this->application->getMorphClass(), 'resourceable_id' => $this->application->id]);
     DB::table('environment_variables')->where('id', $variable->id)->update(['key' => 'legacy-key']);

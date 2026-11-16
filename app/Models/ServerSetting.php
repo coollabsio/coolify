@@ -43,6 +43,8 @@ use OpenApi\Attributes as OA;
         'geoip_refresh_days' => ['type' => 'integer'],
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
         'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
+        'public_ipv4' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP.'],
+        'public_ipv6' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP.'],
         'is_reachable' => ['type' => 'boolean'],
         'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
         'ssh_host_key_source' => ['type' => 'string', 'nullable' => true, 'enum' => ['tofu', 'upgrade', 'transfer', 'manual']],
@@ -130,6 +132,8 @@ class ServerSetting extends Model
         'server_id',
         'is_image_scan_enabled',
         'image_scan_memory_mb',
+        'public_ipv4',
+        'public_ipv6',
         'image_candidate_scans_today',
         'image_candidate_scans_date',
         'image_scan_syft_timeout',
@@ -513,6 +517,16 @@ class ServerSetting extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    protected function publicIpv4(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => filled($value) ? normalizeIpAddress($value) : null);
+    }
+
+    protected function publicIpv6(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => filled($value) ? normalizeIpAddress($value) : null);
     }
 
     public function dockerCleanupFrequency(): Attribute

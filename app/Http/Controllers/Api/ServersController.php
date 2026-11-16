@@ -725,6 +725,8 @@ class ServersController extends Controller
                         'server_disk_usage_notification_interval_hours' => ['type' => 'integer', 'description' => 'Minimum hours between high disk usage notifications (1-720). Default: 24.'],
                         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
                         'wildcard_domain' => ['type' => 'string', 'nullable' => true, 'description' => 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'],
+                        'public_ipv4' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'],
+                        'public_ipv6' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'],
                         'server_timezone' => ['type' => 'string', 'description' => 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'],
                         'backup_compression_cpu_percentage' => ['type' => 'integer', 'enum' => [25, 50, 75, 100], 'description' => 'Maximum CPU percentage that backup compression can use. Default: 25.'],
                     ],
@@ -764,7 +766,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled', 'wildcard_domain', 'server_timezone', 'backup_compression_cpu_percentage'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled', 'wildcard_domain', 'public_ipv4', 'public_ipv6', 'server_timezone', 'backup_compression_cpu_percentage'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -795,6 +797,8 @@ class ServersController extends Controller
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
             'wildcard_domain' => 'nullable|url',
+            'public_ipv4' => 'nullable|ipv4',
+            'public_ipv6' => 'nullable|ipv6',
             'server_timezone' => ['bail', 'filled', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
                 if (! is_string($value) || ! validate_timezone($value)) {
                     $fail('The server_timezone must be a valid timezone.');
@@ -929,6 +933,10 @@ class ServersController extends Controller
         }
         if ($request->has('wildcard_domain')) {
             $server->settings()->update(['wildcard_domain' => $request->input('wildcard_domain')]);
+        }
+        $publicIps = $request->only(['public_ipv4', 'public_ipv6']);
+        if ($publicIps !== [] && ! $server->isLocalhost()) {
+            $server->settings->update($publicIps);
         }
 
         if ($proxyTypeChanged) {

@@ -13,27 +13,43 @@ final class ServerDnsAddresses
     /**
      * @param  string|null  $address  The resolved IP, or the configured value when it does not resolve.
      * @param  string|null  $configured  The address as configured (can be a hostname).
-     * @param  bool  $isInstanceServer  The server that runs Coolify: the instance public IPv4/IPv6 settings also apply.
+     * @param  string|null  $publicIpv4  The public IPv4 set for the server (instance settings for the server that runs Coolify).
+     * @param  string|null  $publicIpv6  The public IPv6 set for the server (instance settings for the server that runs Coolify).
      */
     public function __construct(
         public readonly ?string $address,
         public readonly ?string $configured,
-        public readonly bool $isInstanceServer,
+        public readonly ?string $publicIpv4 = null,
+        public readonly ?string $publicIpv6 = null,
     ) {}
 
+    /**
+     * The public IPs of a server win over its SSH address: Coolify can connect to a server over a private network
+     * while DNS records point to its public IP.
+     */
     public static function forServer(?Server $server): self
     {
         if ($server === null) {
-            return new self(null, null, false);
+            return new self(null, null);
         }
 
-        $settings = instanceSettings();
-        $configured = $server->id === 0
-            ? (data_get($settings, 'public_ipv4') ?: data_get($settings, 'public_ipv6') ?: $server->ip)
-            : $server->ip;
+        [$publicIpv4, $publicIpv6] = self::publicIps($server);
+        $configured = $publicIpv4 ?? $publicIpv6 ?? $server->ip;
         $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
 
-        return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], $server->id === 0);
+        return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], $publicIpv4, $publicIpv6);
+    }
+
+    /**
+     * The public IPv4 and IPv6 set for a server. The server that runs Coolify uses the instance settings.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public static function publicIps(?Server $server): array
+    {
+        $settings = $server?->id === 0 ? instanceSettings() : $server?->settings;
+
+        return [data_get($settings, 'public_ipv4') ?: null, data_get($settings, 'public_ipv6') ?: null];
     }
 
     /**
@@ -52,20 +68,11 @@ final class ServerDnsAddresses
             }
         }
 
-        if ($this->isInstanceServer) {
-            try {
-                $settings = instanceSettings();
-                $publicV4 = data_get($settings, 'public_ipv4');
-                $publicV6 = data_get($settings, 'public_ipv6');
-                if ($ipv4 === null && is_string($publicV4) && filter_var($publicV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    $ipv4 = $publicV4;
-                }
-                if ($ipv6 === null && is_string($publicV6) && filter_var($publicV6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-                    $ipv6 = $publicV6;
-                }
-            } catch (\Throwable) {
-                //
-            }
+        if ($ipv4 === null && is_string($this->publicIpv4) && filter_var($this->publicIpv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $ipv4 = $this->publicIpv4;
+        }
+        if ($ipv6 === null && is_string($this->publicIpv6) && filter_var($this->publicIpv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $ipv6 = $this->publicIpv6;
         }
 
         return [$ipv4, $ipv6];

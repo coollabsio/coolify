@@ -42,6 +42,7 @@ use App\Models\User;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\DnsRecord;
 use App\Services\Dns\DnsResolver;
+use App\Services\Dns\ServerDnsAddresses;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
@@ -2436,26 +2437,12 @@ function resolveServerIpAddress(?string $ipOrHost): array
 }
 
 /**
- * Preferred server address for DNS validation: public instance IPs for localhost,
+ * Preferred server address for DNS validation: the public IPs of the server (instance settings for localhost),
  * otherwise the server IP/hostname resolved to a real IP when possible.
  */
 function serverDnsTargetIp(Server $server): ?string
 {
-    $settings = instanceSettings();
-
-    if ($server->id === 0) {
-        $configured = data_get($settings, 'public_ipv4')
-            ?: data_get($settings, 'public_ipv6')
-            ?: $server->ip;
-    } else {
-        $configured = $server->ip;
-    }
-
-    $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
-
-    // Prefer resolved IP; fall back to configured value so existing hostname-based
-    // comparisons still have something to show if DNS resolution fails.
-    return $resolved['ip'] ?? $resolved['configured'];
+    return ServerDnsAddresses::forServer($server)->address;
 }
 
 /**
