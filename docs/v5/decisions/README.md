@@ -40,6 +40,7 @@ current v5 architecture.
 | [0026: Keep Horizon and move workload convergence into Sentinel](0026-sentinel-workload-convergence.md) | Accepted | No new queue in v5.0; jobs carry only IDs; Coolify sends the desired set of each Node through Flux, Sentinel converges and reports the status of each revision behind `workload.reconcile.v1`; placement, cross-Node order, builds, and one-shot commands stay in Coolify. |
 | [0027: Clean up unused images on Nodes](0027-node-image-cleanup.md) | Proposed | A Sentinel `image.prune.v1` command removes images that no container uses, except a keep list from Coolify (the last 3 revisions of each workload and the pinned infrastructure images); a daily run and a disk threshold like v4, **Clean up now** on the Node page, and a journald limit; volumes stay out. |
 | [0028: Compose keys that Nodes ignore today](0028-node-stack-ignored-compose-keys.md) | Proposed | Map `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`, `tty`, and `stdin_open` to new validated Sentinel fields behind `workload.runtime_options.v1`, and `deploy.resources` to the existing CPU and memory fields; `sysctls` and the isolation keys stay out. |
+| [0029: REST API for cluster resources](0029-node-api.md) | Accepted | `/api/v1/cluster-applications`, `/cluster-databases`, `/cluster-stacks`, `/clusters`, and `/nodes` with the v4 conventions; every write calls the action of the Livewire page, the policy of the resource authorizes the token user, and secret values follow `ApiSensitiveData`. |
 
 ## Adding a decision
 
