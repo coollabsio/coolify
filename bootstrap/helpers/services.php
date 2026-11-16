@@ -91,6 +91,7 @@ function resource_logo(Model $resource): ?array
 
     if ($resource instanceof Application) {
         $logo = match (true) {
+            $resource->is_archive_source => $resourceLogo('static-archive'),
             $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
             $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
             $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
