@@ -16,6 +16,7 @@
                 return;
             }
             new window.Dropzone(element, {
+                url: @js(route('upload.static-archive')),
                 chunking: true,
                 forceChunking: true,
                 method: 'POST',
@@ -67,11 +68,9 @@
         script.addEventListener('load', attach, { once: true });
     },
 }" {{ $attributes }}>
-    <form action="{{ route('upload.static-archive') }}"
-        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
-        x-init="mountDropzone($el)" wire:ignore>
-        @csrf
-    </form>
+    {{-- A div, not a form: this component can sit inside another form, where a nested form is dropped by the browser. --}}
+    <div class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
+        x-init="mountDropzone($el)" wire:ignore></div>
     <div x-cloak x-show="uploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
         <div class="h-full rounded-full bg-coollabs dark:bg-brand" :style="`width: ${progress}%`"></div>
     </div>
