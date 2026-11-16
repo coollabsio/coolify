@@ -61,6 +61,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 | L7 | ~~A clear error instead of a 500 when you create a database and the cluster network is not ready~~ Done: the create page shows the reason above the image picker. | 0010 |
 | L9 | ~~Reverse lookups of external addresses from containers get NXDOMAIN~~ | — | Fixed in Sentinel `26334ea`: the discovery DNS claims only the mesh and workload reverse zones and forwards the rest. A restart of systemd-resolved drops the routing domains and is not detected as drift (older gap). |
 | L8 | ~~Strict "serve files only" mode for Static~~ Done: **Publish directory** on Static applications, the Railpack staticfile provider forced by the builder, capability `image.build.static.v1` (Sentinel `be0c977`, `ec64ac1`). Verified on dev with a repository that has `package.json`: Caddy and no npm, `dist` served alone, a missing folder fails the build. | [0006 amendment](decisions/0006-node-image-builds.md) |
+| L10 | Cleanup of unused images on Nodes (like the v4 Docker cleanup): a Sentinel `image.prune.v1` command with a keep list of rollback and infrastructure images, a daily run and a disk threshold, and a journald limit. Not built. | [0027](decisions/0027-node-image-cleanup.md) (Proposed) |
 
 ## Small gaps
 
