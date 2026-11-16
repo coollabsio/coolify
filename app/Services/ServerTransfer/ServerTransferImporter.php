@@ -1254,6 +1254,10 @@ class ServerTransferImporter
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['source_id'], $attributes['source_type'], $attributes['private_key_id']);
         $attributes = $this->onlyExistingColumns(Application::class, $attributes);
+        // A bundle without the flag is from a Coolify version whose healthcheck did not check the text.
+        if (! data_get($payload, 'checks_health_check_response_text', false)) {
+            $attributes['health_check_response_text'] = null;
+        }
 
         $attributes['uuid'] = $uuid;
         $attributes['environment_id'] = $environment->id;

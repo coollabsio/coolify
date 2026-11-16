@@ -1231,6 +1231,35 @@ test('transfer keeps the legacy escaping flag and treats old exports as legacy',
         ->and($this->application->environment_variables()->where('key', 'OLD_EXPORT_VAR')->first()->uses_legacy_escaping)->toBeTrue();
 });
 
+test('transfer keeps the expected healthcheck response text only from a bundle that checks it', function (bool $exportedFlag, ?string $expected) {
+    $this->application->forceFill(['health_check_response_text' => 'OK'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $app = &$bundle['projects'][0]['environments'][0]['applications'][0];
+    expect($app['checks_health_check_response_text'])->toBeTrue();
+    if (! $exportedFlag) {
+        // A bundle from a Coolify version whose healthcheck did not check the text.
+        unset($app['checks_health_check_response_text']);
+    }
+    unset($app);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->health_check_response_text)->toBe($expected);
+})->with([
+    'current bundle' => [true, 'OK'],
+    'bundle without the flag' => [false, null],
+]);
+
 test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
     LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
     $bundle = $this->exporter->export($this->server);

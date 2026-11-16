@@ -308,9 +308,9 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
-        'health_check_return_code' => 'numeric',
+        'health_check_return_code' => 'integer|between:100,599',
         'health_check_scheme' => 'string|in:http,https',
-        'health_check_response_text' => 'string|nullable',
+        'health_check_response_text' => ['string', 'nullable', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
         'health_check_retries' => 'numeric',

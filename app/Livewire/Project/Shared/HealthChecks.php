@@ -73,9 +73,9 @@ class HealthChecks extends Component
                 }
             }],
             'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
-            'healthCheckReturnCode' => 'integer',
+            'healthCheckReturnCode' => 'integer|between:100,599',
             'healthCheckScheme' => 'required|string|in:http,https',
-            'healthCheckResponseText' => 'nullable|string',
+            'healthCheckResponseText' => ['nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
             'healthCheckInterval' => 'integer|min:1',
             'healthCheckTimeout' => 'integer|min:1',
             'healthCheckRetries' => 'integer|min:1',

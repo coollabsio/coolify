@@ -5325,7 +5325,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             : null;
 
         $url = escapeshellarg("{$scheme}://{$host}:{$health_check_port}".($path ?? '/'));
-        $escapedMethod = escapeshellarg($method);
+        // curl -X HEAD waits for a response body that never comes, so HEAD needs -I.
+        $curlOptions = $method === 'HEAD' ? ' -I' : ' -X '.escapeshellarg($method);
+        // The wget fallback always sends GET. Existing apps whose endpoint rejects the configured
+        // method pass only through this GET, and BusyBox wget cannot send most other methods.
+        $wgetOptions = '';
+        // The check runs inside the container, where apps often serve HTTPS with a self-signed certificate.
+        if ($scheme === 'https') {
+            $curlOptions .= ' -k';
+            $wgetOptions .= ' --no-check-certificate';
+        }
 
         if ($path) {
             $this->full_healthcheck_url = "{$method}: {$scheme}://{$host}:{$health_check_port}{$path}";
@@ -5333,11 +5342,75 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->full_healthcheck_url = "{$method}: {$scheme}://{$host}:{$health_check_port}/";
         }
 
-        $generated_healthchecks_commands = [
-            "curl -s -X {$escapedMethod} -f {$url} > /dev/null || wget -q -O- {$url} > /dev/null || exit 1",
-        ];
+        $statusCheck = "curl -s{$curlOptions} -f {$url} > /dev/null || wget -q{$wgetOptions} -O- {$url} > /dev/null";
 
-        return implode(' ', $generated_healthchecks_commands);
+        $expectedErrorCode = $this->expectedHealthCheckErrorCode();
+        if ($expectedErrorCode !== null) {
+            $this->full_healthcheck_url .= " (or HTTP {$expectedErrorCode})";
+
+            // curl does not follow redirects, so its code is the final one. wget follows redirects,
+            // so the code must be in the last response: a 3xx response is never the last one.
+            $statusCheck = "curl -s -o /dev/null -w '%{http_code}'{$curlOptions} {$url} | grep -qxE '[23][0-9][0-9]|{$expectedErrorCode}'"
+                ." || wget -S{$wgetOptions} -O /dev/null {$url} 2>&1 | grep -qE 'HTTP/[0-9.]+ (2[0-9][0-9]|{$expectedErrorCode})'";
+        }
+
+        $expectedText = $this->expectedHealthCheckResponseText($method);
+        if ($expectedText === null) {
+            return "{$statusCheck} || exit 1";
+        }
+
+        // The text can contain credentials, so the deployment log does not show it.
+        $this->full_healthcheck_url .= ', and the response must contain the expected text';
+
+        // Docker Compose interpolates $ in the healthcheck, so $$ keeps a literal $.
+        $grepText = str_replace('$', '$$', escapeshellarg($expectedText));
+        $textCheck = "curl -s{$curlOptions} {$url} | grep -qF -- {$grepText}"
+            ." || wget -q{$wgetOptions} -O- {$url} 2>/dev/null | grep -qF -- {$grepText}";
+        if ($expectedErrorCode !== null) {
+            // wget writes the body of a 4xx or 5xx response only with --content-on-error. BusyBox wget
+            // rejects that option, so it is a separate fallback after the plain wget.
+            $textCheck .= " || wget -q{$wgetOptions} --content-on-error -O- {$url} 2>/dev/null | grep -qF -- {$grepText}";
+        }
+
+        return "{ {$statusCheck}; } && { {$textCheck}; } || exit 1";
+    }
+
+    /**
+     * A HEAD response has no body, so the text is not checked for HEAD.
+     */
+    private function expectedHealthCheckResponseText(string $method): ?string
+    {
+        $text = $this->application->health_check_response_text;
+        if (! is_string($text) || $text === '') {
+            return null;
+        }
+        if ($method === 'HEAD') {
+            $this->application_deployment_queue->addLogEntry('Warning: A HEAD response has no body, so the healthcheck does not check the expected response text.');
+
+            return null;
+        }
+        if (preg_match('/[\x00-\x1F\x7F]/', $text) || strlen($text) > 255) {
+            $this->application_deployment_queue->addLogEntry('Warning: The expected response text of the healthcheck contains control characters or is longer than 255 characters, so the healthcheck does not check it.');
+
+            return null;
+        }
+
+        return $text;
+    }
+
+    /**
+     * A 2xx or 3xx response always passes the HTTP healthcheck. An expected code of 400-599
+     * also passes, for example a 401 from an endpoint behind authentication.
+     */
+    private function expectedHealthCheckErrorCode(): ?int
+    {
+        $code = $this->application->health_check_return_code;
+        if (! is_numeric($code)) {
+            return null;
+        }
+        $code = (int) $code;
+
+        return $code >= 400 && $code <= 599 ? $code : null;
     }
 
     private function sanitizeHealthCheckValue(string $value, string $pattern, string $default): string

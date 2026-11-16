@@ -999,6 +999,7 @@ class ServerTransferExporter
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
             'had_private_key' => filled($application->private_key_id),
+            'checks_health_check_response_text' => true,
         ];
     }
 
