@@ -124,12 +124,11 @@ class ApiTokens extends Component
             $environment->id => $projectNames[$environment->project_id].' / '.$environment->name,
         ]);
 
-        $resources = collect(AccessResolver::RESOURCE_MODELS)
-            ->flatMap(fn (string $model) => $model::query()->whereIn('environment_id', $environments->pluck('id'))->get(['uuid', 'name', 'environment_id']))
-            ->map(fn ($resource) => [
-                'value' => "resource:{$resource->uuid}",
-                'label' => $environmentPaths[$resource->environment_id].' / '.$resource->name,
-                'parents' => $environmentParents[$resource->environment_id],
+        $resources = AccessResolver::grantableResourceOptions($environments->pluck('id'), onlyVisible: true)
+            ->map(fn (array $resource) => [
+                'value' => "resource:{$resource['uuid']}",
+                'label' => $environmentPaths[$resource['environment_id']].' / '.$resource['name'],
+                'parents' => $environmentParents[$resource['environment_id']],
             ])
             ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();

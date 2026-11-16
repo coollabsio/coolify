@@ -203,11 +203,8 @@ class Access extends Component
             $environment->id => $projectNames[$environment->project_id].' / '.$environment->name,
         ]);
 
-        $resources = collect(AccessResolver::RESOURCE_MODELS)
-            ->flatMap(fn (string $model) => $model::withoutGlobalScope(VisibleThroughAccessGrants::class)
-                ->whereIn('environment_id', $environments->pluck('id'))
-                ->get(['uuid', 'name', 'environment_id']))
-            ->map(fn ($resource) => ['value' => "resource:{$resource->uuid}", 'label' => $environmentPaths[$resource->environment_id].' / '.$resource->name])
+        $resources = AccessResolver::grantableResourceOptions($environments->pluck('id'), onlyVisible: false)
+            ->map(fn (array $resource) => ['value' => "resource:{$resource['uuid']}", 'label' => $environmentPaths[$resource['environment_id']].' / '.$resource['name']])
             ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
