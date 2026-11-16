@@ -919,33 +919,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
-        if ($this->preserveRepository) {
-            foreach ($this->application->fileStorages as $fileStorage) {
-                $path = $fileStorage->fs_path;
-                $saveName = 'file_stat_'.$fileStorage->id;
-                $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
-                // check if the file is a directory or a file inside the repository
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
-                );
-                if ($this->saved_outputs->has($saveName)) {
-                    $fileStat = $this->trimmedSavedOutput($saveName);
-                    if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
-                        $fileStorage->is_directory = true;
-                        $fileStorage->content = null;
-                        $fileStorage->save();
-                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
-                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
-                    } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
-                        $fileStorage->is_directory = false;
-                        $fileStorage->is_based_on_git = true;
-                        $fileStorage->save();
-                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
-                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
-                    }
-                }
-            }
-        }
         $this->generate_image_names();
         $this->cleanup_git();
         $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
@@ -986,6 +959,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             $yaml = Yaml::dump(convertToArray($composeFile), 10);
         }
+        $this->syncPreservedStorageTypesWithRepository();
         $this->generated_docker_compose = $yaml;
         $this->execute_remote_command([
             "docker exec {$this->deployment_uuid} rm -f {$this->workdir}{$this->docker_compose_location}",
@@ -4188,6 +4162,42 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * With a preserved repository, a bind source that is a file or a directory in the repository decides the type
+     * of its storage. It runs after the Compose parse, so it also sees the storages that the first deployment creates.
+     */
+    private function syncPreservedStorageTypesWithRepository(): void
+    {
+        if (! $this->preserveRepository) {
+            return;
+        }
+        foreach ($this->application->fileStorages()->get() as $fileStorage) {
+            $path = $fileStorage->fs_path;
+            $saveName = 'file_stat_'.$fileStorage->id;
+            $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
+            // check if the file is a directory or a file inside the repository
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+            );
+            if ($this->saved_outputs->has($saveName)) {
+                $fileStat = $this->trimmedSavedOutput($saveName);
+                if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
+                    $fileStorage->is_directory = true;
+                    $fileStorage->content = null;
+                    $fileStorage->save();
+                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
+                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
+                } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
+                    $fileStorage->is_directory = false;
+                    $fileStorage->is_based_on_git = true;
+                    $fileStorage->save();
+                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
+                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
+                }
+            }
+        }
     }
 
     private function cleanup_git()

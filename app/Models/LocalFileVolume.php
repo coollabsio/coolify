@@ -600,7 +600,8 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * Coolify writes this file from its content when the file is missing on the server. Files from
+     * Coolify writes this file from its content when the file is missing on the server. A file without
+     * content becomes an empty file, so Docker does not create a directory at its path. Files from
      * the Git repository, host files and placeholders for binary or large files are not written.
      */
     public function hasContentToWrite(): bool
@@ -609,8 +610,7 @@ class LocalFileVolume extends BaseModel
             && ! $this->is_host_file
             && ! $this->is_based_on_git
             && ! $this->is_binary
-            && ! $this->is_too_large
-            && (string) $this->content !== '';
+            && ! $this->is_too_large;
     }
 
     /**

@@ -318,11 +318,33 @@ test('a Compose deployment does not write storages without Coolify content', fun
     'host file' => [['is_host_file' => true]],
     'file from the Git repository' => [['is_based_on_git' => true]],
     'directory' => [['is_directory' => true, 'content' => null]],
-    'file without content' => [['content' => null]],
-    'file with empty content' => [['content' => '']],
     'binary file placeholder' => [['content' => LocalFileVolume::BINARY_PLACEHOLDER]],
     'too large file placeholder' => [['content' => LocalFileVolume::TOO_LARGE_PLACEHOLDER]],
 ]);
+
+test('a Compose deployment creates a missing file without content as an empty file', function (array $attributes, string $state) {
+    $volume = contentFilesVolume($this->application, 'config/prometheus.yml', $attributes);
+    fakeContentFilesServer([$volume->fs_path => $state]);
+
+    runComposeStart($this);
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'touch '.escapeshellarg($volume->fs_path)));
+    expect(ContentFilesUpRecorder::indexOf('ssh', 'touch '))->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'))
+        ->and($volume->fresh()->is_directory)->toBeFalsy();
+})->with([
+    'file without content' => [['content' => null]],
+    'file with empty content' => [['content' => '']],
+])->with(['missing', 'empty-directory']);
+
+test('a Compose deployment keeps an existing file without content', function () {
+    $volume = contentFilesVolume($this->application, 'config/prometheus.yml', ['content' => null]);
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+
+    runComposeStart($this);
+
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'touch '));
+    contentFilesAssertNoWrite();
+});
 
 test('a pull request deployment writes the preview content file path', function () {
     $volume = contentFilesVolume($this->application, 'config/app.conf');

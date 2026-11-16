@@ -1652,7 +1652,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = data_get_str($volume, 'source');
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
-                    $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                    $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
@@ -1679,10 +1679,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
-                        // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                        if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
-                            $isDirectory = true;
-                        }
+                        // Without is_directory, a bind without content is a directory. An explicit `is_directory: false` stays a file.
+                        $isDirectory = is_null($isDirectory) ? is_null($content) : (bool) $isDirectory;
                     }
                 }
                 if ($type->value() === 'bind') {
@@ -3014,7 +3012,7 @@ function serviceParser(Service $resource): Collection
                     $source = data_get_str($volume, 'source');
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
-                    $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                    $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
@@ -3041,10 +3039,8 @@ function serviceParser(Service $resource): Collection
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
-                        // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                        if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
-                            $isDirectory = true;
-                        }
+                        // Without is_directory, a bind without content is a directory. An explicit `is_directory: false` stays a file.
+                        $isDirectory = is_null($isDirectory) ? is_null($content) : (bool) $isDirectory;
                     }
                 }
                 if ($type->value() === 'bind') {
