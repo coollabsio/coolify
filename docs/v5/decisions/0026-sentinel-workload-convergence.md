@@ -1,6 +1,6 @@
 # Decision 0026: Keep Horizon and move workload convergence into Sentinel
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-16**
 
@@ -81,6 +81,45 @@ metrics only.
 6. **Secret values** go only in the message to the Node that runs the
    workload, as with `workload.secrets.v1` today. They are not stored in
    Corrosion, and Flux does not store them.
+
+## Additions after the review (2026-11-16)
+
+These rules are part of the decision. They close gaps that the review found.
+
+1. **Generation and fencing.** Each desired set has a generation number that
+   only goes up. Sentinel stores it with the set. Without a connection,
+   Sentinel only keeps the containers of the stored set running: it restarts a
+   crashed one and starts them after a reboot, as the restore does today. It
+   does not deploy a new revision or remove a container until it has the
+   current generation from Coolify. Fencing after a recovery move
+   (`FenceRecoveredNodeWorkloads`, decision 0014) stays in Coolify: the first
+   set after a reconnect removes the moved workload, as the fence does today.
+2. **Secrets and registry logins.** Secret values stay only in the Podman
+   secret store of the Node (decision 0008). The stored desired set has
+   references to them, not values. Without a connection to Coolify, Sentinel
+   does not pull an image: a convergence that needs a pull waits for Coolify,
+   and the registry login comes in the message of that change only.
+3. **Changes, not full sets.** Coolify sends one change for each workload (put
+   or remove, with the generation) and the hash of the full set of the Node.
+   On connect, Sentinel sends its generation and hash in `Hello`. Coolify sends
+   the full set only when they differ.
+4. **Heartbeat hash.** Sentinel puts the generation and the hash of its set in
+   each heartbeat. When they differ from Postgres, Coolify sends the set
+   again. This replaces polling and finds a lost message.
+5. **Network revision.** Each entry of the set has the network revision that
+   the workload needs. Sentinel starts a new container of the entry only after
+   it applied that network revision. The wait across Nodes before Coolify sends
+   the entry stays in Coolify.
+6. **Deploy history.** A deploy, rollback, stop, start, or move that a user
+   starts keeps its `NodeOperation`. The status events of the revision update
+   that operation and its log. A change that Sentinel makes alone (a restart
+   after a crash) adds an event to the deployment history, not an operation.
+7. **Work that moves to Sentinel.** Also the crash-loop detection of a new
+   revision (`VerifyDeploymentConvergence`, restart count in the first 60 s),
+   the START backoff of `ReconcileNodeWorkloads::recentlyStarted()`, and the
+   local-image rollback with pull policy `missing`. The image cleanup
+   (decision 0027) builds its keep list from the stored set in Sentinel;
+   Coolify then sends only the infrastructure images.
 
 ## Options considered
 
