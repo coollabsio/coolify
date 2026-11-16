@@ -41,11 +41,11 @@ stable need.
 ## Sentinel versions
 
 Until the first release, Coolify uses Sentinel `main-<sha>` images, not
-releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-b0a04a5`
-by digest (Nodes 1 and 3 of the dev cluster run `sentinel-host` `main-b0a04a5`). `upstream.json` takes only release versions, so a
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-8e040d0`
+by digest (Nodes 1 and 3 of the dev cluster run `sentinel-host` `main-8e040d0`). `upstream.json` takes only release versions, so a
 new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 `image.build.target.v1`, no read lane for fast commands (Sentinel
-`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), and no Docker socket for stack services (Sentinel `b0a04a5`). Install the `main-<sha>` `sentinel-host` on it by hand with
+`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), and no external image storage (Sentinel `8e040d0`). Install the `main-<sha>` `sentinel-host` on it by hand with
 `InstallSentinel`.
 
 ## Build when there is time
