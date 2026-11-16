@@ -3,20 +3,20 @@
 namespace App\Livewire\Project\ClusterStack;
 
 use App\Actions\Node\DeleteNodeVolumeData;
+use App\Actions\Node\DeployNodeStack;
 use App\Enums\NodeVolumeCopyState;
 use App\Jobs\DeleteNodeStackJob;
-use App\Jobs\DeployNodeStackJob;
 use App\Models\NodeContainer;
 use App\Models\NodeStack;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Project;
-use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use RuntimeException;
 
 /** A stack of Compose services on a cluster (decision 0023): its services, shared volumes (decision 0024), Deploy, and Delete. */
 class Show extends Component
@@ -50,18 +50,13 @@ class Show extends Component
     public function deploy(): void
     {
         $this->authorize('deploy', $this->stack);
-        if (NodeStackCompose::mountsContainerSocket($this->stack->compose_parsed ?? []) && ! auth()->user()->isAdminOfTeam((int) $this->stack->team_id)) {
-            $this->dispatch('error', 'This stack mounts the Docker socket, which controls every container on its server. Only a team admin or owner can deploy it.');
+        try {
+            DeployNodeStack::run($this->stack, auth()->user());
+        } catch (RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        if ($this->stack->deploy_status === 'deploying') {
-            $this->dispatch('error', 'This stack is deploying. Wait until the deployment finishes.');
-
-            return;
-        }
-        $this->stack->update(['deploy_status' => 'queued', 'deploy_error' => null]);
-        DeployNodeStackJob::dispatch($this->stack->id, auth()->id());
         $this->dispatch('success', 'Stack deployment queued. Each service deploys after the services it depends on.');
     }
 

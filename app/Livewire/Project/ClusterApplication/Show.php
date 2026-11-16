@@ -3,37 +3,28 @@
 namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\Build\CancelNodeBuild;
-use App\Actions\Node\Build\CreateClusterGitWorkload;
-use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
-use App\Actions\Node\Build\StartNodeBuild;
-use App\Actions\Node\CreateClusterDatabaseWorkload;
-use App\Actions\Node\CreateClusterDockerImageWorkload;
-use App\Actions\Node\CreateDeploymentOperation;
-use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\CreateNodeVolume;
 use App\Actions\Node\DeleteNodeVolumeCopy;
 use App\Actions\Node\DeleteNodeVolumeData;
+use App\Actions\Node\DeployNodeWorkload;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\MoveNodeWorkload;
 use App\Actions\Node\NotifyNodeReachability;
-use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\PublishNodeWorkloadPort;
+use App\Actions\Node\QueueNodeWorkloadLifecycle;
 use App\Actions\Node\ReadImageArchitectures;
 use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\RollbackNodeWorkload;
-use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
+use App\Actions\Node\UpdateNodeWorkloadSettings;
 use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
-use App\Enums\NodeWorkloadSourceType;
 use App\Enums\NodeWorkloadState;
-use App\Jobs\DeployNodeWorkloadJob;
-use App\Jobs\ManageNodeWorkloadJob;
-use App\Jobs\MoveNodeWorkloadJob;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
@@ -43,25 +34,19 @@ use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodePublishedPort;
-use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadEvent;
 use App\Models\Project;
 use App\Models\RegistryCredential;
-use App\Rules\DockerImageFormat;
-use App\Rules\ValidGitBranch;
 use App\Services\DockerImageParser;
-use App\Services\DockerRegistryLogins;
 use App\Support\CpuArchitecture;
 use App\Support\DomainUrlParts;
-use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -254,9 +239,8 @@ class Show extends Component
             if (! $this->ensureHasServer()) {
                 return;
             }
-            // A Git application deploys through a build: its job publishes the revision and deploys it.
-            if ($this->workload->buildsFromSource()) {
-                $build = StartNodeBuild::run($this->workload, auth()->user());
+            ['operation' => $operation, 'build' => $build] = DeployNodeWorkload::run($this->workload, auth()->user());
+            if ($build !== null) {
                 redirectRoute($this, 'project.cluster-application.build.show', [
                     'project_uuid' => $this->project->uuid,
                     'environment_uuid' => $this->environment->uuid,
@@ -265,16 +249,6 @@ class Show extends Component
                 ]);
 
                 return;
-            }
-            $revision = PrepareNodeWorkloadRevision::run($this->workload);
-            foreach ($this->workload->nodes()->orderBy('nodes.id')->get() as $node) {
-                $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer');
-                if ($deployment['created']) {
-                    DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
-                    $operation ??= $deployment['operation'];
-                } elseif (in_array($deployment['operation']->command_type, self::DEPLOYMENT_COMMAND_TYPES, true)) {
-                    $operation ??= $deployment['operation'];
-                }
             }
         } catch (\Throwable $exception) {
             handleError($exception, $this);
@@ -382,12 +356,7 @@ class Show extends Component
                 'isAutoCancelQueuedDeploymentsEnabled' => ['boolean'],
                 'isAutoCancelBuildingDeploymentsEnabled' => ['boolean'],
             ]);
-            $this->workload->update([
-                'is_auto_deploy_enabled' => $this->isAutoDeployEnabled,
-                // Stopping a running build also cancels the waiting ones, as in v4.
-                'is_auto_cancel_queued_deployments_enabled' => $this->isAutoCancelQueuedDeploymentsEnabled || $this->isAutoCancelBuildingDeploymentsEnabled,
-                'is_auto_cancel_building_deployments_enabled' => $this->isAutoCancelBuildingDeploymentsEnabled,
-            ]);
+            UpdateNodeWorkloadSettings::make()->deploymentSettings($this->workload, $this->isAutoDeployEnabled, $this->isAutoCancelQueuedDeploymentsEnabled, $this->isAutoCancelBuildingDeploymentsEnabled);
             $this->dispatch('success', 'Deployment settings updated.');
         } catch (Throwable $exception) {
             handleError($exception, $this);
@@ -404,26 +373,13 @@ class Show extends Component
 
             return;
         }
-        $this->validate([
-            'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
-            'imageTag' => ValidationPatterns::dockerImageTagRules(),
-            'startCommand' => ['nullable', 'string', 'max:16384'],
-        ]);
-        $command = $this->parseStartCommand();
-        if ($this->getErrorBag()->isNotEmpty()) {
-            return;
-        }
-        $tag = filled($this->imageTag) ? trim($this->imageTag) : 'latest';
-        $image = CreateClusterDockerImageWorkload::qualifiedImage(
-            trim($this->imageName).(preg_match('/^[a-f0-9]{64}$/i', $tag) === 1 ? '@sha256:' : ':').$tag,
-        );
-        $credential = $this->selectedRegistryCredential($image, 'registryCredentialUuid');
-        if ($this->getErrorBag()->isNotEmpty()) {
-            return;
-        }
+        try {
+            UpdateNodeWorkloadSettings::make()->image($this->workload, $this->imageName, $this->imageTag, $this->startCommand, $this->registryCredentialUuid, auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addSettingsErrors($exception);
 
-        $this->workload->update(['registry_credential_id' => $credential?->id]);
-        UpdateNodeWorkloadConfiguration::run($this->workload, $command, null, $image);
+            return;
+        }
         $this->loadData();
         $this->loadConfiguration();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
@@ -717,16 +673,7 @@ class Show extends Component
     public function saveDetails(): void
     {
         $this->authorize('update', $this->workload);
-        $validated = $this->validate([
-            'name' => ValidationPatterns::nameRules(),
-            'description' => ValidationPatterns::descriptionRules(),
-        ], ValidationPatterns::combinedMessages());
-
-        // The internal DNS name is allocated once, so renaming keeps the internal hostname stable.
-        $this->workload->update([
-            'name' => trim($validated['name']),
-            'description' => filled($validated['description']) ? trim($validated['description']) : null,
-        ]);
+        UpdateNodeWorkloadSettings::make()->details($this->workload, $this->name, $this->description);
         $this->loadDetails();
         $this->dispatch('success', 'Application updated.');
     }
@@ -740,30 +687,16 @@ class Show extends Component
         $this->authorize('update', $this->workload);
         $type = $this->workload->database_type;
         abort_if($type === null, 404);
-        $credentialRules = collect($type->credentials())
+        $credentials = collect($type->credentials())
             ->reject(fn (array $credential): bool => in_array($credential['key'], $this->lockedDatabaseCredentials, true))
-            ->mapWithKeys(fn (array $credential): array => ['databaseCredentials.'.$credential['key'] => ['required', 'string', 'max:255', 'not_regex:/\x00/']])
+            ->mapWithKeys(fn (array $credential): array => [$credential['key'] => $this->databaseCredentials[$credential['key']] ?? null])
             ->all();
-        $validated = $this->validate([
-            'name' => ValidationPatterns::nameRules(),
-            'description' => ValidationPatterns::descriptionRules(),
-            'databaseImage' => ['required', 'string', 'max:255', new DockerImageFormat],
-            ...$credentialRules,
-        ], ValidationPatterns::combinedMessages());
+        try {
+            UpdateNodeWorkloadSettings::make()->database($this->workload, $this->name, $this->description, $this->databaseImage, $credentials);
+        } catch (ValidationException $exception) {
+            $this->addSettingsErrors($exception);
 
-        $this->workload->update([
-            'name' => trim($validated['name']),
-            'description' => filled($validated['description']) ? trim($validated['description']) : null,
-        ]);
-        foreach ($type->credentials() as $credential) {
-            if (array_key_exists('databaseCredentials.'.$credential['key'], $credentialRules)) {
-                CreateClusterDatabaseWorkload::storeCredential($this->workload, $credential, $this->databaseCredentials[$credential['key']]);
-            }
-        }
-        $revision = $this->workload->revisions()->latest('id')->first();
-        $image = CreateClusterDockerImageWorkload::qualifiedImage(trim($validated['databaseImage']));
-        if ($revision !== null && $image !== $revision->image) {
-            UpdateNodeWorkloadConfiguration::run($this->workload, $revision->configuration['command'] ?? [], null, $image);
+            return;
         }
         $this->loadData();
         $this->loadDetails();
@@ -797,28 +730,17 @@ class Show extends Component
                 'moveSource' => ['required', 'string'],
                 'moveTarget' => ['required', 'string'],
             ]);
-            $source = $this->workload->nodes()->where('nodes.uuid', $this->moveSource)->firstOrFail();
-            $target = Node::query()
-                ->where('uuid', $this->moveTarget)
-                ->where('team_id', $this->workload->team_id)
-                ->where('node_cluster_id', $source->node_cluster_id)
-                ->whereDoesntHave('workloads', fn ($query) => $query->whereKey($this->workload->id))
-                ->firstOrFail();
-            $this->authorize('placeResource', $target);
-            $revision = $this->workload->revisions()->latest('id')->firstOrFail();
-            $recovery = NotifyNodeReachability::isOffline($source);
-            $hasVolumes = $this->workload->hasVolumesWithData();
-            if ($recovery && $hasVolumes && ! $this->moveRecoveryConfirmed) {
-                $this->addError('moveRecoveryConfirmed', 'Confirm that the volumes are restored from their latest backups.');
+            try {
+                ['operation' => $operation, 'source' => $source, 'target' => $target, 'recovery' => $recovery, 'has_volumes' => $hasVolumes, 'group' => $group]
+                    = MoveNodeWorkload::run($this->workload, $this->moveSource, $this->moveTarget, auth()->user(), $this->moveRecoveryConfirmed);
+            } catch (ValidationException $exception) {
+                $this->addError('moveRecoveryConfirmed', collect($exception->errors())->flatten()->first());
 
                 return;
             }
-            $operation = CreateMoveOperation::run($source, $target, $revision, auth()->user(), recovery: $recovery);
-            MoveNodeWorkloadJob::dispatch($operation->id);
             $this->moveTarget = '';
             $this->moveRecoveryConfirmed = false;
             $this->dispatch('close-modal');
-            $group = MoveNodeWorkloadJob::movingGroup($operation)->slice(1)->pluck('workload.stack_service')->filter();
             $this->dispatch('success', ($group->isEmpty() ? '' : 'The services '.$group->implode(', ').' move too, because they share a volume. ').($recovery
                 ? 'Recovery move queued. The application starts on '.$target->name.($hasVolumes ? ' with the volumes from their latest backups' : '').'. Its old container on '.$source->name.' is removed when that server comes back.'
                 : (data_get($operation->result, 'stateful') || $hasVolumes
@@ -1010,19 +932,8 @@ class Show extends Component
             if (! $this->ensureHasServer()) {
                 return;
             }
-            $revision = $this->workload->revisions()->latest('id')->firstOrFail();
-            $failures = [];
-            $queued = 0;
-            foreach ($this->workload->nodes()->orderBy('nodes.id')->get() as $node) {
-                try {
-                    $operation = CreateLifecycleOperation::run($node, $revision, $action, auth()->user());
-                    ManageNodeWorkloadJob::dispatch($operation->id);
-                    $queued++;
-                } catch (\RuntimeException $exception) {
-                    $failures[] = "{$node->name}: {$exception->getMessage()}";
-                }
-            }
-            if ($queued > 0) {
+            ['operations' => $operations, 'failures' => $failures] = QueueNodeWorkloadLifecycle::run($this->workload, $action, auth()->user());
+            if ($operations !== []) {
                 match ($action) {
                     NodeWorkloadAction::STOP => $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.'),
                     NodeWorkloadAction::REMOVE => $this->dispatch('info', 'Removing the application container.'),
@@ -1695,52 +1606,21 @@ class Show extends Component
     private function saveSourceConfiguration(): void
     {
         $this->gitBranch = trim($this->gitBranch);
-        $usesGit = $this->workload->buildsFromGit();
-        $this->validate([
-            ...($usesGit ? [
-                'gitBranch' => ['required', 'string', 'max:255', new ValidGitBranch],
-                'buildPack' => ['required', Rule::enum(NodeWorkloadSourceType::class)->only(NodeWorkloadSourceType::gitBuildPacks())],
-            ] : [
-                'dockerfile' => CreateClusterInlineDockerfileWorkload::dockerfileRules(),
-            ]),
-            'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
-            'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
-            'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
-            'startCommand' => ['nullable', 'string', 'max:16384'],
-            'dockerRegistryImageName' => [...ValidationPatterns::dockerImageNameRules(), 'not_regex:/@/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//'],
-            'dockerRegistryImageTag' => ['nullable', 'string', 'max:128', 'regex:'.ValidationPatterns::DOCKER_IMAGE_LITERAL_TAG_PATTERN],
-        ], [
-            'dockerRegistryImageName.regex' => 'Enter an image repository without a tag, for example ghcr.io/acme/api.',
-            'dockerRegistryImageName.not_regex' => 'Enter an image repository outside the cluster registry, without a digest.',
-        ]);
-        $command = $this->parseStartCommand();
-        $imageName = trim($this->dockerRegistryImageName);
-        $credential = null;
-        if ($imageName === '' && $this->registryCredentialUuid !== '') {
-            $this->addError('registryCredentialUuid', 'Set the Docker image name to push with a registry credential.');
-        } elseif ($imageName !== '') {
-            $credential = $this->selectedRegistryCredential($imageName, 'registryCredentialUuid');
-        }
-        if ($this->getErrorBag()->isNotEmpty()) {
-            return;
-        }
-        $this->workload->update([
-            'registry_credential_id' => $credential?->id,
-            'docker_registry_image_name' => $imageName === '' ? null : $imageName,
-            'docker_registry_image_tag' => filled($this->dockerRegistryImageTag) ? trim($this->dockerRegistryImageTag) : null,
-            ...($usesGit ? [
+        try {
+            UpdateNodeWorkloadSettings::make()->source($this->workload, [
                 'git_branch' => $this->gitBranch,
-                'source_type' => NodeWorkloadSourceType::from($this->buildPack),
-                'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
-                'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
-                'publish_directory' => CreateClusterGitWorkload::publishDirectory($this->publishDirectory),
-            ] : ['dockerfile' => $this->dockerfile]),
-        ]);
-        $revision = $this->workload->revisions()->latest('id')->first();
-        if ($revision !== null && $command !== ($revision->configuration['command'] ?? [])) {
-            UpdateNodeWorkloadConfiguration::run($this->workload, $command, null, $revision->image);
-        } elseif ($revision === null && $command !== []) {
-            $this->addError('startCommand', 'Deploy the application once before you set a start command.');
+                'build_pack' => $this->buildPack,
+                'dockerfile' => $this->dockerfile,
+                'base_directory' => $this->baseDirectory,
+                'dockerfile_location' => $this->dockerfileLocation,
+                'publish_directory' => $this->publishDirectory,
+                'start_command' => $this->startCommand,
+                'docker_registry_image_name' => $this->dockerRegistryImageName,
+                'docker_registry_image_tag' => $this->dockerRegistryImageTag,
+                'registry_credential_uuid' => $this->registryCredentialUuid,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addSettingsErrors($exception);
 
             return;
         }
@@ -1748,36 +1628,6 @@ class Show extends Component
         $this->loadConfiguration();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Configuration saved. Deploy to build the new source.');
-    }
-
-    /**
-     * The selected registry credential, which must belong to the team of the workload and be for
-     * the registry of the image. Adds a validation error otherwise.
-     */
-    private function selectedRegistryCredential(string $image, string $errorField): ?RegistryCredential
-    {
-        if ($this->registryCredentialUuid === '') {
-            return null;
-        }
-        $credential = RegistryCredential::query()
-            ->where('team_id', $this->workload->team_id)
-            ->where('uuid', $this->registryCredentialUuid)
-            ->first();
-        if ($credential === null) {
-            $this->addError($errorField, 'Select a registry credential of this team.');
-
-            return null;
-        }
-        if (! $credential->matchesImage($image)) {
-            $this->addError($errorField, "This credential is for {$credential->registry}, but the image is in ".DockerRegistryLogins::registryFromImage($image).'.');
-
-            return null;
-        }
-        if ($credential->id !== $this->workload->registry_credential_id) {
-            $this->authorize('useTeamCredentials', $this->workload);
-        }
-
-        return $credential;
     }
 
     /** @return list<array{value: string, label: string, description: string}> */
@@ -1821,20 +1671,20 @@ class Show extends Component
             ->implode(' ');
     }
 
-    /** @return list<string> */
-    private function parseStartCommand(): array
+    /** Shows the errors of UpdateNodeWorkloadSettings on the fields of this page. */
+    private function addSettingsErrors(ValidationException $exception): void
     {
-        $command = array_values(array_filter(
-            str_getcsv(trim($this->startCommand), ' ', '"', ''),
-            fn (?string $argument): bool => $argument !== null && $argument !== '',
-        ));
-        if (count($command) > 64 || collect($command)->contains(fn (string $argument): bool => mb_strlen($argument) > 4096)) {
-            $this->addError('startCommand', 'Use at most 64 arguments with at most 4096 characters each.');
-
-            return [];
+        $fields = [
+            'image_name' => 'imageName', 'image_tag' => 'imageTag', 'start_command' => 'startCommand',
+            'registry_credential_uuid' => 'registryCredentialUuid', 'git_branch' => 'gitBranch', 'build_pack' => 'buildPack',
+            'base_directory' => 'baseDirectory', 'dockerfile_location' => 'dockerfileLocation', 'publish_directory' => 'publishDirectory',
+            'docker_registry_image_name' => 'dockerRegistryImageName', 'docker_registry_image_tag' => 'dockerRegistryImageTag',
+            'image' => 'databaseImage',
+        ];
+        foreach ($exception->errors() as $key => $messages) {
+            $field = str_starts_with($key, 'credentials.') ? 'databaseCredentials.'.substr($key, 12) : ($fields[$key] ?? $key);
+            $this->addError($field, $messages[0]);
         }
-
-        return $command;
     }
 
     private function loadDomains(): void

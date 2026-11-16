@@ -2,10 +2,7 @@
 
 namespace App\Traits;
 
-use App\Actions\Node\Build\CreateClusterGitStack;
-use App\Actions\Node\Build\CreateClusterGitWorkload;
-use App\Actions\Node\Build\IssueNodeGitCredential;
-use App\Actions\Node\Build\ResolveGitCommit;
+use App\Actions\Node\Build\CreateClusterGitApplication;
 use App\Enums\NodeWorkloadSourceType;
 use App\Livewire\Project\New\DockerImage;
 use App\Models\Environment;
@@ -15,6 +12,7 @@ use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Services\NodeStack\NodeStackGitSource;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -101,47 +99,29 @@ trait CreatesClusterGitApplication
         [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
         [$cluster, $targetNode] = DockerImage::resolveClusterTarget($project, $targetType, $targetUuid);
 
-        if ($this->build_pack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
-            $this->authorize('create', [NodeStack::class, $environment]);
-            try {
-                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $repository, $branch, auth()->user(), $targetNode, null, $this->base_directory, $this->composeLocation, $githubApp, $privateKey, $targetNode === null && $this->stackPlacement === 'spread');
-            } catch (Throwable $exception) {
-                $this->addError($errorField, $exception->getMessage());
-
-                return null;
-            }
-
-            return redirectRoute($this, 'project.cluster-stack.show', [
-                'environment_uuid' => $environment->uuid,
-                'project_uuid' => $project->uuid,
-                'stack_uuid' => $stack->uuid,
-            ]);
-        }
-
         try {
-            $unsaved = new NodeWorkload(['team_id' => $project->team_id, 'github_app_id' => $githubApp?->id, 'private_key_id' => $privateKey?->id]);
-            ResolveGitCommit::run($repository, $branch, IssueNodeGitCredential::run($unsaved));
-            $workload = CreateClusterGitWorkload::run(
-                $project,
-                $environment,
-                $cluster,
-                NodeWorkloadSourceType::from($this->build_pack),
-                $repository,
-                $branch,
-                auth()->user(),
-                $targetNode,
-                null,
-                $this->base_directory,
-                $this->dockerfileLocation,
-                $githubApp,
-                $privateKey,
-                $this->publishDirectory,
-            );
+            $created = CreateClusterGitApplication::run($project, $environment, $cluster, $targetNode, $this->build_pack, $repository, $branch, auth()->user(), $githubApp, $privateKey, [
+                'base_directory' => $this->base_directory,
+                'dockerfile_location' => $this->dockerfileLocation,
+                'publish_directory' => $this->publishDirectory,
+                'compose_location' => $this->composeLocation,
+                'spread' => $this->stackPlacement === 'spread',
+            ]);
+        } catch (AuthorizationException $exception) {
+            throw $exception;
         } catch (Throwable $exception) {
             $this->addError($errorField, $exception->getMessage());
 
             return null;
         }
+        if ($created instanceof NodeStack) {
+            return redirectRoute($this, 'project.cluster-stack.show', [
+                'environment_uuid' => $environment->uuid,
+                'project_uuid' => $project->uuid,
+                'stack_uuid' => $created->uuid,
+            ]);
+        }
+        $workload = $created;
 
         // Like v4 applications: creating does not deploy. The user deploys from the application page.
         return redirectRoute($this, 'project.cluster-application.show', [

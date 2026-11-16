@@ -3,8 +3,8 @@
 namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\DumpNodeDatabase;
+use App\Actions\Node\ManageNodeDatabaseBackups;
 use App\Actions\Node\RestoreNodeDatabase;
-use App\Jobs\DatabaseBackupJob;
 use App\Models\NodeWorkload;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -13,9 +13,11 @@ use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -99,50 +101,25 @@ class DatabaseBackups extends Component
             'newFrequency' => ['required', 'string'],
             'newS3StorageId' => ['required', 'integer'],
         ]);
-        if (! $this->supportsDumps()) {
-            $this->dispatch('error', 'Dump backups are not available for this database.');
+        try {
+            $backup = ManageNodeDatabaseBackups::make()->createSchedule(
+                $this->workload,
+                $this->newFrequency,
+                $this->storages()->whereKey((int) $this->newS3StorageId)->first(),
+                auth()->user(),
+            );
+        } catch (ValidationException $exception) {
+            $fields = ['frequency' => 'newFrequency', 's3_storage' => 'newS3StorageId'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
+
+            return;
+        } catch (RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        if (! validate_cron_expression($this->newFrequency)) {
-            $this->addError('newFrequency', 'The frequency must be a valid cron or human expression.');
-
-            return;
-        }
-        $s3 = $this->storages()->whereKey((int) $this->newS3StorageId)->first();
-        if ($s3 === null) {
-            $this->addError('newS3StorageId', 'Select a usable S3 storage of the team.');
-
-            return;
-        }
-        $this->authorizeS3Storage($s3);
-        $key = $this->workload->database_type->backupDatabaseKey();
-
-        $backup = ScheduledDatabaseBackup::query()->create([
-            'team_id' => $this->workload->team_id,
-            'database_type' => $this->workload->getMorphClass(),
-            'database_id' => $this->workload->id,
-            'frequency' => $this->newFrequency,
-            'enabled' => true,
-            'save_s3' => true,
-            'disable_local_backup' => true,
-            's3_storage_id' => $s3->id,
-            'databases_to_backup' => $key === null ? null : $this->workload->environment_variables()->where('key', $key)->value('value'),
-            'dump_all' => false,
-            'database_backup_retention_amount_locally' => 0,
-            'database_backup_retention_days_locally' => 0,
-            'database_backup_retention_max_storage_locally' => 0,
-            'database_backup_retention_amount_s3' => 7,
-        ]);
-        $backup->syncS3Storages([$s3->id]);
-        auditLog('ui.database.backup_schedule_created', [
-            'team_id' => $this->workload->team_id,
-            'database_uuid' => $this->workload->uuid,
-            'database_name' => $this->workload->name,
-            'backup_uuid' => $backup->uuid,
-            'frequency' => $backup->frequency,
-            'save_s3' => true,
-        ]);
         $this->dispatch('success', 'Backup schedule created.');
         $this->redirectRoute('project.cluster-application.backup.show', [...$this->routeParameters(), 'backup_uuid' => $backup->uuid], navigate: true);
     }
@@ -214,20 +191,12 @@ class DatabaseBackups extends Component
         $this->authorize('update', $this->workload);
         $backup = $this->backup();
         try {
-            DumpNodeDatabase::node(DumpNodeDatabase::workload($backup));
-            DumpNodeDatabase::storage($backup, $this->workload);
+            ManageNodeDatabaseBackups::make()->runNow($this->workload, $backup);
         } catch (Throwable $exception) {
             $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        DatabaseBackupJob::dispatch($backup);
-        auditLog('ui.database.backup_started', [
-            'team_id' => $this->workload->team_id,
-            'database_uuid' => $this->workload->uuid,
-            'database_name' => $this->workload->name,
-            'backup_uuid' => $backup->uuid,
-        ]);
         $this->dispatch('success', 'Backup queued.');
     }
 
@@ -343,9 +312,7 @@ class DatabaseBackups extends Component
     /** An S3 storage that no backup schedule of this application uses yet is a team credential. */
     private function authorizeS3Storage(S3Storage $s3): void
     {
-        if (! $this->schedules()->where('s3_storage_id', $s3->id)->exists()) {
-            $this->authorize('useTeamCredentials', $this->workload);
-        }
+        ManageNodeDatabaseBackups::authorizeStorage($this->workload, $s3, auth()->user());
     }
 
     private function backup(): ScheduledDatabaseBackup
@@ -362,17 +329,13 @@ class DatabaseBackups extends Component
     /** @return Builder<ScheduledDatabaseBackup> */
     private static function schedulesOf(NodeWorkload $workload): Builder
     {
-        return ScheduledDatabaseBackup::query()
-            ->where('database_type', $workload->getMorphClass())
-            ->where('database_id', $workload->id);
+        return ManageNodeDatabaseBackups::schedulesOf($workload);
     }
 
     /** Usable S3 storages of the team of the database, plus the current one. */
     private function storages(?int $currentId = null): Builder
     {
-        return S3Storage::query()
-            ->where('team_id', $this->workload->team_id)
-            ->where(fn (Builder $query) => $query->where('is_usable', true)->when($currentId !== null, fn (Builder $query) => $query->orWhere('id', $currentId)));
+        return ManageNodeDatabaseBackups::storages($this->workload, $currentId);
     }
 
     private function fillForm(ScheduledDatabaseBackup $backup): void
