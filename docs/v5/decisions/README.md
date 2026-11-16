@@ -37,6 +37,7 @@ current v5 architecture.
 | [0023: Run Compose services on Nodes as stacks of workloads](0023-node-compose-stacks.md) | Accepted | A stack groups one workload for each Compose service, with names by service, traffic allowed inside the stack, `depends_on` order, and file mounts. 316 of 388 templates in the first step. |
 | [0024: Share a volume between the services of one stack](0024-node-stack-shared-volumes.md) | Accepted | A named volume that several services of one stack mount is a stack volume on one Node; the services that share it are placed, moved, and restored together. 18 more templates. |
 | [0025: Deploy each pull request as a preview workload](0025-node-preview-deployments.md) | Accepted | A preview is a child cluster application with its own build, empty volumes, and a domain from the template. Pull request events open, update, and close it. Fork previews get no production values, build secrets, or outbound rules. No limit on the number of previews. |
+| [0026: Keep Horizon and move workload convergence into Sentinel](0026-sentinel-workload-convergence.md) | Proposed | No new queue in v5.0; jobs carry only IDs; Coolify sends the desired set of each Node through Flux, Sentinel converges and reports the status of each revision behind `workload.reconcile.v1`; placement, cross-Node order, builds, and one-shot commands stay in Coolify. |
 
 ## Adding a decision
 
