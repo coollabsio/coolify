@@ -65,6 +65,7 @@ class IssueFluxCredential
             'workload.dns_search.v1',
             'workload.files.v1',
             'workload.container_socket.v1',
+            'workload.user.v1',
             'network.firewall.stack_rules.v1',
             'network.firewall.published_ports.v1',
             'discovery.names.underscore.v1',
