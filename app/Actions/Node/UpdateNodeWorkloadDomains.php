@@ -6,6 +6,7 @@ use App\Models\NodeCluster;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Rules\ValidHostname;
+use App\Services\Access\AccessResolver;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -77,8 +78,9 @@ class UpdateNodeWorkloadDomains
         $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $routes, $domains, $redirects, $user): bool {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             if ($domains !== []) {
-                // Each cluster serves only its own team's routes, so a domain is unique per team.
-                $taken = NodeWorkload::query()
+                // Each cluster serves only its own team's routes, so a domain is unique per team. The check must see
+                // the applications that the access grants of the user hide.
+                $taken = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
                     ->where('team_id', $workload->team_id)
                     ->whereKeyNot($workload->id)
                     ->whereNotNull('domains')
@@ -87,7 +89,7 @@ class UpdateNodeWorkloadDomains
                             $query->orWhereJsonContains('domains', $domain);
                         }
                     })
-                    ->pluck('domains')
+                    ->pluck('domains'))
                     ->flatten()
                     ->intersect($domains)
                     ->first();

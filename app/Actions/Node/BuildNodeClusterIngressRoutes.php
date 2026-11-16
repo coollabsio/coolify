@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
+use App\Services\Access\AccessResolver;
 use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Database\Eloquent\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -147,13 +148,13 @@ class BuildNodeClusterIngressRoutes
      */
     public static function names(NodeCluster $cluster): array
     {
-        $workloads = NodeWorkload::query()
+        $workloads = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
             ->where('team_id', $cluster->team_id)
             ->whereNotNull('internal_dns_name')
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id))
             ->with('stack')
             ->orderBy('id')
-            ->get(['id', 'uuid', 'internal_dns_name', 'node_stack_id', 'stack_service']);
+            ->get(['id', 'uuid', 'internal_dns_name', 'node_stack_id', 'stack_service']));
         $names = $workloads
             // Sentinel rejects the whole name table for one invalid or duplicate name.
             ->filter(fn (NodeWorkload $workload): bool => self::validLabel((string) $workload->internal_dns_name))
@@ -232,13 +233,14 @@ class BuildNodeClusterIngressRoutes
      */
     public static function routedWorkloads(NodeCluster $cluster): Collection
     {
-        return NodeWorkload::query()
+        // The routes of the cluster, not only those that the access grants of the current user show.
+        return app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
             ->where('team_id', $cluster->team_id)
             ->whereNotNull('domain_routes')
             ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id))
             ->with(['nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)])
             ->orderBy('id')
-            ->get()
+            ->get())
             ->filter(fn (NodeWorkload $workload): bool => $workload->hasIngressRoutes())
             ->values();
     }

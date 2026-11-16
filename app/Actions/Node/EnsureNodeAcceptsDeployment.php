@@ -4,6 +4,7 @@ namespace App\Actions\Node;
 
 use App\Models\Node;
 use App\Models\NodeWorkloadRevision;
+use App\Services\Access\AccessResolver;
 use DomainException;
 use Illuminate\Support\Carbon;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -88,11 +89,12 @@ class EnsureNodeAcceptsDeployment
         $requested = data_get($revision->configuration, 'resources', []);
         $cpuReservation = (float) data_get($requested, 'cpu_reservation', 0);
         $memoryReservation = (int) data_get($requested, 'memory_reservation_bytes', 0);
-        $workloads = $node->workloads()
+        // Every workload on the Node reserves capacity, also those that the access grants of the user hide.
+        $workloads = app(AccessResolver::class)->withoutVisibilityScope(fn () => $node->workloads()
             ->whereKeyNot($revision->node_workload_id)
             ->where('desired_state', 'running')
             ->with(['revisions' => fn ($query) => $query->latest('id')->limit(1)])
-            ->get();
+            ->get());
         foreach ($workloads as $workload) {
             $resources = data_get($workload->revisions->first()?->configuration, 'resources', []);
             $cpuReservation += (float) data_get($resources, 'cpu_reservation', 0);

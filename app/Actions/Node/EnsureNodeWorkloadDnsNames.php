@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeWorkload;
+use App\Services\Access\AccessResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -20,7 +21,8 @@ class EnsureNodeWorkloadDnsNames
             return [];
         }
 
-        return DB::transaction(function () use ($node): array {
+        // The names are unique in the cluster, so this sees the workloads that the access grants of the user hide.
+        return app(AccessResolver::class)->withoutVisibilityScope(fn (): array => DB::transaction(function () use ($node): array {
             // Shares the per-cluster lock with internal DNS renames.
             NodeCluster::query()->whereKey($node->node_cluster_id)->lockForUpdate()->first();
             $workloads = NodeWorkload::query()
@@ -43,7 +45,7 @@ class EnsureNodeWorkloadDnsNames
             }
 
             return $workloads->pluck('internal_dns_name', 'id')->all();
-        });
+        }));
     }
 
     private function baseName(NodeWorkload $workload): string

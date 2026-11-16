@@ -12,6 +12,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -142,14 +143,14 @@ class CreateClusterDockerImageWorkload
     /** Adds `-2`, `-3`, … while another application in the environment uses the name. */
     public static function uniqueName(Environment $environment, string $name): string
     {
-        $usedNames = NodeWorkload::query()
+        $usedNames = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
             ->where('environment_id', $environment->id)
             ->where('name', 'like', $name.'%')
             ->pluck('name')
             ->merge(Application::query()
                 ->where('environment_id', $environment->id)
                 ->where('name', 'like', $name.'%')
-                ->pluck('name'))
+                ->pluck('name')))
             ->map(fn (string $usedName): string => mb_strtolower($usedName))
             ->flip();
 

@@ -13,6 +13,7 @@ use App\Models\NodePublishedPort;
 use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -569,13 +570,13 @@ class ReconcileNodeClusterNetwork
      */
     private function stackRules(NodeCluster $cluster): array
     {
-        return NodeWorkload::query()
+        return app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
             ->where('team_id', $cluster->team_id)
             ->whereNotNull('node_stack_id')
             ->whereHas('stack', fn ($query) => $query->where('node_cluster_id', $cluster->id))
             ->with(['nodes' => fn ($query) => $query->where('nodes.node_cluster_id', $cluster->id)])
             ->orderBy('id')
-            ->get()
+            ->get())
             ->groupBy('node_stack_id')
             ->flatMap(function ($services) {
                 $addresses = $services->map(fn (NodeWorkload $workload) => self::containerAddresses($workload->nodes));
