@@ -35,6 +35,8 @@ trait CreatesClusterGitApplication
 
     public string $dockerfileLocation = 'Dockerfile';
 
+    public string $publishDirectory = '';
+
     public string $composeLocation = NodeStackGitSource::DEFAULT_COMPOSE_LOCATION;
 
     public array $parameters = [];
@@ -70,6 +72,7 @@ trait CreatesClusterGitApplication
             'build_pack' => ['required', Rule::in(array_column(NodeWorkloadSourceType::gitBuildPackOptions(withCompose: true), 'value'))],
             'base_directory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'composeLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
         ];
     }
@@ -121,6 +124,7 @@ trait CreatesClusterGitApplication
                 $this->dockerfileLocation,
                 $githubApp,
                 $privateKey,
+                $this->publishDirectory,
             );
         } catch (Throwable $exception) {
             $this->addError($errorField, $exception->getMessage());

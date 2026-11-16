@@ -126,7 +126,11 @@
                                 helper="Relative to the base directory. Each service with build: builds its image on a cluster server. Each Compose service becomes an application of one stack." />
                         </div>
                         <x-forms.input id="base_directory" label="Base directory" placeholder="/"
-                            helper="Repository directory used as the build root. Static serves this directory on port 80, so it needs an index.html." />
+                            helper="Repository directory used as the build root." />
+                        <div x-cloak x-show="$wire.build_pack === 'static'">
+                            <x-forms.input id="publishDirectory" label="Publish directory" placeholder="/"
+                                helper="Directory with the files to serve on port 80, relative to the base directory, for example dist. Static only serves files: it does not install packages or run a build. Empty serves the base directory, so every file in it can be downloaded." />
+                        </div>
                     </div>
                 </section>
             </form>

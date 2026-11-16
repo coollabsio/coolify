@@ -33,6 +33,8 @@ class ClusterGitRepository extends Component
 
     public string $dockerfileLocation = 'Dockerfile';
 
+    public string $publishDirectory = '';
+
     public string $composeLocation = NodeStackGitSource::DEFAULT_COMPOSE_LOCATION;
 
     public string $name = '';
@@ -67,6 +69,7 @@ class ClusterGitRepository extends Component
             'buildPack' => ['required', Rule::in(array_column(NodeWorkloadSourceType::gitBuildPackOptions(withCompose: true), 'value'))],
             'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'composeLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'name' => ValidationPatterns::nameRules(required: false),
         ], [
@@ -111,6 +114,7 @@ class ClusterGitRepository extends Component
                 $this->name,
                 $this->baseDirectory,
                 $this->dockerfileLocation,
+                publishDirectory: $this->publishDirectory,
             );
         } catch (RuntimeException $exception) {
             $this->addError('repository', $exception->getMessage());

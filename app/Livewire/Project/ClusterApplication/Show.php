@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\Build\CancelNodeBuild;
+use App\Actions\Node\Build\CreateClusterGitWorkload;
 use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateClusterDatabaseWorkload;
@@ -1611,7 +1612,7 @@ class Show extends Component
                 'source_type' => NodeWorkloadSourceType::from($this->buildPack),
                 'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
                 'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
-                'publish_directory' => trim($this->publishDirectory, ' /') === '' || trim($this->publishDirectory, ' /') === '.' ? null : trim($this->publishDirectory, ' /'),
+                'publish_directory' => CreateClusterGitWorkload::publishDirectory($this->publishDirectory),
             ] : ['dockerfile' => $this->dockerfile]),
         ]);
         $revision = $this->workload->revisions()->latest('id')->first();

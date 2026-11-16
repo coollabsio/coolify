@@ -198,7 +198,8 @@ ran `npm install`, `npm run build`, and `npm run start` (tested on dev: the
 container crash-looped on a missing `server.js`).
 
 - **Field.** A Static application has **Publish directory**
-  (`node_workloads.publish_directory`), relative to the base directory. Empty
+  (`node_workloads.publish_directory`), relative to the base directory, on the
+  create pages of a Git source and on the **General** page. Empty
   serves the base directory, so every file in it can be downloaded; the help
   text says this.
 - **Protocol.** `ImageBuildRequest.static_root` (field 18) and the capability

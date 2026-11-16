@@ -44,6 +44,7 @@ class CreateClusterGitWorkload
         ?string $dockerfileLocation = null,
         ?GithubApp $githubApp = null,
         ?PrivateKey $privateKey = null,
+        ?string $publishDirectory = null,
     ): NodeWorkload {
         if (! $sourceType->builds()) {
             throw new RuntimeException('A Git application needs a build type.');
@@ -60,7 +61,7 @@ class CreateClusterGitWorkload
         }
 
         $registryIsNew = ! $cluster->registry()->exists();
-        $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey): NodeWorkload {
+        $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey, $publishDirectory): NodeWorkload {
             // A build runs on a builder of the architecture of the Node (decision 0020).
             $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures());
             $workload = NodeWorkload::query()->create([
@@ -76,6 +77,7 @@ class CreateClusterGitWorkload
                 'private_key_id' => $privateKey?->id,
                 'base_directory' => filled($baseDirectory) ? trim($baseDirectory, ' /') : null,
                 'dockerfile_location' => $sourceType === NodeWorkloadSourceType::DOCKERFILE && filled($dockerfileLocation) ? ltrim(trim($dockerfileLocation), '/') : null,
+                'publish_directory' => $sourceType === NodeWorkloadSourceType::STATIC ? self::publishDirectory($publishDirectory) : null,
             ]);
             $workload->nodes()->attach($node);
             EnsureNodeWorkloadDnsNames::run($node);
@@ -112,6 +114,14 @@ class CreateClusterGitWorkload
         if ($githubApp === null && $privateKey === null && ! $isHttps) {
             throw new RuntimeException('A public repository needs an https:// URL.');
         }
+    }
+
+    /** The stored publish directory of a Static application: `/dist/` becomes `dist`, and the base directory (empty, `/`, or `.`) is null. */
+    public static function publishDirectory(?string $value): ?string
+    {
+        $directory = trim((string) $value, ' /');
+
+        return $directory === '' || $directory === '.' ? null : $directory;
     }
 
     /** `https://github.com/acme/web-app.git` becomes `web-app`. */
