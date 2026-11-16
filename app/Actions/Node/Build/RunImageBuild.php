@@ -4,6 +4,7 @@ namespace App\Actions\Node\Build;
 
 use App\Actions\Node\IssueNodeRegistryCredential;
 use App\Enums\NodeBuildStatus;
+use App\Enums\NodeWorkloadSourceType;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeBuildLogLine;
@@ -71,6 +72,8 @@ class RunImageBuild
             'image' => $build->image,
             'dockerfile_path' => '',
             ...(filled($build->workload->build_target) ? ['target' => (string) $build->workload->build_target] : []),
+            // Static serves files only, also when the repository has a package.json (decision 0006).
+            ...($build->source_type === NodeWorkloadSourceType::STATIC ? ['static_root' => trim((string) $build->workload->publish_directory, '/') ?: '.'] : []),
             ...$source,
             ...$credential,
             ...$push,

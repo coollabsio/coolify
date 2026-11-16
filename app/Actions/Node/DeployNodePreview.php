@@ -40,7 +40,7 @@ class DeployNodePreview
     private const COPIED_COLUMNS = [
         'team_id', 'project_id', 'environment_id',
         'source_type', 'git_repository', 'git_branch', 'github_app_id', 'private_key_id',
-        'base_directory', 'dockerfile_location', 'build_target', 'registry_credential_id',
+        'base_directory', 'publish_directory', 'dockerfile_location', 'build_target', 'registry_credential_id',
         'include_coolify_default_variables', 'redact_all_env_values_in_logs', 'is_env_sorting_enabled',
         'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_method',
         'health_check_scheme', 'health_check_host', 'health_check_port', 'health_check_path',

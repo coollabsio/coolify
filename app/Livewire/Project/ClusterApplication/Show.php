@@ -135,6 +135,9 @@ class Show extends Component
 
     public string $dockerfileLocation = '';
 
+    /** The folder that a Static application serves, relative to the base directory. */
+    public string $publishDirectory = '';
+
     /** The Dockerfile of an application without Git. */
     public string $dockerfile = '';
 
@@ -1580,6 +1583,7 @@ class Show extends Component
             ]),
             'baseDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'startCommand' => ['nullable', 'string', 'max:16384'],
             'dockerRegistryImageName' => [...ValidationPatterns::dockerImageNameRules(), 'not_regex:/@/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//'],
             'dockerRegistryImageTag' => ['nullable', 'string', 'max:128', 'regex:'.ValidationPatterns::DOCKER_IMAGE_LITERAL_TAG_PATTERN],
@@ -1607,6 +1611,7 @@ class Show extends Component
                 'source_type' => NodeWorkloadSourceType::from($this->buildPack),
                 'base_directory' => filled($this->baseDirectory) ? trim($this->baseDirectory, ' /') : null,
                 'dockerfile_location' => filled($this->dockerfileLocation) ? ltrim(trim($this->dockerfileLocation), '/') : null,
+                'publish_directory' => trim($this->publishDirectory, ' /') === '' || trim($this->publishDirectory, ' /') === '.' ? null : trim($this->publishDirectory, ' /'),
             ] : ['dockerfile' => $this->dockerfile]),
         ]);
         $revision = $this->workload->revisions()->latest('id')->first();
@@ -1678,6 +1683,7 @@ class Show extends Component
         $this->gitBranch = (string) $this->workload->git_branch;
         $this->baseDirectory = (string) $this->workload->base_directory;
         $this->dockerfileLocation = (string) $this->workload->dockerfile_location;
+        $this->publishDirectory = (string) $this->workload->publish_directory;
         $this->dockerfile = (string) $this->workload->dockerfile;
         $this->buildPack = (string) $this->workload->source_type?->value;
         $revision = $this->workload->revisions->first();

@@ -378,6 +378,7 @@ class NodeWorkload extends BaseModel
             $this->environment_variables()->where('is_buildtime', true)->exists() ? NodeRegistry::BUILD_VARIABLES_CAPABILITY : null,
             $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeRegistry::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
             filled($this->build_target) ? NodeRegistry::BUILD_TARGET_CAPABILITY : null,
+            $this->source_type === NodeWorkloadSourceType::STATIC ? NodeRegistry::STATIC_BUILD_CAPABILITY : null,
         ]));
     }
 

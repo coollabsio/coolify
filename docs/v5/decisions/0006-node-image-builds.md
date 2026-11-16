@@ -189,6 +189,36 @@ before v5 ships:
   that release. Add the `coolify-builder` image to the Sentinel `release.yaml`
   workflow; today only `release-main.yaml` publishes it.
 
+## Amendment (2026-11-16): Static serves files only
+
+A Static source is built by the Railpack job, but Railpack selects the provider
+by itself. Railpack 0.43.0 selects Node when the repository has a
+`package.json`, also with `index.html` or `public/`, so a Static application
+ran `npm install`, `npm run build`, and `npm run start` (tested on dev: the
+container crash-looped on a missing `server.js`).
+
+- **Field.** A Static application has **Publish directory**
+  (`node_workloads.publish_directory`), relative to the base directory. Empty
+  serves the base directory, so every file in it can be downloaded; the help
+  text says this.
+- **Protocol.** `ImageBuildRequest.static_root` (field 18) and the capability
+  `image.build.static.v1` (Sentinel `be0c977`, fix `ec64ac1`). Coolify sends
+  `static_root` for every Static build, `.` for an empty field, and needs the
+  capability on the builder Node. A Node with `sentinel-host` 1.1.7 cannot
+  build Static.
+- **Builder.** The entrypoint checks that the folder exists and has files,
+  writes a Railpack config outside the source with `"provider": "staticfile"`
+  merged into the `railpack.json` of the source (the provider of Coolify
+  wins), passes it with `--config-file ../…`, and sets
+  `RAILPACK_STATIC_FILE_ROOT`. Railpack makes each `--env` variable a secret
+  of the plan, so BuildKit gets that value as a secret too.
+- **Limit.** With the staticfile provider, Railpack ignores
+  `buildAptPackages` of a `railpack.json`.
+- **Verified on dev.** `index.html` + `package.json` with a start script:
+  Caddy, no npm, `/index.html` 200. With `dist`: `/` serves `dist/index.html`
+  and `/package.json` is 404. A missing folder fails the build with "the
+  publish directory missing does not exist".
+
 ## Left open
 
 - Private repositories, webhooks, preview builds, and build-time secrets (see

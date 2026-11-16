@@ -51,6 +51,9 @@ class NodeRegistry extends BaseModel
     /** Builds the stage `target` of `image.build` instead of the last stage (Compose `build.target`). */
     public const BUILD_TARGET_CAPABILITY = 'image.build.target.v1';
 
+    /** A Static build serves files only, with the Railpack static file provider (decision 0006). */
+    public const STATIC_BUILD_CAPABILITY = 'image.build.static.v1';
+
     protected $guarded = [];
 
     protected $hidden = ['ca_private_key_pem', 'private_key_pem', 'push_password', 'pull_password', 'htpasswd'];

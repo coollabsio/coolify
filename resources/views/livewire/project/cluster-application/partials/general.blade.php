@@ -73,7 +73,7 @@
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,dockerfileLocation,dockerfile,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,publishDirectory,dockerfileLocation,dockerfile,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
@@ -95,7 +95,12 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
                     canGate="update" :canResource="$workload"
-                    helper="Repository directory used as the build root. Static serves this directory on port 80, so it needs an index.html." />
+                    helper="Repository directory used as the build root." />
+                <div x-cloak x-show="$wire.buildPack === 'static'">
+                    <x-forms.input id="publishDirectory" label="Publish directory" placeholder="/"
+                        canGate="update" :canResource="$workload"
+                        helper="Directory with the files to serve on port 80, relative to the base directory, for example dist. Static only serves files: it does not install packages or run a build. Empty serves the base directory, so every file in it can be downloaded." />
+                </div>
                 <div x-cloak x-show="$wire.buildPack === 'dockerfile'">
                     <x-forms.input id="dockerfileLocation" label="Dockerfile location" placeholder="Dockerfile"
                         canGate="update" :canResource="$workload" helper="Relative to the base directory." />
