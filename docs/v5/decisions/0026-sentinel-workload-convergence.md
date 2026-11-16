@@ -62,8 +62,9 @@ metrics only.
    - Sentinel reports a status for each workload and revision: `progressing`,
      `healthy`, `failed` (with the reason), `stopped`, or `removed`. Coolify
      records these events in the deployment history.
-   - `Hello` carries the applied revision of each workload, so Coolify sends
-     only what is missing after a reconnect.
+   - `Hello` carries the generation and the hash of the stored set (addition
+     3), not the applied revision of each workload. Coolify compares them with
+     Postgres and sends the full set when they differ.
    - The capability `workload.reconcile.v1` gates the new path. Sentinels
      without it keep the command path.
 4. **Sentinel owns what happens on one Node:** the deploy without downtime
@@ -115,11 +116,98 @@ These rules are part of the decision. They close gaps that the review found.
    that operation and its log. A change that Sentinel makes alone (a restart
    after a crash) adds an event to the deployment history, not an operation.
 7. **Work that moves to Sentinel.** Also the crash-loop detection of a new
-   revision (`VerifyDeploymentConvergence`, restart count in the first 60 s),
-   the START backoff of `ReconcileNodeWorkloads::recentlyStarted()`, and the
-   local-image rollback with pull policy `missing`. The image cleanup
-   (decision 0027) builds its keep list from the stored set in Sentinel;
-   Coolify then sends only the infrastructure images.
+   revision (`VerifyDeploymentConvergence`: a restart, `unhealthy`, or an exit
+   before the container is healthy), the START backoff of
+   `ReconcileNodeWorkloads::recentlyStarted()`, and the local-image rollback
+   with pull policy `missing`. The image cleanup (decision 0027) adds the
+   images of the stored set to its keep list in Sentinel. Coolify still sends
+   the infrastructure images and the earlier revisions that a rollback needs,
+   because the set has only the current revision of each workload.
+
+## Implementation notes
+
+Built on 2026-11-16 (Sentinel `7a509e9`, `7574bf0`, `6774450`; Coolify
+`e0cdeeeb92`, `501805d0de`). The code changed or added these points:
+
+- **Messages.** `WorkloadReconcileRequest` has the generation, the set hash,
+  `full`, `puts`, `removes`, and `releases`. Each `WorkloadSetEntry` has the
+  deploy request, the container name that it replaces, the operation UUID, the
+  network revision, the stop timeout, the entry hash, and `redeploy`. Sentinel
+  sends `WorkloadStatus` events with an event ID. Flux forwards them to Coolify
+  as `workload_status`, and acknowledges them to Sentinel only after Coolify
+  accepted them. Sentinel sends an unacknowledged event again every 10 s. The
+  Flux route `/v1/commands/workload.reconcile` returns 409 without the
+  capability.
+- **Hash.** The set hash is the SHA-256 of the lines `<workload_id>
+  <entry_hash>\n`, sorted by workload ID. Coolify computes the entry hash.
+  Sentinel accepts a change only when its set then has the hash of the
+  message. Otherwise Coolify sends the full set.
+- **Confirmation (addition 1).** Sentinel cannot know if its stored generation
+  is current. Each new connection starts unconfirmed. Coolify confirms with a
+  message that has the same generation and hash and no change, or it sends the
+  full set. Before that, Sentinel only starts the stopped containers of entries
+  that it applied, with a backoff of 10 s that doubles up to 10 min. A deploy,
+  stop, or removal waits for the confirmation.
+- **Secrets (addition 2).** The stored set has the deploy request without the
+  secret values and the registry login, in
+  `/var/lib/coolify/workloads/desired-set.pb` with mode 0600. After a restart
+  of Sentinel, an entry that needs
+  them counts with an empty entry hash. The hash then differs, and Coolify
+  sends the full set with the values.
+- **Releases.** An entry can leave the set without a change of its containers.
+  Coolify uses this when a workload goes back to the command path.
+- **Published ports keep the command path.** A published port forwards to one
+  container (decision 0016). Before the old container goes, every Node must
+  forward the port to the new one. That is a network revision of the cluster,
+  which Coolify applies across Nodes. Volumes, databases, and stack services
+  converge in Sentinel.
+- **Writable volumes.** A workload with a writable volume deploys in place
+  (decision 0022): `podman run --replace` in its slot, so no older container
+  runs. Sentinel tries a failed revision of such a workload again after 10 min.
+- **Health.** Without a health check, a new container must run 10 s without a
+  restart. With a health check, Sentinel waits for `healthy` for the start
+  period plus (interval + timeout) × retries + 30 s, from 10 s to 300 s. A
+  failed rolling deploy removes the new container, and the reason ends with
+  "The previous version keeps running."
+- **Backups.** A volume backup that stops its container holds it, so Sentinel
+  does not start it during the backup.
+- **Coolify rows.** `node_workload_set_entries` has one entry for each workload
+  of a Node in the set. `nodes.workload_set_generation` and
+  `nodes.workload_set_hash` have the generation that Coolify sent last and the
+  hash of the desired set. A change that Sentinel made alone goes to
+  `node_workload_events` and shows in the deployment history (addition 6).
+- **Operations.** `DeployNodeWorkloadJob` and `ManageNodeWorkloadJob` write the
+  entry, send the change, and wait for the status events. A move or a stack
+  deploy that runs them inline gets the result. When Sentinel is not
+  connected, the operation is `uncertain`, and Sentinel applies the change
+  when it connects again.
+- **Adoption.** `ReconcileNodeWorkloads` skips the workloads in the set. It
+  gives a workload of the command path to Sentinel when its deployed revision
+  is the latest revision and runs in a slot. No operation is created.
+- **Fence.** Before Coolify compares or sends the set, it deletes the entries
+  of workloads that are no longer on the Node. The first set after a reconnect
+  then removes the moved workload. `FenceRecoveredNodeWorkloads` also still
+  sends its removal. Both remove the same containers.
+- **Order of a stack.** `DeployNodeStackJob` keeps the `depends_on` order of a
+  deploy. After a reboot, Sentinel starts the stored containers without an
+  order, as the Podman restart policy did before.
+- **Both paths stay (step 5).** A new Node gets `sentinel-host` from
+  `upstream.json` (1.1.7), which does not have the capability, and cluster 2
+  of the dev instance runs 1.1.5. Workloads with published ports also need the
+  command path. `ReconcileNodeWorkloads` and `RecoverStaleOperations` stay for
+  these. Remove them when a released Sentinel has the capability and the
+  published ports converge in Sentinel.
+- **Checked on dev (cluster 1, Sentinel `main-6774450`).** A deploy, a rolling
+  redeploy, a rollback with pull policy `missing`, stop and start, and a
+  crash-looping revision that failed while the older container kept running.
+  With Coolify stopped, Sentinel started a killed and a stopped container
+  again, and every container after a reboot of a Node. When Coolify started,
+  the hashes matched, no operations were added, and the deployment history
+  showed the restarts. A recovery move with Node 1 offline, then Node 1 came
+  back: the old copy was removed. A database, a stack with `depends_on` across
+  two Nodes, a stop and start with a volume, and a move with a volume were
+  healthy. Cluster 2 (Sentinel 1.1.5) deployed and stopped through the command
+  path.
 
 ## Options considered
 
@@ -167,6 +255,7 @@ These rules are part of the decision. They close gaps that the review found.
 3. Coolify: send the desired set on each change and on connect, record the
    status events, and skip Nodes with the capability in
    `ReconcileNodeWorkloads`.
-4. Extend the path to volumes, databases, and stack services.
+4. Extend the path to volumes, databases, and stack services. A workload
+   with published ports keeps the command path (see the implementation notes).
 5. Remove the PHP convergence path when the pinned Sentinel has the
-   capability.
+   capability. Not done: see the implementation notes.
