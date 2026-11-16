@@ -156,6 +156,8 @@ differ from the decision above:
   of the image. A note on the service says this.
 - **Ignored keys.** `user`, `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`,
   `deploy`, `tty`, and `stdin_open` are ignored, with a note on the service.
+  (Later: `user` works since step 3, see "User of a service". Decision 0028
+  maps the other keys.)
   Read-only volumes are mounted read-write. A service with `profiles` is not
   created.
 - **Health check.** The Compose health check is kept in

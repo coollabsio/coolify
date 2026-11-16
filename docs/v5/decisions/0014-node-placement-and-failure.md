@@ -25,6 +25,17 @@ if a Node is only partly down, two containers can write the same data.
 - An outage of a Node needs a person to act.
 - No split brain is possible.
 
+## Amendment (2026-11-16): placement when the user does not select a Node
+
+When the user does not select a Node on the create page, Coolify places the new
+application on the allowed Node with the fewest workloads
+(`placementNode()`: role, network, CPU architecture, capacity, and the access
+grants of the user). A new stack can use **Spread across the cluster**: each
+group of services that share a volume goes to one Node, and the other
+services go to the least loaded Nodes (decision 0023, step 3). This happens
+only when a resource is created. Coolify still does not move a running
+workload by itself, and there is no automatic failover (P7).
+
 ## Not decided here
 
 - Automatic placement ("any Node").

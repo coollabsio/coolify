@@ -25,7 +25,7 @@ current v5 architecture.
 | [0011: Build private Git repositories](0011-node-git-sources.md) | Accepted | Reuse v4 Git sources and webhooks; send a short-lived credential for each build; previews ship later. |
 | [0012: Pass build-time secrets as secret mounts](0012-node-build-secrets.md) | Accepted | Secret build variables are BuildKit secret mounts only, never build args. |
 | [0013: Upgrade host Sentinel one Node at a time](0013-host-sentinel-upgrades.md) | Accepted | Pinned version; manual cluster upgrade one Node at a time; SSH rollback after 5 minutes without a reconnect. |
-| [0014: Keep explicit placement](0014-node-placement-and-failure.md) | Accepted | The user selects Nodes; no automatic failover; notify, then move or restore from backup. |
+| [0014: Keep explicit placement](0014-node-placement-and-failure.md) | Accepted, amended | The user selects Nodes; no automatic failover; notify, then move or restore from backup. |
 | [0015: Release Nodes as beta](0015-node-release-criteria.md) | Accepted | An instance setting replaces `SENTINEL_HOST_ENABLED`; lists the beta and stable criteria. |
 | [0016: Publish TCP and UDP ports](0016-node-port-publishing.md) | Accepted, amended | Host and container port on every Node of the cluster, with nftables NAT, reserved ports, an optional source allow-list, and no redeploy. |
 | [0017: Roll back by image digest](0017-node-revision-rollback.md) | Accepted | Revisions store the digest; the registry keeps 10 images; rebuild or pull when the image is gone. |
