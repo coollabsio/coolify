@@ -209,6 +209,8 @@ Route::group([
     Route::post('/cluster-databases/{uuid}/restart', [ClusterDatabasesController::class, 'restart'])->middleware(['api.ability:deploy']);
     Route::get('/cluster-databases/{uuid}/backups', [ClusterDatabasesController::class, 'backups'])->middleware(['api.ability:read']);
     Route::post('/cluster-databases/{uuid}/backups', [ClusterDatabasesController::class, 'createBackup'])->middleware(['api.ability:write']);
+    Route::patch('/cluster-databases/{uuid}/backups/{backup_uuid}', [ClusterDatabasesController::class, 'updateBackup'])->middleware(['api.ability:write']);
+    Route::delete('/cluster-databases/{uuid}/backups/{backup_uuid}', [ClusterDatabasesController::class, 'deleteBackup'])->middleware(['api.ability:delete']);
     Route::post('/cluster-databases/{uuid}/backups/{backup_uuid}/run', [ClusterDatabasesController::class, 'runBackup'])->middleware(['api.ability:write', 'api.ability:deploy']);
     Route::get('/cluster-databases/{uuid}/backups/{backup_uuid}/executions', [ClusterDatabasesController::class, 'backupExecutions'])->middleware(['api.ability:read']);
     Route::get('/cluster-applications/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'index'])

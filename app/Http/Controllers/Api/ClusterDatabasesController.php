@@ -82,6 +82,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -98,6 +99,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -114,6 +116,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -130,6 +133,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -146,6 +150,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -162,6 +167,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -178,6 +184,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -194,6 +201,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 201, description: 'The database is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -230,7 +238,7 @@ class ClusterDatabasesController extends Controller
 
     #[OA\Patch(
         summary: 'Update',
-        description: 'Update a cluster database. `credentials` changes the credential variables, keyed by name (for example `POSTGRES_PASSWORD`). A locked credential cannot change. The container gets new values at the next deploy.',
+        description: 'Update a cluster database. `credentials` changes the credential variables, keyed by name (for example `POSTGRES_PASSWORD`). A locked credential cannot change. The credentials apply at the next deploy, and the response shows the saved values, not the values of the running container. The database engine reads a database name (for example `POSTGRES_DB`) only when it creates a new data volume, so the backup schedules keep their `databases_to_backup`, as in v4. Change a schedule with PATCH `/cluster-databases/{uuid}/backups/{backup_uuid}` when the running database has another name.',
         path: '/cluster-databases/{uuid}',
         operationId: 'update-cluster-database-by-uuid',
         security: [['bearerAuth' => []]],
@@ -311,6 +319,7 @@ class ClusterDatabasesController extends Controller
             new OA\Response(response: 200, description: 'The deployment is queued.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterDeploymentQueued')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
@@ -426,6 +435,108 @@ class ClusterDatabasesController extends Controller
         ), 201));
     }
 
+    #[OA\Patch(
+        summary: 'Update Backup Schedule',
+        description: 'Change a backup schedule. Fields that the request does not have keep their values. `databases_to_backup` is a comma-separated list; empty means the database of the `POSTGRES_DB`, `MYSQL_DATABASE`, `MARIADB_DATABASE`, or `CLICKHOUSE_DB` credential at the time of the run.',
+        path: '/cluster-databases/{uuid}/backups/{backup_uuid}',
+        operationId: 'update-cluster-database-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster database.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'backup_uuid', in: 'path', description: 'UUID of the backup schedule.', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                'frequency' => new OA\Property(property: 'frequency', type: 'string'),
+                'enabled' => new OA\Property(property: 'enabled', type: 'boolean'),
+                's3_storage_uuid' => new OA\Property(property: 's3_storage_uuid', type: 'string'),
+                'databases_to_backup' => new OA\Property(property: 'databases_to_backup', type: 'string', nullable: true),
+                'dump_all' => new OA\Property(property: 'dump_all', type: 'boolean'),
+                'database_backup_retention_amount_s3' => new OA\Property(property: 'database_backup_retention_amount_s3', type: 'integer'),
+                'database_backup_retention_days_s3' => new OA\Property(property: 'database_backup_retention_days_s3', type: 'integer'),
+                'database_backup_retention_max_storage_s3' => new OA\Property(property: 'database_backup_retention_max_storage_s3', type: 'number'),
+                'timeout' => new OA\Property(property: 'timeout', type: 'integer'),
+                'missing_backup_notification_days' => new OA\Property(property: 'missing_backup_notification_days', type: 'integer'),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'The schedule.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterDatabaseBackup')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function updateBackup(Request $request): JsonResponse
+    {
+        [$workload, $backup] = $this->backup($request);
+        if ($backup === null) {
+            return response()->json(['message' => 'Backup schedule not found.'], 404);
+        }
+        $this->authorize('update', $workload);
+        $invalid = $this->validateRequest($request, [
+            ...collect(ManageNodeDatabaseBackups::scheduleRules())->map(fn (array $rules): array => ['sometimes', ...array_diff($rules, ['required', 'sometimes'])])->all(),
+            's3_storage_uuid' => 'sometimes|string',
+        ]);
+        if ($invalid !== null) {
+            return $invalid;
+        }
+        $s3 = $request->has('s3_storage_uuid')
+            ? ManageNodeDatabaseBackups::storages($workload, $backup->s3_storage_id)->where('uuid', (string) $request->input('s3_storage_uuid'))->first()
+            : $backup->s3;
+        $input = [
+            'frequency' => $backup->frequency,
+            'enabled' => (bool) $backup->enabled,
+            'databases_to_backup' => $backup->databases_to_backup,
+            'dump_all' => (bool) $backup->dump_all,
+            'database_backup_retention_amount_s3' => $backup->database_backup_retention_amount_s3,
+            'database_backup_retention_days_s3' => $backup->database_backup_retention_days_s3,
+            'database_backup_retention_max_storage_s3' => $backup->database_backup_retention_max_storage_s3,
+            'timeout' => $backup->timeout,
+            'missing_backup_notification_days' => $backup->missing_backup_notification_days,
+            ...$request->only(array_keys(ManageNodeDatabaseBackups::scheduleRules())),
+            's3_storage' => $s3,
+        ];
+
+        return $this->runClusterAction(fn (): JsonResponse => response()->json($this->backupResponse(
+            ManageNodeDatabaseBackups::make()->updateSchedule($workload, $backup, $input, $request->user(), 'api')->refresh()->load('s3'),
+        )));
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Backup Schedule',
+        description: 'Delete a backup schedule and its runs. With `delete_s3=true`, also the files of the runs in S3.',
+        path: '/cluster-databases/{uuid}/backups/{backup_uuid}',
+        operationId: 'delete-cluster-database-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster database.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'backup_uuid', in: 'path', description: 'UUID of the backup schedule.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'delete_s3', in: 'query', description: 'Also delete the files in S3. The default is false.', required: false, schema: new OA\Schema(type: 'boolean', default: false)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'The schedule is deleted.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function deleteBackup(Request $request): JsonResponse
+    {
+        [$workload, $backup] = $this->backup($request);
+        if ($backup === null) {
+            return response()->json(['message' => 'Backup schedule not found.'], 404);
+        }
+        $this->authorize('delete', $workload);
+
+        return $this->runClusterAction(function () use ($request, $workload, $backup): JsonResponse {
+            ManageNodeDatabaseBackups::make()->deleteSchedule($workload, $backup, $request->boolean('delete_s3'), 'api');
+
+            return response()->json(['message' => 'Backup schedule deleted.']);
+        });
+    }
+
     #[OA\Post(
         summary: 'Run Backup',
         description: 'Run a backup schedule now.',
@@ -524,6 +635,9 @@ class ClusterDatabasesController extends Controller
             'dump_all' => (bool) $backup->dump_all,
             'database_backup_retention_amount_s3' => $backup->database_backup_retention_amount_s3,
             'database_backup_retention_days_s3' => $backup->database_backup_retention_days_s3,
+            'database_backup_retention_max_storage_s3' => $backup->database_backup_retention_max_storage_s3,
+            'timeout' => $backup->timeout,
+            'missing_backup_notification_days' => $backup->missing_backup_notification_days,
             'created_at' => $backup->created_at,
         ];
     }

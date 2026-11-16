@@ -8,7 +8,6 @@ use App\Actions\Node\RestoreNodeDatabase;
 use App\Models\NodeWorkload;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ScheduledDatabaseBackupExecution;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -139,41 +138,25 @@ class DatabaseBackups extends Component
             'timeout' => ['required', 'integer', 'min:60', 'max:36000'],
             'missingBackupNotificationDays' => ['required', 'integer', 'min:0', 'max:365'],
         ], ['databasesToBackup.regex' => 'Enter database names separated by commas. A name has letters, digits, `_`, and `-`.']);
-        if (! validate_cron_expression($this->frequency)) {
-            $this->addError('frequency', 'The frequency must be a valid cron or human expression.');
+        try {
+            ManageNodeDatabaseBackups::make()->updateSchedule($this->workload, $backup, [
+                'frequency' => $this->frequency,
+                'databases_to_backup' => $this->databasesToBackup,
+                'dump_all' => $this->dumpAll,
+                's3_storage' => $this->storages($backup->s3_storage_id)->whereKey((int) $this->s3StorageId)->first(),
+                'database_backup_retention_amount_s3' => $this->retentionAmountS3,
+                'database_backup_retention_days_s3' => $this->retentionDaysS3,
+                'database_backup_retention_max_storage_s3' => $this->retentionMaxStorageS3,
+                'timeout' => $this->timeout,
+                'missing_backup_notification_days' => $this->missingBackupNotificationDays,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $fields = ['frequency' => 'frequency', 's3_storage' => 's3StorageId'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
 
             return;
-        }
-        // The current storage stays selectable while it is unusable, so other settings can be saved.
-        $s3 = $this->storages($backup->s3_storage_id)->whereKey((int) $this->s3StorageId)->first();
-        if ($s3 === null) {
-            $this->addError('s3StorageId', 'Select a usable S3 storage of the team.');
-
-            return;
-        }
-        $this->authorizeS3Storage($s3);
-
-        $backup->fill([
-            'frequency' => $this->frequency,
-            'databases_to_backup' => filled($this->databasesToBackup) ? $this->databasesToBackup : null,
-            'dump_all' => $this->dumpAll,
-            's3_storage_id' => $s3->id,
-            'database_backup_retention_amount_s3' => $this->retentionAmountS3,
-            'database_backup_retention_days_s3' => $this->retentionDaysS3,
-            'database_backup_retention_max_storage_s3' => $this->retentionMaxStorageS3,
-            'timeout' => $this->timeout,
-            'missing_backup_notification_days' => $this->missingBackupNotificationDays,
-        ]);
-        $changedFields = auditChangedFields($backup);
-        $backup->save();
-        $backup->syncS3Storages([$s3->id]);
-        if ($changedFields !== []) {
-            auditLog('ui.database.backup_schedule_updated', [
-                'team_id' => $this->workload->team_id,
-                'database_uuid' => $this->workload->uuid,
-                'backup_uuid' => $backup->uuid,
-                'changed_fields' => $changedFields,
-            ]);
         }
         $this->dispatch('success', 'Backup schedule saved.');
     }
@@ -260,22 +243,12 @@ class DatabaseBackups extends Component
         }
         $backup = $this->backup();
         try {
-            if (in_array('delete_associated_backups_s3', $selectedActions, true)) {
-                $backup->executions()->get()->each(fn (ScheduledDatabaseBackupExecution $execution) => $execution->deleteS3Copies());
-            }
-            $backup->executions()->delete();
-            $backup->delete();
+            ManageNodeDatabaseBackups::make()->deleteSchedule($this->workload, $backup, in_array('delete_associated_backups_s3', $selectedActions, true));
         } catch (Throwable $exception) {
             $this->dispatch('error', 'Could not delete the backup schedule: '.$exception->getMessage());
 
             return false;
         }
-        auditLog('ui.database.backup_schedule_deleted', [
-            'team_id' => $this->workload->team_id,
-            'database_uuid' => $this->workload->uuid,
-            'database_name' => $this->workload->name,
-            'backup_uuid' => $backup->uuid,
-        ]);
         $this->dispatch('success', 'Backup schedule deleted.');
         $this->redirectRoute('project.cluster-application.backups', $this->routeParameters(), navigate: true);
 
@@ -307,12 +280,6 @@ class DatabaseBackups extends Component
     private function supportsDumps(): bool
     {
         return $this->workload->database_type?->dumpEngine() !== null;
-    }
-
-    /** An S3 storage that no backup schedule of this application uses yet is a team credential. */
-    private function authorizeS3Storage(S3Storage $s3): void
-    {
-        ManageNodeDatabaseBackups::authorizeStorage($this->workload, $s3, auth()->user());
     }
 
     private function backup(): ScheduledDatabaseBackup
