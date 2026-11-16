@@ -85,7 +85,7 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
             return;
         }
         // A close event of a pull request can follow its push at once, so the removal waits for the deploy.
-        if (! $this->deleteFromCoolifyOnly && $this->hasActiveOperation($workload)) {
+        if (! $this->deleteFromCoolifyOnly && self::hasActiveOperation($workload)) {
             $this->release(15);
 
             return;
@@ -110,7 +110,8 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
     }
 
     /** Whether a deploy or lifecycle action of the application or of one of its previews still runs. */
-    private function hasActiveOperation(NodeWorkload $workload): bool
+    /** A deploy or a lifecycle action of the workload or of a preview is not finished. */
+    public static function hasActiveOperation(NodeWorkload $workload): bool
     {
         return NodeOperation::query()
             ->whereIn('node_workload_id', $workload->previews()->withoutGlobalScopes()->pluck('id')->push($workload->id))

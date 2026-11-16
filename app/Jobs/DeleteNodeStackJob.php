@@ -12,6 +12,7 @@ use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -24,7 +25,10 @@ class DeleteNodeStackJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    private const WAIT_FOR_OPERATIONS_SECONDS = 1800;
+
+    /** Waiting for an active operation releases the job; any exception fails it. */
+    public int $maxExceptions = 1;
 
     public int $timeout = 900;
 
@@ -46,7 +50,12 @@ class DeleteNodeStackJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueFor(): int
     {
-        return $this->timeout + 60;
+        return $this->timeout + self::WAIT_FOR_OPERATIONS_SECONDS + 60;
+    }
+
+    public function retryUntil(): Carbon
+    {
+        return now()->addSeconds(self::WAIT_FOR_OPERATIONS_SECONDS);
     }
 
     public function handle(): void
@@ -55,7 +64,15 @@ class DeleteNodeStackJob implements ShouldBeUnique, ShouldQueue
         if ($stack === null) {
             return;
         }
-        foreach ($stack->workloads()->withoutGlobalScopes()->pluck('id') as $workloadId) {
+        // The delete of a service waits for its active deploy or lifecycle action. It runs inline
+        // here, where it cannot release itself, so the stack job waits for every service instead.
+        $services = $stack->workloads()->withoutGlobalScopes()->get();
+        if ($services->contains(fn (NodeWorkload $workload): bool => DeleteNodeWorkloadJob::hasActiveOperation($workload))) {
+            $this->release(15);
+
+            return;
+        }
+        foreach ($services->pluck('id') as $workloadId) {
             try {
                 (new DeleteNodeWorkloadJob($workloadId, $this->requestedById, deleteVolumes: $this->deleteVolumes))->handle();
             } catch (Throwable $exception) {
