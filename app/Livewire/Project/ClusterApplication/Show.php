@@ -58,6 +58,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -237,7 +238,7 @@ class Show extends Component
     {
         $operation = null;
         try {
-            $this->authorize('update', $this->workload);
+            $this->authorize('deploy', $this->workload);
             if (! $this->ensureHasServer()) {
                 return;
             }
@@ -290,7 +291,7 @@ class Show extends Component
      */
     public function rollback(string $revisionUuid): void
     {
-        $this->authorize('update', $this->workload);
+        $this->authorize('deploy', $this->workload);
         $revision = $this->workload->revisions()->where('uuid', $revisionUuid)->firstOrFail();
         try {
             $rollback = RollbackNodeWorkload::run($this->workload, $revision, auth()->user());
@@ -315,7 +316,7 @@ class Show extends Component
 
     public function cancelBuild(): void
     {
-        $this->authorize('update', $this->workload);
+        $this->authorize('deploy', $this->workload);
         $build = $this->workload->builds()->where('uuid', $this->buildUuid)->firstOrFail();
         CancelNodeBuild::run($build);
         $this->dispatch('success', 'Build cancelled.');
@@ -767,6 +768,7 @@ class Show extends Component
                 ->where('node_cluster_id', $source->node_cluster_id)
                 ->whereDoesntHave('workloads', fn ($query) => $query->whereKey($this->workload->id))
                 ->firstOrFail();
+            $this->authorize('placeResource', $target);
             $revision = $this->workload->revisions()->latest('id')->firstOrFail();
             $recovery = NotifyNodeReachability::isOffline($source);
             $hasVolumes = $this->workload->hasVolumesWithData();
@@ -810,7 +812,7 @@ class Show extends Component
             ->whereKeyNot($sources->modelKeys())
             ->orderBy('name')
             ->get()
-            ->filter(fn (Node $node): bool => $node->role->runsWorkloads());
+            ->filter(fn (Node $node): bool => $node->role->runsWorkloads() && Gate::allows('placeResource', $node));
         $architectures = $targets->isEmpty() ? null : ReadImageArchitectures::forWorkload($this->workload);
 
         return [
@@ -968,7 +970,7 @@ class Show extends Component
     private function queueLifecycle(NodeWorkloadAction $action): void
     {
         try {
-            $this->authorize('update', $this->workload);
+            $this->authorize('deploy', $this->workload);
             if (! $this->ensureHasServer()) {
                 return;
             }
@@ -1533,8 +1535,8 @@ class Show extends Component
         $this->databaseImage = (string) $this->workload->revisions()->latest('id')->value('image');
         $variables = $this->workload->environment_variables()->whereIn('key', array_column($type->credentials(), 'key'))->get()->keyBy('key');
         $this->lockedDatabaseCredentials = $variables->filter(fn ($variable): bool => (bool) $variable->is_shown_once)->keys()->values()->all();
-        // Livewire sends public properties to the browser, so only users who can update the database get the values.
-        $this->databaseCredentials = auth()->user()?->can('update', $this->workload)
+        // Livewire sends public properties to the browser, so only users who can read its secrets get the values.
+        $this->databaseCredentials = auth()->user()?->can('viewSensitive', $this->workload)
             ? collect($type->credentials())
                 ->mapWithKeys(fn (array $credential): array => [$credential['key'] => in_array($credential['key'], $this->lockedDatabaseCredentials, true) ? '' : (string) $variables->get($credential['key'])?->value])
                 ->all()
@@ -1643,6 +1645,9 @@ class Show extends Component
             $this->addError($errorField, "This credential is for {$credential->registry}, but the image is in ".DockerRegistryLogins::registryFromImage($image).'.');
 
             return null;
+        }
+        if ($credential->id !== $this->workload->registry_credential_id) {
+            $this->authorize('useTeamCredentials', $this->workload);
         }
 
         return $credential;

@@ -15,6 +15,7 @@ class ApiAbility extends CheckForAnyAbility
      */
     public const SCOPED_ACCESS_ROUTES = [
         'applications',
+        'cluster-applications',
         'services',
         'databases',
         'projects',

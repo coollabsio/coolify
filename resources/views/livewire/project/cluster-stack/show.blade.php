@@ -33,7 +33,7 @@
                 @endif
             @endif
         </div>
-        @can('update', $stack)
+        @can('deploy', $stack)
             <x-forms.button wire:click="deploy" :disabled="in_array($stack->deploy_status, ['queued', 'deploying'], true)">
                 {{ in_array($stack->deploy_status, ['queued', 'deploying'], true) ? 'Deploying…' : 'Deploy' }}
             </x-forms.button>

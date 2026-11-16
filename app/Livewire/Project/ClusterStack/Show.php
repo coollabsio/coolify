@@ -48,7 +48,7 @@ class Show extends Component
 
     public function deploy(): void
     {
-        $this->authorize('update', $this->stack);
+        $this->authorize('deploy', $this->stack);
         if ($this->stack->deploy_status === 'deploying') {
             $this->dispatch('error', 'This stack is deploying. Wait until the deployment finishes.');
 

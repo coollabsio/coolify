@@ -15,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -107,6 +108,8 @@ class VolumeBackups extends Component
 
             return;
         }
+        // An S3 storage that this application does not use yet is a team credential.
+        $this->authorize('useTeamCredentials', $this->workload);
 
         $backup = $volume->scheduledBackups()->create([
             'team_id' => $this->workload->team_id,
@@ -163,6 +166,9 @@ class VolumeBackups extends Component
             $this->addError('s3StorageId', 'Select a usable S3 storage of the team.');
 
             return;
+        }
+        if ($s3->id !== (int) $backup->s3_storage_id) {
+            $this->authorize('useTeamCredentials', $this->workload);
         }
 
         $backup->fill([
@@ -391,7 +397,7 @@ class VolumeBackups extends Component
             ->where('node_cluster_id', $current->node_cluster_id)
             ->orderBy('name')
             ->get()
-            ->filter(fn (Node $node): bool => $node->role->runsWorkloads() && $this->supportsBackups($node))
+            ->filter(fn (Node $node): bool => $node->role->runsWorkloads() && $this->supportsBackups($node) && Gate::allows('placeResource', $node))
             ->sortBy(fn (Node $node): int => $node->id === $current->id ? 0 : 1)
             ->values();
     }

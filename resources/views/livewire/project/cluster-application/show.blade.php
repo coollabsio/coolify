@@ -51,10 +51,10 @@
             </div>
         </div>
         <div class="w-full xl:hidden">
-            @can('update', $workload)
+            @can('deploy', $workload)
                 <x-cluster-applications.deployment-actions id="cluster-application-mobile-actions"
                     :is-running="$isRunning" :container-present="$containerPresent" class="mb-3 flex w-full">
-                    @if ($moveTargetOptions !== [])
+                    @if ($moveTargetOptions !== [] && auth()->user()->can('update', $workload))
                         <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                             @click="open = false; document.getElementById('cluster-application-move-trigger')?.click()"
@@ -89,7 +89,7 @@
                         <button id="cluster-application-restart-trigger" type="button">Restart</button>
                     </x-slot:trigger>
                 </x-modal-confirmation>
-                @if ($moveTargetOptions !== [])
+                @if ($moveTargetOptions !== [] && auth()->user()->can('update', $workload))
                     @can('update', $workload)
                         <x-modal-input title="Move to another server" :subtitle="$workload->name" :wireIgnore="false">
                             <x-slot:content>
@@ -163,10 +163,10 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-cluster-applications.links :workload="$workload" />
                         </div>
-                        @can('update', $workload)
+                        @can('deploy', $workload)
                             <x-cluster-applications.deployment-actions id="cluster-application-desktop-actions"
                                 :is-running="$isRunning" :container-present="$containerPresent">
-                                @if ($moveTargetOptions !== [])
+                                @if ($moveTargetOptions !== [] && auth()->user()->can('update', $workload))
                                     <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('cluster-application-move-trigger')?.click()"

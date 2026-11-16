@@ -157,7 +157,7 @@ class ClusterApplicationsController extends Controller
         if ($workload === null) {
             return response()->json(['message' => 'Cluster application not found.'], 404);
         }
-        $this->authorize('update', $workload);
+        $this->authorize('deploy', $workload);
 
         $validator = customApiValidator($request->all(), ['revision_uuid' => 'required|string']);
         $extraFields = array_diff(array_keys($request->all()), ['revision_uuid']);

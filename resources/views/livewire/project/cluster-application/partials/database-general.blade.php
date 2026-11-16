@@ -2,7 +2,7 @@
     $databaseType = $workload->database_type;
     // Like v4 `started_at`: after the first deploy, the database may have created its data directory with these values.
     $wasDeployed = $workload->operations()->where('command_type', 'workload.deploy.v1')->exists();
-    $canUpdate = auth()->user()->can('update', $workload);
+    $canViewSecrets = auth()->user()->can('viewSensitive', $workload);
 @endphp
 
 <form wire:submit="saveDatabase" class="flex flex-col gap-6">
@@ -31,8 +31,8 @@
             @endif
             <div class="{{ $wasDeployed ? 'mt-4 ' : '' }}grid gap-4 lg:grid-cols-2">
                 @foreach ($databaseType->credentials() as $credential)
-                    @if (! $canUpdate)
-                        <x-forms.input :label="$credential['label']" disabled value="Hidden (only admins can view)" />
+                    @if (! $canViewSecrets)
+                        <x-forms.input :label="$credential['label']" disabled value="Hidden (needs the Read secrets level)" />
                     @elseif (in_array($credential['key'], $lockedDatabaseCredentials, true))
                         <x-forms.input :label="$credential['label']" disabled value="Locked (shown once)"
                             helper="The {{ $credential['key'] }} variable is locked. Change it in Environment Variables." />
@@ -53,8 +53,8 @@
     <x-application.settings-subsection id="connection-section" title="Connection"
         helper="Only other workloads in the cluster can reach the internal hostname." first>
         <div class="space-y-5">
-            @if (! $canUpdate)
-                <x-forms.input :label="$databaseType->label().' URL (internal)'" disabled value="Hidden (only admins can view)" />
+            @if (! $canViewSecrets)
+                <x-forms.input :label="$databaseType->label().' URL (internal)'" disabled value="Hidden (needs the Read secrets level)" />
             @elseif ($lockedDatabaseCredentials !== [])
                 <x-forms.input :label="$databaseType->label().' URL (internal)'" disabled value="Locked (shown once)"
                     helper="A credential variable is locked, so the URL that contains it is not shown." />

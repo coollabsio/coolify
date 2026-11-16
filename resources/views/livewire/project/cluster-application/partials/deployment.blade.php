@@ -189,7 +189,7 @@
                                 @endif
                             </button>
                             @if ($build['isActive'])
-                                @can('update', $workload)
+                                @can('deploy', $workload)
                                     <button type="button" wire:click="cancelBuild" wire:confirm="Cancel this build?"
                                         class="mb-1 font-sans text-xs font-medium text-red-500 underline underline-offset-2 hover:text-red-400">Cancel build</button>
                                 @endcan

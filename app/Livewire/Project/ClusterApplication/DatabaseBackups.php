@@ -115,6 +115,8 @@ class DatabaseBackups extends Component
 
             return;
         }
+        // An S3 storage that this application does not use yet is a team credential.
+        $this->authorize('useTeamCredentials', $this->workload);
         $key = $this->workload->database_type->backupDatabaseKey();
 
         $backup = ScheduledDatabaseBackup::query()->create([
@@ -172,6 +174,9 @@ class DatabaseBackups extends Component
             $this->addError('s3StorageId', 'Select a usable S3 storage of the team.');
 
             return;
+        }
+        if ($s3->id !== (int) $backup->s3_storage_id) {
+            $this->authorize('useTeamCredentials', $this->workload);
         }
 
         $backup->fill([

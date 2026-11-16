@@ -88,9 +88,9 @@
                                     <span class="truncate text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white"
                                         title="{{ $deployment['imageTitle'] }}">{{ $deployment['image'] }}</span>
                                     @if ($deployment['rollbackRevisionUuid'] ?? null)
-                                        @can('update', $workload)
+                                        @can('deploy', $workload)
                                             <span class="relative z-10 ml-auto shrink-0">
-                                                <x-modal-confirmation canGate="update" :canResource="$workload"
+                                                <x-modal-confirmation canGate="deploy" :canResource="$workload"
                                                     title="Roll back to this revision?" buttonTitle="Rollback"
                                                     warningMessage="The application restarts with the image of this deployment. A later deploy or rollback can change it again."
                                                     submitAction="rollback('{{ $deployment['rollbackRevisionUuid'] }}')"
