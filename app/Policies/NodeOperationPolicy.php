@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\NodeOperation;
+use App\Models\NodeWorkload;
 use App\Models\User;
 
 class NodeOperationPolicy
@@ -16,11 +17,19 @@ class NodeOperationPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * The operation of a workload follows the `view` policy of the workload (a stack service: its stack,
+     * a preview: its parent). An operation of a server or cluster, or of a deleted workload, needs read
+     * on the whole team, as the server pages.
      */
     public function view(User $user, NodeOperation $nodeOperation): bool
     {
-        return $user->teams->contains('id', $nodeOperation->node->team_id);
+        $workload = $nodeOperation->node_workload_id === null ? null
+            : NodeWorkload::query()->withoutGlobalScopes()->find($nodeOperation->node_workload_id);
+        if ($workload !== null) {
+            return $user->can('view', $workload);
+        }
+
+        return $nodeOperation->node !== null && $user->can('view', $nodeOperation->node);
     }
 
     /**

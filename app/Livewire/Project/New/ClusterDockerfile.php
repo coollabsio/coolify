@@ -51,7 +51,7 @@ class ClusterDockerfile extends Component
 
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
-        $this->authorize('create', NodeWorkload::class);
+        $this->authorize('create', [NodeWorkload::class, $environment]);
         [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
         [$cluster, $targetNode] = DockerImage::resolveClusterTarget($project, $targetType, $targetUuid);
 

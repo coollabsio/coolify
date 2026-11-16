@@ -8,6 +8,7 @@ use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\ResolveGitCommit;
 use App\Enums\NodeWorkloadSourceType;
 use App\Livewire\Project\New\DockerImage;
+use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
@@ -61,9 +62,15 @@ trait CreatesClusterGitApplication
         return Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
     }
 
+    /** The environment of the page, in the project of the page. */
+    protected function clusterEnvironment(): Environment
+    {
+        return $this->clusterProject()->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+    }
+
     protected function authorizeClusterCredentials(): void
     {
-        $this->authorize('create', NodeWorkload::class);
+        $this->authorize('create', [NodeWorkload::class, $this->clusterEnvironment()]);
         $this->authorize('useTeamCredentials');
     }
 
@@ -95,7 +102,7 @@ trait CreatesClusterGitApplication
         [$cluster, $targetNode] = DockerImage::resolveClusterTarget($project, $targetType, $targetUuid);
 
         if ($this->build_pack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
-            $this->authorize('create', NodeStack::class);
+            $this->authorize('create', [NodeStack::class, $environment]);
             try {
                 $stack = CreateClusterGitStack::run($project, $environment, $cluster, $repository, $branch, auth()->user(), $targetNode, null, $this->base_directory, $this->composeLocation, $githubApp, $privateKey, $targetNode === null && $this->stackPlacement === 'spread');
             } catch (Throwable $exception) {

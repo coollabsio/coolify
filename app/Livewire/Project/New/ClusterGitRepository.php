@@ -82,12 +82,12 @@ class ClusterGitRepository extends Component
 
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
-        $this->authorize('create', NodeWorkload::class);
+        $this->authorize('create', [NodeWorkload::class, $environment]);
         [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
         [$cluster, $targetNode] = DockerImage::resolveClusterTarget($project, $targetType, $targetUuid);
 
         if ($this->buildPack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
-            $this->authorize('create', NodeStack::class);
+            $this->authorize('create', [NodeStack::class, $environment]);
             try {
                 $stack = CreateClusterGitStack::run($project, $environment, $cluster, $this->repository, $this->branch, auth()->user(), $targetNode, $this->name, $this->baseDirectory, $this->composeLocation, spread: $targetNode === null && $this->stackPlacement === 'spread');
             } catch (RuntimeException $exception) {

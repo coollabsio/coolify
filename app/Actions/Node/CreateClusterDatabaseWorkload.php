@@ -40,17 +40,15 @@ class CreateClusterDatabaseWorkload
         if ($cluster->team_id !== $project->team_id) {
             throw new RuntimeException('The cluster does not belong to this project team.');
         }
-        if (! $requestedBy->isAdminOfTeam($project->team_id)) {
-            throw new RuntimeException('The user cannot create resources for this project team.');
-        }
+        CreateClusterDockerImageWorkload::ensureMayCreate($requestedBy, $environment, $targetNode);
         if (! in_array($cluster->network_status, ['active', 'degraded'], true)) {
             throw new RuntimeException('The cluster network is not ready. Wait until the cluster shows the network as active, then try again.');
         }
         $image = filled($image) ? trim($image) : $type->defaultImage();
         $architectures = ReadImageArchitectures::run($image);
 
-        return DB::transaction(function () use ($project, $environment, $cluster, $type, $targetNode, $image, $architectures): NodeWorkload {
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
+        return DB::transaction(function () use ($project, $environment, $cluster, $type, $targetNode, $image, $architectures, $requestedBy): NodeWorkload {
+            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures, $requestedBy);
 
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,

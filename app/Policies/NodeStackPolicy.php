@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\NodeStack;
 use App\Models\User;
 
@@ -19,9 +20,13 @@ class NodeStackPolicy
         return NodeWorkloadPolicy::allowsOn($user, AccessLevel::Read, $nodeStack);
     }
 
-    public function create(User $user): bool
+    /**
+     * As a v4 service: write access on the environment, or on the whole current team without one.
+     * A stack that mounts the Docker socket also needs an admin (NodeStackCompose::ensureMayMountContainerSocket()).
+     */
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /** Every change of the compose file and the settings. */

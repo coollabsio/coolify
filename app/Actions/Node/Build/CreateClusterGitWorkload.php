@@ -52,18 +52,16 @@ class CreateClusterGitWorkload
         if ($environment->project_id !== $project->id || $cluster->team_id !== $project->team_id) {
             throw new RuntimeException('The environment or cluster does not belong to this project.');
         }
-        if (! $requestedBy->isAdminOfTeam($project->team_id)) {
-            throw new RuntimeException('The user cannot deploy resources for this project team.');
-        }
+        CreateClusterDockerImageWorkload::ensureMayCreate($requestedBy, $environment, $targetNode);
         self::ensureSource($project, $repository, $githubApp, $privateKey);
         if (! in_array($cluster->network_status, ['active', 'degraded'], true)) {
             throw new RuntimeException('The cluster network is not ready.');
         }
 
         $registryIsNew = ! $cluster->registry()->exists();
-        $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey, $publishDirectory): NodeWorkload {
+        $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey, $publishDirectory, $requestedBy): NodeWorkload {
             // A build runs on a builder of the architecture of the Node (decision 0020).
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures());
+            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures(), $requestedBy);
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,
                 'project_id' => $project->id,

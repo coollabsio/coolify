@@ -38,6 +38,9 @@ class StartNodeBuild
             if ($workload->mountsContainerSocket()) {
                 NodeStackCompose::ensureMayMountContainerSocket($user, (int) $workload->team_id);
             }
+            if ($user !== null) {
+                SelectBuilderNode::ensureMayBuild($workload, $user);
+            }
             if ($rebuildOf !== null) {
                 if ($workload->builds()->active()->exists()) {
                     throw new RuntimeException('A build of this application is running. Wait for it or cancel it, then roll back again.');

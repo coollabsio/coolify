@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class DockerImage extends Component
@@ -81,13 +82,15 @@ class DockerImage extends Component
                 ->whereIn('role', ['worker', 'controller-worker'])
                 ->onDeployableClusterNetwork()
                 ->orderBy('name')])
-            ->withCount(['nodes as available_nodes_count' => fn ($query) => $query
-                ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker'])
-                ->onDeployableClusterNetwork()])
             ->orderBy('name')
             ->get()
             ->flatMap(function (NodeCluster $cluster): array {
+                // Only the servers where the user may place resources, as for Docker servers.
+                $cluster->setRelation('nodes', $cluster->nodes->filter(fn (Node $node): bool => Gate::allows('placeResource', $node))->values());
+                $cluster->available_nodes_count = $cluster->nodes->count();
+                if ($cluster->available_nodes_count === 0 && ! $cluster->nodes()->get()->contains(fn (Node $node): bool => Gate::allows('placeResource', $node))) {
+                    return [];
+                }
                 $ready = in_array($cluster->network_status, ['active', 'degraded'], true) && $cluster->available_nodes_count > 0;
 
                 $targets = [[
@@ -228,7 +231,7 @@ class DockerImage extends Component
             abort_unless(nodesEnabled(), 404);
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
-            $this->authorize('create', NodeWorkload::class);
+            $this->authorize('create', [NodeWorkload::class, $environment]);
             [$cluster, $targetNode] = self::resolveClusterTarget($project, $targetType, $targetUuid);
             $created = CreateClusterDockerImageWorkload::run(
                 $project,

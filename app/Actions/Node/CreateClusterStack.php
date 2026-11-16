@@ -66,9 +66,7 @@ class CreateClusterStack
         if ($cluster->team_id !== $project->team_id) {
             throw new RuntimeException('The cluster does not belong to this project team.');
         }
-        if (! $requestedBy->isAdminOfTeam($project->team_id)) {
-            throw new RuntimeException('The user cannot create resources for this project team.');
-        }
+        CreateClusterDockerImageWorkload::ensureMayCreate($requestedBy, $environment, $targetNode);
         if ($git !== null) {
             CreateClusterGitWorkload::ensureSource($project, $git->repository, $git->githubApp, $git->privateKey);
         }
@@ -89,7 +87,7 @@ class CreateClusterStack
         $architectures = $spread ? null : self::architectures($cluster, $yaml);
 
         $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory, $architectures, $spread): NodeStack {
-            $node = $spread ? null : CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
+            $node = $spread ? null : CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures, $requestedBy);
             NodeCluster::query()->whereKey($cluster->id)->lockForUpdate()->first();
             $stack = NodeStack::query()->create([
                 'team_id' => $project->team_id,

@@ -80,7 +80,7 @@ class Create extends Component
 
                 return;
             }
-            $this->authorize('create', NodeWorkload::class);
+            $this->authorize('create', [NodeWorkload::class, $environment]);
             Validator::make(['image' => $database_image], ['image' => ['nullable', 'string', 'max:255', new DockerImageFormat]])->validate();
             [$cluster, $targetNode] = request()->filled('server')
                 ? DockerImage::resolveClusterTarget($project, 'node', (string) request()->query('server'))
@@ -102,7 +102,7 @@ class Create extends Component
             ]);
         }
         if ($type->startsWith('one-click-service-') && nodesEnabled() && (request()->filled('cluster') || request()->filled('server'))) {
-            $this->authorize('create', NodeStack::class);
+            $this->authorize('create', [NodeStack::class, $environment]);
             $templates = get_service_templates();
             $template = resolve_service_template_key($type->after('one-click-service-')->value(), $templates);
             $compose = NodeStackCompose::templateCompose((string) $template, $templates);

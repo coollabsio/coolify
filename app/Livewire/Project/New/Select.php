@@ -544,15 +544,18 @@ class Select extends Component
     {
         abort_unless(nodesEnabled(), 404);
 
-        return NodeCluster::query()
+        $cluster = NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->where('uuid', $clusterUuid)
             ->whereIn('network_status', ['active', 'degraded'])
-            ->whereHas('nodes', fn ($query) => $query
+            ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
                 ->whereIn('role', ['worker', 'controller-worker'])
-                ->onDeployableClusterNetwork())
+                ->onDeployableClusterNetwork()])
             ->firstOrFail();
+        abort_if(self::withPlaceableNodes($cluster)->nodes->isEmpty(), 403, 'You cannot place resources on a server of this cluster.');
+
+        return $cluster;
     }
 
     public function setNode(string $nodeUuid)
@@ -566,6 +569,7 @@ class Select extends Component
             ->whereIn('role', ['worker', 'controller-worker'])
             ->onDeployableClusterNetwork()
             ->firstOrFail();
+        abort_unless(Gate::allows('placeResource', $node), 403, 'You cannot place resources on this server.');
 
         return $this->createOnCluster(['server' => $node->uuid]);
     }
@@ -687,16 +691,24 @@ class Select extends Component
                 ->where('is_usable', true)
                 ->whereIn('role', ['worker', 'controller-worker'])
                 ->onDeployableClusterNetwork())
-            ->withCount(['nodes' => fn ($query) => $query
-                ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker'])
-                ->onDeployableClusterNetwork()])
             ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
                 ->whereIn('role', ['worker', 'controller-worker'])
                 ->onDeployableClusterNetwork()
                 ->orderBy('name')])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn (NodeCluster $cluster): NodeCluster => self::withPlaceableNodes($cluster))
+            ->filter(fn (NodeCluster $cluster): bool => $cluster->nodes->isNotEmpty())
+            ->values();
+    }
+
+    /** Keeps only the loaded servers of the cluster where the user may place resources, as for Docker servers. */
+    private static function withPlaceableNodes(NodeCluster $cluster): NodeCluster
+    {
+        $cluster->setRelation('nodes', $cluster->nodes->filter(fn (Node $node): bool => Gate::allows('placeResource', $node))->values());
+        $cluster->nodes_count = $cluster->nodes->count();
+
+        return $cluster;
     }
 }

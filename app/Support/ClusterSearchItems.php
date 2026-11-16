@@ -56,7 +56,7 @@ final class ClusterSearchItems
             'webhooks' => ['label' => 'Webhooks', 'route' => 'project.cluster-application.webhooks', 'keywords' => 'deploy webhook git'],
             'backups' => ['label' => 'Backups', 'route' => 'project.cluster-application.backups', 'keywords' => 'volume backups restore', 'when' => 'volumes'],
             'resource-limits' => ['label' => 'Resource Limits', 'route' => 'project.cluster-application.resource-limits', 'keywords' => 'cpu memory'],
-            'danger' => ['label' => 'Danger Zone', 'route' => 'project.cluster-application.danger', 'keywords' => 'delete remove', 'requires' => 'admin'],
+            'danger' => ['label' => 'Danger Zone', 'route' => 'project.cluster-application.danger', 'keywords' => 'delete remove', 'requires' => 'delete'],
         ],
         // x-node-cluster.sidebar
         'cluster' => [
@@ -98,7 +98,8 @@ final class ClusterSearchItems
     }
 
     /**
-     * Drops every entry when Nodes are off, and the pages that the user may not open: Danger Zone and
+     * Drops every entry when Nodes are off, and the pages that the user may not open: Danger Zone of a
+     * cluster application without `delete` on it (as its sidebar), Danger Zone of a cluster or server and
      * Logs for users who are not an admin of the team (the delete and manageSentinel policies), and
      * Terminal without the canAccessTerminal gate.
      *
@@ -113,13 +114,27 @@ final class ClusterSearchItems
             'terminal' => $user->can('canAccessTerminal'),
         ];
 
+        $deletable = ! $nodesEnabled ? collect() : NodeWorkload::query()
+            ->withoutGlobalScopes()
+            ->where('team_id', $teamId)
+            ->whereIn('id', collect($items)->where('type', 'cluster-application')->pluck('id'))
+            ->with('stack')
+            ->get()
+            ->filter(fn (NodeWorkload $workload): bool => $user->can('delete', $workload))
+            ->pluck('id')
+            ->flip();
+
         return collect($items)
             ->reject(fn (array $item): bool => ! $nodesEnabled && in_array($item['type'] ?? null, self::TYPES, true))
-            ->map(function (array $item) use ($granted): array {
+            ->map(function (array $item) use ($granted, $deletable): array {
                 if (isset($item['pages'])) {
                     $item['pages'] = array_values(array_filter(
                         $item['pages'],
-                        fn (string $key): bool => $granted[self::PAGES[$item['type']][$key]['requires'] ?? ''] ?? true,
+                        fn (string $key): bool => match ($requires = self::PAGES[$item['type']][$key]['requires'] ?? null) {
+                            null => true,
+                            'delete' => $deletable->has($item['id']),
+                            default => $granted[$requires],
+                        },
                     ));
                 }
 

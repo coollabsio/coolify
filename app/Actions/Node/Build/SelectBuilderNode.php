@@ -6,6 +6,8 @@ use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -15,12 +17,18 @@ use RuntimeException;
  * private repository also needs a Sentinel that accepts Git credentials.
  * BuildKit builds for the CPU architecture of its own Node, so the builder
  * has the architecture of the Nodes that run the workload (decision 0020).
+ *
+ * A build that a user started runs only on a builder Node where that user may place
+ * resources (NodePolicy::placeResource), because the build runs the code of the user there. A
+ * build without a user (webhook, reconciler) can use every builder Node.
  */
 class SelectBuilderNode
 {
     use AsAction;
 
-    public function handle(NodeWorkload $workload): Node
+    public const NOT_ALLOWED = 'You cannot place resources on a builder server of this cluster. Ask an admin for access to a builder server, or to deploy this application.';
+
+    public function handle(NodeWorkload $workload, ?User $requestedBy = null): Node
     {
         $clusterIds = $workload->clusterIds();
         if ($clusterIds === []) {
@@ -43,6 +51,12 @@ class SelectBuilderNode
             throw new RuntimeException("No builder server in this cluster has the {$architecture} CPU architecture of the servers that run this application. Turn on the builder role on a server with this architecture. Coolify does not build for another architecture.");
         }
         $candidates = $fitting;
+        if ($requestedBy !== null && $candidates->isNotEmpty()) {
+            $candidates = $candidates->filter(fn (Node $node): bool => Gate::forUser($requestedBy)->allows('placeResource', $node));
+            if ($candidates->isEmpty()) {
+                throw new RuntimeException(self::NOT_ALLOWED);
+            }
+        }
 
         // One build at a time on each builder Node; the job waits for a free one.
         $node = $candidates->first(fn (Node $node): bool => $node->active_builds_count === 0);
@@ -56,6 +70,15 @@ class SelectBuilderNode
         }
 
         return $node;
+    }
+
+    /** Refuses a build of the user before it is queued when the user may not place resources on a builder Node of the cluster. */
+    public static function ensureMayBuild(NodeWorkload $workload, User $user): void
+    {
+        $builders = Node::query()->whereIn('node_cluster_id', $workload->clusterIds())->get()->filter(fn (Node $node): bool => $node->canBuild());
+        if ($builders->isNotEmpty() && ! $builders->contains(fn (Node $node): bool => Gate::forUser($user)->allows('placeResource', $node))) {
+            throw new RuntimeException(self::NOT_ALLOWED);
+        }
     }
 
     /** The CPU architecture of the Nodes that run the workload, or null when it is unknown. */

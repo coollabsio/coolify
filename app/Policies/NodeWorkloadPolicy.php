@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\User;
@@ -24,9 +25,13 @@ class NodeWorkloadPolicy
         return $this->allows($user, AccessLevel::Read, $nodeWorkload);
     }
 
-    public function create(User $user): bool
+    /**
+     * As a v4 application: write access on the environment, or on the whole current team without
+     * one. The create actions also check the placement (`NodePolicy::placeResource`).
+     */
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /** Every change of the settings. */
