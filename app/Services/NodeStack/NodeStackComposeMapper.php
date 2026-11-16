@@ -129,6 +129,8 @@ class NodeStackComposeMapper
      */
     public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null, array $sharedKeys = []): array
     {
+        // As the one `.env` file of a v4 service: a default in one service is the value in every service.
+        $variables += self::defaults($yaml);
         $services = [];
         $fileBytes = 0;
         $fileCount = 0;
@@ -354,6 +356,42 @@ class NodeStackComposeMapper
             '+' => $value !== null ? self::interpolate($operand, $variables) : '',
             default => $value ?? '',
         };
+    }
+
+    /**
+     * The default of each variable that the file gives one, with `${VAR:-default}` or
+     * `${VAR-default}`, outside `content:` mounts. The first default in the file wins. v4 writes
+     * these defaults to the `.env` file of the service, which every container of the service
+     * reads, so `${VAR}` without a default in another service gets the same value. A default with
+     * a variable in it and a `SERVICE_*` variable are left out.
+     *
+     * @param  array<string, mixed>  $yaml
+     * @return array<string, string>
+     */
+    private static function defaults(array $yaml): array
+    {
+        $defaults = [];
+        foreach ($yaml['services'] as $service) {
+            $service = is_array($service) ? $service : [];
+            foreach ((array) ($service['volumes'] ?? []) as $index => $volume) {
+                if (is_array($volume)) {
+                    unset($service['volumes'][$index]['content']);
+                }
+            }
+            array_walk_recursive($service, function ($value) use (&$defaults): void {
+                if (! is_string($value)) {
+                    return;
+                }
+                preg_match_all('/(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^${}]*)\}/', $value, $matches, PREG_SET_ORDER);
+                foreach ($matches as [, $name, $default]) {
+                    if (! str_starts_with($name, 'SERVICE_')) {
+                        $defaults[$name] ??= $default;
+                    }
+                }
+            });
+        }
+
+        return $defaults;
     }
 
     /**

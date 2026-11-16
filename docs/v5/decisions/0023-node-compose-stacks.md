@@ -342,6 +342,40 @@ two items were open in **Not decided here**. They are decided as follows.
   show a warning: "This service mounts the Docker socket. It has full
   control of the server <server>, including every container on it."
 
+- **Tested templates (2026-11-16).** On cluster 1, deployed as the root
+  user, each service that mounts the socket got
+  `/run/podman/podman.sock` read-write at its path. The Podman API of the
+  Nodes is Podman Engine 6.1.4.
+
+  | Template | Result | Socket use |
+  | --- | --- | --- |
+  | `dozzle` | Works | The event stream lists the containers of the Node. |
+  | `portainer` | Works | Through the local Docker endpoint, `_ping`, `version`, `info`, `containers/json`, `images/json`, `volumes`, `networks`, `system/df`, and `containers/<id>/json`, `stats`, `logs`, and `top` return 200. |
+  | `diun` | Works | It finds the 14 images of the Node. It cannot read the images of the cluster registry, of a private registry, and of local builds (`localhost/...`). That is registry access, not the socket. |
+  | `homepage` | Works, with a change | The template does not mount the socket (the line is a comment). With `- /var/run/docker.sock:/var/run/docker.sock:ro` and `my-docker: socket: /var/run/docker.sock`, `/api/docker/statuses` and `/api/docker/stats` return the container. |
+  | `glances` | Not available | `privileged` and `pid: host`. Without them, `/api/4/containers` returns the containers with their stats. |
+  | `beszel` | Not available | `network_mode: host` of `beszel-agent`. Without it, the hub reaches the agent through the shared volume `beszel_socket`, the system is `up`, and the hub stores the containers and their stats. |
+  | `authentik` | Works, without the Docker integration | The server and the worker run. The worker runs as uid 1000, because `user: root` is ignored, so it gets `Permission denied` on the socket. |
+
+  The test found and fixed one mapping defect: a `${VAR}` without a default
+  was empty when another service of the stack gives a default
+  (`${VAR:-true}`). v4 writes the defaults to the `.env` file of the service,
+  so now the mapper gives every service the first default of the file.
+  The authentik worker did not start without this fix.
+- **Known limits.**
+  - Podman: a stats call with `stream=false` returns zero values in
+    `precpu_stats`. A tool that computes the CPU from one call shows 0 %
+    (the CPU of `homepage`). Tools that compare two calls (`glances`,
+    `portainer`) show the CPU.
+  - Two socket paths in one service are the same Podman socket. `glances`
+    with `/var/run/docker.sock` and `/run/user/1000/podman/podman.sock`
+    lists each container two times, once for each engine.
+  - The socket is `root:root` with mode `0660`. A container that does not run
+    as root cannot use it. `user:` is not supported on Nodes yet (Sentinel
+    has no user field in `workload.deploy`), so the `user: root` of the
+    authentik worker is ignored and its Docker integration does not work.
+  - A `:ro` socket mount is read-write.
+
 ### Placement on several Nodes
 
 - **Choice.** The template target list has **Spread across the cluster**
