@@ -113,6 +113,7 @@ Thank you so much!
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
 * [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
+* [Groundmail](https://groundmail.dev/lp/coolify/?utm_source=github&utm_medium=readme&utm_campaign=coollabsio-coolify) - Email API and SMTP relay for the apps you deploy
 
 ### Small Sponsors
 
