@@ -864,13 +864,13 @@ class Application extends BaseModel
                 $base_dir = $this->base_directory ?? '/';
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/branch/{$this->git_branch}{$base_dir}";
+                        return "{$this->sourceRepositoryUrl()}/src/branch/{$this->git_branch}{$base_dir}";
                     }
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
+                        return "{$this->sourceRepositoryUrl()}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
+                    return "{$this->sourceRepositoryUrl()}/tree/{$this->git_branch}{$base_dir}";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
@@ -881,7 +881,7 @@ class Application extends BaseModel
                     return "{$httpsRepository}/tree/{$this->git_branch}{$base_dir}";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
     }
@@ -891,14 +891,14 @@ class Application extends BaseModel
         return Attribute::make(
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
-                    return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
+                    return "{$this->sourceRepositoryUrl()}/settings/hooks";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/settings/hooks";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
     }
@@ -909,29 +909,42 @@ class Application extends BaseModel
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
-                        return "{$this->source->html_url}/{$this->git_repository}/commits/branch/{$this->git_branch}";
+                        return "{$this->sourceRepositoryUrl()}/commits/branch/{$this->git_branch}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
+                    return "{$this->sourceRepositoryUrl()}/commits/{$this->git_branch}";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/commits/{$this->git_branch}";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
+    }
+
+    /**
+     * The raw repository value is shown as a link, so only an http(s) URL is returned.
+     */
+    private function httpGitRepositoryUrl(): ?string
+    {
+        $repository = $this->git_repository;
+        if (! is_string($repository) || ! in_array(parse_url($repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $repository;
     }
 
     public function gitCommitLink($link): ?string
     {
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
-                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
+                return "{$this->sourceRepositoryUrl()}/commits/{$link}";
             }
 
-            return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
+            return "{$this->sourceRepositoryUrl()}/commit/{$link}";
         }
 
         $git_repository = $this->git_repository;
@@ -950,6 +963,24 @@ class Application extends BaseModel
         $url = $url->withPath(Str::finish($url->getPath(), '/').$commitPath.'/'.$link);
 
         return $url->__toString();
+    }
+
+    /**
+     * Web URL of the repository for an application with a Git source.
+     * The repository is usually stored as owner/name, but deploy key and public applications can store a full SSH or http(s) URL.
+     */
+    private function sourceRepositoryUrl(): string
+    {
+        $httpsRepository = $this->httpsUrlFromSshGitRepository();
+        if (is_string($httpsRepository)) {
+            return $httpsRepository;
+        }
+
+        if (in_array(parse_url($this->git_repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
+            return (string) Url::fromString(Str::replaceEnd('.git', '', $this->git_repository))->withUserInfo('');
+        }
+
+        return "{$this->source->html_url}/{$this->git_repository}";
     }
 
     private function httpsUrlFromSshGitRepository(): ?string

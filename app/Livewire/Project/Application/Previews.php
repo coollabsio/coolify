@@ -7,9 +7,11 @@ use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
 class Previews extends Component
@@ -38,11 +40,19 @@ class Previews extends Component
 
     public ?string $manualDockerTag = null;
 
-    protected $rules = [
-        'previewDockerTags.*' => 'string|nullable',
-        'manualPullRequestId' => 'integer|min:1|nullable',
-        'manualDockerTag' => 'string|nullable',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'previewDockerTags.*' => ValidationPatterns::dockerImageTagRules(),
+            'manualPullRequestId' => 'integer|min:1|nullable',
+            'manualDockerTag' => ValidationPatterns::dockerImageTagRules(),
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return ['previewDockerTags.*' => 'docker tag'];
+    }
 
     public function mount()
     {
@@ -135,6 +145,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -211,6 +222,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
@@ -257,6 +269,17 @@ class Previews extends Component
         }
     }
 
+    private function validatePreviewInput(?string $pullRequestHtmlUrl, ?string $dockerRegistryImageTag): void
+    {
+        Validator::make([
+            'pull_request_html_url' => $pullRequestHtmlUrl,
+            'docker_registry_image_tag' => $dockerRegistryImageTag,
+        ], [
+            'pull_request_html_url' => ['nullable', 'url:http,https', 'max:2048'],
+            'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        ])->validate();
+    }
+
     private function saveDockerTagWithAudit(ApplicationPreview $preview, string $dockerRegistryImageTag): void
     {
         $preview->docker_registry_image_tag = $dockerRegistryImageTag;
@@ -288,6 +311,7 @@ class Previews extends Component
     public function addDockerImagePreview()
     {
         $this->authorize('deploy', $this->application);
+        $this->manualDockerTag = filled($this->manualDockerTag) ? trim($this->manualDockerTag) : null;
         $this->validateOnly('manualPullRequestId');
         $this->validateOnly('manualDockerTag');
 
@@ -303,9 +327,7 @@ class Previews extends Component
             return;
         }
 
-        $dockerTag = str($this->manualDockerTag)->trim()->value();
-
-        $this->add_and_deploy($this->manualPullRequestId, null, $dockerTag);
+        $this->add_and_deploy($this->manualPullRequestId, null, $this->manualDockerTag);
 
         $this->manualPullRequestId = null;
         $this->manualDockerTag = null;

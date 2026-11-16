@@ -2,6 +2,7 @@
 
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\GitlabApp;
@@ -169,4 +170,63 @@ it('saves the docker tag of the remaining preview after another preview is delet
         ->assertHasNoErrors();
 
     expect($previewB->fresh()->docker_registry_image_tag)->toBe('tag-b');
+});
+
+it('rejects docker tags that are not valid image tags', function (string $method) {
+    $this->application->update(['build_pack' => 'dockerimage']);
+    $preview = ApplicationPreview::create(['application_id' => $this->application->id, 'pull_request_id' => 7, 'pull_request_html_url' => '', 'docker_registry_image_tag' => 'pr-7']);
+    $invalidTag = "it's not a tag";
+
+    $component = Livewire::test(Previews::class, ['application' => $this->application]);
+    match ($method) {
+        'save_preview' => $component->set("previewDockerTags.{$preview->id}", $invalidTag)->call('save_preview', $preview->id),
+        'add' => $component->call('add', 7, null, $invalidTag),
+        'deploy' => $component->call('deploy', 7, null, false, $invalidTag),
+    };
+
+    expect($preview->fresh()->docker_registry_image_tag)->toBe('pr-7');
+})->with(['save_preview', 'add', 'deploy']);
+
+it('rejects preview pull request URLs that are not http or https', function () {
+    Livewire::test(Previews::class, ['application' => $this->application])
+        ->call('add', 9, 'ftp://git.example.com/pull/9');
+
+    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 9)->exists())->toBeFalse();
+});
+
+it('renders preview actions without stored values and hides non-http pull request links', function () {
+    $this->application->update(['build_pack' => 'dockerimage']);
+    ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => 'ftp://git.example.com/pull/7',
+        'docker_registry_image_tag' => "it's-stored",
+    ]);
+
+    $html = $this->get(route('project.application.preview-deployments', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]))->assertOk()->getContent();
+
+    expect($html)->toContain('wire:click="deploy(7)"')
+        ->not->toMatch('/wire:click="[^"]*stored/')
+        ->not->toContain('href="ftp:');
+});
+
+it('deploys a docker image preview with its stored tag when no tag is passed', function () {
+    Queue::fake();
+    $this->application->update(['build_pack' => 'dockerimage']);
+    $component = Livewire::test(Previews::class, ['application' => $this->application])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ]);
+    ApplicationPreview::create(['application_id' => $this->application->id, 'pull_request_id' => 7, 'pull_request_html_url' => '', 'docker_registry_image_tag' => 'pr-7']);
+
+    $component->call('deploy', 7)
+        ->assertRedirect();
+
+    expect(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 7)->value('docker_registry_image_tag'))->toBe('pr-7');
 });

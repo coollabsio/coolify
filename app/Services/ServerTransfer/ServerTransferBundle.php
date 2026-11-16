@@ -206,10 +206,12 @@ class ServerTransferBundle
 
                 foreach (self::items($environment['applications'] ?? null) as $a => $application) {
                     self::checkDomains($errors, "{$at}.applications.{$a}.fqdn", data_get($application, 'attributes.fqdn'));
+                    self::checkComposeDomains($errors, "{$at}.applications.{$a}.docker_compose_domains", data_get($application, 'attributes.docker_compose_domains'));
                     self::checkStorages($errors, "{$at}.applications.{$a}", $application);
                     self::checkScheduledTasks($errors, "{$at}.applications.{$a}", $application);
                     foreach (self::items($application['previews'] ?? null) as $r => $preview) {
                         self::checkDomains($errors, "{$at}.applications.{$a}.previews.{$r}.fqdn", $preview['fqdn'] ?? null);
+                        self::checkComposeDomains($errors, "{$at}.applications.{$a}.previews.{$r}.docker_compose_domains", $preview['docker_compose_domains'] ?? null);
                         self::checkStorages($errors, "{$at}.applications.{$a}.previews.{$r}", $preview);
                     }
                 }
@@ -313,6 +315,23 @@ class ServerTransferBundle
     {
         foreach (ValidationPatterns::validateApplicationDomains($value) as $message) {
             $errors[] = "{$at}: {$message}";
+        }
+    }
+
+    /**
+     * @param  list<string>  $errors
+     */
+    private static function checkComposeDomains(array &$errors, string $at, mixed $value): void
+    {
+        if (is_string($value)) {
+            $value = json_decode($value, true);
+        }
+        if (! is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $service => $config) {
+            self::checkDomains($errors, "{$at}.{$service}.domain", data_get($config, 'domain'));
         }
     }
 

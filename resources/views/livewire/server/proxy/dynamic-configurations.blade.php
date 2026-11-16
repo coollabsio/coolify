@@ -28,6 +28,9 @@
                 <div x-init="$wire.initLoadDynamicConfigurations" class="contents">
                     <x-skeleton.settings-sections wire:loading.flex wire:target="initLoadDynamicConfigurations"
                         label="Loading dynamic configurations" />
+                    {{-- Add and delete reload the list through an event, which Livewire sends as __dispatch. --}}
+                    <x-loading wire:loading.flex wire:target="loadDynamicConfigurations, __dispatch" compact
+                        text="Reloading dynamic configurations..." class="justify-start! px-1" />
 
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)

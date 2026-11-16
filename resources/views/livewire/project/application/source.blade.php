@@ -6,20 +6,24 @@
             description="Configure the Git repository, branch, and commit Coolify deploys.">
             <x-slot:actions>
                 <div class="flex flex-wrap items-center gap-2">
-                    <a target="_blank" class="button" href="{{ $application?->gitBranchLocation }}">
-                        Repository
-                        <x-external-link />
-                    </a>
+                    @if (filled($application?->gitBranchLocation))
+                        <a target="_blank" class="button" href="{{ $application->gitBranchLocation }}">
+                            Repository
+                            <x-external-link />
+                        </a>
+                    @endif
                     @if (data_get($application, 'source.is_public') === false && $application->source instanceof \App\Models\GithubApp)
                         <a target="_blank" class="button" href="{{ getInstallationPath($application->source) }}">
                             Git app
                             <x-external-link />
                         </a>
                     @endif
-                    <a target="_blank" class="button" href="{{ $application?->gitCommits }}">
-                        Commits
-                        <x-external-link />
-                    </a>
+                    @if (filled($application?->gitCommits))
+                        <a target="_blank" class="button" href="{{ $application->gitCommits }}">
+                            Commits
+                            <x-external-link />
+                        </a>
+                    @endif
                 </div>
             </x-slot:actions>
 

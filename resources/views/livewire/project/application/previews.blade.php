@@ -52,12 +52,12 @@
                                         </div>
                                         <div class="flex shrink-0 items-center gap-2">
                                             <x-forms.button
-                                                wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                wire:click="add({{ (int) data_get($pull_request, 'number') }}, '{{ data_get($pull_request, 'html_url') }}')">
                                                 Configure
                                             </x-forms.button>
                                             @can('deploy', $application)
                                                 <x-forms.button
-                                                    wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                    wire:click="add_and_deploy({{ (int) data_get($pull_request, 'number') }}, '{{ data_get($pull_request, 'html_url') }}')">
                                                     Deploy preview
                                                 </x-forms.button>
                                             @endcan
@@ -166,7 +166,7 @@
                                         <span class="min-w-0 truncate">Open preview</span>
                                     </a>
                                 @endif
-                                @if (filled(data_get($preview, 'pull_request_html_url')))
+                                @if (str(data_get($preview, 'pull_request_html_url'))->startsWith(['https://', 'http://']))
                                     <a target="_blank" title="Open pull request in a new tab"
                                         class="listbox-option justify-start! gap-2.5!"
                                         href="{{ data_get($preview, 'pull_request_html_url') }}" @click="open = false"
@@ -216,20 +216,20 @@
                             </span>
                         </button>
                         <div x-cloak x-show="open" x-transition.origin.top.right
-                            class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-52! min-w-52!"
+                            class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-max! min-w-52!"
                             role="menu">
                             @can('deploy', $application)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="force_deploy_without_cache({{ data_get($preview, 'pull_request_id') }})"
+                                    wire:click="deploy({{ (int) data_get($preview, 'pull_request_id') }})"
                                     @click="open = false" role="menuitem">
-                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Rebuild
+                                    <x-reicon :name="$previewIsStopped ? 'play-circle' : 'refresh'" class="size-3.5 shrink-0 opacity-70" />
+                                    {{ $previewIsStopped ? 'Deploy' : 'Redeploy' }}
                                 </button>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="deploy({{ data_get($preview, 'pull_request_id') }}, null, false, '{{ data_get($preview, 'docker_registry_image_tag') }}')"
+                                    wire:click="force_deploy_without_cache({{ (int) data_get($preview, 'pull_request_id') }})"
                                     @click="open = false" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    {{ $previewIsStopped ? 'Deploy' : 'Redeploy' }}
+                                    <x-reicon name="refresh" class="size-3.5 shrink-0 opacity-70" />
+                                    {{ $previewIsStopped ? 'Deploy (without cache)' : 'Redeploy (without cache)' }}
                                 </button>
                                 @if (!$previewIsStopped || auth()->user()->can('delete', $application))
                                     <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
@@ -239,7 +239,7 @@
                                         class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                         @click="open = false; document.getElementById('preview-stop-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                         role="menuitem">
-                                        <x-reicon name="stop" class="size-3.5" />
+                                        <x-reicon name="stop" class="size-3.5 shrink-0" />
                                         Stop
                                     </button>
                                 @endif
@@ -249,7 +249,7 @@
                                     class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                     @click="open = false; document.getElementById('preview-delete-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="trash" class="size-3.5" />
+                                    <x-reicon name="trash" class="size-3.5 shrink-0" />
                                     Delete
                                 </button>
                             @endcan
@@ -297,13 +297,13 @@
                         :preview="$preview" />
 
                     @if ($application->build_pack === 'dockerimage')
-                        <form wire:submit="save_preview('{{ $preview->id }}')"
+                        <form wire:submit="save_preview({{ (int) $preview->id }})"
                             class="application-settings-section-body is-flush mt-3 overflow-visible">
                             <div class="data-table-header grid-cols-1"><span>Docker tag</span></div>
                             <div class="p-3">
                                 <x-forms.input id="previewDockerTags.{{ $preview->id }}" canGate="update"
                                     :canResource="$application"
-                                    wire:change="save_preview('{{ $preview->id }}')" />
+                                    wire:change="save_preview({{ (int) $preview->id }})" />
                             </div>
                         </form>
                     @endif

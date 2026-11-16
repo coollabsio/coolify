@@ -137,22 +137,27 @@
                                 <div class="flex justify-end">
                                     @if (in_array($containerState, ['running', 'exited', 'restarting'], true))
                                         @can('update', $server)
+                                            @php($containerId = Js::from(data_get($resource, 'ID')))
+                                            @php($containerActionTargets = "startUnmanaged({$containerId}), stopUnmanaged({$containerId}), restartUnmanaged({$containerId})")
+                                            <x-loading-on-button wire:loading.inline-flex wire:target="{{ $containerActionTargets }}"
+                                                text="Working..." class="text-[11px] text-neutral-500 dark:text-fg-dim" />
+                                            <div class="contents" wire:loading.remove wire:target="{{ $containerActionTargets }}">
                                             @if ($containerState === 'running')
                                                 <x-table.row-actions label="Container actions">
                                                     <x-table.row-action
-                                                        wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                        wire:click="restartUnmanaged({{ Js::from(data_get($resource, 'ID')) }})"
                                                         wire:key="restart-{{ data_get($resource, 'ID') }}">
                                                         Restart
                                                     </x-table.row-action>
                                                     <x-table.row-action
-                                                        wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                        wire:click="stopUnmanaged({{ Js::from(data_get($resource, 'ID')) }})"
                                                         wire:key="stop-{{ data_get($resource, 'ID') }}">
                                                         Stop
                                                     </x-table.row-action>
                                                 </x-table.row-actions>
                                             @elseif ($containerState === 'exited')
                                                 <button type="button" class="icon-button shrink-0"
-                                                    wire:click="startUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                    wire:click="startUnmanaged(@js(data_get($resource, 'ID')))"
                                                     wire:key="start-{{ data_get($resource, 'ID') }}"
                                                     title="Start container" aria-label="Start container">
                                                     <x-reicon name="play-circle" class="size-3.5" />
@@ -160,12 +165,13 @@
                                             @else
                                                 <button type="button"
                                                     class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                    wire:click="stopUnmanaged('{{ data_get($resource, 'ID') }}')"
+                                                    wire:click="stopUnmanaged(@js(data_get($resource, 'ID')))"
                                                     wire:key="stop-restarting-{{ data_get($resource, 'ID') }}"
                                                     title="Stop container" aria-label="Stop container">
                                                     <x-reicon name="stop-circle" class="size-3.5" />
                                                 </button>
                                             @endif
+                                            </div>
                                         @endcan
                                     @endif
                                 </div>
