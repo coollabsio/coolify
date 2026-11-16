@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Enums\AccessLevel;
 use App\Enums\NodeRole;
 use App\Enums\NodeWorkloadDesiredState;
+use App\Exceptions\NodePlacementDeniedException;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Node;
@@ -85,12 +86,12 @@ class CreateClusterDockerImageWorkload
     public static function ensureMayCreate(User $user, Environment $environment, ?Node $targetNode): void
     {
         if (! Gate::forUser($user)->allows('createAnyResource', [$environment])) {
-            throw new RuntimeException('You cannot create resources in this environment. You need write access on the environment.');
+            throw new NodePlacementDeniedException('You cannot create resources in this environment. You need write access on the environment.');
         }
         if ($targetNode !== null) {
             $placement = Gate::forUser($user)->inspect('placeResource', $targetNode);
             if ($placement->denied()) {
-                throw new RuntimeException((string) $placement->message());
+                throw new NodePlacementDeniedException((string) $placement->message());
             }
         }
     }
@@ -121,9 +122,9 @@ class CreateClusterDockerImageWorkload
                 throw new RuntimeException("{$mismatch} Select a server with one of these architectures.");
             }
         } else {
-            $fitting = $availableNodes->get()
-                ->filter(fn (Node $candidate): bool => CpuArchitecture::mismatch($candidate, $architectures) === null)
-                ->filter(fn (Node $candidate): bool => $placedBy === null || Gate::forUser($placedBy)->allows('placeResource', $candidate));
+            $matching = $availableNodes->get()
+                ->filter(fn (Node $candidate): bool => CpuArchitecture::mismatch($candidate, $architectures) === null);
+            $fitting = $matching->filter(fn (Node $candidate): bool => $placedBy === null || Gate::forUser($placedBy)->allows('placeResource', $candidate));
             $node = $fitting->first(function (Node $candidate): bool {
                 try {
                     EnsureNodeAcceptsDeployment::run($candidate);
@@ -132,11 +133,11 @@ class CreateClusterDockerImageWorkload
                 } catch (\DomainException) {
                     return false;
                 }
-            }) ?? throw new RuntimeException($fitting->isEmpty() && $architectures !== null
-                ? 'The cluster has no workload server with a CPU architecture of the image ('.(implode(', ', $architectures) ?: 'none in common').'). Coolify does not emulate another architecture.'
+            }) ?? throw ($matching->isEmpty() && $architectures !== null
+                ? new RuntimeException('The cluster has no workload server with a CPU architecture of the image ('.(implode(', ', $architectures) ?: 'none in common').'). Coolify does not emulate another architecture.')
                 : ($placedBy !== null && ! app(AccessResolver::class)->allowsTeamWide($placedBy, AccessLevel::Write, (int) $cluster->team_id)
-                    ? 'The cluster has no workload server where you may place resources that can accept a deployment. You need write access on a resource that runs on the server.'
-                    : 'The cluster has no workload server that can accept a deployment.'));
+                    ? new NodePlacementDeniedException('The cluster has no workload server where you may place resources that can accept a deployment. You need write access on a resource that runs on the server.')
+                    : new RuntimeException('The cluster has no workload server that can accept a deployment.')));
         }
         EnsureNodeAcceptsDeployment::run($node);
 

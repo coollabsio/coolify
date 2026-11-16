@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node\Build;
 
+use App\Exceptions\NodePlacementDeniedException;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeRegistry;
@@ -54,7 +55,7 @@ class SelectBuilderNode
         if ($requestedBy !== null && $candidates->isNotEmpty()) {
             $candidates = $candidates->filter(fn (Node $node): bool => Gate::forUser($requestedBy)->allows('placeResource', $node));
             if ($candidates->isEmpty()) {
-                throw new RuntimeException(self::NOT_ALLOWED);
+                throw new NodePlacementDeniedException(self::NOT_ALLOWED);
             }
         }
 
@@ -77,7 +78,7 @@ class SelectBuilderNode
     {
         $builders = Node::query()->whereIn('node_cluster_id', $workload->clusterIds())->get()->filter(fn (Node $node): bool => $node->canBuild());
         if ($builders->isNotEmpty() && ! $builders->contains(fn (Node $node): bool => Gate::forUser($user)->allows('placeResource', $node))) {
-            throw new RuntimeException(self::NOT_ALLOWED);
+            throw new NodePlacementDeniedException(self::NOT_ALLOWED);
         }
     }
 

@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Actions\Node\Build\EnsureNodeRegistry;
 use App\Enums\AccessLevel;
 use App\Enums\NodeWorkloadSourceType;
+use App\Exceptions\NodePlacementDeniedException;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -240,7 +241,7 @@ class SyncNodeStackCompose
         $allowed = fn (Node $node): bool => Gate::forUser($requestedBy)->allows('placeResource', $node);
         if ($placement !== null) {
             if (! $allowed($placement)) {
-                throw new RuntimeException("The new service {$service} must run on {$placement->name}, where you may not place resources. Ask a team admin to deploy the stack.");
+                throw new NodePlacementDeniedException("The new service {$service} must run on {$placement->name}, where you may not place resources. Ask a team admin to deploy the stack.");
             }
 
             return CreateClusterDockerImageWorkload::placementNode($cluster, $placement, $architectures);
@@ -258,7 +259,9 @@ class SyncNodeStackCompose
             }
         }
 
-        throw new RuntimeException("The new service {$service} needs a server where you may place resources (write access on a resource that runs there), and none of them can take it. Ask a team admin to deploy the stack.");
+        $message = "The new service {$service} needs a server where you may place resources (write access on a resource that runs there), and none of them can take it. Ask a team admin to deploy the stack.";
+
+        throw $candidates->isEmpty() ? new NodePlacementDeniedException($message) : new RuntimeException($message);
     }
 
     private function actor(NodeStack $stack, ?User $requestedBy): User

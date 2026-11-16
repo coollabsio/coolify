@@ -8,6 +8,7 @@ use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\QueueNodeWorkloadLifecycle;
 use App\Enums\NodeWorkloadAction;
 use App\Enums\NodeWorkloadState;
+use App\Exceptions\NodePlacementDeniedException;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Livewire\Project\New\ClusterGithubPrivateRepositoryDeployKey;
 use App\Livewire\Project\New\DockerImage;
@@ -177,7 +178,8 @@ trait HandlesClusterResourcesApi
 
     /**
      * Runs an action and gives its errors as API responses: 422 for a validation error, 404 for a
-     * missing record, 400 with the reason for a refused change. An authorization error stays a 403.
+     * missing record, 403 for a refused placement, 400 with the reason for a refused change. An
+     * authorization error stays a 403.
      */
     protected function runClusterAction(callable $action): mixed
     {
@@ -189,6 +191,8 @@ trait HandlesClusterResourcesApi
             return response()->json(['message' => 'Validation failed.', 'errors' => $exception->errors()], 422);
         } catch (ModelNotFoundException) {
             return response()->json(['message' => 'Not found.'], 404);
+        } catch (NodePlacementDeniedException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 403);
         } catch (RuntimeException|DomainException|InvalidArgumentException $exception) {
             return response()->json(['message' => $exception->getMessage()], 400);
         } catch (Throwable $exception) {

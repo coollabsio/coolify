@@ -8,6 +8,7 @@ use App\Enums\AccessLevel;
 use App\Enums\NodeRole;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
+use App\Exceptions\NodePlacementDeniedException;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -203,7 +204,9 @@ class CreateClusterStack
             }
             $names = implode(', ', array_column($unit, 'service'));
             if ($node === null) {
-                throw new RuntimeException((count($unit) > 1 ? "The services {$names} share a volume and must run on one server, but no server can take them." : "No server can take the service {$names}.")
+                $exception = $reason === null && ! $teamWide ? NodePlacementDeniedException::class : RuntimeException::class;
+
+                throw new $exception((count($unit) > 1 ? "The services {$names} share a volume and must run on one server, but no server can take them." : "No server can take the service {$names}.")
                     .($reason === null ? ($teamWide ? '' : ' You may place resources only on servers where you have write access on a resource.') : " {$reason}"));
             }
             $load[$node->id] += count($unit);

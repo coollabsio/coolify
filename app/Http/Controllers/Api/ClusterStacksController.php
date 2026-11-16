@@ -125,6 +125,7 @@ class ClusterStacksController extends Controller
             new OA\Response(response: 201, description: 'The cluster stack is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -195,6 +196,7 @@ class ClusterStacksController extends Controller
             new OA\Response(response: 201, description: 'The cluster stack is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -272,6 +274,7 @@ class ClusterStacksController extends Controller
             ])),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -353,6 +356,7 @@ class ClusterStacksController extends Controller
             new OA\Response(response: 200, description: 'The deployment is queued.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string')])),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
@@ -383,6 +387,7 @@ class ClusterStacksController extends Controller
             new OA\Response(response: 200, description: 'The deployment is queued.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string')])),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]

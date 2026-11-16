@@ -111,6 +111,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 201, description: 'The cluster application is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -153,6 +154,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 201, description: 'The cluster application is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -174,6 +176,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 201, description: 'The cluster application is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -195,6 +198,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 201, description: 'The cluster application is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -230,6 +234,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 201, description: 'The cluster application is created.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterResourceCreated')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -294,6 +299,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 200, description: 'The updated cluster application.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterApplication')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -402,6 +408,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 200, description: 'The deployment or build is queued.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterDeploymentQueued')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
@@ -422,6 +429,7 @@ class ClusterApplicationsController extends Controller
             new OA\Response(response: 200, description: 'The deployment or build is queued.', content: new OA\JsonContent(ref: '#/components/schemas/ClusterDeploymentQueued')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The user may not create or place the resource on this environment or server, or may not build on a builder server.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ]
     )]
