@@ -5,7 +5,13 @@ use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\AuditEventsController;
 use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
+use App\Http\Controllers\Api\ClusterApplicationPreviewsController;
 use App\Http\Controllers\Api\ClusterApplicationsController;
+use App\Http\Controllers\Api\ClusterApplicationSettingsController;
+use App\Http\Controllers\Api\ClusterDatabasesController;
+use App\Http\Controllers\Api\ClusterEnvironmentVariablesController;
+use App\Http\Controllers\Api\ClustersController;
+use App\Http\Controllers\Api\ClusterStacksController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
@@ -166,8 +172,108 @@ Route::group([
     Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
     Route::post('/deployments/{uuid}/cancel', [DeployController::class, 'cancel_deployment'])->middleware(['api.ability:deploy']);
     Route::get('/deployments/applications/{uuid}', [DeployController::class, 'get_application_deployments'])->middleware(['api.ability:read']);
+    // Cluster resources (decision 0029).
+    Route::get('/cluster-applications/{uuid}/previews', [ClusterApplicationPreviewsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::post('/cluster-applications/{uuid}/previews', [ClusterApplicationPreviewsController::class, 'deploy'])->middleware(['api.ability:deploy']);
+    Route::patch('/cluster-applications/{uuid}/domains', [ClusterApplicationSettingsController::class, 'domains'])->middleware(['api.ability:write']);
+    Route::patch('/cluster-applications/{uuid}/resources', [ClusterApplicationSettingsController::class, 'resources'])->middleware(['api.ability:write']);
+    Route::get('/cluster-applications/{uuid}/ports', [ClusterApplicationSettingsController::class, 'ports'])->middleware(['api.ability:read']);
+    Route::post('/cluster-applications/{uuid}/ports', [ClusterApplicationSettingsController::class, 'publishPort'])->middleware(['api.ability:write']);
+    Route::delete('/cluster-applications/{uuid}/ports/{port_uuid}', [ClusterApplicationSettingsController::class, 'removePort'])->middleware(['api.ability:delete']);
+    Route::post('/cluster-applications/{uuid}/move', [ClusterApplicationSettingsController::class, 'move'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::get('/cluster-applications/{uuid}/logs', [ClusterApplicationSettingsController::class, 'logs'])->middleware(['api.ability:read:sensitive']);
+    Route::get('/cluster-applications', [ClusterApplicationsController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/cluster-applications/{uuid}', [ClusterApplicationsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::post('/cluster-applications/docker-image', [ClusterApplicationsController::class, 'createDockerImage'])->middleware(['api.ability:write']);
+    Route::post('/cluster-applications/public', [ClusterApplicationsController::class, 'createPublic'])->middleware(['api.ability:write']);
+    Route::post('/cluster-applications/private-github-app', [ClusterApplicationsController::class, 'createPrivateGithubApp'])->middleware(['api.ability:write']);
+    Route::post('/cluster-applications/private-deploy-key', [ClusterApplicationsController::class, 'createPrivateDeployKey'])->middleware(['api.ability:write']);
+    Route::post('/cluster-applications/dockerfile', [ClusterApplicationsController::class, 'createDockerfile'])->middleware(['api.ability:write']);
+    Route::patch('/cluster-applications/{uuid}', [ClusterApplicationsController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/cluster-applications/{uuid}', [ClusterApplicationsController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::post('/cluster-applications/{uuid}/deploy', [ClusterApplicationsController::class, 'deploy'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-applications/{uuid}/start', [ClusterApplicationsController::class, 'start'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-applications/{uuid}/stop', [ClusterApplicationsController::class, 'stop'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-applications/{uuid}/restart', [ClusterApplicationsController::class, 'restart'])->middleware(['api.ability:deploy']);
     Route::get('/cluster-applications/{uuid}/revisions', [ClusterApplicationsController::class, 'revisions'])->middleware(['api.ability:read']);
     Route::post('/cluster-applications/{uuid}/rollback', [ClusterApplicationsController::class, 'rollback'])->middleware(['api.ability:deploy']);
+    Route::get('/cluster-databases', [ClusterDatabasesController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/cluster-databases/{uuid}', [ClusterDatabasesController::class, 'show'])->middleware(['api.ability:read']);
+    Route::post('/cluster-databases/{engine}', [ClusterDatabasesController::class, 'store'])
+        ->whereIn('engine', ['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse'])
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-databases/{uuid}', [ClusterDatabasesController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/cluster-databases/{uuid}', [ClusterDatabasesController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::post('/cluster-databases/{uuid}/start', [ClusterDatabasesController::class, 'start'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-databases/{uuid}/stop', [ClusterDatabasesController::class, 'stop'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-databases/{uuid}/restart', [ClusterDatabasesController::class, 'restart'])->middleware(['api.ability:deploy']);
+    Route::get('/cluster-databases/{uuid}/backups', [ClusterDatabasesController::class, 'backups'])->middleware(['api.ability:read']);
+    Route::post('/cluster-databases/{uuid}/backups', [ClusterDatabasesController::class, 'createBackup'])->middleware(['api.ability:write']);
+    Route::post('/cluster-databases/{uuid}/backups/{backup_uuid}/run', [ClusterDatabasesController::class, 'runBackup'])->middleware(['api.ability:write', 'api.ability:deploy']);
+    Route::get('/cluster-databases/{uuid}/backups/{backup_uuid}/executions', [ClusterDatabasesController::class, 'backupExecutions'])->middleware(['api.ability:read']);
+    Route::get('/cluster-applications/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'index'])
+        ->defaults('cluster_kind', 'application')
+        ->middleware(['api.ability:read']);
+    Route::get('/cluster-databases/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'index'])
+        ->defaults('cluster_kind', 'database')
+        ->middleware(['api.ability:read']);
+    Route::get('/cluster-stacks/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'index'])
+        ->defaults('cluster_kind', 'stack')
+        ->middleware(['api.ability:read']);
+    Route::post('/cluster-applications/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'store'])
+        ->defaults('cluster_kind', 'application')
+        ->middleware(['api.ability:write']);
+    Route::post('/cluster-databases/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'store'])
+        ->defaults('cluster_kind', 'database')
+        ->middleware(['api.ability:write']);
+    Route::post('/cluster-stacks/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'store'])
+        ->defaults('cluster_kind', 'stack')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-applications/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'update'])
+        ->defaults('cluster_kind', 'application')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-databases/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'update'])
+        ->defaults('cluster_kind', 'database')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-stacks/{uuid}/envs', [ClusterEnvironmentVariablesController::class, 'update'])
+        ->defaults('cluster_kind', 'stack')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-applications/{uuid}/envs/bulk', [ClusterEnvironmentVariablesController::class, 'bulk'])
+        ->defaults('cluster_kind', 'application')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-databases/{uuid}/envs/bulk', [ClusterEnvironmentVariablesController::class, 'bulk'])
+        ->defaults('cluster_kind', 'database')
+        ->middleware(['api.ability:write']);
+    Route::patch('/cluster-stacks/{uuid}/envs/bulk', [ClusterEnvironmentVariablesController::class, 'bulk'])
+        ->defaults('cluster_kind', 'stack')
+        ->middleware(['api.ability:write']);
+    Route::delete('/cluster-applications/{uuid}/envs/{env_uuid}', [ClusterEnvironmentVariablesController::class, 'destroy'])
+        ->defaults('cluster_kind', 'application')
+        ->middleware(['api.ability:delete']);
+    Route::delete('/cluster-databases/{uuid}/envs/{env_uuid}', [ClusterEnvironmentVariablesController::class, 'destroy'])
+        ->defaults('cluster_kind', 'database')
+        ->middleware(['api.ability:delete']);
+    Route::delete('/cluster-stacks/{uuid}/envs/{env_uuid}', [ClusterEnvironmentVariablesController::class, 'destroy'])
+        ->defaults('cluster_kind', 'stack')
+        ->middleware(['api.ability:delete']);
+    Route::get('/cluster-stacks', [ClusterStacksController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'show'])->middleware(['api.ability:read']);
+    Route::get('/cluster-stacks/{uuid}/services', [ClusterStacksController::class, 'services'])->middleware(['api.ability:read']);
+    Route::post('/cluster-stacks/template', [ClusterStacksController::class, 'createTemplate'])->middleware(['api.ability:write']);
+    Route::post('/cluster-stacks/git', [ClusterStacksController::class, 'createGit'])->middleware(['api.ability:write']);
+    Route::patch('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::post('/cluster-stacks/{uuid}/deploy', [ClusterStacksController::class, 'deploy'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-stacks/{uuid}/start', [ClusterStacksController::class, 'start'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-stacks/{uuid}/stop', [ClusterStacksController::class, 'stop'])->middleware(['api.ability:deploy']);
+    Route::post('/cluster-stacks/{uuid}/restart', [ClusterStacksController::class, 'restart'])->middleware(['api.ability:deploy']);
+    Route::get('/clusters', [ClustersController::class, 'index'])->middleware(['api.ability:read']);
+    Route::get('/clusters/{uuid}', [ClustersController::class, 'show'])->middleware(['api.ability:read']);
+    Route::get('/nodes', [ClustersController::class, 'nodes'])->middleware(['api.ability:read']);
+    Route::get('/nodes/{uuid}', [ClustersController::class, 'node'])->middleware(['api.ability:read']);
+    Route::patch('/nodes/{uuid}/roles', [ClustersController::class, 'roles'])->middleware(['api.ability:write']);
+    Route::post('/nodes/{uuid}/image-cleanup', [ClustersController::class, 'cleanupImages'])->middleware(['api.ability:write']);
+    Route::post('/nodes/{uuid}/sentinel/upgrade', [ClustersController::class, 'upgradeSentinel'])->middleware(['api.ability:write']);
 
     Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);

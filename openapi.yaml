@@ -4962,6 +4962,895 @@ paths:
       security:
         -
           bearerAuth: []
+  '/cluster-applications/{uuid}/previews':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: 'List Previews'
+      description: 'List the preview deployments of a cluster application, one for each pull request.'
+      operationId: list-cluster-application-previews
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The previews.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { uuid: { type: string }, pull_request_id: { type: integer }, pull_request_url: { type: [string, 'null'] }, pull_request_from_fork: { type: boolean }, status: { type: string }, removing: { type: boolean }, domains: { type: array, items: { type: string } } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Deploy Preview'
+      description: 'Build and deploy the preview of a pull request, like Deploy on the Previews page. A manual deploy gets the values of a same-repository pull request, as in v4.'
+      operationId: deploy-cluster-application-preview
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - pull_request_id
+              properties:
+                pull_request_id:
+                  type: integer
+              type: object
+      responses:
+        '200':
+          description: 'The preview build is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  build_uuid: { type: string }
+                  domain_error: { type: [string, 'null'] }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/domains':
+    patch:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Update Domains'
+      description: 'Replace the domains of a cluster application. Ingress servers apply them without a redeploy. A domain without a scheme gets https. A port in a URL is the port of the container.'
+      operationId: update-cluster-application-domains
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                domains:
+                  description: 'For example `https://app.example.com` or `http://app.example.com:3000/api`. An empty list removes every domain.'
+                  type: array
+                  items: { type: string }
+                force_https:
+                  type: boolean
+                www_redirect:
+                  type: string
+                  enum: [both, www, non-www]
+                permanent_redirect:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'The updated cluster application.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterApplication'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/resources':
+    patch:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Update Resource Limits'
+      description: 'Set the CPU and memory limits and reservations of a cluster application. Null removes a value. A running application applies them within about a minute.'
+      operationId: update-cluster-application-resources
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                cpu_limit:
+                  description: 'CPUs, for example 0.5.'
+                  type: [number, 'null']
+                cpu_reservation:
+                  type: [number, 'null']
+                memory_limit_mb:
+                  type: [integer, 'null']
+                memory_reservation_mb:
+                  type: [integer, 'null']
+              type: object
+      responses:
+        '200':
+          description: 'The updated cluster application.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterApplication'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/ports':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: 'List Published Ports'
+      description: 'List the TCP and UDP ports that every server of the cluster publishes for this application.'
+      operationId: list-cluster-application-ports
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application or database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The published ports.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterPublishedPort'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Publish Port'
+      description: 'Publish a TCP or UDP port of the container on every server of the cluster. The servers open it without a redeploy.'
+      operationId: create-cluster-application-port
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application or database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - container_port
+              properties:
+                protocol:
+                  type: string
+                  default: tcp
+                  enum: [tcp, udp]
+                container_port:
+                  type: integer
+                host_port:
+                  description: 'Default: the container port.'
+                  type: integer
+                source_cidrs:
+                  description: 'IPv4 addresses or CIDRs that may connect. Empty allows every source.'
+                  type: array
+                  items: { type: string }
+              type: object
+      responses:
+        '201':
+          description: 'The port is published.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterPublishedPort'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/ports/{port_uuid}':
+    delete:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Remove Published Port'
+      description: 'Close a published port on every server of the cluster.'
+      operationId: delete-cluster-application-port
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application or database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: port_uuid
+          in: path
+          description: 'UUID of the published port.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The port is removed.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/move':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: Move
+      description: 'Move a cluster application from one of its servers to another server of the same cluster (decision 0014). With volumes, Coolify copies the data first and stops the application only for the final copy. A move from an offline server restores the volumes from their latest backups and needs `recovery_confirmed`.'
+      operationId: move-cluster-application
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application or database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - target_server_uuid
+              properties:
+                source_server_uuid:
+                  description: 'Default: the first server of the application.'
+                  type: string
+                target_server_uuid:
+                  type: string
+                recovery_confirmed:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'The move is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  move_uuid: { type: string }
+                  recovery: { type: boolean }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/logs':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Get Logs'
+      description: 'Get the latest log lines of the container of a cluster application on one server. Logs can contain secrets, so the token needs `read:sensitive`, and the user needs write access on the application, like the Logs page.'
+      operationId: get-cluster-application-logs
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application or database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: lines
+          in: query
+          description: 'Number of lines, from 1 to 10000.'
+          required: false
+          schema:
+            type: integer
+            default: 100
+        -
+          name: server_uuid
+          in: query
+          description: 'The server. Default: the first server of the application.'
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The logs.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                  truncated: { type: boolean }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications:
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: List
+      description: 'List the cluster applications that the token can see. Stack services, databases, and previews are not in this list.'
+      operationId: list-cluster-applications
+      responses:
+        '200':
+          description: 'The cluster applications.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterApplication'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: Get
+      description: 'Get a cluster application by UUID.'
+      operationId: get-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The cluster application.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterApplication'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Cluster Applications'
+      summary: Delete
+      description: 'Delete a cluster application. Coolify removes its containers on every server in the background.'
+      operationId: delete-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: delete_volumes
+          in: query
+          description: 'Also delete the data of its volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: 'The deletion is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Applications'
+      summary: Update
+      description: 'Update a cluster application. Only the fields in the request change. An image application uses `docker_registry_image_name` and `docker_registry_image_tag` for its image. An application that Coolify builds uses them for the registry that the build pushes to. A running application applies a new image or command at its next deploy.'
+      operationId: update-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                docker_registry_image_name:
+                  type: string
+                docker_registry_image_tag:
+                  type: string
+                registry_credential_uuid:
+                  description: 'A registry credential of the team, or empty for none.'
+                  type: string
+                start_command:
+                  description: 'Words split at spaces, with "" quotes.'
+                  type: string
+                git_branch:
+                  type: string
+                build_pack:
+                  type: string
+                  enum: [railpack, dockerfile, static]
+                base_directory:
+                  type: string
+                dockerfile_location:
+                  type: string
+                publish_directory:
+                  type: string
+                dockerfile:
+                  type: string
+                is_auto_deploy_enabled:
+                  type: boolean
+                is_auto_cancel_queued_deployments_enabled:
+                  type: boolean
+                is_auto_cancel_building_deployments_enabled:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'The updated cluster application.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterApplication'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications/docker-image:
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create (Docker Image)'
+      description: 'Create a cluster application from a Docker image. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster. Like v4, it does not deploy unless `instant_deploy` is true.'
+      operationId: create-cluster-application-docker-image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - docker_registry_image_name
+              properties:
+                project_uuid:
+                  type: string
+                environment_uuid:
+                  description: 'Or `environment_name`.'
+                  type: string
+                environment_name:
+                  type: string
+                cluster_uuid:
+                  description: 'Automatic placement in this cluster.'
+                  type: string
+                server_uuid:
+                  description: 'One server of a cluster.'
+                  type: string
+                docker_registry_image_name:
+                  description: 'The image, for example `nginx` or `ghcr.io/acme/api:1.2`.'
+                  type: string
+                docker_registry_image_tag:
+                  description: 'The tag, or a sha256 digest. Default `latest`.'
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'The cluster application is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications/public:
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create (Public Git)'
+      description: 'Create a cluster application from a public Git repository. Coolify builds it on a builder server of the cluster with Railpack, the Dockerfile of the repository, or as Static files. Use `/cluster-stacks/git` for a Docker Compose file.'
+      operationId: create-cluster-application-public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterGitApplicationRequest'
+      responses:
+        '201':
+          description: 'The cluster application is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications/private-github-app:
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create (Private - GitHub App)'
+      description: 'Create a cluster application from a private repository through a GitHub App of the team. `git_repository` is `owner/repository`.'
+      operationId: create-cluster-application-private-github-app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterGitApplicationRequest'
+      responses:
+        '201':
+          description: 'The cluster application is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications/private-deploy-key:
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create (Private - Deploy Key)'
+      description: 'Create a cluster application from a private repository with a deploy key (a private key of the team).'
+      operationId: create-cluster-application-private-deploy-key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterGitApplicationRequest'
+      responses:
+        '201':
+          description: 'The cluster application is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-applications/dockerfile:
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create (Dockerfile)'
+      description: 'Create a cluster application from a Dockerfile without Git. A builder server of the cluster builds it.'
+      operationId: create-cluster-application-dockerfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - dockerfile
+              properties:
+                project_uuid:
+                  type: string
+                environment_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                cluster_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                dockerfile:
+                  description: 'The Dockerfile, as plain text or base64.'
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'The cluster application is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/deploy':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: Deploy
+      description: 'Deploy the latest configuration on every server of the application. An application that Coolify builds starts a build, which deploys the result.'
+      operationId: deploy-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The deployment or build is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDeploymentQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/start':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: Start
+      description: 'Start a cluster application. Like v4, this deploys it.'
+      operationId: start-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The deployment or build is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDeploymentQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/stop':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: Stop
+      description: 'Stop a cluster application on every server.'
+      operationId: stop-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The stop is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/restart':
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: Restart
+      description: 'Restart a cluster application on every server.'
+      operationId: restart-cluster-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The restart is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/cluster-applications/{uuid}/revisions':
     get:
       tags:
@@ -5040,6 +5929,1856 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases:
+    get:
+      tags:
+        - 'Cluster Databases'
+      summary: List
+      description: 'List the cluster databases that the token can see.'
+      operationId: list-cluster-databases
+      responses:
+        '200':
+          description: 'The cluster databases.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterDatabase'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}':
+    get:
+      tags:
+        - 'Cluster Databases'
+      summary: Get
+      description: 'Get a cluster database by UUID.'
+      operationId: get-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The cluster database.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDatabase'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Cluster Databases'
+      summary: Delete
+      description: 'Delete a cluster database. Coolify removes its containers in the background.'
+      operationId: delete-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: delete_volumes
+          in: query
+          description: 'Also delete the data of its volumes.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: 'The deletion is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Databases'
+      summary: Update
+      description: 'Update a cluster database. `credentials` changes the credential variables, keyed by name (for example `POSTGRES_PASSWORD`). A locked credential cannot change. The container gets new values at the next deploy.'
+      operationId: update-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                credentials:
+                  type: object
+                  additionalProperties: { type: string }
+              type: object
+      responses:
+        '200':
+          description: 'The updated cluster database.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDatabase'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/postgresql:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (PostgreSQL)'
+      description: 'Create a PostgreSQL database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-postgresql
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/mysql:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (MySQL)'
+      description: 'Create a MySQL database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-mysql
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/mariadb:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (MariaDB)'
+      description: 'Create a MariaDB database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-mariadb
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/mongodb:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (MongoDB)'
+      description: 'Create a MongoDB database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-mongodb
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/redis:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (Redis)'
+      description: 'Create a Redis database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-redis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/keydb:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (KeyDB)'
+      description: 'Create a KeyDB database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-keydb
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/dragonfly:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (Dragonfly)'
+      description: 'Create a Dragonfly database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-dragonfly
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-databases/clickhouse:
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create (ClickHouse)'
+      description: 'Create a ClickHouse database on a cluster. Coolify generates the credentials. Set `cluster_uuid` for automatic placement, or `server_uuid` for one server of the cluster.'
+      operationId: create-cluster-database-clickhouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterDatabaseRequest'
+      responses:
+        '201':
+          description: 'The database is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/start':
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: Start
+      description: 'Start a cluster database. Like v4, this deploys it.'
+      operationId: start-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The deployment is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDeploymentQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/stop':
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: Stop
+      description: 'Stop a cluster database.'
+      operationId: stop-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The stop is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/restart':
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: Restart
+      description: 'Restart a cluster database.'
+      operationId: restart-cluster-database-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The restart is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/backups':
+    get:
+      tags:
+        - 'Cluster Databases'
+      summary: 'List Backups'
+      description: 'List the backup schedules of a cluster database.'
+      operationId: list-cluster-database-backups
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The backup schedules.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterDatabaseBackup'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create Backup Schedule'
+      description: 'Create a schedule of dump backups to an S3 storage of the team.'
+      operationId: create-cluster-database-backup
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - frequency
+                - s3_storage_uuid
+              properties:
+                frequency:
+                  description: 'A cron expression, or `daily`, `hourly`, and so on.'
+                  type: string
+                s3_storage_uuid:
+                  type: string
+              type: object
+      responses:
+        '201':
+          description: 'The schedule is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDatabaseBackup'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/backups/{backup_uuid}/run':
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Run Backup'
+      description: 'Run a backup schedule now.'
+      operationId: run-cluster-database-backup
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: backup_uuid
+          in: path
+          description: 'UUID of the backup schedule.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The backup is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/backups/{backup_uuid}/executions':
+    get:
+      tags:
+        - 'Cluster Databases'
+      summary: 'List Backup Runs'
+      description: 'List the runs of a backup schedule, newest first.'
+      operationId: list-cluster-database-backup-executions
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: backup_uuid
+          in: path
+          description: 'UUID of the backup schedule.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The runs.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  properties: { uuid: { type: string }, status: { type: string }, message: { type: [string, 'null'] }, size: { type: [integer, 'null'] }, filename: { type: [string, 'null'] }, created_at: { type: string, format: date-time }, finished_at: { type: [string, 'null'], format: date-time } }
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/envs':
+    get:
+      tags:
+        - 'Cluster Applications'
+      summary: 'List Envs'
+      description: 'List the environment variables of a cluster application.'
+      operationId: list-envs-by-application-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variables. A value shows only for a token that may read sensitive data.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Create Env'
+      description: 'Create an environment variable of a cluster application.'
+      operationId: create-env-by-application-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The environment variable already exists.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Update Env'
+      description: 'Update the environment variable of a cluster application with the key `key`.'
+      operationId: update-env-by-application-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/envs':
+    get:
+      tags:
+        - 'Cluster Databases'
+      summary: 'List Envs'
+      description: 'List the environment variables of a cluster database.'
+      operationId: list-envs-by-database-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variables. A value shows only for a token that may read sensitive data.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Create Env'
+      description: 'Create an environment variable of a cluster database.'
+      operationId: create-env-by-database-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The environment variable already exists.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Update Env'
+      description: 'Update the environment variable of a cluster database with the key `key`.'
+      operationId: update-env-by-database-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/envs':
+    get:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'List Envs'
+      description: 'List the environment variables of a cluster stack. Without `service`, the variables of every service.'
+      operationId: list-envs-by-stack-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+        -
+          name: service
+          in: query
+          description: 'The service of the stack.'
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variables. A value shows only for a token that may read sensitive data.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Create Env'
+      description: 'Create an environment variable of a cluster stack. Name the service in `service`.'
+      operationId: create-env-by-stack-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterStackEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The environment variable already exists.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Update Env'
+      description: 'Update the environment variable of a cluster stack with the key `key`. Name the service in `service`.'
+      operationId: update-env-by-stack-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterStackEnvironmentVariableRequest'
+      responses:
+        '201':
+          description: 'The environment variable.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentVariable'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Update Envs (Bulk)'
+      description: 'Create or update many environment variables of a cluster application.'
+      operationId: update-envs-by-application-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { $ref: '#/components/schemas/ClusterEnvironmentVariableRequest' }
+              type: object
+      responses:
+        '201':
+          description: 'The environment variables.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Update Envs (Bulk)'
+      description: 'Create or update many environment variables of a cluster database.'
+      operationId: update-envs-by-database-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  items: { $ref: '#/components/schemas/ClusterEnvironmentVariableRequest' }
+              type: object
+      responses:
+        '201':
+          description: 'The environment variables.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/envs/bulk':
+    patch:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Update Envs (Bulk)'
+      description: 'Create or update many environment variables of a cluster stack. Name the service in `service`.'
+      operationId: update-envs-by-stack-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - data
+                - service
+              properties:
+                data:
+                  type: array
+                  items: { $ref: '#/components/schemas/ClusterEnvironmentVariableRequest' }
+                service:
+                  type: string
+              type: object
+      responses:
+        '201':
+          description: 'The environment variables.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnvironmentVariable'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-applications/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - 'Cluster Applications'
+      summary: 'Delete Env'
+      description: 'Delete an environment variable of a cluster application.'
+      operationId: delete-env-by-application-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variable is deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-databases/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - 'Cluster Databases'
+      summary: 'Delete Env'
+      description: 'Delete an environment variable of a cluster database.'
+      operationId: delete-env-by-database-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variable is deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/envs/{env_uuid}':
+    delete:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Delete Env'
+      description: 'Delete an environment variable of a cluster stack.'
+      operationId: delete-env-by-stack-cluster-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+        -
+          name: env_uuid
+          in: path
+          description: 'UUID of the environment variable.'
+          required: true
+          schema:
+            type: string
+        -
+          name: service
+          in: query
+          description: 'The service of the stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The environment variable is deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /cluster-stacks:
+    get:
+      tags:
+        - 'Cluster Stacks'
+      summary: List
+      description: 'List the cluster stacks of the team.'
+      operationId: list-cluster-stacks
+      responses:
+        '200':
+          description: 'The cluster stacks.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterStack'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}':
+    get:
+      tags:
+        - 'Cluster Stacks'
+      summary: Get
+      description: 'Get a cluster stack with its services.'
+      operationId: get-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The cluster stack.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterStack'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Cluster Stacks'
+      summary: Delete
+      description: 'Delete a cluster stack and all its services in the background.'
+      operationId: delete-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+        -
+          name: delete_volumes
+          in: query
+          description: 'Delete the volumes. The default is true.'
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: 'The deletion is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Cluster Stacks'
+      summary: Update
+      description: 'Change the name of a cluster stack, or give a stack without Git a new Compose file. The services change as for a Git sync: added services are created, changed services get the new settings, and removed services are deleted. Deploy the stack to apply the changes.'
+      operationId: update-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+                docker_compose_raw:
+                  description: 'The Compose file, as plain text or base64.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The cluster stack is updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                  compose_changes: { description: 'The added, changed, and removed services, or null when the Compose file did not change.', type: [object, 'null'] }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/services':
+    get:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'List Services'
+      description: 'List the services of a cluster stack. Each service is a cluster application of the stack.'
+      operationId: list-cluster-stack-services
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The services.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClusterApplication'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /cluster-stacks/template:
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Create (Template)'
+      description: 'Create a cluster stack from a one-click service template, like a one-click service on a cluster in the UI. Without `server_uuid`, `spread` spreads the services across the servers of the cluster.'
+      operationId: create-cluster-stack-template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - type
+              properties:
+                type:
+                  description: 'The one-click service template, for example `uptime-kuma`.'
+                  type: string
+                project_uuid:
+                  type: string
+                environment_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                cluster_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                spread:
+                  type: boolean
+                name:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'The cluster stack is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /cluster-stacks/git:
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: 'Create (Git)'
+      description: 'Create a cluster stack from a Compose file in Git. Without a credential, `git_repository` is a public HTTPS URL. With `github_app_uuid`, it is `owner/repository`. With `private_key_uuid`, it is an SSH URL. A service with `build` builds from the repository.'
+      operationId: create-cluster-stack-git
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - git_repository
+                - git_branch
+              properties:
+                project_uuid:
+                  type: string
+                environment_uuid:
+                  type: string
+                environment_name:
+                  type: string
+                cluster_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                spread:
+                  type: boolean
+                git_repository:
+                  type: string
+                git_branch:
+                  type: string
+                github_app_uuid:
+                  type: string
+                private_key_uuid:
+                  type: string
+                base_directory:
+                  type: string
+                docker_compose_location:
+                  description: 'The default is `/docker-compose.yaml`.'
+                  type: string
+                name:
+                  type: string
+                instant_deploy:
+                  type: boolean
+              type: object
+      responses:
+        '201':
+          description: 'The cluster stack is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterResourceCreated'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/deploy':
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: Deploy
+      description: 'Deploy a cluster stack: each service deploys after the services it depends on. A stack from Git reads its Compose file first.'
+      operationId: deploy-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The deployment is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/start':
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: Start
+      description: 'Start a cluster stack. This is the same as a deploy, like the start of a v4 service.'
+      operationId: start-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The deployment is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/stop':
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: Stop
+      description: 'Stop every service of a cluster stack.'
+      operationId: stop-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The stop is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/cluster-stacks/{uuid}/restart':
+    post:
+      tags:
+        - 'Cluster Stacks'
+      summary: Restart
+      description: 'Restart every service of a cluster stack.'
+      operationId: restart-cluster-stack-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster stack.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The restart is queued.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLifecycleQueued'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /clusters:
+    get:
+      tags:
+        - Clusters
+      summary: List
+      description: 'List the clusters of the team.'
+      operationId: list-clusters
+      responses:
+        '200':
+          description: 'The clusters.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cluster'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/clusters/{uuid}':
+    get:
+      tags:
+        - Clusters
+      summary: Get
+      description: 'Get a cluster with its servers.'
+      operationId: get-cluster-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The cluster.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cluster'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /nodes:
+    get:
+      tags:
+        - Clusters
+      summary: 'List Nodes'
+      description: 'List the servers of the clusters of the team.'
+      operationId: list-nodes
+      responses:
+        '200':
+          description: 'The servers.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/nodes/{uuid}':
+    get:
+      tags:
+        - Clusters
+      summary: 'Get Node'
+      description: 'Get a server of a cluster.'
+      operationId: get-node-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The server.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/nodes/{uuid}/roles':
+    patch:
+      tags:
+        - Clusters
+      summary: 'Set Node Roles'
+      description: 'Turn ingress or builds on or off for a server of a cluster, like the Servers tab of the cluster page. Needs a team admin.'
+      operationId: update-node-roles
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                is_ingress:
+                  type: boolean
+                is_builder:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'The server.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/nodes/{uuid}/image-cleanup':
+    post:
+      tags:
+        - Clusters
+      summary: 'Clean Up Node Images'
+      description: 'Queue an image cleanup on a server now, like the button on the Node page. It waits while a build or a deploy runs on the server. Needs a team admin.'
+      operationId: cleanup-node-images
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The cleanup is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  operation_uuid: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/nodes/{uuid}/sentinel/upgrade':
+    post:
+      tags:
+        - Clusters
+      summary: 'Upgrade Sentinel'
+      description: 'Upgrade Sentinel on a server to the version of this Coolify, like the button on the Node page. Needs a team admin.'
+      operationId: upgrade-node-sentinel
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The upgrade is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  operation_uuid: { type: string }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -17794,6 +20533,762 @@ components:
               type: integer
           type: object
       type: object
+    ClusterApplication:
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        type:
+          type: string
+          enum:
+            - application
+            - database
+            - stack-service
+            - preview
+        status:
+          description: 'For example `running:healthy` or `exited`.'
+          type: string
+        desired_state:
+          type: string
+        build_pack:
+          type: string
+          enum:
+            - image
+            - dockerfile
+            - railpack
+            - static
+            - dockerfile_inline
+        database_type:
+          type:
+            - string
+            - 'null'
+        image:
+          description: 'The image of the latest revision.'
+          type:
+            - string
+            - 'null'
+        git_repository:
+          type:
+            - string
+            - 'null'
+        git_branch:
+          type:
+            - string
+            - 'null'
+        base_directory:
+          type:
+            - string
+            - 'null'
+        dockerfile_location:
+          type:
+            - string
+            - 'null'
+        publish_directory:
+          type:
+            - string
+            - 'null'
+        docker_registry_image_name:
+          type:
+            - string
+            - 'null'
+        docker_registry_image_tag:
+          type:
+            - string
+            - 'null'
+        registry_credential_uuid:
+          type:
+            - string
+            - 'null'
+        github_app_uuid:
+          type:
+            - string
+            - 'null'
+        private_key_uuid:
+          type:
+            - string
+            - 'null'
+        start_command:
+          description: 'Only for a token that may read sensitive data.'
+          type:
+            - array
+            - 'null'
+          items:
+            type: string
+        dockerfile:
+          description: 'The inline Dockerfile. Only for a token that may read sensitive data.'
+          type:
+            - string
+            - 'null'
+        domains:
+          type: array
+          items:
+            type: string
+        force_https:
+          type: boolean
+        www_redirect:
+          type:
+            - string
+            - 'null'
+        permanent_redirect:
+          type: boolean
+        internal_hostname:
+          type:
+            - string
+            - 'null'
+        cpu_limit:
+          type:
+            - number
+            - 'null'
+        cpu_reservation:
+          type:
+            - number
+            - 'null'
+        memory_limit_mb:
+          type:
+            - integer
+            - 'null'
+        memory_reservation_mb:
+          type:
+            - integer
+            - 'null'
+        is_auto_deploy_enabled:
+          type: boolean
+        is_auto_cancel_queued_deployments_enabled:
+          type: boolean
+        is_auto_cancel_building_deployments_enabled:
+          type: boolean
+        preview_deployments_enabled:
+          type: boolean
+        stack_uuid:
+          type:
+            - string
+            - 'null'
+        stack_service:
+          type:
+            - string
+            - 'null'
+        project_uuid:
+          type: string
+        environment_uuid:
+          type: string
+        cluster_uuid:
+          type:
+            - string
+            - 'null'
+        servers:
+          type: array
+          items:
+            properties:
+              uuid:
+                type: string
+              name:
+                type: string
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    ClusterDatabase:
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        type:
+          type: string
+          enum:
+            - application
+            - database
+            - stack-service
+            - preview
+        status:
+          description: 'For example `running:healthy` or `exited`.'
+          type: string
+        desired_state:
+          type: string
+        build_pack:
+          type: string
+          enum:
+            - image
+            - dockerfile
+            - railpack
+            - static
+            - dockerfile_inline
+        database_type:
+          type:
+            - string
+            - 'null'
+        image:
+          description: 'The image of the latest revision.'
+          type:
+            - string
+            - 'null'
+        git_repository:
+          type:
+            - string
+            - 'null'
+        git_branch:
+          type:
+            - string
+            - 'null'
+        base_directory:
+          type:
+            - string
+            - 'null'
+        dockerfile_location:
+          type:
+            - string
+            - 'null'
+        publish_directory:
+          type:
+            - string
+            - 'null'
+        docker_registry_image_name:
+          type:
+            - string
+            - 'null'
+        docker_registry_image_tag:
+          type:
+            - string
+            - 'null'
+        registry_credential_uuid:
+          type:
+            - string
+            - 'null'
+        github_app_uuid:
+          type:
+            - string
+            - 'null'
+        private_key_uuid:
+          type:
+            - string
+            - 'null'
+        start_command:
+          description: 'Only for a token that may read sensitive data.'
+          type:
+            - array
+            - 'null'
+          items:
+            type: string
+        dockerfile:
+          description: 'The inline Dockerfile. Only for a token that may read sensitive data.'
+          type:
+            - string
+            - 'null'
+        domains:
+          type: array
+          items:
+            type: string
+        force_https:
+          type: boolean
+        www_redirect:
+          type:
+            - string
+            - 'null'
+        permanent_redirect:
+          type: boolean
+        internal_hostname:
+          type:
+            - string
+            - 'null'
+        cpu_limit:
+          type:
+            - number
+            - 'null'
+        cpu_reservation:
+          type:
+            - number
+            - 'null'
+        memory_limit_mb:
+          type:
+            - integer
+            - 'null'
+        memory_reservation_mb:
+          type:
+            - integer
+            - 'null'
+        is_auto_deploy_enabled:
+          type: boolean
+        is_auto_cancel_queued_deployments_enabled:
+          type: boolean
+        is_auto_cancel_building_deployments_enabled:
+          type: boolean
+        preview_deployments_enabled:
+          type: boolean
+        stack_uuid:
+          type:
+            - string
+            - 'null'
+        stack_service:
+          type:
+            - string
+            - 'null'
+        project_uuid:
+          type: string
+        environment_uuid:
+          type: string
+        cluster_uuid:
+          type:
+            - string
+            - 'null'
+        servers:
+          type: array
+          items:
+            properties:
+              uuid:
+                type: string
+              name:
+                type: string
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        credentials:
+          description: 'The credential variables by name. A value shows only for a token that may read sensitive data, and never when it is locked.'
+          type: object
+          additionalProperties:
+            type:
+              - string
+              - 'null'
+        internal_db_url:
+          description: 'Only for a token that may read sensitive data.'
+          type:
+            - string
+            - 'null'
+      type: object
+    ClusterStack:
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        template:
+          type:
+            - string
+            - 'null'
+        deploy_status:
+          type:
+            - string
+            - 'null'
+        deploy_error:
+          type:
+            - string
+            - 'null'
+        git_repository:
+          type:
+            - string
+            - 'null'
+        git_branch:
+          type:
+            - string
+            - 'null'
+        base_directory:
+          type:
+            - string
+            - 'null'
+        docker_compose_location:
+          type:
+            - string
+            - 'null'
+        commit_sha:
+          type:
+            - string
+            - 'null'
+        github_app_uuid:
+          type:
+            - string
+            - 'null'
+        private_key_uuid:
+          type:
+            - string
+            - 'null'
+        docker_compose_raw:
+          description: 'Only for a token that may read sensitive data.'
+          type:
+            - string
+            - 'null'
+        compose_changes:
+          type:
+            - object
+            - 'null'
+        search_domain:
+          type: string
+        project_uuid:
+          type: string
+        environment_uuid:
+          type: string
+        cluster_uuid:
+          type: string
+        services:
+          description: 'Only in Get.'
+          type: array
+          items:
+            properties:
+              uuid:
+                type: string
+              service:
+                type: string
+              name:
+                type: string
+              status:
+                type: string
+              servers:
+                type: array
+                items:
+                  properties: { uuid: { type: string }, name: { type: string } }
+                  type: object
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    Cluster:
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        cidr:
+          type: string
+        network_status:
+          type: string
+        last_reconciled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        image_storage:
+          type:
+            - string
+            - 'null'
+        generated_domain_base:
+          type:
+            - string
+            - 'null'
+        servers:
+          type: array
+          items:
+            properties:
+              uuid:
+                type: string
+              name:
+                type: string
+              role:
+                type: string
+              is_ingress:
+                type: boolean
+              is_builder:
+                type: boolean
+              is_usable:
+                type: boolean
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    Node:
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        ip:
+          type: string
+        port:
+          type: integer
+        user:
+          type: string
+        role:
+          type: string
+          enum:
+            - worker
+            - controller-worker
+            - controller
+        cluster_uuid:
+          type:
+            - string
+            - 'null'
+        is_reachable:
+          type: boolean
+        is_usable:
+          type: boolean
+        is_ingress:
+          type: boolean
+        is_builder:
+          type: boolean
+        wireguard_ip:
+          type:
+            - string
+            - 'null'
+        network_status:
+          type:
+            - string
+            - 'null'
+        sentinel_version:
+          type:
+            - string
+            - 'null'
+        image_cleanup_frequency:
+          type:
+            - string
+            - 'null'
+        image_cleanup_threshold:
+          type:
+            - integer
+            - 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    ClusterResourceCreated:
+      properties:
+        uuid:
+          type: string
+        deployment_uuid:
+          type:
+            - string
+            - 'null'
+        build_uuid:
+          type:
+            - string
+            - 'null'
+      type: object
+    ClusterGitApplicationRequest:
+      required:
+        - project_uuid
+        - git_repository
+        - git_branch
+        - build_pack
+      properties:
+        project_uuid:
+          type: string
+        environment_uuid:
+          description: 'The environment. Or use `environment_name`.'
+          type: string
+        environment_name:
+          type: string
+        cluster_uuid:
+          description: 'The cluster. Coolify selects a server of the cluster.'
+          type: string
+        server_uuid:
+          description: 'One server of a cluster. Use it instead of `cluster_uuid` to select the server.'
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        instant_deploy:
+          type: boolean
+        git_repository:
+          type: string
+        git_branch:
+          type: string
+        build_pack:
+          type: string
+          enum:
+            - railpack
+            - static
+            - dockerfile
+        base_directory:
+          type: string
+        dockerfile_location:
+          type: string
+        publish_directory:
+          type: string
+        github_app_uuid:
+          description: 'Only for /private-github-app. `git_repository` is then `owner/repository`.'
+          type: string
+        private_key_uuid:
+          description: 'Only for /private-deploy-key.'
+          type: string
+      type: object
+    ClusterDatabaseRequest:
+      required:
+        - project_uuid
+      properties:
+        project_uuid:
+          type: string
+        environment_uuid:
+          description: 'The environment. Or use `environment_name`.'
+          type: string
+        environment_name:
+          type: string
+        cluster_uuid:
+          description: 'The cluster. Coolify selects a server of the cluster.'
+          type: string
+        server_uuid:
+          description: 'One server of a cluster. Use it instead of `cluster_uuid` to select the server.'
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        instant_deploy:
+          type: boolean
+        image:
+          description: 'The default is the image of the engine.'
+          type: string
+      type: object
+    ClusterDeploymentQueued:
+      properties:
+        message:
+          type: string
+        deployment_uuid:
+          type:
+            - string
+            - 'null'
+        build_uuid:
+          type:
+            - string
+            - 'null'
+      type: object
+    ClusterLifecycleQueued:
+      properties:
+        message:
+          type: string
+        deployment_uuids:
+          type: array
+          items:
+            type: string
+        failures:
+          type: array
+          items:
+            type: string
+      type: object
+    ClusterPublishedPort:
+      properties:
+        uuid:
+          type: string
+        protocol:
+          type: string
+          enum:
+            - tcp
+            - udp
+        container_port:
+          type: integer
+        host_port:
+          type: integer
+        source_cidrs:
+          type: array
+          items:
+            type: string
+        label:
+          type: string
+      type: object
+    ClusterDatabaseBackup:
+      properties:
+        uuid:
+          type: string
+        frequency:
+          type: string
+        enabled:
+          type: boolean
+        s3_storage_uuid:
+          type:
+            - string
+            - 'null'
+        databases_to_backup:
+          type:
+            - string
+            - 'null'
+        dump_all:
+          type: boolean
+        database_backup_retention_amount_s3:
+          type:
+            - integer
+            - 'null'
+        database_backup_retention_days_s3:
+          type:
+            - integer
+            - 'null'
+        created_at:
+          type: string
+          format: date-time
+      type: object
+    ClusterEnvironmentVariableRequest:
+      required:
+        - key
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        is_literal:
+          type: boolean
+        is_multiline:
+          type: boolean
+        is_shown_once:
+          description: 'Lock the value: it never shows again in the UI and the API.'
+          type: boolean
+        is_buildtime:
+          type: boolean
+        is_runtime:
+          type: boolean
+        comment:
+          type:
+            - string
+            - 'null'
+      type: object
+    ClusterStackEnvironmentVariableRequest:
+      required:
+        - service
+        - key
+      properties:
+        service:
+          description: 'The service of the stack.'
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        is_literal:
+          type: boolean
+        is_multiline:
+          type: boolean
+        is_shown_once:
+          description: 'Lock the value: it never shows again in the UI and the API.'
+          type: boolean
+        is_buildtime:
+          type: boolean
+        is_runtime:
+          type: boolean
+        comment:
+          type:
+            - string
+            - 'null'
+      type: object
     ApplicationPreview:
       properties:
         uuid:
@@ -19553,6 +23048,15 @@ tags:
   -
     name: 'Cluster Applications'
     description: 'Cluster Applications'
+  -
+    name: 'Cluster Databases'
+    description: 'Cluster Databases'
+  -
+    name: 'Cluster Stacks'
+    description: 'Cluster Stacks'
+  -
+    name: Clusters
+    description: Clusters
   -
     name: Databases
     description: Databases
