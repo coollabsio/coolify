@@ -52,6 +52,9 @@ the backup schedule of a database.
    sensitive values of the resource. A locked value never shows.
 6. **Admin-only Node writes.** The roles of a Node (ingress, builder), the image
    cleanup, and the Sentinel upgrade need a team admin, as on the Node page.
+   `/clusters` and `/nodes` are team-level routes, like `/servers`: a token
+   that access grants limit cannot use them (`ApiAbility::SCOPED_ACCESS_ROUTES`
+   has only the three resource paths).
 7. **Stack services.** `/cluster-applications` lists the cluster applications
    without previews and stack services. A stack lists its services. The
    environment variables of a stack belong to its services, so each stack
