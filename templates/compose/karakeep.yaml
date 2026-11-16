@@ -7,7 +7,7 @@
 
 services:
   web:
-    image: ghcr.io/karakeep-app/karakeep:0.33.2
+    image: ghcr.io/karakeep-app/karakeep:0.35.0
     volumes:
       - karakeep-data:/data
     environment:
@@ -23,8 +23,8 @@ services:
 
   chrome:
     image: ghcr.io/karakeep-app/karakeep-chrome:157.0.8103.78-r1
+    init: true
     command:
-      - '--no-sandbox'
       - '--disable-gpu'
       - '--disable-dev-shm-usage'
       - '--hide-scrollbars'

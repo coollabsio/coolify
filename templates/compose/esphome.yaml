@@ -7,7 +7,7 @@
 
 services:
   esphome:
-    image: ghcr.io/esphome/esphome:2025.12.4
+    image: ghcr.io/esphome/esphome:2026.10.2
     volumes:
       - esp_config:/config
       - /etc/localtime:/etc/localtime:ro
@@ -15,5 +15,5 @@ services:
     network_mode: host
     environment:
       - SERVICE_URL_ESPHOME_6052
-      - USERNAME=${SERVICE_USER_ADMIN}
-      - PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - ESPHOME_USERNAME=${SERVICE_USER_ADMIN}
+      - ESPHOME_PASSWORD=${SERVICE_PASSWORD_ADMIN}

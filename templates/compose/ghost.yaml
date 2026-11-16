@@ -7,7 +7,7 @@
 
 services:
   ghost:
-    image: ghost:5
+    image: ghost:6
     volumes:
       - ghost-content-data:/var/lib/ghost/content
     environment:
