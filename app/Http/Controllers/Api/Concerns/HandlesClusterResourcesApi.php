@@ -158,10 +158,11 @@ trait HandlesClusterResourcesApi
      * Validates the request. Fields outside the rules are refused, like the v4 API.
      *
      * @param  array<string, mixed>  $rules
+     * @param  array<string, string>  $messages
      */
-    protected function validateRequest(Request $request, array $rules): ?JsonResponse
+    protected function validateRequest(Request $request, array $rules, array $messages = []): ?JsonResponse
     {
-        $validator = customApiValidator($request->all(), $rules);
+        $validator = customApiValidator($request->all(), $rules, $messages);
         $allowed = collect(array_keys($rules))->map(fn (string $key): string => explode('.', $key)[0])->unique()->all();
         $extraFields = array_diff(array_keys($request->all()), $allowed);
         if ($validator->fails() || $extraFields !== []) {

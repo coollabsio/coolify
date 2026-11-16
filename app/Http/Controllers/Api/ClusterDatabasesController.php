@@ -429,6 +429,9 @@ class ClusterDatabasesController extends Controller
             return $invalid;
         }
         $s3 = ManageNodeDatabaseBackups::storages($workload)->where('uuid', (string) $request->input('s3_storage_uuid'))->first();
+        if ($s3 === null) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => ['s3_storage_uuid' => ['Select a usable S3 storage of the team.']]], 422);
+        }
 
         return $this->runClusterAction(fn (): JsonResponse => response()->json($this->backupResponse(
             ManageNodeDatabaseBackups::make()->createSchedule($workload, (string) $request->input('frequency'), $s3, $request->user(), 'api'),
@@ -478,13 +481,16 @@ class ClusterDatabasesController extends Controller
         $invalid = $this->validateRequest($request, [
             ...collect(ManageNodeDatabaseBackups::scheduleRules())->map(fn (array $rules): array => ['sometimes', ...array_diff($rules, ['required', 'sometimes'])])->all(),
             's3_storage_uuid' => 'sometimes|string',
-        ]);
+        ], ManageNodeDatabaseBackups::scheduleMessages());
         if ($invalid !== null) {
             return $invalid;
         }
         $s3 = $request->has('s3_storage_uuid')
             ? ManageNodeDatabaseBackups::storages($workload, $backup->s3_storage_id)->where('uuid', (string) $request->input('s3_storage_uuid'))->first()
             : $backup->s3;
+        if ($s3 === null) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => ['s3_storage_uuid' => ['Select a usable S3 storage of the team.']]], 422);
+        }
         $input = [
             'frequency' => $backup->frequency,
             'enabled' => (bool) $backup->enabled,
