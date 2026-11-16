@@ -3,9 +3,11 @@
 namespace App\Jobs;
 
 use App\Actions\Node\BackupNodeVolume;
+use App\Actions\Node\CleanupNodeImages;
 use App\Actions\Node\DumpNodeDatabase;
 use App\Actions\Node\RunNodeWorkloadCommand;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Models\Node;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\ScheduledDatabaseBackup;
@@ -57,7 +59,7 @@ class ScheduledJobManager implements ShouldQueue
         'backups' => ['database-backup'],
         'tasks' => ['scheduled-task'],
         'volume-backups' => ['volume-backup'],
-        'docker-cleanups' => ['docker-cleanup'],
+        'docker-cleanups' => ['docker-cleanup', 'node-image-cleanup'],
     ];
 
     /**
@@ -199,6 +201,7 @@ class ScheduledJobManager implements ShouldQueue
             if ($this->includes('docker-cleanups')) {
                 DockerCleanupJob::failInterruptedExecutions();
                 $this->processDockerCleanups();
+                $this->processNodeImageCleanups();
             }
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to process docker cleanups', [
@@ -930,6 +933,60 @@ class ScheduledJobManager implements ShouldQueue
             Log::channel('scheduled-errors')->error('Error processing docker cleanup', [
                 'server_id' => $server->id,
                 'server_name' => $server->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** The daily image cleanup of each Node (decision 0027), like the Docker cleanup of a server. */
+    private function processNodeImageCleanups(): void
+    {
+        if (! nodesInUse()) {
+            return;
+        }
+        Node::query()
+            ->where('is_usable', true)
+            ->chunkById(self::CHUNK_SIZE, function ($nodes): void {
+                foreach ($nodes as $node) {
+                    $this->processNodeImageCleanup($node);
+                }
+            });
+    }
+
+    private function processNodeImageCleanup(Node $node): void
+    {
+        try {
+            $frequency = $node->image_cleanup_frequency ?: '0 0 * * *';
+            $timezone = data_get($node->settings, 'server_timezone', config('app.timezone'));
+            $timezone = validate_timezone($timezone) ? $timezone : config('app.timezone');
+            $cron = new CronExpression($this->normalizeFrequency($frequency));
+            $executionTime = $this->executionTime->copy()->setTimezone($timezone);
+            $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+            if ($previousDue->lt($executionTime->copy()->subMinutes(ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES))) {
+                return;
+            }
+            $delivery = app(ScheduledJobDeliveryService::class);
+            $scheduleKey = "node-image-cleanup:{$node->id}";
+            $skipReason = match (true) {
+                ! $node->hasRecentFluxHeartbeat() => 'node_offline',
+                $node->supportsCapability(CleanupNodeImages::COMMAND_TYPE) !== true => 'node_capability_missing',
+                default => null,
+            };
+            if ($skipReason !== null) {
+                if ($delivery->recordSkipped($scheduleKey, $frequency, $timezone, $this->executionTime)) {
+                    $this->skippedCount++;
+                    $this->logSkip('node_image_cleanup', $skipReason, ['node_id' => $node->id, 'team_id' => $node->team_id]);
+                }
+
+                return;
+            }
+            if ($delivery->recordAndPublish($scheduleKey, $frequency, $timezone, 'node-image-cleanup', $node->id, [], $this->executionTime)) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Node image cleanup dispatched', ['node_id' => $node->id, 'team_id' => $node->team_id]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing node image cleanup', [
+                'node_id' => $node->id,
                 'error' => $e->getMessage(),
             ]);
         }

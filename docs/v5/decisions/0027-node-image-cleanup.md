@@ -1,6 +1,6 @@
 # Decision 0027: Clean up unused images on Nodes
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-16**
 
@@ -32,7 +32,7 @@ v4 has Docker cleanup for servers (`CleanupDocker`): a schedule
 (`docker_cleanup_frequency`), a disk threshold (`docker_cleanup_threshold`),
 a kept number of rollback images, and options for volumes and networks.
 
-## Decision (proposed)
+## Decision
 
 - **Sentinel command.** `image.prune.v1` (new capability) removes:
   - images that no container uses, in any state, except the images that
@@ -58,6 +58,48 @@ a kept number of rollback images, and options for volumes and networks.
   result. A run waits while a build or a deploy runs on the Node.
 - **Journal.** `PrepareNodeHost` writes a journald drop-in with
   `SystemMaxUse=500M`.
+
+## Implementation notes
+
+Built on 2026-11-16. The code changed these points of the proposal:
+
+- **Infrastructure images.** BuildKit and zot are pinned in Sentinel
+  (`BUILDKIT_IMAGE`, `ZOT_IMAGE`), not in Coolify, so Sentinel keeps them
+  itself. The ingress is the Caddy binary of `coolify-ingress.service`, not a
+  container, so it has no image to keep. Sentinel also keeps the newest
+  `sentinel-host` image when Coolify does not send one. Coolify sends the
+  pinned builder image and the `sentinel-host` image of the last upgrade of the
+  Node (else `constants.sentinel.host_image`).
+- **Keep list.** For each workload that runs or ran on the Node, Coolify keeps
+  the revision of the last successful deploy or move on that Node, the 2
+  revisions before it, and the newest revision. Images that a container uses,
+  in any state, always stay.
+- **Build containers.** Coolify sends the `coolify-build-<uuid>` names of the
+  active builds of the Node. Sentinel removes every other `coolify-build-*`
+  container that does not run.
+- **Local builds.** A build without a registry (`image.load.v1`) has no copy in
+  a registry. A rollback to such a revision that the cleanup removed needs a
+  new build.
+- **Rollback.** A rollback checked only the cluster registry, and built the
+  revision again when the registry did not have its image, also when the Node
+  still had it. Now a rollback deploys the image without the registry when
+  every server of the application ran it and the cleanup keeps it there. The
+  deploy uses the pull policy `missing`, so Podman starts the local image.
+- **No forced removal.** Sentinel never uses `--force`. An image that a
+  container starts to use during the cleanup is skipped and listed in the
+  result.
+- **Settings.** `nodes.image_cleanup_frequency` (default `0 0 * * *`, in the
+  server timezone) and `nodes.image_cleanup_threshold` (default 80). The
+  scheduler runs the daily cleanup with the v4 Docker cleanup
+  (`ScheduledJobManager`, type `docker-cleanups`). The threshold uses the disk
+  use of the last `system.info` (every minute) and starts at most one cleanup
+  per hour.
+- **Waiting.** A queued cleanup waits while a build, deploy, move, or lifecycle
+  action runs on the Node, for at most 2 hours. Sentinel also runs it in the
+  serial command lane, so a deploy that starts later waits for it.
+- **Server transfer.** Nodes are not in the scope of a server transfer
+  (`ServerTransferCoverage::NOT_TRANSFERRED`), so the new columns need no
+  transfer decision.
 
 ## Options compared
 

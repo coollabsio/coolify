@@ -33,6 +33,8 @@ class InstallSentinel
             disableMultiplexing: true,
         );
         DistributeFluxTrustBundle::recordInstalledVersion($node, $bundle['version']);
+        // The image cleanup keeps this image (decision 0027).
+        $node->mergeMetadata(['sentinel_host_image' => $image]);
 
         return $output;
     }

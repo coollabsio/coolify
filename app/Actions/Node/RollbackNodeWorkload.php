@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Actions\Node\Build\RunImageBuild;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Enums\NodeBuildStatus;
+use App\Enums\NodeOperationStatus;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeBuild;
@@ -13,6 +14,7 @@ use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -56,7 +58,7 @@ class RollbackNodeWorkload
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $current);
         }
 
-        if ($this->registryHasImage($workload, $nodes->first(), $revision->image) === false) {
+        if (! $this->keptOnEveryNode($workload, $nodes, $revision->image) && $this->registryHasImage($workload, $nodes->first(), $revision->image) === false) {
             return ['operation' => null, 'build' => StartNodeBuild::run($workload, $user, rebuildOf: $this->buildOf($workload, $revision))];
         }
 
@@ -75,6 +77,23 @@ class RollbackNodeWorkload
         }
 
         return ['operation' => $operation, 'build' => null];
+    }
+
+    /**
+     * Whether every server ran the image and the image cleanup keeps it there (decision 0027). Then the
+     * deploy starts it without a pull, also when the registry no longer has it.
+     *
+     * @param  Collection<int, Node>  $nodes
+     */
+    private function keptOnEveryNode(NodeWorkload $workload, Collection $nodes, string $image): bool
+    {
+        return $nodes->every(fn (Node $node): bool => $node->operations()
+            ->where('node_workload_id', $workload->id)
+            ->whereIn('command_type', ['workload.deploy.v1', 'workload.move.v1'])
+            ->where('status', NodeOperationStatus::SUCCEEDED)
+            ->whereHas('revision', fn ($revision) => $revision->where('image', $image))
+            ->exists()
+            && in_array($image, CleanupNodeImages::keepList($node), true));
     }
 
     /** The successful build that made the image of the revision, with a source that can be built again. */

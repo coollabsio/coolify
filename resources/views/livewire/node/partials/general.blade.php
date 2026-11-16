@@ -121,3 +121,38 @@
     </div>
 </x-application.settings-section>
 </form>
+
+<form wire:submit="saveImageCleanup" class="application-settings-form">
+<x-application.settings-section id="node-image-cleanup-section" title="Image cleanup"
+    helper="Removes the images that no container uses. The deployed revision and the 2 revisions before it of each application, and the builder, BuildKit, registry, and Sentinel images stay. Volumes, networks, and the build cache stay.">
+    <x-slot:actions>
+        @can('update', $node)
+            <x-forms.button type="button" wire:click="cleanupImages" title="Clean up images now">
+                Clean up now
+            </x-forms.button>
+            <x-forms.button type="submit">Save</x-forms.button>
+        @endcan
+    </x-slot:actions>
+    <div class="grid gap-4 sm:grid-cols-2">
+        <x-forms.input id="imageCleanup.frequency" label="Frequency" placeholder="0 0 * * *" required
+            helper="A cron expression in the timezone of the server. The default is every day at 00:00." canGate="update" :canResource="$node" />
+        <x-forms.input id="imageCleanup.threshold" label="Disk threshold (%)" type="number" min="1" max="100" required
+            helper="A cleanup also starts when the disk use of the server is at or above this value." canGate="update" :canResource="$node" />
+    </div>
+    @isset($lastImageCleanup)
+        @php
+            $cleanupResult = $lastImageCleanup->result ?? [];
+        @endphp
+        <p class="mt-4 text-sm text-neutral-500 dark:text-fg-dim" wire:key="node-image-cleanup-{{ $lastImageCleanup->uuid }}">
+            Last cleanup: {{ $lastImageCleanup->status->value }}, {{ $lastImageCleanup->created_at?->diffForHumans() }}.
+            @if ($lastImageCleanup->status->value === 'succeeded')
+                Freed {{ formatBytes((int) data_get($cleanupResult, 'freed_bytes', 0)) }},
+                removed {{ (int) data_get($cleanupResult, 'removed_images_count', 0) }} images and {{ count(data_get($cleanupResult, 'removed_containers', [])) }} build containers,
+                kept {{ (int) data_get($cleanupResult, 'kept_images', 0) }} images.
+            @elseif (filled($lastImageCleanup->error))
+                {{ $lastImageCleanup->error }}
+            @endif
+        </p>
+    @endisset
+</x-application.settings-section>
+</form>

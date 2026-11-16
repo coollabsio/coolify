@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Node;
 
+use App\Actions\Node\CleanupNodeImages;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\CreateMoveOperation;
@@ -82,6 +83,9 @@ class Show extends Component
     /** @var array<string, string> */
     public array $moveTargets = [];
 
+    /** @var array{frequency: string, threshold: int} The image cleanup settings (decision 0027). */
+    public array $imageCleanup = ['frequency' => '0 0 * * *', 'threshold' => 80];
+
     public function mount(string $node_uuid, ?string $section = null): void
     {
         abort_unless(nodesEnabled(), 404);
@@ -96,8 +100,45 @@ class Show extends Component
             'server_timezone' => 'UTC',
             'wildcard_domain' => null,
         ], $this->node->settings ?? []);
+        $this->imageCleanup = [
+            'frequency' => (string) $this->node->image_cleanup_frequency,
+            'threshold' => (int) $this->node->image_cleanup_threshold,
+        ];
         $this->section = $this->resolveSection($section);
         $this->loadSectionData();
+    }
+
+    public function saveImageCleanup(): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $validated = Validator::make(['imageCleanup' => $this->imageCleanup], [
+                'imageCleanup.frequency' => ['required', 'string', 'max:100'],
+                'imageCleanup.threshold' => ['required', 'integer', 'min:1', 'max:100'],
+            ])->validate()['imageCleanup'];
+            if (! validate_cron_expression($validated['frequency'])) {
+                throw new \RuntimeException('The image cleanup frequency is not a valid cron expression.');
+            }
+            $this->node->update([
+                'image_cleanup_frequency' => $validated['frequency'],
+                'image_cleanup_threshold' => (int) $validated['threshold'],
+            ]);
+            $this->dispatch('success', 'Image cleanup settings saved.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** Queues an image cleanup now. It waits while a build or a deploy runs on the server. */
+    public function cleanupImages(): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $operation = CleanupNodeImages::start($this->node, auth()->user(), 'manual');
+            $this->dispatch('success', $operation->wasRecentlyCreated ? 'Image cleanup queued.' : 'An image cleanup is already queued or running.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function saveConnection(): void
@@ -433,6 +474,7 @@ class Show extends Component
         return view('livewire.node.show', match ($this->section) {
             'workloads' => $this->workloadsViewData(),
             'containers' => ['orphanVolumes' => $this->orphanVolumes()],
+            'general' => ['lastImageCleanup' => $this->node->operations()->where('command_type', CleanupNodeImages::COMMAND_TYPE)->latest('id')->first()],
             default => [],
         });
     }

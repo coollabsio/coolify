@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Events\BackupCreated;
 use App\Events\DockerCleanupDone;
 use App\Events\ScheduledTaskDone;
+use App\Jobs\CleanupNodeImagesJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\VolumeBackupJob;
 use App\Models\DockerCleanupExecution;
+use App\Models\Node;
 use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -603,6 +605,9 @@ class ScheduledJobDeliveryService
                 : null,
             'volume-backup' => ($backup = ScheduledVolumeBackup::find($occurrence->resource_id))
                 ? new VolumeBackupJob($backup, $occurrence->uuid)
+                : null,
+            'node-image-cleanup' => Node::query()->whereKey($occurrence->resource_id)->exists()
+                ? new CleanupNodeImagesJob(null, $occurrence->uuid, $occurrence->resource_id)
                 : null,
             'docker-cleanup' => ($server = Server::find($occurrence->resource_id))
                 ? new DockerCleanupJob(

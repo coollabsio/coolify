@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\CleanupNodeImages;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
 use App\Models\Node;
 use Illuminate\Bus\Queueable;
@@ -34,5 +35,7 @@ class RefreshNodeInformationJob implements ShouldBeUnique, ShouldQueue
         }
 
         FetchFluxNodeInformation::run($node);
+        // The disk threshold of the image cleanup (decision 0027), like v4 `docker_cleanup_threshold`.
+        rescue(fn () => CleanupNodeImages::startWhenAboveThreshold($node->refresh()), report: false);
     }
 }

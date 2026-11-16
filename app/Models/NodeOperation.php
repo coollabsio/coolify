@@ -40,6 +40,7 @@ class NodeOperation extends BaseModel
         'discovery.corrosion.reconcile.v1' => 'Configure internal DNS',
         'builder.reconcile.v1' => 'Configure the image builder',
         'image.build.v1' => 'Start a build',
+        'image.prune.v1' => 'Clean up images',
         'ingress.reconcile.v1' => 'Apply routes and internal names',
         'network.cluster.leave.v1' => 'Leave cluster',
         'network.firewall.inspect.v1' => 'Inspect firewall',

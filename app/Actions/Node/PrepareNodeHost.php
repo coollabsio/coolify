@@ -75,6 +75,12 @@ systemctl is-active --quiet podman.socket
 printf 'L+ /run/docker.sock - - - - /run/podman/podman.sock\n' > /etc/tmpfiles.d/coolify-docker-socket.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/coolify-docker-socket.conf
 test -S /var/run/docker.sock
+# The journal keeps at most 500 MB instead of the systemd default of 10% of the disk (decision 0027).
+if ! grep -qx 'SystemMaxUse=500M' /etc/systemd/journald.conf.d/coolify.conf 2>/dev/null; then
+    install -d -m 0755 /etc/systemd/journald.conf.d
+    printf '[Journal]\nSystemMaxUse=500M\n' > /etc/systemd/journald.conf.d/coolify.conf
+    systemctl restart systemd-journald || true
+fi
 podman info --format json >/dev/null
 SH;
     }

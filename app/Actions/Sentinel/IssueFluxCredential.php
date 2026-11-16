@@ -72,6 +72,7 @@ class IssueFluxCredential
             'image.build.v1',
             'image.build.private_git.v1',
             'image.load.v1',
+            'image.prune.v1',
             'image.build.external_push.v1',
             'image.build.external_image.v1',
             'image.build.variables.v1',
