@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\NodeCluster;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
 
@@ -60,6 +61,9 @@ class CleanupRedis extends Command
         if ($isRestart || $this->option('clear-locks')) {
             $jobsCleaned = $this->cleanupStuckJobs($redis, $prefix, $dryRun, $isRestart);
             $deletedCount += $jobsCleaned;
+        }
+        if ($isRestart && ! $dryRun) {
+            $this->releaseNodeClusterNetworkLocks();
         }
 
         if ($dryRun) {
@@ -260,6 +264,15 @@ class CleanupRedis extends Command
         }
 
         return $cleanedCount;
+    }
+
+    /**
+     * A restart ends every process, so no network run of a cluster still holds its lock. The lock
+     * lives 20 minutes, and until it expires no network revision applies and deploys fail.
+     */
+    private function releaseNodeClusterNetworkLocks(): void
+    {
+        NodeCluster::query()->select('id')->each(fn (NodeCluster $cluster) => $cluster->networkLock()->forceRelease());
     }
 
     private function cleanupCacheLocks(bool $dryRun): int
