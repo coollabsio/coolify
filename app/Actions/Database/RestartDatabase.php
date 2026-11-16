@@ -3,6 +3,7 @@
 namespace App\Actions\Database;
 
 use App\Exceptions\RemoteSecretException;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -29,7 +30,7 @@ class RestartDatabase
     /**
      * @param  string|null  $reservation  The token from StartDatabase::reserveOperation(). The request
      *                                    that queued this action holds the reservation; this action
-     *                                    keeps it during the stop and releases it after the start.
+     *                                    releases it after the start is queued.
      */
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null)
     {
@@ -62,9 +63,8 @@ class RestartDatabase
             } catch (RemoteSecretException $e) {
                 return $e->getMessage();
             }
-            StopDatabase::run($database, dockerCleanup: false);
-            // The stop can take a while; keep the reservation for the start that follows.
-            DatabaseOperationReservation::renew($database->uuid, $reservation);
+            // The start script stops the container only after the image pull, so a failed pull keeps the database running.
+            NotifyResourceStoppedJob::expectStop($database);
 
             return StartDatabase::run($database, $reservation);
         } finally {
