@@ -19,14 +19,19 @@ use RuntimeException;
  * without one, the build resolves the head of the branch. A rollback passes an earlier build,
  * whose source and commit the new build copies. A stack deploy builds without deploying
  * (`$skipDeploy`), then deploys its services in `depends_on` order.
+ *
+ * A push webhook (`$fromWebhook`) that comes while a build runs adds a waiting build, which starts
+ * when the running build ends, like a queued v4 deployment. The v4 settings of the workload decide
+ * which older webhook builds a newer push cancels. Manual, API, and rollback builds are never cancelled.
  */
 class StartNodeBuild
 {
     use AsAction;
 
-    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null, ?NodeBuild $rebuildOf = null, bool $skipDeploy = false): NodeBuild
+    public function handle(NodeWorkload $workload, ?User $user, ?string $commitSha = null, ?NodeBuild $rebuildOf = null, bool $skipDeploy = false, bool $fromWebhook = false): NodeBuild
     {
-        $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf, $skipDeploy): NodeBuild {
+        $superseded = collect();
+        $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf, $skipDeploy, $fromWebhook, &$superseded): NodeBuild {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             if ($rebuildOf !== null) {
                 if ($workload->builds()->active()->exists()) {
@@ -48,12 +53,22 @@ class StartNodeBuild
             if ($missingSource !== null) {
                 throw new RuntimeException($missingSource);
             }
-            $active = $workload->builds()->active()->latest('id')->first();
-            if ($active !== null) {
-                return $active;
+            $active = $workload->builds()->active()->orderBy('id')->get();
+            if ($active->isNotEmpty() && ! $fromWebhook) {
+                return $active->last();
             }
+            $sameCommit = $commitSha === null ? null : $active->firstWhere('commit_sha', $commitSha);
+            if ($sameCommit !== null) {
+                return $sameCommit;
+            }
+            $superseded = $active->filter(fn (NodeBuild $build): bool => $build->is_webhook && (
+                $workload->is_auto_cancel_building_deployments_enabled
+                || ($workload->is_auto_cancel_queued_deployments_enabled && $build->is_waiting)
+            ));
 
             return $workload->builds()->create([
+                'is_webhook' => $fromWebhook,
+                'is_waiting' => $active->count() > $superseded->count(),
                 'requested_by_user_id' => $user?->id,
                 'source_type' => $workload->source_type,
                 'git_repository' => $workload->git_repository,
@@ -68,14 +83,20 @@ class StartNodeBuild
             ]);
         });
 
-        if ($build->wasRecentlyCreated) {
-            match ($build->source_type) {
-                NodeWorkloadSourceType::DOCKERFILE, NodeWorkloadSourceType::DOCKERFILE_INLINE => DeployDockerfileWorkloadJob::dispatch($build->id),
-                NodeWorkloadSourceType::RAILPACK, NodeWorkloadSourceType::STATIC => DeployRailpackWorkloadJob::dispatch($build->id),
-                NodeWorkloadSourceType::IMAGE => throw new RuntimeException('An image application is not built.'),
-            };
+        $superseded->each(fn (NodeBuild $old) => CancelNodeBuild::run($old, 'Cancelled by a newer push.'));
+        if ($build->wasRecentlyCreated && ! $build->is_waiting) {
+            self::dispatchBuild($build);
         }
 
         return $build;
+    }
+
+    public static function dispatchBuild(NodeBuild $build): void
+    {
+        match ($build->source_type) {
+            NodeWorkloadSourceType::DOCKERFILE, NodeWorkloadSourceType::DOCKERFILE_INLINE => DeployDockerfileWorkloadJob::dispatch($build->id),
+            NodeWorkloadSourceType::RAILPACK, NodeWorkloadSourceType::STATIC => DeployRailpackWorkloadJob::dispatch($build->id),
+            NodeWorkloadSourceType::IMAGE => throw new RuntimeException('An image application is not built.'),
+        };
     }
 }

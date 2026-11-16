@@ -26,6 +26,8 @@ class NodeBuild extends BaseModel
             'status' => NodeBuildStatus::class,
             'source_type' => NodeWorkloadSourceType::class,
             'skip_deploy' => 'boolean',
+            'is_webhook' => 'boolean',
+            'is_waiting' => 'boolean',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

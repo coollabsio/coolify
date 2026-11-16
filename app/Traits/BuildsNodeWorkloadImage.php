@@ -7,6 +7,7 @@ use App\Actions\Node\Build\PublishBuiltRevision;
 use App\Actions\Node\Build\ResolveGitCommit;
 use App\Actions\Node\Build\RunImageBuild;
 use App\Actions\Node\Build\SelectBuilderNode;
+use App\Actions\Node\Build\StartWaitingNodeBuild;
 use App\Enums\NodeBuildStatus;
 use App\Models\NodeBuild;
 use Illuminate\Support\Carbon;
@@ -45,7 +46,13 @@ trait BuildsNodeWorkloadImage
     public function handle(): void
     {
         $build = NodeBuild::query()->find($this->buildId);
-        if ($build === null || $build->status !== NodeBuildStatus::QUEUED) {
+        if ($build === null || $build->is_waiting) {
+            return;
+        }
+        if ($build->status !== NodeBuildStatus::QUEUED) {
+            // Cancelled before it started: the next waiting build of the workload can start.
+            StartWaitingNodeBuild::run($build->node_workload_id);
+
             return;
         }
 
@@ -79,6 +86,7 @@ trait BuildsNodeWorkloadImage
         } catch (Throwable $exception) {
             $this->markFailed($build, $exception->getMessage());
         }
+        StartWaitingNodeBuild::run($build->node_workload_id);
     }
 
     public function failed(?Throwable $exception): void
@@ -86,6 +94,7 @@ trait BuildsNodeWorkloadImage
         $build = NodeBuild::query()->find($this->buildId);
         if ($build !== null) {
             $this->markFailed($build, $exception?->getMessage() ?? 'The build job failed.');
+            StartWaitingNodeBuild::run($build->node_workload_id);
         }
     }
 

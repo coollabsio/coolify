@@ -112,8 +112,14 @@ class RunImageBuild
         $digest = is_array($result) ? ($result['digest'] ?? null) : null;
         if (! is_string($digest) || preg_match('/^sha256:[0-9a-f]{64}$/', $digest) !== 1) {
             // The builder and BuildKit write the reason as the last `error: ` line, for example a failed push.
+            // Railpack writes ` ERRO <reason>`.
             $reason = $build->logLines()->where('line', 'like', 'error: %')->latest('id')->value('line');
-            throw new RuntimeException(is_string($reason) ? ucfirst(substr($reason, strlen('error: '))) : 'The build failed. See the build log for the reason.');
+            $railpackError = $reason === null ? $build->logLines()->where('line', 'like', ' ERRO %')->latest('id')->value('line') : null;
+            throw new RuntimeException(match (true) {
+                is_string($reason) => ucfirst(substr($reason, strlen('error: '))),
+                is_string($railpackError) => ucfirst(trim(substr($railpackError, strlen(' ERRO ')))),
+                default => 'The build failed. See the build log for the reason.',
+            });
         }
         if ($local) {
             self::flux('image.load', [

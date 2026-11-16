@@ -28,6 +28,33 @@ Git credentials.
   repositories and webhooks. Each pull request becomes a separate workload with
   a generated domain. Coolify removes it when the pull request closes.
 
+## Amendment (2026-11-16): Auto deploy and pushes during a build
+
+The **Webhooks** tab of a Git cluster application has the three v4 settings of
+**Advanced** > **Deployment**, with the v4 defaults
+(`node_workloads.is_auto_deploy_enabled`,
+`is_auto_cancel_queued_deployments_enabled`,
+`is_auto_cancel_building_deployments_enabled`). A stack service has no such
+settings; its webhook deploys the stack.
+
+- **Auto deploy** off: a push webhook answers "Deployments disabled.", as in v4.
+- A push that comes while a build of the application runs adds a waiting build
+  (`node_builds.is_waiting`), shown as Queued. When a build ends, fails, or is
+  cancelled, `StartWaitingNodeBuild` starts the oldest waiting build, if no
+  other build of the application is active. A push of a commit that is already
+  queued or running is skipped.
+- **Queued webhook deployments** (default: cancel): a newer push cancels the
+  older waiting webhook builds ("Cancelled by a newer push."). "Deploy every
+  push" builds each push in order.
+- **Building webhook deployments** (default: let it finish): "Stop the build"
+  also cancels the running webhook build, and the new build starts at once. It
+  turns on the cancel of waiting builds too, as in v4.
+- Only builds that a webhook started (`node_builds.is_webhook`) are cancelled.
+  Manual, API, and rollback builds are never cancelled. A manual deploy while a
+  build is queued or running returns that build.
+- Verified on dev: each rule above, with builds in order 81, 82, 83 for
+  "Deploy every push".
+
 ## Consequences
 
 - Users keep their existing GitHub Apps and deploy keys.

@@ -221,13 +221,17 @@ trait StartsClusterWebhookBuilds
             return $this->startClusterWebhookStackDeploy($workload, $commit, $provider, $mode);
         }
 
+        if (! $workload->is_auto_deploy_enabled) {
+            return [...$result, 'status' => 'skipped', 'message' => 'Deployments disabled.'];
+        }
+
         try {
-            $build = StartNodeBuild::run($workload, null, $commit);
+            $build = StartNodeBuild::run($workload, null, $commit, fromWebhook: true);
         } catch (Throwable $exception) {
             return [...$result, 'status' => 'failed', 'message' => $exception->getMessage()];
         }
         if (! $build->wasRecentlyCreated) {
-            return [...$result, 'status' => 'skipped', 'message' => 'A build of this application is already running.', 'build_uuid' => $build->uuid];
+            return [...$result, 'status' => 'skipped', 'message' => 'A build of this commit is already queued or running.', 'build_uuid' => $build->uuid];
         }
 
         auditLog('webhook.build.queued', [
@@ -239,7 +243,7 @@ trait StartsClusterWebhookBuilds
             'commit' => $commit,
         ]);
 
-        return [...$result, 'status' => 'success', 'message' => 'Build queued.', 'build_uuid' => $build->uuid];
+        return [...$result, 'status' => 'success', 'message' => $build->is_waiting ? 'Build queued. It starts when the running build ends.' : 'Build queued.', 'build_uuid' => $build->uuid];
     }
 
     /**

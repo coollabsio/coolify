@@ -26,6 +26,7 @@ class CancelNodeBuild
             return;
         }
         $build->refresh();
+        StartWaitingNodeBuild::run($build->node_workload_id);
         if ($build->node === null || $build->started_at === null) {
             return;
         }

@@ -50,6 +50,9 @@ class NodeWorkload extends BaseModel
         'fork_preview_deployments_enabled' => false,
         'preview_url_template' => self::DEFAULT_PREVIEW_URL_TEMPLATE,
         'preview_uses_production_values' => true,
+        'is_auto_deploy_enabled' => true,
+        'is_auto_cancel_queued_deployments_enabled' => true,
+        'is_auto_cancel_building_deployments_enabled' => false,
     ];
 
     /** The v4 default: the pull request number in front of each domain of the parent. */
@@ -72,6 +75,9 @@ class NodeWorkload extends BaseModel
             'stack_health_check' => 'array',
             'force_https' => 'boolean',
             'permanent_redirect' => 'boolean',
+            'is_auto_deploy_enabled' => 'boolean',
+            'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+            'is_auto_cancel_building_deployments_enabled' => 'boolean',
             'is_env_sorting_enabled' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'redact_all_env_values_in_logs' => 'boolean',

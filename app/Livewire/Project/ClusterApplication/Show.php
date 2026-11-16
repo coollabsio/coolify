@@ -139,6 +139,13 @@ class Show extends Component
     /** The folder that a Static application serves, relative to the base directory. */
     public string $publishDirectory = '';
 
+    /** The v4 deployment settings of the Webhooks tab of a Git application. */
+    public bool $isAutoDeployEnabled = true;
+
+    public bool $isAutoCancelQueuedDeploymentsEnabled = true;
+
+    public bool $isAutoCancelBuildingDeploymentsEnabled = false;
+
     /** The Dockerfile of an application without Git. */
     public string $dockerfile = '';
 
@@ -362,6 +369,30 @@ class Show extends Component
         $this->loadResourceSettings();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Resource settings saved. A running application applies them automatically within about a minute, or redeploy to apply them now.');
+    }
+
+    /** Saves the webhook deployment settings, like the v4 Advanced > Deployment settings. */
+    public function saveDeploymentSettings(): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $this->validate([
+                'isAutoDeployEnabled' => ['boolean'],
+                'isAutoCancelQueuedDeploymentsEnabled' => ['boolean'],
+                'isAutoCancelBuildingDeploymentsEnabled' => ['boolean'],
+            ]);
+            $this->workload->update([
+                'is_auto_deploy_enabled' => $this->isAutoDeployEnabled,
+                // Stopping a running build also cancels the waiting ones, as in v4.
+                'is_auto_cancel_queued_deployments_enabled' => $this->isAutoCancelQueuedDeploymentsEnabled || $this->isAutoCancelBuildingDeploymentsEnabled,
+                'is_auto_cancel_building_deployments_enabled' => $this->isAutoCancelBuildingDeploymentsEnabled,
+            ]);
+            $this->dispatch('success', 'Deployment settings updated.');
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        } finally {
+            $this->loadConfiguration();
+        }
     }
 
     public function saveConfiguration(): void
@@ -1229,7 +1260,7 @@ class Show extends Component
             ->map(fn (NodeBuildLogLine $line): array => [
                 'timestamp' => $line->logged_at->format('Y-M-d H:i:s'),
                 'line' => $line->line,
-                'stderr' => preg_match('/^(error: |#\d+ ERROR: )/', $line->line) === 1,
+                'stderr' => preg_match('/^(error: |#\d+ ERROR: | ERRO )/', $line->line) === 1,
             ])->all();
         if ($build->status === NodeBuildStatus::FAILED && filled($build->error)) {
             $lines[] = [
@@ -1705,6 +1736,9 @@ class Show extends Component
         $this->baseDirectory = (string) $this->workload->base_directory;
         $this->dockerfileLocation = (string) $this->workload->dockerfile_location;
         $this->publishDirectory = (string) $this->workload->publish_directory;
+        $this->isAutoDeployEnabled = (bool) $this->workload->is_auto_deploy_enabled;
+        $this->isAutoCancelQueuedDeploymentsEnabled = (bool) $this->workload->is_auto_cancel_queued_deployments_enabled;
+        $this->isAutoCancelBuildingDeploymentsEnabled = (bool) $this->workload->is_auto_cancel_building_deployments_enabled;
         $this->dockerfile = (string) $this->workload->dockerfile;
         $this->buildPack = (string) $this->workload->source_type?->value;
         $revision = $this->workload->revisions->first();
