@@ -68,8 +68,10 @@ class DeployNodePreview
         bool $fromFork = false,
         ?User $requestedBy = null,
     ): array {
+        // Deploying an existing preview needs the deploy level on the parent; creating one changes the parent.
+        $existing = NodeWorkload::query()->withoutGlobalScopes()->where('preview_of_id', $parent->id)->where('pull_request_id', $pullRequestId)->exists();
         if ($requestedBy !== null) {
-            Gate::forUser($requestedBy)->authorize('update', $parent);
+            Gate::forUser($requestedBy)->authorize($existing ? 'deploy' : 'update', $parent);
         }
         $parent = NodeWorkload::query()->withoutGlobalScopes()->findOrFail($parent->id);
         $this->ensureDeployable($parent, $pullRequestId, $commitSha, $ref, $fromFork);
@@ -82,7 +84,7 @@ class DeployNodePreview
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        [$preview, $created, $forkChanged] = DB::transaction(function () use ($parent, $node, $pullRequestId, $ref, $url, $fromFork): array {
+        [$preview, $created, $forkChanged] = DB::transaction(function () use ($parent, $node, $pullRequestId, $ref, $url, $fromFork, $existing, $requestedBy): array {
             NodeWorkload::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($parent->id);
             $preview = NodeWorkload::query()->withoutGlobalScopes()
                 ->where('preview_of_id', $parent->id)
@@ -100,6 +102,9 @@ class DeployNodePreview
                 'pull_request_from_fork' => $fromFork,
             ];
             $created = $preview === null;
+            if ($created && $existing && $requestedBy !== null) {
+                Gate::forUser($requestedBy)->authorize('update', $parent);
+            }
             $forkChanged = ! $created && $preview->pull_request_from_fork !== $fromFork;
             if ($created) {
                 $preview = NodeWorkload::query()->create([

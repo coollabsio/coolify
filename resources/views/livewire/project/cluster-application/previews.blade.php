@@ -1,5 +1,6 @@
 @php
     $canUpdate = auth()->user()->can('update', $workload);
+    $canDeploy = auth()->user()->can('deploy', $workload);
 @endphp
 <div class="flex flex-col gap-6" wire:poll.10000ms>
     <x-application.settings-section id="preview-settings-section" title="Preview settings"
@@ -227,7 +228,7 @@
                                 </div>
                             </div>
 
-                            @if ($canUpdate)
+                            @if ($canDeploy)
                                 <div class="relative" x-data="{ open: false }" @click.outside="open = false"
                                     @keydown.escape.window="open = false">
                                     <button type="button" class="button gap-1.5" title="Preview actions" @click="open = !open"
@@ -262,6 +263,7 @@
                                                 Stop
                                             </button>
                                         @endunless
+                                        @if ($canUpdate)
                                         <button type="button"
                                             class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                             @click="open = false; document.getElementById('preview-delete-trigger-{{ $preview['uuid'] }}')?.click()"
@@ -269,6 +271,7 @@
                                             <x-reicon name="trash" class="size-3.5" />
                                             Delete
                                         </button>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -288,6 +291,7 @@
                                             </x-slot:trigger>
                                         </x-modal-confirmation>
                                     @endunless
+                                    @if ($canUpdate)
                                     <x-modal-confirmation title="Delete preview deployment?" buttonTitle="Delete"
                                         isErrorButton submitAction="delete('{{ $preview['uuid'] }}')"
                                         :actions="['All containers, volumes, and domains of this preview deployment will be stopped and permanently deleted.']"
@@ -298,6 +302,7 @@
                                             <button id="preview-delete-trigger-{{ $preview['uuid'] }}" type="button"></button>
                                         </x-slot:trigger>
                                     </x-modal-confirmation>
+                                    @endif
                                 </div>
                             @endif
                         </div>

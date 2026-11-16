@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodePublishedPort;
 use App\Models\NodeWorkload;
@@ -38,6 +39,7 @@ class PublishNodeWorkloadPort
         $cluster = $workload->cluster()
             ?? throw ValidationException::withMessages(['container_port' => 'Place the application on a server of a cluster first.']);
         $spec = self::validated($port);
+        self::ensureMayOpenOnCluster($cluster, $user);
 
         $published = self::lockCluster($cluster, function () use ($cluster, $workload, $spec): NodePublishedPort {
             $reason = self::unavailableReason($cluster, $spec);
@@ -53,6 +55,23 @@ class PublishNodeWorkloadPort
         QueueNodeClusterNetworkRevision::run($cluster, $user);
 
         return $published;
+    }
+
+    /**
+     * A published port opens on every server of the cluster, so the user needs placeResource on each of them:
+     * team-wide write, or write on a resource that runs there.
+     */
+    public static function ensureMayOpenOnCluster(NodeCluster $cluster, User $user): void
+    {
+        $denied = Node::query()
+            ->where('node_cluster_id', $cluster->id)
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (Node $node): bool => Gate::forUser($user)->allows('placeResource', $node))
+            ->pluck('name');
+        if ($denied->isNotEmpty()) {
+            throw ValidationException::withMessages(['host_port' => 'A published port opens on every server of the cluster, so it needs write access on the whole team or on a resource on each server. You have none on: '.$denied->implode(', ').'.']);
+        }
     }
 
     /**

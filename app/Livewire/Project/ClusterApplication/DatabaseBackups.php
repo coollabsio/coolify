@@ -115,8 +115,7 @@ class DatabaseBackups extends Component
 
             return;
         }
-        // An S3 storage that this application does not use yet is a team credential.
-        $this->authorize('useTeamCredentials', $this->workload);
+        $this->authorizeS3Storage($s3);
         $key = $this->workload->database_type->backupDatabaseKey();
 
         $backup = ScheduledDatabaseBackup::query()->create([
@@ -175,9 +174,7 @@ class DatabaseBackups extends Component
 
             return;
         }
-        if ($s3->id !== (int) $backup->s3_storage_id) {
-            $this->authorize('useTeamCredentials', $this->workload);
-        }
+        $this->authorizeS3Storage($s3);
 
         $backup->fill([
             'frequency' => $this->frequency,
@@ -341,6 +338,14 @@ class DatabaseBackups extends Component
     private function supportsDumps(): bool
     {
         return $this->workload->database_type?->dumpEngine() !== null;
+    }
+
+    /** An S3 storage that no backup schedule of this application uses yet is a team credential. */
+    private function authorizeS3Storage(S3Storage $s3): void
+    {
+        if (! $this->schedules()->where('s3_storage_id', $s3->id)->exists()) {
+            $this->authorize('useTeamCredentials', $this->workload);
+        }
     }
 
     private function backup(): ScheduledDatabaseBackup

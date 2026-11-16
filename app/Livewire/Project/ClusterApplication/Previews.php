@@ -179,7 +179,7 @@ class Previews extends Component
     public function redeploy(string $previewUuid): void
     {
         try {
-            $preview = $this->preview($previewUuid);
+            $preview = $this->preview($previewUuid, 'deploy');
             ['build' => $build] = DeployNodePreview::run(
                 $this->workload,
                 (int) $preview->pull_request_id,
@@ -269,11 +269,11 @@ class Previews extends Component
         ]);
     }
 
-    private function preview(string $previewUuid): NodeWorkload
+    private function preview(string $previewUuid, string $ability = 'update'): NodeWorkload
     {
-        $this->authorize('update', $this->workload);
+        $this->authorize($ability, $this->workload);
         $preview = $this->workload->previews()->where('uuid', $previewUuid)->firstOrFail();
-        $this->authorize('update', $preview);
+        $this->authorize($ability, $preview);
 
         return $preview;
     }
@@ -281,7 +281,7 @@ class Previews extends Component
     private function queueLifecycle(string $previewUuid, NodeWorkloadAction $action): void
     {
         try {
-            $preview = $this->preview($previewUuid);
+            $preview = $this->preview($previewUuid, 'deploy');
             $revision = $preview->revisions()->latest('id')->first()
                 ?? throw new RuntimeException('The preview has no deployment yet. Redeploy it first.');
             foreach ($preview->nodes()->orderBy('nodes.id')->get() as $node) {

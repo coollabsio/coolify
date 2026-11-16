@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Actions\Node\Build\EnsureNodeRegistry;
+use App\Enums\AccessLevel;
 use App\Enums\NodeWorkloadSourceType;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Models\Node;
@@ -12,11 +13,15 @@ use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use App\Services\NodeStack\NodeStackCompose;
 use App\Services\NodeStack\NodeStackComposeDiff;
 use App\Services\NodeStack\NodeStackComposeMapper;
 use App\Services\NodeStack\NodeStackServiceChange;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -57,7 +62,7 @@ class SyncNodeStackCompose
         $registryIsNew = ! $cluster->registry()->exists();
 
         $portsChanged = false;
-        $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor, &$portsChanged): array {
+        $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor, $requestedBy, &$portsChanged): array {
             $stack = NodeStack::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($stack->id);
             $stored = $stack->variables ?? [];
             $variables = CreateClusterStack::stackVariables($cluster, $stack, $yaml, $compose, $stored);
@@ -87,6 +92,15 @@ class SyncNodeStackCompose
             $portsChanged = $portsChanged
                 || collect($diff->changed)->contains(fn (NodeStackServiceChange $change): bool => $change->publishedPorts !== null)
                 || collect($diff->added)->contains(fn (array $service): bool => $service['published_ports'] !== []);
+            $portsOpened = collect($diff->added)->contains(fn (array $service): bool => $service['published_ports'] !== [])
+                || collect($diff->changed)->contains(fn (NodeStackServiceChange $change): bool => filled($change->publishedPorts));
+            if ($portsOpened && $requestedBy !== null) {
+                try {
+                    PublishNodeWorkloadPort::ensureMayOpenOnCluster($cluster, $requestedBy);
+                } catch (ValidationException $exception) {
+                    throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} publishes ports. ".collect($exception->errors())->flatten()->first());
+                }
+            }
 
             NodeVolumeMount::query()->whereKey(array_keys($diff->removedMounts))->delete();
             foreach ($diff->updatedMounts as $id => $mount) {
@@ -100,9 +114,9 @@ class SyncNodeStackCompose
             $nodes = [];
             foreach ($diff->added as $service) {
                 $placement = $diff->placements[$service['service']] === null ? null : Node::query()->find($diff->placements[$service['service']]);
-                $node = CreateClusterDockerImageWorkload::placementNode($cluster, $placement, $service['build'] !== null
+                $node = $this->placementNode($cluster, $workloads, $service['service'], $placement, $service['build'] !== null
                     ? $cluster->builderArchitectures()
-                    : ReadImageArchitectures::run((string) $service['image']));
+                    : ReadImageArchitectures::run((string) $service['image']), $requestedBy);
                 $all[$service['service']] = CreateClusterStack::createService($stack, $node, $service, $actor);
                 $nodes[$node->id] = $node;
             }
@@ -183,6 +197,42 @@ class SyncNodeStackCompose
      * the Compose file of the repository is trusted like at the creation of the stack, so an
      * owner or admin of the stack team saves them.
      */
+    /**
+     * The Node of a new service. A requester without team-wide write may only place it on a Node where
+     * placeResource allows them (NodePolicy), the Nodes of the other services of the stack first.
+     *
+     * @param  Collection<string, NodeWorkload>  $services
+     * @param  list<string>|null  $architectures
+     */
+    private function placementNode(NodeCluster $cluster, Collection $services, string $service, ?Node $placement, ?array $architectures, ?User $requestedBy): Node
+    {
+        if ($requestedBy === null || app(AccessResolver::class)->allowsTeamWide($requestedBy, AccessLevel::Write, (int) $cluster->team_id)) {
+            return CreateClusterDockerImageWorkload::placementNode($cluster, $placement, $architectures);
+        }
+        $allowed = fn (Node $node): bool => Gate::forUser($requestedBy)->allows('placeResource', $node);
+        if ($placement !== null) {
+            if (! $allowed($placement)) {
+                throw new RuntimeException("The new service {$service} must run on {$placement->name}, where you may not place resources. Ask a team admin to deploy the stack.");
+            }
+
+            return CreateClusterDockerImageWorkload::placementNode($cluster, $placement, $architectures);
+        }
+        $stackNodeIds = $services->flatMap(fn (NodeWorkload $workload) => $workload->nodes()->pluck('nodes.id'))->unique();
+        $candidates = $cluster->nodes()->get()
+            ->filter($allowed)
+            ->sortBy(fn (Node $node): int => $stackNodeIds->contains($node->id) ? 0 : 1)
+            ->values();
+        foreach ($candidates as $candidate) {
+            try {
+                return CreateClusterDockerImageWorkload::placementNode($cluster, $candidate, $architectures);
+            } catch (RuntimeException|\DomainException) {
+                continue;
+            }
+        }
+
+        throw new RuntimeException("The new service {$service} needs a server where you may place resources (write access on a resource that runs there), and none of them can take it. Ask a team admin to deploy the stack.");
+    }
+
     private function actor(NodeStack $stack, ?User $requestedBy): User
     {
         if ($requestedBy?->isAdminOfTeam($stack->team_id)) {

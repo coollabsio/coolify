@@ -652,7 +652,7 @@ class DeployController extends Controller
     private function deployClusterWorkload(NodeWorkload $workload, int $pr, ?string $dockerTag): array
     {
         try {
-            $this->authorize('update', $workload);
+            $this->authorize('deploy', $workload);
         } catch (AuthorizationException) {
             return ['message' => 'Unauthorized to deploy this application.', 'deployment_uuid' => null];
         }
