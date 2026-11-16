@@ -5,9 +5,8 @@ namespace App\Policies;
 use App\Enums\AccessLevel;
 use App\Models\NodeStack;
 use App\Models\User;
-use App\Services\Access\AccessResolver;
 
-/** The rules of NodeWorkloadPolicy: the services of a stack are cluster applications. */
+/** The rules of NodeWorkloadPolicy: the services of a stack are cluster applications with the access of the stack. */
 class NodeStackPolicy
 {
     public function viewAny(User $user): bool
@@ -17,9 +16,7 @@ class NodeStackPolicy
 
     public function view(User $user, NodeStack $nodeStack): bool
     {
-        return $nodeStack->environment_id !== null
-            ? $user->canAccess(AccessLevel::Read, $nodeStack)
-            : app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $nodeStack->team_id);
+        return NodeWorkloadPolicy::allowsOn($user, AccessLevel::Read, $nodeStack);
     }
 
     public function create(User $user): bool
@@ -27,14 +24,19 @@ class NodeStackPolicy
         return $user->isAdmin();
     }
 
-    /** Deploy and every other change. */
+    /** Every change of the compose file and the settings. */
     public function update(User $user, NodeStack $nodeStack): bool
     {
-        return $user->isAdminOfTeam($nodeStack->team_id);
+        return NodeWorkloadPolicy::allowsOn($user, AccessLevel::Write, $nodeStack);
+    }
+
+    public function deploy(User $user, NodeStack $nodeStack): bool
+    {
+        return NodeWorkloadPolicy::allowsOn($user, AccessLevel::Deploy, $nodeStack);
     }
 
     public function delete(User $user, NodeStack $nodeStack): bool
     {
-        return $user->isAdminOfTeam($nodeStack->team_id);
+        return NodeWorkloadPolicy::allowsOn($user, AccessLevel::Delete, $nodeStack);
     }
 }

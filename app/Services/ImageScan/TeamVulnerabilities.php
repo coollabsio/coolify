@@ -218,7 +218,7 @@ final class TeamVulnerabilities
             $class = Relation::getMorphedModel($type) ?? $type;
             if (in_array($class, [ServiceApplication::class, ServiceDatabase::class], true)) {
                 $resourceIds[Service::class] = [...($resourceIds[Service::class] ?? []), ...$class::query()->whereIn('id', $ids)->pluck('service_id')->all()];
-            } elseif (in_array($class, AccessResolver::RESOURCE_MODELS, true)) {
+            } elseif (in_array($class, AccessResolver::SERVER_RESOURCE_MODELS, true)) {
                 $resourceIds[$class] = [...($resourceIds[$class] ?? []), ...$ids];
             }
         }

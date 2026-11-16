@@ -6,6 +6,8 @@ use App\Enums\AccessLevel;
 use App\Enums\AccessScope;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\Node;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\PersonalAccessToken;
 use App\Models\Project;
@@ -27,6 +29,7 @@ use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 /**
  * Decides what a user, and the API token of the current request, can see and do.
@@ -38,11 +41,11 @@ use Illuminate\Database\Eloquent\Model;
 class AccessResolver
 {
     /**
-     * Models that are a resource inside an environment.
+     * Resources inside an environment that run on a v4 server destination.
      *
      * @var list<class-string<Model>>
      */
-    public const RESOURCE_MODELS = [
+    public const SERVER_RESOURCE_MODELS = [
         Application::class,
         Service::class,
         StandalonePostgresql::class,
@@ -55,6 +58,23 @@ class AccessResolver
         StandaloneClickhouse::class,
         StandaloneSqlite::class,
     ];
+
+    /**
+     * Resources inside an environment that run on the Nodes of a cluster.
+     *
+     * @var list<class-string<Model>>
+     */
+    public const CLUSTER_RESOURCE_MODELS = [
+        NodeWorkload::class,
+        NodeStack::class,
+    ];
+
+    /**
+     * Models that a resource grant can name.
+     *
+     * @var list<class-string<Model>>
+     */
+    public const RESOURCE_MODELS = [...self::SERVER_RESOURCE_MODELS, ...self::CLUSTER_RESOURCE_MODELS];
 
     /** @var array<string, AccessGrants> */
     private array $layers = [];
@@ -263,7 +283,7 @@ class AccessResolver
             return false;
         }
 
-        foreach (self::RESOURCE_MODELS as $modelClass) {
+        foreach (self::SERVER_RESOURCE_MODELS as $modelClass) {
             $resources = $modelClass::withoutGlobalScope(VisibleThroughAccessGrants::class)
                 ->whereIn('environment_id', array_keys($environmentProjects))
                 ->where(function (Builder $query) use ($modelClass, $server) {
@@ -274,23 +294,115 @@ class AccessResolver
                 })
                 ->get(['uuid', 'environment_id']);
 
-            foreach ($resources as $resource) {
-                $environmentId = (int) $resource->environment_id;
-                $projectId = $environmentProjects[$environmentId];
-                $allowed = true;
-                foreach ($layers as $layer) {
-                    if (! $layer->allows($level, $projectId, $environmentId, $resource->uuid)) {
-                        $allowed = false;
-                        break;
-                    }
-                }
-                if ($allowed) {
-                    return true;
-                }
+            if ($this->anyAllowed($layers, $level, $environmentProjects, $resources)) {
+                return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * True when the user (and the current token) has the level on at least one cluster resource that is placed
+     * on the Node. A preview counts for its parent, and a stack service for its stack.
+     */
+    public function allowsOnNode(User $user, AccessLevel $level, Node $node): bool
+    {
+        $teamId = (int) $node->team_id;
+        if (! $this->isMember($user, $teamId)) {
+            return false;
+        }
+
+        $layers = $this->layersFor($user, $teamId);
+        if ($layers === []) {
+            return true;
+        }
+
+        $environmentProjects = $this->teamEnvironments($teamId)->pluck('environments.project_id', 'environments.id')->all();
+        if ($environmentProjects === []) {
+            return false;
+        }
+
+        $targets = NodeWorkload::withoutGlobalScope(VisibleThroughAccessGrants::class)
+            ->where('team_id', $teamId)
+            ->whereHas('nodes', fn (Builder $nodes) => $nodes->whereKey($node->id))
+            ->with(['previewOf', 'stack'])
+            ->get()
+            ->map(fn (NodeWorkload $workload) => $workload->accessTarget())
+            ->filter(fn (?Model $target) => $target !== null && isset($environmentProjects[(int) $target->getAttribute('environment_id')]));
+
+        return $this->anyAllowed($layers, $level, $environmentProjects, $targets);
+    }
+
+    /**
+     * @param  list<AccessGrants>  $layers
+     * @param  array<int, int>  $environmentProjects  environment ID => project ID
+     * @param  iterable<Model>  $resources  with `uuid` and `environment_id`
+     */
+    private function anyAllowed(array $layers, AccessLevel $level, array $environmentProjects, iterable $resources): bool
+    {
+        foreach ($resources as $resource) {
+            $environmentId = (int) $resource->getAttribute('environment_id');
+            $projectId = $environmentProjects[$environmentId];
+            $allowed = true;
+            foreach ($layers as $layer) {
+                if (! $layer->allows($level, $projectId, $environmentId, $resource->getAttribute('uuid'))) {
+                    $allowed = false;
+                    break;
+                }
+            }
+            if ($allowed) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The rows of a resource model that a resource grant can name. Previews and stack services are not
+     * grantable: they follow the grants of their parent application or stack.
+     *
+     * @param  class-string<Model>  $modelClass
+     */
+    public static function grantableResources(string $modelClass): Builder
+    {
+        $query = $modelClass::query();
+        if ($modelClass === NodeWorkload::class) {
+            $query->whereNull('preview_of_id')->whereNull('node_stack_id');
+        }
+
+        return $query;
+    }
+
+    /**
+     * The grantable resources of the environments, for the grant pickers. Cluster resources carry their kind
+     * in the label, such as `nginx (Cluster application)`.
+     *
+     * @param  iterable<int>  $environmentIds
+     * @param  bool  $onlyVisible  apply the access grants of the current user
+     * @return Collection<int, array{uuid: string, name: string, environment_id: int}>
+     */
+    public static function grantableResourceOptions(iterable $environmentIds, bool $onlyVisible): Collection
+    {
+        $environmentIds = collect($environmentIds)->all();
+
+        return collect(self::RESOURCE_MODELS)->flatMap(function (string $modelClass) use ($environmentIds, $onlyVisible) {
+            $query = self::grantableResources($modelClass)->whereIn('environment_id', $environmentIds);
+            if (! $onlyVisible) {
+                $query->withoutGlobalScope(VisibleThroughAccessGrants::class);
+            }
+
+            return $query->get()->map(fn (Model $resource) => [
+                'uuid' => (string) $resource->getAttribute('uuid'),
+                'name' => match (true) {
+                    $resource instanceof NodeStack => $resource->name.' (Cluster stack)',
+                    $resource instanceof NodeWorkload => $resource->name.($resource->isDatabase() ? ' (Cluster database)' : ' (Cluster application)'),
+                    default => (string) $resource->getAttribute('name'),
+                },
+                'environment_id' => (int) $resource->getAttribute('environment_id'),
+            ]);
+        })->values();
     }
 
     /**
@@ -457,7 +569,8 @@ class AccessResolver
         if ($resourceUuids !== []) {
             $teamEnvironmentProjects = $this->teamEnvironments($teamId)->pluck('environments.project_id', 'environments.id')->all();
             foreach (self::RESOURCE_MODELS as $modelClass) {
-                $resources = $modelClass::withoutGlobalScope(VisibleThroughAccessGrants::class)
+                $resources = self::grantableResources($modelClass)
+                    ->withoutGlobalScope(VisibleThroughAccessGrants::class)
                     ->whereIn('uuid', $resourceUuids)
                     ->whereIn('environment_id', array_keys($teamEnvironmentProjects))
                     ->get(['uuid', 'environment_id']);
@@ -495,9 +608,9 @@ class AccessResolver
         if ($target instanceof Project) {
             return [$target->team_id, $target->id, null, null];
         }
-        // A preview has the access of its parent (decision 0025), also a grant on the parent alone.
-        if ($target instanceof NodeWorkload && $target->isPreview()) {
-            $target = $target->previewOf;
+        // A preview has the access of its parent (decision 0025), and a stack service the access of its stack.
+        if ($target instanceof NodeWorkload) {
+            $target = $target->accessTarget();
             if ($target === null) {
                 return null;
             }

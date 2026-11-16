@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Models\Node;
 use App\Models\User;
 use App\Services\Access\AccessResolver;
+use Illuminate\Auth\Access\Response;
 
 class NodePolicy
 {
@@ -31,6 +32,20 @@ class NodePolicy
     public function create(User $user): bool
     {
         return $user->isAdmin();
+    }
+
+    /**
+     * Determine whether the user can place a cluster resource on the Node: move one there or restore a volume there.
+     * Like ServerPolicy::placeResource: team-wide write, or write on a cluster resource that already runs there.
+     * The Node pages stay team-wide, as the v4 server pages.
+     */
+    public function placeResource(User $user, Node $node): Response
+    {
+        $resolver = app(AccessResolver::class);
+
+        return $resolver->allowsTeamWide($user, AccessLevel::Write, (int) $node->team_id) || $resolver->allowsOnNode($user, AccessLevel::Write, $node)
+            ? Response::allow()
+            : Response::deny('You need write access on the whole team, or on a resource that already runs on this server, to place resources on it.');
     }
 
     /**

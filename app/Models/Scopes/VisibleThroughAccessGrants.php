@@ -3,6 +3,8 @@
 namespace App\Models\Scopes;
 
 use App\Models\Environment;
+use App\Models\NodeStack;
+use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Services\Access\AccessResolver;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,6 +35,14 @@ class VisibleThroughAccessGrants implements Scope
                 $builder->whereIn($model->qualifyColumn('id'), $layer->visibleProjectIds());
             } elseif ($model instanceof Environment) {
                 $builder->whereIn($model->qualifyColumn('id'), $layer->visibleEnvironmentIds());
+            } elseif ($model instanceof NodeWorkload) {
+                // A preview is visible with its parent, and a stack service with its stack.
+                $uuids = $layer->resourceUuids();
+                $builder->where(fn (Builder $query) => $query
+                    ->whereIn($model->qualifyColumn('environment_id'), $layer->fullEnvironmentIds())
+                    ->orWhereIn($model->qualifyColumn('uuid'), $uuids)
+                    ->orWhereIn($model->qualifyColumn('preview_of_id'), NodeWorkload::withoutGlobalScope(self::class)->whereIn('uuid', $uuids)->select('id'))
+                    ->orWhereIn($model->qualifyColumn('node_stack_id'), NodeStack::withoutGlobalScope(self::class)->whereIn('uuid', $uuids)->select('id')));
             } else {
                 $builder->where(fn (Builder $query) => $query
                     ->whereIn($model->qualifyColumn('environment_id'), $layer->fullEnvironmentIds())

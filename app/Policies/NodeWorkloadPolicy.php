@@ -3,14 +3,14 @@
 namespace App\Policies;
 
 use App\Enums\AccessLevel;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Services\Access\AccessResolver;
 
 /**
- * A preview follows its parent (decision 0025): a user who can view the parent can view its
- * previews, and a user who can deploy the parent can deploy and delete them. A preview without
- * its parent allows nothing.
+ * The levels of ApplicationPolicy. A preview follows its parent (decision 0025) and a stack service
+ * its stack: the access grants of that resource apply. A preview without its parent allows nothing.
  */
 class NodeWorkloadPolicy
 {
@@ -21,15 +21,7 @@ class NodeWorkloadPolicy
 
     public function view(User $user, NodeWorkload $nodeWorkload): bool
     {
-        $workload = $this->governing($nodeWorkload);
-        if ($workload === null) {
-            return false;
-        }
-
-        // A workload in an environment follows the access grants there, like other resources.
-        return $workload->environment_id !== null
-            ? $user->canAccess(AccessLevel::Read, $workload)
-            : app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $workload->team_id);
+        return $this->allows($user, AccessLevel::Read, $nodeWorkload);
     }
 
     public function create(User $user): bool
@@ -37,14 +29,21 @@ class NodeWorkloadPolicy
         return $user->isAdmin();
     }
 
+    /** Every change of the settings. */
     public function update(User $user, NodeWorkload $nodeWorkload): bool
     {
-        return $this->isAdminOfGoverningTeam($user, $nodeWorkload);
+        return $this->allows($user, AccessLevel::Write, $nodeWorkload);
+    }
+
+    /** Deploy, rollback, restart, stop, and cancel a build. */
+    public function deploy(User $user, NodeWorkload $nodeWorkload): bool
+    {
+        return $this->allows($user, AccessLevel::Deploy, $nodeWorkload);
     }
 
     public function delete(User $user, NodeWorkload $nodeWorkload): bool
     {
-        return $this->isAdminOfGoverningTeam($user, $nodeWorkload);
+        return $this->allows($user, AccessLevel::Delete, $nodeWorkload);
     }
 
     /**
@@ -52,7 +51,7 @@ class NodeWorkloadPolicy
      */
     public function viewSensitive(User $user, NodeWorkload $nodeWorkload): bool
     {
-        return $this->isAdminOfGoverningTeam($user, $nodeWorkload);
+        return $this->allows($user, AccessLevel::ReadSensitive, $nodeWorkload);
     }
 
     /**
@@ -60,19 +59,23 @@ class NodeWorkloadPolicy
      */
     public function manageEnvironment(User $user, NodeWorkload $nodeWorkload): bool
     {
-        return $this->isAdminOfGoverningTeam($user, $nodeWorkload);
+        return $this->allows($user, AccessLevel::Write, $nodeWorkload);
     }
 
-    private function isAdminOfGoverningTeam(User $user, NodeWorkload $nodeWorkload): bool
+    private function allows(User $user, AccessLevel $level, NodeWorkload $nodeWorkload): bool
     {
-        $workload = $this->governing($nodeWorkload);
-
-        return $workload !== null && $user->isAdminOfTeam($workload->team_id);
+        return self::allowsOn($user, $level, $nodeWorkload->accessTarget());
     }
 
-    /** The workload whose access applies: the parent of a preview, else the workload itself. */
-    private function governing(NodeWorkload $nodeWorkload): ?NodeWorkload
+    /** A resource in an environment follows the access grants there, one without an environment the team-wide grants. */
+    public static function allowsOn(User $user, AccessLevel $level, NodeWorkload|NodeStack|null $resource): bool
     {
-        return $nodeWorkload->isPreview() ? $nodeWorkload->previewOf : $nodeWorkload;
+        if ($resource === null) {
+            return false;
+        }
+
+        return $resource->environment_id !== null
+            ? $user->canAccess($level, $resource)
+            : app(AccessResolver::class)->allowsTeamWide($user, $level, $resource->team_id);
     }
 }

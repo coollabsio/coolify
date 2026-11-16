@@ -178,8 +178,8 @@ class NodeWorkload extends BaseModel
     }
 
     /**
-     * The stack that this workload is a service of (decision 0023). Unscoped: a member with a
-     * grant on this service only still deploys it with the names of its stack.
+     * The stack that this workload is a service of (decision 0023). Unscoped: the access of a
+     * service is the access of its stack, and a job resolves it without an actor.
      */
     public function stack(): BelongsTo
     {
@@ -199,6 +199,19 @@ class NodeWorkload extends BaseModel
     public function previews(): HasMany
     {
         return $this->hasMany(self::class, 'preview_of_id')->orderBy('pull_request_id');
+    }
+
+    /**
+     * The resource whose access grants apply to this workload: the parent of a preview (decision 0025),
+     * the stack of a stack service, else the workload itself. Null when the parent is gone.
+     */
+    public function accessTarget(): NodeWorkload|NodeStack|null
+    {
+        return match (true) {
+            $this->isPreview() => $this->previewOf,
+            $this->node_stack_id !== null => $this->stack,
+            default => $this,
+        };
     }
 
     public function isPreview(): bool
