@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
+use App\Enums\NodeImageStorage;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use Illuminate\Contracts\Cache\Lock;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 
 class NodeCluster extends BaseModel
 {
@@ -46,6 +48,7 @@ class NodeCluster extends BaseModel
             'disk_pressure_threshold' => 'integer',
             'resource_stale_after_minutes' => 'integer',
             'last_reconciled_at' => 'datetime',
+            'image_storage' => NodeImageStorage::class,
         ];
     }
 
@@ -68,16 +71,52 @@ class NodeCluster extends BaseModel
     /** How long the registry Node may be unreachable before the registry moves automatically. */
     public const REGISTRY_MOVE_AFTER_MINUTES = 10;
 
-    /**
-     * A cluster with one Node runs no registry: its builds stay in the Podman store of that Node,
-     * and no other Node can need them. A second Node turns the registry on, and the next build
-     * of each application pushes again. An older Sentinel cannot keep a build local.
-     */
-    public function needsRegistryServer(): bool
+    /** The login for the external image storage. */
+    public function imageRegistryCredential(): BelongsTo
     {
-        $nodes = $this->nodes()->limit(2)->get();
+        return $this->belongsTo(RegistryCredential::class, 'image_registry_credential_id');
+    }
 
-        return $nodes->count() !== 1 || $nodes->first()->supportsCapability(NodeRegistry::LOAD_CAPABILITY) !== true;
+    /**
+     * Where the builds of this cluster go. The choice of the user, but a cluster with one Node
+     * keeps them in the Podman store of that Node unless the user chose an external registry:
+     * no other Node can need them. Null when a cluster with more Nodes has no choice yet, or
+     * when the only Node runs an older Sentinel that cannot keep a build local.
+     */
+    public function imageStorage(): ?NodeImageStorage
+    {
+        if ($this->image_storage === NodeImageStorage::EXTERNAL) {
+            return NodeImageStorage::EXTERNAL;
+        }
+        $nodes = $this->nodes()->limit(2)->get();
+        if ($nodes->count() === 1 && $nodes->first()->supportsCapability(NodeRegistry::LOAD_CAPABILITY) === true) {
+            return NodeImageStorage::LOCAL;
+        }
+
+        return $this->image_storage;
+    }
+
+    /** Whether the user must choose the image storage before the next build. */
+    public function needsImageStorageChoice(): bool
+    {
+        return $this->image_storage === null && $this->nodes()->count() > 1;
+    }
+
+    /**
+     * The login for a build image in the external image storage, read again at each build and
+     * deploy. Null when the image is not there or the storage has no login.
+     *
+     * @return array{username: string, password: string}|null
+     */
+    public function imageStorageLogin(string $image): ?array
+    {
+        if ($this->image_registry_credential_id === null || NodeRegistry::isLocalImage($image) || str_starts_with($image, NodeRegistry::HOST.'/')) {
+            return null;
+        }
+        $credential = RegistryCredential::query()->where('team_id', $this->team_id)->find($this->image_registry_credential_id)
+            ?? throw new RuntimeException("The registry credential of the image storage of the cluster {$this->name} is not available anymore. Select another one in the Advanced settings of the cluster.");
+
+        return $credential->matchesImage($image) ? ['username' => $credential->username, 'password' => $credential->password] : null;
     }
 
     /**
@@ -89,7 +128,7 @@ class NodeCluster extends BaseModel
     public function desiredRegistryNode(): ?Node
     {
         $registry = $this->registry;
-        if ($registry === null || ! $this->needsRegistryServer()) {
+        if ($registry === null || $this->imageStorage() !== NodeImageStorage::BUILT_IN) {
             return null;
         }
         if ($registry->selected_node_id !== null) {

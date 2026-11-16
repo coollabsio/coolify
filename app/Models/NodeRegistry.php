@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * The image registry of one cluster (decision 0006). zot runs on one Node and
- * serves `registry.cluster.coolify.internal:5443` over the mesh. A cluster with
- * one Node runs no zot (NodeCluster::needsRegistryServer()). Its CA is
+ * serves `registry.cluster.coolify.internal:5443` over the mesh. It runs only
+ * when the image storage of the cluster is built in (NodeCluster::imageStorage()). Its CA is
  * separate from the Flux CA, and only this registry trusts it.
  */
 class NodeRegistry extends BaseModel
@@ -32,6 +32,9 @@ class NodeRegistry extends BaseModel
 
     /** Starts one build container. */
     public const BUILD_CAPABILITY = 'image.build.v1';
+
+    /** Builds into an image outside the cluster registry: the external image storage of a cluster. */
+    public const EXTERNAL_IMAGE_CAPABILITY = 'image.build.external_image.v1';
 
     /** Loads a `localhost/` build into the Podman store of its Node, so a single-Node cluster runs no registry. */
     public const LOAD_CAPABILITY = 'image.load.v1';
@@ -85,12 +88,6 @@ class NodeRegistry extends BaseModel
     public function node(): BelongsTo
     {
         return $this->belongsTo(Node::class, 'node_id');
-    }
-
-    /** The image reference of a build, before the digest is known. */
-    public static function imageReference(NodeWorkload $workload, string $tag, bool $local = false): string
-    {
-        return ($local ? self::LOCAL_PREFIX : self::HOST.'/').$workload->uuid.':'.$tag;
     }
 
     public static function isLocalImage(?string $image): bool

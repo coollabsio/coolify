@@ -70,8 +70,10 @@ class DispatchWorkloadDeployment
                 $operation->node->ensureReportedCapability(self::SECRET_OWNER_CAPABILITY);
             }
         }
-        // A Git application deploys its build from the cluster registry; its credential is for the push.
-        $login = $operation->workload->buildsFromSource() ? null : IssueNodeRegistryCredential::run($operation->workload, $operation->revision->image);
+        // A Git application deploys its build from the image storage of the cluster; its own credential is for the push.
+        $login = $operation->workload->buildsFromSource()
+            ? $operation->node->cluster?->imageStorageLogin($operation->revision->image)
+            : IssueNodeRegistryCredential::run($operation->workload, $operation->revision->image);
         if ($login !== null) {
             // An older Sentinel ignores unknown fields and would pull without the login.
             $operation->node->ensureReportedCapability(IssueNodeRegistryCredential::DEPLOY_CAPABILITY);

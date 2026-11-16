@@ -26,9 +26,10 @@ class PublishBuiltRevision
         $workload = DB::transaction(function () use ($build, $digest): NodeWorkload {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($build->node_workload_id);
             $current = $workload->revisions()->latest('id')->first();
-            // A local build has no registry digest; its tag is unique to the build.
+            // A local build has no registry digest; its tag is unique to the build. A pushed build
+            // is pulled by digest from its repository.
             $workload->createRevision(
-                NodeRegistry::isLocalImage($build->image) ? $build->image : NodeRegistry::HOST.'/'.$workload->uuid.'@'.$digest,
+                NodeRegistry::isLocalImage($build->image) ? $build->image : preg_replace('/:[^:\/]+$/', '', $build->image).'@'.$digest,
                 // A preview follows the configuration of its parent at each build (decision 0025).
                 $workload->isPreview() ? $workload->firstRevisionConfiguration() : ($current?->configuration ?? $workload->firstRevisionConfiguration()),
                 $current?->environment ?? [],

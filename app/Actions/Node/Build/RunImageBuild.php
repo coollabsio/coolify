@@ -4,6 +4,7 @@ namespace App\Actions\Node\Build;
 
 use App\Actions\Node\IssueNodeRegistryCredential;
 use App\Enums\NodeBuildStatus;
+use App\Enums\NodeImageStorage;
 use App\Enums\NodeWorkloadSourceType;
 use App\Models\Node;
 use App\Models\NodeBuild;
@@ -22,8 +23,9 @@ use Throwable;
  * Runs the build container on the builder Node and follows it until it ends.
  * Sentinel only starts the container (`image.build.v1`). The state comes from
  * `container.list` and the output from `container.logs`. The last line of a
- * successful build carries the image digest. In a cluster without a registry
- * the build stays on the builder Node: Sentinel loads it into its Podman store.
+ * successful build carries the image digest. The image storage of the cluster
+ * decides the target: an external registry, the built-in registry, or, in a
+ * cluster with one Node, its Podman store, where Sentinel loads the build.
  */
 class RunImageBuild
 {
@@ -49,15 +51,27 @@ class RunImageBuild
         }
         // Build-time variables are sent with this request only, like the credential.
         $variables = $build->workload->buildVariables();
-        $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null, ...array_values($variables['secrets'])], fn (?string $value): bool => filled($value)));
-        $local = $node->cluster?->needsRegistryServer() === false;
+        $cluster = $node->cluster;
+        $storage = $cluster?->imageStorage()
+            ?? throw new RuntimeException('Choose where the cluster stores its images: open the cluster, then Advanced, Image storage.');
+        $image = match ($storage) {
+            NodeImageStorage::EXTERNAL => "{$cluster->image_repository}:{$build->workload->uuid}-{$build->uuid}",
+            NodeImageStorage::BUILT_IN => NodeRegistry::HOST."/{$build->workload->uuid}:{$build->uuid}",
+            NodeImageStorage::LOCAL => NodeRegistry::LOCAL_PREFIX."{$build->workload->uuid}:{$build->uuid}",
+        };
+        $imageLogin = null;
+        if ($storage === NodeImageStorage::EXTERNAL) {
+            $node->ensureReportedCapability(NodeRegistry::EXTERNAL_IMAGE_CAPABILITY);
+            $imageLogin = $cluster->imageStorageLogin($image);
+        }
+        $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null, $imageLogin['password'] ?? null, ...array_values($variables['secrets'])], fn (?string $value): bool => filled($value)));
         $build->update([
             'node_id' => $node->id,
             // BuildKit builds for the architecture of its Node (decision 0020).
             'architecture' => $node->cpuArchitecture(),
             'status' => NodeBuildStatus::RUNNING,
             'started_at' => now(),
-            'image' => NodeRegistry::imageReference($build->workload, $build->uuid, $local),
+            'image' => $image,
         ]);
         self::flux('image.build', [
             'server_id' => $node->uuid,
@@ -77,6 +91,7 @@ class RunImageBuild
             ...$source,
             ...$credential,
             ...$push,
+            ...($imageLogin === null ? [] : ['image_username' => $imageLogin['username'], 'image_password' => $imageLogin['password']]),
             // Objects, because Flux reads maps and an empty PHP array encodes as a list.
             ...($variables['args'] === [] ? [] : ['build_args' => (object) $variables['args']]),
             ...($variables['secrets'] === [] ? [] : ['build_secrets' => (object) $variables['secrets']]),
@@ -121,7 +136,7 @@ class RunImageBuild
                 default => 'The build failed. See the build log for the reason.',
             });
         }
-        if ($local) {
+        if ($storage === NodeImageStorage::LOCAL) {
             self::flux('image.load', [
                 'server_id' => $node->uuid,
                 'command_id' => (string) Str::uuid(),

@@ -14,6 +14,7 @@ use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpdateNodeCluster;
 use App\Actions\Node\UpgradeSentinel;
+use App\Enums\NodeImageStorage;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Jobs\UpgradeClusterSentinelJob;
@@ -21,8 +22,12 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
+use App\Models\RegistryCredential;
 use App\Rules\PrivateIpv4Cidr;
+use App\Services\DockerRegistryLogins;
+use App\Support\ValidationPatterns;
 use DomainException;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
@@ -78,6 +83,13 @@ class Show extends Component
     public int $diskPressureThreshold = 90;
 
     public int $resourceStaleAfterMinutes = 5;
+
+    /** `external`, `built_in`, or empty while the user has not chosen. */
+    public string $imageStorage = '';
+
+    public string $imageRepository = '';
+
+    public string $imageRegistryCredentialUuid = '';
 
     public string $nodeUuid = '';
 
@@ -248,6 +260,57 @@ class Show extends Component
         $this->dispatch('success', $nodeId === null
             ? 'The registry runs on the first available server.'
             : 'The registry moves to the selected server. Images stored on the previous server are rebuilt on the next deploy.');
+    }
+
+    /**
+     * Saves where the builds of this cluster are stored. A change turns the built-in registry on
+     * or off; images in the previous storage are not copied.
+     */
+    public function saveImageStorage(): void
+    {
+        $this->authorize('update', $this->cluster);
+        $external = $this->imageStorage === NodeImageStorage::EXTERNAL->value;
+        $validated = $this->validate([
+            'imageStorage' => ['required', Rule::in([NodeImageStorage::EXTERNAL->value, NodeImageStorage::BUILT_IN->value])],
+            'imageRepository' => $external
+                ? [...ValidationPatterns::dockerImageNameRules(required: true), 'not_regex:/@/', 'not_regex:/:[^\/]*$/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//']
+                : ['nullable'],
+            'imageRegistryCredentialUuid' => ['nullable', 'string'],
+        ], [
+            'imageRepository.not_regex' => 'Enter a repository without a tag or digest, outside the cluster, for example ghcr.io/acme/coolify-builds.',
+        ], [
+            'imageStorage' => 'image storage',
+            'imageRepository' => 'repository',
+            'imageRegistryCredentialUuid' => 'registry credential',
+        ]);
+        $repository = $external ? trim($validated['imageRepository']) : null;
+        $credential = null;
+        if ($external && $this->imageRegistryCredentialUuid !== '') {
+            $credential = RegistryCredential::query()->where('team_id', $this->cluster->team_id)->where('uuid', $this->imageRegistryCredentialUuid)->first();
+            if ($credential === null) {
+                $this->addError('imageRegistryCredentialUuid', 'Select a registry credential of this team.');
+
+                return;
+            }
+            if (! $credential->matchesImage($repository)) {
+                $this->addError('imageRegistryCredentialUuid', "This credential is for {$credential->registry}, but the repository is in ".DockerRegistryLogins::registryFromImage($repository).'.');
+
+                return;
+            }
+        }
+        $previous = $this->cluster->image_storage;
+        $this->cluster->update([
+            'image_storage' => $validated['imageStorage'],
+            'image_repository' => $repository,
+            'image_registry_credential_id' => $credential?->id,
+        ]);
+        if ($this->cluster->refresh()->syncRegistryNode()) {
+            QueueNodeClusterNetworkRevision::run($this->cluster, auth()->user());
+        }
+        $this->fillFromCluster();
+        $this->dispatch('success', $previous !== null && $previous !== $this->cluster->image_storage
+            ? 'Image storage saved. Deploy each Git application again, so that its image is in the new storage.'
+            : 'Image storage saved.');
     }
 
     public function deleteCluster(mixed $password = null): bool|string
@@ -454,6 +517,7 @@ class Show extends Component
     {
         return view('livewire.node-cluster.show', [
             'nodesNeedAttention' => $this->cluster->hasNodesNeedingAttention(),
+            'needsImageStorageChoice' => $this->cluster->needsImageStorageChoice(),
             ...match ($this->section) {
                 'general' => $this->generalData(),
                 'resources' => $this->resourcesData(),
@@ -608,6 +672,18 @@ class Show extends Component
     private function advancedData(): array
     {
         return [
+            'registryCredentialOptions' => RegistryCredential::query()
+                ->where('team_id', $this->cluster->team_id)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (RegistryCredential $credential): array => [
+                    'value' => $credential->uuid,
+                    'label' => $credential->name,
+                    'description' => $credential->registry.' · '.$credential->username,
+                ])
+                ->prepend(['value' => '', 'label' => 'None', 'description' => 'A registry without a login'])
+                ->values()
+                ->all(),
             'operations' => NodeOperation::query()
                 ->with('node')
                 ->whereHas('node', fn ($query) => $query->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id))
@@ -649,5 +725,8 @@ class Show extends Component
         $this->memoryPressureThreshold = $this->cluster->memory_pressure_threshold;
         $this->diskPressureThreshold = $this->cluster->disk_pressure_threshold;
         $this->resourceStaleAfterMinutes = $this->cluster->resource_stale_after_minutes;
+        $this->imageStorage = (string) $this->cluster->image_storage?->value;
+        $this->imageRepository = (string) $this->cluster->image_repository;
+        $this->imageRegistryCredentialUuid = (string) $this->cluster->imageRegistryCredential?->uuid;
     }
 }

@@ -45,9 +45,44 @@
     </form>
 </x-application.settings-section>
 
-@if ($cluster->registry)
+@php
+    $currentImageStorage = $cluster->imageStorage();
+@endphp
+<x-application.settings-section id="node-cluster-image-storage-section" title="Image storage"
+    helper="Where the images of Git applications are stored, so that every server of the cluster can pull them. A cluster with one server needs nothing: builds stay on that server, unless you select an external registry.">
+    <form wire:submit="saveImageStorage" class="flex flex-col gap-4">
+        <p class="text-sm text-neutral-600 dark:text-fg-dim">
+            Now: <span class="font-medium text-black dark:text-fg">{{ match ($currentImageStorage) {
+                \App\Enums\NodeImageStorage::EXTERNAL => 'External registry ('.$cluster->image_repository.')',
+                \App\Enums\NodeImageStorage::BUILT_IN => 'Built-in registry',
+                \App\Enums\NodeImageStorage::LOCAL => 'On the server (one server)',
+                null => 'Not chosen. Builds fail until you choose.',
+            } }}</span>
+        </p>
+        <x-forms.listbox id="imageStorage" label="Storage" canGate="update" :canResource="$cluster" required
+            :options="[
+                ['value' => 'external', 'label' => 'External registry (recommended)', 'description' => 'A registry of your team, for example GHCR, Docker Hub, or Harbor. It stays available when a server is offline.'],
+                ['value' => 'built_in', 'label' => 'Built-in registry', 'description' => 'Runs on one server of the cluster. No copy: when that server is offline, no server can pull, and a move of the registry starts it empty.'],
+            ]" />
+        <div x-cloak x-show="$wire.imageStorage === 'external'" class="grid gap-4 lg:grid-cols-2">
+            <x-forms.input id="imageRepository" label="Repository" placeholder="ghcr.io/your-org/coolify-builds"
+                canGate="update" :canResource="$cluster"
+                helper="One repository for every application of the cluster. Each build gets the tag &lt;application&gt;-&lt;build&gt;. Coolify does not delete old tags." />
+            <x-forms.listbox id="imageRegistryCredentialUuid" label="Registry credential" canGate="update"
+                :canResource="$cluster" :options="$registryCredentialOptions"
+                helper="The login that pushes and pulls. It needs write access to the repository. Add one in Keys & Tokens, Registry Credentials." />
+        </div>
+        @if ($canUpdateCluster)
+            <div class="flex">
+                <x-forms.button type="submit">Save</x-forms.button>
+            </div>
+        @endif
+    </form>
+</x-application.settings-section>
+
+@if ($cluster->registry && $currentImageStorage === \App\Enums\NodeImageStorage::BUILT_IN)
     <x-application.settings-section id="node-cluster-registry-section" title="Image registry"
-        helper="Git applications push their images to the registry of the cluster. By default it runs on the first available server and moves when that server is offline. A selected server is kept, also while it is offline. A cluster with one server runs no registry: builds stay on that server.">
+        helper="Git applications push their images to the built-in registry of the cluster. By default it runs on the first available server and moves when that server is offline. A selected server is kept, also while it is offline.">
         @php
             $registryOptions = collect([['value' => '', 'label' => 'Automatic (first available server)']])
                 ->concat($cluster->nodes->sortBy('id')->map(fn ($node) => ['value' => $node->uuid, 'label' => $node->name]))
@@ -57,7 +92,7 @@
         <div class="flex flex-col gap-3" wire:init="loadRegistryReport">
             <div class="flex flex-wrap items-center gap-3">
                 <p class="text-sm text-neutral-600 dark:text-fg-dim">
-                    Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? ($cluster->needsRegistryServer() ? 'No available server' : 'Not needed (one server, builds stay on it)') }}</span>
+                    Runs on: <span class="font-medium text-black dark:text-fg">{{ $cluster->registry->node?->name ?? 'No available server' }}</span>
                 </p>
                 @if ($registryReport === null)
                     <x-status-badge label="Checking" type="neutral" spinning />

@@ -88,6 +88,30 @@ nginx template) are copied into v5 classes.
 - `builder.reconcile` and `registry.reconcile` are idempotent and converge
   `buildkitd`, zot, and their configuration.
 
+### Image storage
+
+- Each cluster has an image storage: where its builds go, so that every Node
+  can pull them. The user chooses it in the Image storage section of the
+  cluster (`node_clusters.image_storage`):
+  - External registry (recommended): one repository of the team, for example
+    `ghcr.io/acme/coolify-builds`, with an optional team registry credential
+    that can push and pull. Each build is the tag `<workload>-<build>`. One
+    repository works with registries that limit the number of private
+    repositories. The revision pulls `<repository>@<digest>` with the same
+    credential. Coolify does not delete old tags; the registry owns
+    retention. Needs `image.build.external_image.v1`: `image.build` accepts
+    an `image` outside the cluster registry, with `image_username` and
+    `image_password` for its push.
+  - Built-in registry: zot on one Node (below).
+- A cluster with one Node needs no choice. Its builds stay on that Node (below),
+  unless the user selected an external registry.
+- When a cluster gets its second Node and has no choice yet, the cluster page
+  asks for one, and builds fail with "Choose where the cluster stores its
+  images" until the user chooses. A cluster that ran zot before this choice
+  existed keeps the built-in registry.
+- A change of the storage does not copy images. The next deploy of each Git
+  application builds into the new storage.
+
 ### Cluster registry
 
 - One zot registry for each cluster, on one Node. By default this is the first
@@ -104,8 +128,9 @@ nginx template) are copied into v5 classes.
   `image.load.v1` loads it into the Podman store of that Node as
   `localhost/<workload>:<build>`. Sentinel keeps the newest `keep_tags` local
   tags of each application. Only one Node exists, so no other Node needs the
-  image. When a second Node joins, the next network reconcile starts zot, and
-  the next build of each application pushes again. Until then, Coolify
+  image. When a second Node joins, the user chooses the image storage. With
+  the built-in registry, the next network reconcile starts zot. The next build
+  of each application pushes again. Until then, Coolify
   refuses to move an application with a local image, because the target Node
   cannot pull it. When one Node remains, zot stops and keeps its volume.
 - The Image registry section of the cluster shows the registry health, the
@@ -224,7 +249,8 @@ container crash-looped on a missing `server.js`).
 
 - Private repositories, webhooks, preview builds, and build-time secrets (see
   decisions 0011 and 0012).
-- External registries and registry replication to a second Node.
+- Registry replication to a second Node, and peers that serve their Podman
+  store.
 - Builds for a different CPU architecture (see decision 0020).
 - The registry port and the exact `buildkitd.toml` defaults.
 - Whether the sandboxed rootless mode needs both `systempaths=unconfined` and

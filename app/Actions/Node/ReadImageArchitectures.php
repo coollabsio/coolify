@@ -106,6 +106,10 @@ class ReadImageArchitectures
     public static function forRevision(NodeWorkloadRevision $revision): ?array
     {
         $workload = $revision->workload;
+        // A build records the architecture of its builder, also when it is stored in an external registry.
+        if ($workload?->buildsFromSource()) {
+            return self::builtArchitectures($revision->image);
+        }
         try {
             $login = $workload === null || $workload->buildsFromSource() ? null : IssueNodeRegistryCredential::run($workload, $revision->image);
         } catch (RuntimeException) {
