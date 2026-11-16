@@ -237,7 +237,20 @@ class DeleteNodeWorkloadJob implements ShouldBeUnique, ShouldQueue
             ->values()
             ->all();
 
-        DB::transaction(function () use ($workload): void {
+        // EnsureNodeWorkloadDnsNames locks the cluster, then the workloads of the cluster. The delete
+        // locks the workload row, and the deleted event then updates the cluster row. Locking the
+        // clusters first keeps the same order, so parallel deletes and deploys do not deadlock.
+        $lockedClusterIds = collect($workload->clusterIds())
+            ->merge($clusterIds)
+            ->merge($workload->publishedPorts()->pluck('node_cluster_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($workload, $lockedClusterIds): void {
+            NodeCluster::query()->whereKey($lockedClusterIds)->orderBy('id')->lockForUpdate()->get();
             $workload->nodes()->detach();
             NodeFirewallRule::query()
                 ->where('source_workload_id', $workload->id)
