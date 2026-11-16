@@ -42,6 +42,12 @@ operator does not convert it.
 Coolify removed the unreleased `servers.mode` implementation. The QEMU node,
 Flux assignment, node metadata, and node-only UI use the `Node` model.
 
+## Amendment (2026-11-16): no conversion
+
+Coolify does not convert a legacy server to a Node, with a tool or as a
+docs guide. A v4 server stays a legacy server. To use Nodes, the operator
+adds a new server as a Node and moves the resources to it.
+
 ## Consequences
 
 - Legacy Docker support does not have a planned removal date.
