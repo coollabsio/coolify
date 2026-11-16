@@ -127,6 +127,12 @@ class ReconcileNodeWorkloads
             return 0;
         }
         if ($currentContainer !== null) {
+            // Podman restarts a crashing container itself, and between two restarts the inventory shows it stopped.
+            // Without a backoff, Coolify sends a start every minute too.
+            if ((int) $currentContainer->restart_count > 0 && $this->recentlyStarted($node, $latestRevision)) {
+                return 0;
+            }
+
             return $this->dispatchLifecycle($node, $currentContainer, $latestRevision, NodeWorkloadAction::START);
         }
         // A failed rolling deploy removes its new container and keeps the old one serving. Like v4, it is not retried.
@@ -159,6 +165,17 @@ class ReconcileNodeWorkloads
         DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
 
         return 1;
+    }
+
+    private function recentlyStarted(Node $node, NodeWorkloadRevision $revision): bool
+    {
+        return NodeOperation::query()
+            ->where('node_id', $node->id)
+            ->where('node_workload_revision_id', $revision->id)
+            ->where('command_type', 'workload.lifecycle.v1')
+            ->where('request->action', NodeWorkloadAction::START->value)
+            ->where('created_at', '>=', now()->subMinutes(self::FAILED_DEPLOYMENT_BACKOFF_MINUTES))
+            ->exists();
     }
 
     private function dispatchLifecycle(

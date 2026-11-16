@@ -24,6 +24,7 @@
         $healthStatus === 'healthy' => 'Healthy',
         $healthStatus === 'unhealthy' => 'Unhealthy',
         $healthStatus === 'starting' => 'Starting',
+        $healthStatus === 'restarting' => 'Restarting',
         default => 'Not configured',
     };
 
@@ -36,7 +37,7 @@
     $healthType = match (true) {
         $monitoringExcluded => 'warning',
         $healthStatus === 'healthy' => 'success',
-        $healthStatus === 'unhealthy' => 'error',
+        in_array($healthStatus, ['unhealthy', 'restarting'], true) => 'error',
         default => 'warning',
     };
 

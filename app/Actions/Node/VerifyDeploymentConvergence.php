@@ -14,9 +14,11 @@ class VerifyDeploymentConvergence
     /**
      * Converged means: the container of this operation runs the revision image and is healthy.
      * Pending means: it runs, but its health check did not pass yet (`starting`). A container
-     * without a health check counts as healthy while it runs.
+     * without a health check counts as healthy while it runs. Each deploy starts a new container, so a
+     * restart of it means a crash: Podman restarts a crashing container at once, and every inventory
+     * then shows it as running.
      *
-     * @return array{converged: bool, pending: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string, health: ?string}
+     * @return array{converged: bool, pending: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string, health: ?string, restarts: int}
      */
     public function handle(NodeOperation $operation): array
     {
@@ -39,6 +41,8 @@ class VerifyDeploymentConvergence
             && $container->image === $operation->revision->image
             && $container->state === 'running'
             && $this->tookEffect($operation, $container);
+        $restarts = (int) ($container?->restart_count ?? 0);
+        $crashed = $running && $restarts > 0;
         $health = $container?->health_status;
         // With a Coolify health check, only `healthy` counts: an inventory without health is not proof.
         $hasHealthCheck = filled(data_get($operation->revision->configuration, 'health_check'));
@@ -65,13 +69,14 @@ class VerifyDeploymentConvergence
         }
 
         return [
-            'converged' => $running && $healthy,
-            'pending' => $running && ! $healthy && $health !== 'unhealthy',
+            'converged' => $running && $healthy && ! $crashed,
+            'pending' => $running && ! $healthy && $health !== 'unhealthy' && ! $crashed,
             'observed_at' => data_get($operation->node->fresh()->metadata, 'container_inventory_observed_at'),
             'runtime_id' => $container?->runtime_id,
             'state' => $container?->state ?? 'missing',
             'image' => $container?->image,
             'health' => $health,
+            'restarts' => $restarts,
         ];
     }
 

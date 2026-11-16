@@ -183,7 +183,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
     /**
      * Polls the inventory until the container is healthy, like v4 waits for the health check of
-     * a new container. An unhealthy container fails at once. A container that stops, or one
+     * a new container. An unhealthy or restarted container fails at once. A container that stops, or one
      * without a health check, is judged after the settle time, so a crash right after the start
      * is not reported as a success.
      *
@@ -200,6 +200,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             $verification = $this->verify($operation);
             $settled = now()->gte($settleUntil);
             if ($verification['health'] === 'unhealthy'
+                || ($verification['restarts'] ?? 0) > 0
                 || ($settled && ! $verification['pending'])
                 || now()->gte($deadline)) {
                 return $verification;
@@ -230,6 +231,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             : '';
 
         return match (true) {
+            ($verification['restarts'] ?? 0) > 0 => 'The application stopped right after the start, and Podman restarted it. Check the logs of the application: its start command or its configuration can be wrong.',
             $verification['health'] === 'unhealthy' => "The application is unhealthy: its health check failed.{$checked}{$tools}",
             $verification['pending'] => 'The health check did not pass in time.'.$checked.$tools,
             default => 'The requested workload revision is not running.',

@@ -286,15 +286,26 @@ class NodeWorkload extends BaseModel
         return $this->hasMany(NodeBuild::class);
     }
 
-    /** The worst health of the running managed containers on the Nodes of this workload, or null without a health check. */
+    /**
+     * The worst health of the running managed containers on the Nodes of this workload, or null without a health check.
+     * `restarting` means a crash loop: Podman restarted the container less than a minute before the Node saw it.
+     * Both times come from the Node clock.
+     */
     public function observedHealth(): ?string
     {
-        $observed = NodeContainer::query()
+        $containers = NodeContainer::query()
             ->where('node_workload_id', $this->id)
             ->whereIn('node_id', $this->nodes()->pluck('nodes.id'))
             ->where('is_managed', true)
             ->where('state', 'running')
-            ->pluck('health_status');
+            ->get(['health_status', 'restart_count', 'runtime_started_at', 'observed_at']);
+        if ($containers->contains(fn (NodeContainer $container): bool => (int) $container->restart_count > 0
+            && $container->runtime_started_at !== null
+            && $container->observed_at !== null
+            && $container->runtime_started_at->diffInSeconds($container->observed_at) < 60)) {
+            return 'restarting';
+        }
+        $observed = $containers->pluck('health_status');
 
         return collect(['unhealthy', 'starting', 'healthy'])->first(fn (string $health): bool => $observed->contains($health));
     }
