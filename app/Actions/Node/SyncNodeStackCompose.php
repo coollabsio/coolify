@@ -45,6 +45,31 @@ class SyncNodeStackCompose
         if (! $stack->hasGitSource()) {
             throw new RuntimeException('Only a stack from Git reads its Compose file again.');
         }
+
+        return $this->sync($stack, $compose, $commitSha, $requestedBy);
+    }
+
+    /**
+     * A new Compose file from the user for a stack without Git, such as a stack from a one-click
+     * service (decision 0029). The same checks and the same three-way rule apply as for a Git sync.
+     *
+     * @return ?array{commit_sha: string, synced_at: string, added: list<string>, changed: list<string>, removed: list<string>, kept_volumes: list<string>}
+     */
+    public function edit(NodeStack $stack, string $compose, User $requestedBy): ?array
+    {
+        if ($stack->hasGitSource()) {
+            throw new RuntimeException('This stack reads its Compose file from Git at each deploy. Change the file in the repository.');
+        }
+
+        return $this->sync($stack, $compose, '', $requestedBy, userIsActor: true);
+    }
+
+    /**
+     * @param  bool  $userIsActor  The file of a user saves its domains and services as that user, not as a team admin.
+     * @return ?array{commit_sha: string, synced_at: string, added: list<string>, changed: list<string>, removed: list<string>, kept_volumes: list<string>}
+     */
+    private function sync(NodeStack $stack, string $compose, string $commitSha, ?User $requestedBy, bool $userIsActor = false): ?array
+    {
         if ($compose === $stack->compose_raw) {
             $this->deleteRemovedServices($stack, $requestedBy);
 
@@ -55,13 +80,13 @@ class SyncNodeStackCompose
         $composeDirectory = $stack->composeDirectory();
         $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket(), $cluster->supportsWorkloadUser());
         if ($reason !== null) {
-            throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} is not available on Nodes. {$reason}");
+            throw new RuntimeException("{$this->fileLabel($commitSha)} is not available on Nodes. {$reason}");
         }
         if (NodeStackCompose::mountsContainerSocket($yaml)) {
-            NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, "The Compose file at {$this->shortCommit($commitSha)}");
+            NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, $this->fileLabel($commitSha));
         }
         (new NodeStack(['compose_parsed' => $yaml]))->deployOrder();
-        $actor = $this->actor($stack, $requestedBy);
+        $actor = $userIsActor && $requestedBy !== null ? $requestedBy : $this->actor($stack, $requestedBy);
         $registryIsNew = ! $cluster->registry()->exists();
 
         $portsChanged = false;
@@ -86,7 +111,7 @@ class SyncNodeStackCompose
             $diff = NodeStackComposeDiff::between($stack, $previous, $next, $workloads);
             $portConflict = CreateClusterStack::portConflict($cluster, $diff->publishedPorts($workloads), $workloads->pluck('id')->all());
             if ($portConflict !== null) {
-                throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} is not available on Nodes. {$portConflict}");
+                throw new RuntimeException("{$this->fileLabel($commitSha)} is not available on Nodes. {$portConflict}");
             }
             // A removed service is deleted after the commit; its ports are free at once.
             foreach ($diff->removed as $workload) {
@@ -101,7 +126,7 @@ class SyncNodeStackCompose
                 try {
                     PublishNodeWorkloadPort::ensureMayOpenOnCluster($cluster, $requestedBy);
                 } catch (ValidationException $exception) {
-                    throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} publishes ports. ".collect($exception->errors())->flatten()->first());
+                    throw new RuntimeException("{$this->fileLabel($commitSha)} publishes ports. ".collect($exception->errors())->flatten()->first());
                 }
             }
 
@@ -293,6 +318,12 @@ class SyncNodeStackCompose
             ->whereNotIn('stack_service', $services)
             ->pluck('id')
             ->each(fn (int $id) => DeleteNodeWorkloadJob::dispatch($id, $requestedBy?->id));
+    }
+
+    /** The Compose file in an error: of a commit, or the file of the user without one. */
+    private function fileLabel(string $commitSha): string
+    {
+        return $commitSha === '' ? 'The new Compose file' : "The Compose file at {$this->shortCommit($commitSha)}";
     }
 
     private function shortCommit(string $commitSha): string

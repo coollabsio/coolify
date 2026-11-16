@@ -65,7 +65,7 @@ class ClusterGithubPrivateRepositoryDeployKey extends Component
     }
 
     /** Like v4, `https://host/owner/repo` becomes `git@host:owner/repo.git`; SSH URLs stay as they are. */
-    private static function sshUrl(string $url): string
+    public static function sshUrl(string $url): string
     {
         if (str_starts_with($url, 'ssh://') || parseScpStyleGitUrl($url) !== null) {
             return $url;

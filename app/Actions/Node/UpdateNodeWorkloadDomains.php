@@ -7,6 +7,7 @@ use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Rules\ValidHostname;
 use App\Services\Access\AccessResolver;
+use App\Support\DomainUrlParts;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -142,6 +143,35 @@ class UpdateNodeWorkloadDomains
             'path' => rtrim($path, '/'),
             'noindex' => (bool) ($route['noindex'] ?? false),
         ];
+    }
+
+    /**
+     * The routes of a list of URLs, such as `https://app.example.com/api` or
+     * `http://app.example.com:3000`, for the API (decision 0029). A URL that the workload already
+     * has keeps its search engine setting.
+     *
+     * @param  list<string>  $urls
+     * @return list<array{scheme: string, host: string, port: string, path: string, noindex: bool}>
+     */
+    public static function routesFromUrls(NodeWorkload $workload, array $urls): array
+    {
+        $current = collect($workload->domain_routes ?? []);
+
+        return collect($urls)
+            ->map(fn (string $url): string => trim($url))
+            ->filter()
+            ->map(function (string $url) use ($current): array {
+                $parts = DomainUrlParts::split(str_contains($url, '://') ? $url : "https://{$url}");
+                $path = rtrim((string) $parts['path'], '/');
+                $existing = $current->first(fn (array $route): bool => $route['host'] === strtolower($parts['host']) && rtrim((string) $route['path'], '/') === $path);
+
+                // Without a port, the container port of this route or of the first route, else 80, like the add form.
+                $port = filled($parts['port'] ?? null) ? $parts['port'] : ($existing['port'] ?? $current->first()['port'] ?? 80);
+
+                return [...$parts, 'port' => (string) $port, 'path' => $path, 'noindex' => (bool) ($existing['noindex'] ?? false)];
+            })
+            ->values()
+            ->all();
     }
 
     /** @param  array{scheme: string, host: string, path: string}  $route */

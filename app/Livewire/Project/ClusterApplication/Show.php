@@ -318,28 +318,23 @@ class Show extends Component
     public function saveResources(): void
     {
         $this->authorize('update', $this->workload);
-        $validated = $this->validate([
-            'cpuLimit' => ['nullable', 'numeric', 'between:0.01,1024'],
-            'cpuReservation' => ['nullable', 'numeric', 'between:0.01,1024'],
-            'memoryLimitMb' => ['nullable', 'integer', 'between:4,1048576'],
-            'memoryReservationMb' => ['nullable', 'integer', 'between:4,1048576'],
-        ]);
-        if (filled($validated['cpuLimit']) && filled($validated['cpuReservation']) && (float) $validated['cpuReservation'] > (float) $validated['cpuLimit']) {
-            $this->addError('cpuReservation', 'CPU reservation cannot be greater than the CPU limit.');
-        }
-        if (filled($validated['memoryLimitMb']) && filled($validated['memoryReservationMb']) && (int) $validated['memoryReservationMb'] > (int) $validated['memoryLimitMb']) {
-            $this->addError('memoryReservationMb', 'Memory reservation cannot be greater than the memory limit.');
-        }
-        if ($this->getErrorBag()->isNotEmpty()) {
+        $this->resetErrorBag();
+        try {
+            $resources = UpdateNodeWorkloadResources::fromInput([
+                'cpu_limit' => $this->cpuLimit,
+                'cpu_reservation' => $this->cpuReservation,
+                'memory_limit_mb' => $this->memoryLimitMb,
+                'memory_reservation_mb' => $this->memoryReservationMb,
+            ]);
+        } catch (ValidationException $exception) {
+            $fields = ['cpu_limit' => 'cpuLimit', 'cpu_reservation' => 'cpuReservation', 'memory_limit_mb' => 'memoryLimitMb', 'memory_reservation_mb' => 'memoryReservationMb'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
+
             return;
         }
-
-        UpdateNodeWorkloadResources::run($this->workload, [
-            'cpu_limit' => filled($validated['cpuLimit']) ? (float) $validated['cpuLimit'] : null,
-            'cpu_reservation' => filled($validated['cpuReservation']) ? (float) $validated['cpuReservation'] : null,
-            'memory_limit_bytes' => filled($validated['memoryLimitMb']) ? (int) $validated['memoryLimitMb'] * 1_048_576 : null,
-            'memory_reservation_bytes' => filled($validated['memoryReservationMb']) ? (int) $validated['memoryReservationMb'] * 1_048_576 : null,
-        ]);
+        UpdateNodeWorkloadResources::run($this->workload, $resources);
         $this->loadData();
         $this->loadResourceSettings();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
@@ -368,6 +363,7 @@ class Show extends Component
     public function saveConfiguration(): void
     {
         $this->authorize('update', $this->workload);
+        $this->resetErrorBag();
         if ($this->workload->buildsFromSource()) {
             $this->saveSourceConfiguration();
 
@@ -673,6 +669,7 @@ class Show extends Component
     public function saveDetails(): void
     {
         $this->authorize('update', $this->workload);
+        $this->resetErrorBag();
         UpdateNodeWorkloadSettings::make()->details($this->workload, $this->name, $this->description);
         $this->loadDetails();
         $this->dispatch('success', 'Application updated.');
@@ -685,6 +682,7 @@ class Show extends Component
     public function saveDatabase(): void
     {
         $this->authorize('update', $this->workload);
+        $this->resetErrorBag();
         $type = $this->workload->database_type;
         abort_if($type === null, 404);
         $credentials = collect($type->credentials())
