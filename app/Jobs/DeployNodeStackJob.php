@@ -16,6 +16,7 @@ use App\Models\NodeOperation;
 use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\User;
+use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -93,6 +94,10 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         try {
             $deadline = now()->addSeconds($this->timeout - 60);
             $commit = $stack->hasGitSource() ? $this->syncCompose($stack, $requestedBy) : null;
+            if (NodeStackCompose::mountsContainerSocket($stack->compose_parsed ?? [])) {
+                // Before the first service deploys, so a refused stack does not deploy half of it.
+                NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, 'This stack');
+            }
             $dependencies = $stack->dependencies();
             $order = $stack->deployOrder($dependencies);
             // A service that left the Compose file is deleted by its own job.

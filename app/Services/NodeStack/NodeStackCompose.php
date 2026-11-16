@@ -2,6 +2,7 @@
 
 namespace App\Services\NodeStack;
 
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -64,8 +65,9 @@ class NodeStackCompose
      * @param  array<string, mixed>  $yaml
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository. Only a file from Git can `build:`.
      * @param  bool  $publishedPorts  Every server of the cluster publishes ports (decision 0016), so `ports:` can run.
+     * @param  bool  $containerSocket  Every server of the cluster mounts the Podman socket in a container, so a mount of the Docker socket can run.
      */
-    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false, bool $containerSocket = false): ?string
     {
         if ($gitComposeDirectory !== null && filled($yaml['include'] ?? null)) {
             return 'The Compose file includes other Compose files (include).';
@@ -73,7 +75,7 @@ class NodeStackCompose
         $services = $yaml['services'] ?? [];
         foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts, $containerSocket);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -89,6 +91,42 @@ class NodeStackCompose
         }
 
         return null;
+    }
+
+    /**
+     * Whether a service of the Compose file mounts the Docker or Podman socket. Such a service
+     * controls every container on its server, so only a team admin may create, change, or deploy it.
+     *
+     * @param  array<string, mixed>  $yaml
+     */
+    public static function mountsContainerSocket(array $yaml): bool
+    {
+        foreach ($yaml['services'] ?? [] as $service) {
+            foreach (self::mounts(is_array($service) ? $service : []) as $mount) {
+                if ($mount['kind'] === 'socket') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Refuses a user who is not an admin or owner of the team: the Docker socket reaches every
+     * container on the server, also resources outside the access grants of a member. A change
+     * without a user (the reconciler, a webhook) is allowed, because the team admin trusted the
+     * repository.
+     *
+     * @param  string  $subject  What mounts the socket, for the message, for example `The service web`.
+     *
+     * @throws RuntimeException
+     */
+    public static function ensureMayMountContainerSocket(?User $user, int $teamId, string $subject = 'This service'): void
+    {
+        if ($user !== null && ! $user->isAdminOfTeam($teamId)) {
+            throw new RuntimeException("{$subject} mounts the Docker socket, which controls every container on its server. Only a team admin or owner can create, change, or deploy it.");
+        }
     }
 
     /**
@@ -136,17 +174,17 @@ class NodeStackCompose
      *
      * @return array<string, string>
      */
-    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false): array
+    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false, bool $containerSocket = false): array
     {
         $templates ??= get_service_templates();
         $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
-        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '');
+        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '').($containerSocket ? 'socket:' : '');
 
-        return Cache::remember('node-stack-template-availability:'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts): array {
+        return Cache::remember('node-stack-template-availability:'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts, $containerSocket): array {
             $reasons = [];
             foreach ($composes as $key => $encoded) {
                 try {
-                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts);
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts, containerSocket: $containerSocket);
                 } catch (RuntimeException $exception) {
                     $reason = $exception->getMessage();
                 }
@@ -232,7 +270,7 @@ class NodeStackCompose
     }
 
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts, bool $containerSocket): ?string
     {
         if (! self::validServiceName($name, $underscoreNames)) {
             return $underscoreNames || ! self::validServiceName($name, true)
@@ -262,8 +300,8 @@ class NodeStackCompose
             return 'has no image';
         }
         foreach (self::mounts($service) as $mount) {
-            if ($mount['kind'] === 'socket') {
-                return 'mounts the Docker socket';
+            if ($mount['kind'] === 'socket' && ! $containerSocket) {
+                return 'mounts the Docker socket, which needs Sentinel with workload.container_socket.v1 on every server of the cluster';
             }
             if ($mount['kind'] === 'host') {
                 return "mounts the host path {$mount['source']}";

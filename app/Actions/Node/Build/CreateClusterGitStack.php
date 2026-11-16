@@ -37,6 +37,7 @@ class CreateClusterGitStack
         ?string $composeLocation = null,
         ?GithubApp $githubApp = null,
         ?PrivateKey $privateKey = null,
+        bool $spread = false,
     ): NodeStack {
         // Checks the source against the project team before the credential is issued.
         CreateClusterGitWorkload::ensureSource($project, $repository, $githubApp, $privateKey);
@@ -53,6 +54,7 @@ class CreateClusterGitStack
             $targetNode,
             $name,
             git: new NodeStackGitSource($repository, $branch, (string) $baseDirectory, $composeLocation, $file['commit_sha'], $githubApp, $privateKey),
+            spread: $spread,
         );
     }
 }

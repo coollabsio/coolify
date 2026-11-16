@@ -50,6 +50,12 @@
         </x-callout>
     @endif
 
+    @foreach (array_filter($services, fn (array $service): bool => $service['mountsContainerSocket']) as $service)
+        <x-callout type="warning" title="The service {{ $service['service'] }} mounts the Docker socket" class="mb-4">
+            This service mounts the Docker socket. It has full control of the server {{ $service['server'] ?? 'that it runs on' }}, including every container on it.
+        </x-callout>
+    @endforeach
+
     <x-application.settings-section title="Services"
         helper="Each service is a cluster application with its own deployments, logs, terminal, and backups.">
         <div class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">

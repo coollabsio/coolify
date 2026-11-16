@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
@@ -260,6 +261,18 @@ class NodeCluster extends BaseModel
         $nodes = $this->nodes()->where('is_usable', true)->get();
 
         return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_CAPABILITY) === true);
+    }
+
+    /**
+     * Whether every usable server of the cluster mounts the host Podman socket in a container
+     * (`container_socket_paths`). Services of a stack can run on any server of the cluster, and
+     * Flux refuses the deploy on a server without it.
+     */
+    public function supportsContainerSocket(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(DispatchWorkloadDeployment::CONTAINER_SOCKET_CAPABILITY) === true);
     }
 
     /**

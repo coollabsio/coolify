@@ -10,6 +10,7 @@ use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use App\Services\NodeStack\NodeStackCompose;
 use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -52,6 +53,10 @@ class CreateDeploymentOperation
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
                 ->firstOrFail();
+            if ($revision->mountsContainerSocket()) {
+                // Every deploy of a user: a new or the same revision, a rollback, a build, and a move.
+                NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $workload->team_id);
+            }
             if (! $partOfMove) {
                 $workload->ensureNotMovingVolumes();
             }
@@ -101,6 +106,10 @@ class CreateDeploymentOperation
 
             if (filled(data_get($revision->configuration, 'files'))) {
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::FILES_CAPABILITY);
+            }
+
+            if ($revision->mountsContainerSocket()) {
+                $node->ensureReportedCapability(DispatchWorkloadDeployment::CONTAINER_SOCKET_CAPABILITY);
             }
 
             if ($workload->node_stack_id !== null) {

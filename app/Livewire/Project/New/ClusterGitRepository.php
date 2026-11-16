@@ -39,6 +39,9 @@ class ClusterGitRepository extends Component
 
     public string $name = '';
 
+    /** Where the services of a Compose stack run: `one` server, or `spread` across the cluster. */
+    public string $stackPlacement = 'one';
+
     public string $deploymentTarget = '';
 
     /** @var array<int, array{value: string, label: string, disabled: bool}> */
@@ -72,6 +75,7 @@ class ClusterGitRepository extends Component
             'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'composeLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'name' => ValidationPatterns::nameRules(required: false),
+            'stackPlacement' => ['required', Rule::in(['one', 'spread'])],
         ], [
             'repository.starts_with' => 'Use the https:// URL of a public repository.',
         ]);
@@ -85,7 +89,7 @@ class ClusterGitRepository extends Component
         if ($this->buildPack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
             $this->authorize('create', NodeStack::class);
             try {
-                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $this->repository, $this->branch, auth()->user(), $targetNode, $this->name, $this->baseDirectory, $this->composeLocation);
+                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $this->repository, $this->branch, auth()->user(), $targetNode, $this->name, $this->baseDirectory, $this->composeLocation, spread: $targetNode === null && $this->stackPlacement === 'spread');
             } catch (RuntimeException $exception) {
                 $this->addError('repository', $exception->getMessage());
 

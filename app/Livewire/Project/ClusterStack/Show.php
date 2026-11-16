@@ -12,6 +12,7 @@ use App\Models\NodeVolume;
 use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Project;
+use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -49,6 +50,11 @@ class Show extends Component
     public function deploy(): void
     {
         $this->authorize('deploy', $this->stack);
+        if (NodeStackCompose::mountsContainerSocket($this->stack->compose_parsed ?? []) && ! auth()->user()->isAdminOfTeam((int) $this->stack->team_id)) {
+            $this->dispatch('error', 'This stack mounts the Docker socket, which controls every container on its server. Only a team admin or owner can deploy it.');
+
+            return;
+        }
         if ($this->stack->deploy_status === 'deploying') {
             $this->dispatch('error', 'This stack is deploying. Wait until the deployment finishes.');
 
@@ -149,6 +155,7 @@ class Show extends Component
                         ? '/'.ltrim(trim((string) $workload->base_directory, '/').'/'.($workload->dockerfile_location ?: 'Dockerfile'), '/').(filled($workload->build_target) ? " (target {$workload->build_target})" : '')
                         : null,
                     'server' => $workload->nodes->first()?->name,
+                    'mountsContainerSocket' => $workload->mountsContainerSocket(),
                     'status' => $container === null ? 'not deployed' : trim($container->state.' '.($container->health_status && $container->health_status !== 'unknown' ? "({$container->health_status})" : '')),
                     'statusType' => $statusType,
                     'domains' => $workload->domains ?? [],

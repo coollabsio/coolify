@@ -29,6 +29,9 @@ class DispatchWorkloadDeployment
     /** Sentinel writes Compose `content:` files and mounts them (decision 0023). */
     public const FILES_CAPABILITY = 'workload.files.v1';
 
+    /** Sentinel bind-mounts the Podman socket of the server at `container_socket_paths` (decision 0023). */
+    public const CONTAINER_SOCKET_CAPABILITY = 'workload.container_socket.v1';
+
     /** Sentinel sets the uid, gid, and mode of a secret file (decision 0008 amendment). */
     public const SECRET_OWNER_CAPABILITY = 'workload.secrets.owner.v1';
 
@@ -85,6 +88,11 @@ class DispatchWorkloadDeployment
         if ($files !== []) {
             // An older Sentinel ignores unknown fields and would start the container without its files.
             $operation->node->ensureReportedCapability(self::FILES_CAPABILITY);
+        }
+        $socketPaths = $configuration['container_socket_paths'] ?? [];
+        if ($socketPaths !== []) {
+            // Flux refuses the field without the capability; check it here for a clear message.
+            $operation->node->ensureReportedCapability(self::CONTAINER_SOCKET_CAPABILITY);
         }
         $stack = $operation->workload->stack;
         $dnsSearch = $stack === null || $operation->node->node_cluster_id === null ? [] : [$stack->searchDomain()];
@@ -143,6 +151,7 @@ class DispatchWorkloadDeployment
                 ...($mounts === [] ? [] : ['mounts' => $mounts]),
                 ...($secrets === [] ? [] : ['secrets' => $secrets]),
                 ...($files === [] ? [] : ['files' => $files]),
+                ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
                 ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
                 ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
                 ...($healthCheck === null ? [] : ['health_check' => [
@@ -297,6 +306,8 @@ class DispatchWorkloadDeployment
             'files.*.content_base64' => ['present', 'string', 'max:1398104'],
             'files.*.mode' => ['present', 'string', 'regex:/\\A(0?[0-7]{3})?\\z/'],
             'files.*.directory' => ['required', 'boolean'],
+            'container_socket_paths' => ['sometimes', 'array', 'max:4'],
+            'container_socket_paths.*' => ['string', 'max:4096', 'distinct', 'starts_with:/', 'not_regex:/[,:\\x00]/'],
             'health_check' => ['sometimes', 'array:command,description,interval_seconds,timeout_seconds,retries,start_period_seconds'],
             'health_check.command' => ['required_with:health_check', 'string', 'max:4096', 'not_regex:/[\\x00\\r\\n]/'],
             'health_check.description' => ['required_with:health_check', 'string', 'max:4096'],

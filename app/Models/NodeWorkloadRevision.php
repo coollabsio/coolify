@@ -30,6 +30,12 @@ class NodeWorkloadRevision extends BaseModel
         return collect($this->secrets ?? [])->contains(fn (string|array $entry): bool => is_array($entry));
     }
 
+    /** Whether Sentinel mounts the Podman socket of the server in the container of this revision. */
+    public function mountsContainerSocket(): bool
+    {
+        return filled(data_get($this->configuration, 'container_socket_paths'));
+    }
+
     public function workload(): BelongsTo
     {
         return $this->belongsTo(NodeWorkload::class, 'node_workload_id');

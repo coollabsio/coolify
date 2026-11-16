@@ -39,6 +39,9 @@ trait CreatesClusterGitApplication
 
     public string $composeLocation = NodeStackGitSource::DEFAULT_COMPOSE_LOCATION;
 
+    /** Where the services of a Compose stack run: `one` server, or `spread` across the cluster. */
+    public string $stackPlacement = 'one';
+
     public array $parameters = [];
 
     protected function mountClusterTarget(): void
@@ -74,6 +77,7 @@ trait CreatesClusterGitApplication
             'dockerfileLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'publishDirectory' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]*$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
             'composeLocation' => ['nullable', 'string', 'max:512', 'regex:/^\/?[A-Za-z0-9._\/-]+$/', 'not_regex:/(^|\/)\.\.(\/|$)/'],
+            'stackPlacement' => ['required', Rule::in(['one', 'spread'])],
         ];
     }
 
@@ -93,7 +97,7 @@ trait CreatesClusterGitApplication
         if ($this->build_pack === NodeWorkloadSourceType::COMPOSE_BUILD_PACK) {
             $this->authorize('create', NodeStack::class);
             try {
-                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $repository, $branch, auth()->user(), $targetNode, null, $this->base_directory, $this->composeLocation, $githubApp, $privateKey);
+                $stack = CreateClusterGitStack::run($project, $environment, $cluster, $repository, $branch, auth()->user(), $targetNode, null, $this->base_directory, $this->composeLocation, $githubApp, $privateKey, $targetNode === null && $this->stackPlacement === 'spread');
             } catch (Throwable $exception) {
                 $this->addError($errorField, $exception->getMessage());
 

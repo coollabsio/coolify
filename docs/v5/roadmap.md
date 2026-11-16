@@ -41,11 +41,11 @@ stable need.
 ## Sentinel versions
 
 Until the first release, Coolify uses Sentinel `main-<sha>` images, not
-releases: `FLUX_IMAGE` pins `main-be0c977` and `constants.node.builder_image`
-pins `main-ec64ac1` by digest (the Nodes run `sentinel-host` `main-be0c977`). `upstream.json` takes only release versions, so a
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-b0a04a5`
+by digest (Nodes 1 and 3 of the dev cluster run `sentinel-host` `main-b0a04a5`). `upstream.json` takes only release versions, so a
 new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 `image.build.target.v1`, no read lane for fast commands (Sentinel
-`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), and no Static builds (Sentinel `be0c977`). Install the `main-<sha>` `sentinel-host` on it by hand with
+`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), and no Docker socket for stack services (Sentinel `b0a04a5`). Install the `main-<sha>` `sentinel-host` on it by hand with
 `InstallSentinel`.
 
 ## Build when there is time
@@ -81,7 +81,7 @@ These items have no decision. Decide them after the first release.
 
 | # | Item | Left open in |
 | --- | --- | --- |
-| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Each deploy of a Git stack reads the Compose file again and adds, changes, and removes services (three-way rule for values that the user changed). `ports:` is published when every Node of the cluster reports `network.firewall.published_ports.v1` (L1). Still open: Docker socket access, and the placement of stack services on several Nodes when the stack is created. |
+| P1 | Docker Compose and one-click services on Nodes | Accepted in [0023](decisions/0023-node-compose-stacks.md) and [0024](decisions/0024-node-stack-shared-volumes.md). Step 1 is done: one-click services run as stacks, and services of a stack share volumes (316 templates with `discovery.names.underscore.v1`, 307 without). Step 2 is done: Compose applications from Git, with `build:` on the Node builder (`image.build.target.v1` for `build.target`). Each deploy of a Git stack reads the Compose file again and adds, changes, and removes services (three-way rule for values that the user changed). `ports:` is published when every Node of the cluster reports `network.firewall.published_ports.v1` (L1). Step 3 is done: a service can mount the Docker socket when every Node reports `workload.container_socket.v1` (Sentinel mounts the Podman socket of the Node), and only a team admin or owner can create, change, or deploy it. A stack can spread across the cluster when it is created: services that share a volume stay on one Node. Still open: rollback of a whole stack, and conversion of a v4 service. |
 | P2 | Converting a legacy server to a Node, also as a docs guide | 0002, 0004 |
 | P3 | Multiple Flux instances for Coolify Cloud | current-state |
 | P4 | Log export and retention | 0003 |

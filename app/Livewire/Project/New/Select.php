@@ -145,7 +145,7 @@ class Select extends Component
         $services = get_service_templates();
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
         // Shown only when a cluster can be the destination (decision 0023).
-        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames(), $this->clustersSupportPublishedPorts()) : [];
+        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames(), $this->clustersSupportPublishedPorts(), $this->clustersSupportContainerSocket()) : [];
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap, $nodeReasons) {
             $serviceKey = (string) $key;
@@ -472,7 +472,7 @@ class Select extends Component
         }
         if (str_starts_with($type, 'one-click-service-') && $this->clusters?->isNotEmpty()) {
             $template = resolve_service_template_key(str($type)->after('one-click-service-')->value());
-            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames(), publishedPorts: $this->clustersSupportPublishedPorts())[$template] ?? null;
+            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames(), publishedPorts: $this->clustersSupportPublishedPorts(), containerSocket: $this->clustersSupportContainerSocket())[$template] ?? null;
         }
         // Clusters run Docker images, build Git repositories, databases, and one-click services; Docker servers keep their flow.
         if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) && $this->clusters?->isNotEmpty()) {
@@ -525,11 +525,26 @@ class Select extends Component
         return $this->whatToDoNext();
     }
 
+    /** A one-click service on a cluster: each service runs on the least loaded server, services that share a volume on one server. */
+    public function setClusterSpread(string $clusterUuid)
+    {
+        if (! str_starts_with($this->type ?? '', 'one-click-service-')) {
+            return null;
+        }
+
+        return $this->createOnCluster(['cluster' => $this->deployableCluster($clusterUuid)->uuid, 'placement' => 'spread']);
+    }
+
     public function setCluster(string $clusterUuid)
+    {
+        return $this->createOnCluster(['cluster' => $this->deployableCluster($clusterUuid)->uuid]);
+    }
+
+    private function deployableCluster(string $clusterUuid): NodeCluster
     {
         abort_unless(nodesEnabled(), 404);
 
-        $cluster = NodeCluster::query()
+        return NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->where('uuid', $clusterUuid)
             ->whereIn('network_status', ['active', 'degraded'])
@@ -538,8 +553,6 @@ class Select extends Component
                 ->whereIn('role', ['worker', 'controller-worker'])
                 ->onDeployableClusterNetwork())
             ->firstOrFail();
-
-        return $this->createOnCluster(['cluster' => $cluster->uuid]);
     }
 
     public function setNode(string $nodeUuid)
@@ -560,7 +573,7 @@ class Select extends Component
     /**
      * Opens the create page for the cluster target. A PostgreSQL database first picks its image, like on a Docker server.
      *
-     * @param  array{cluster?: string, server?: string}  $target
+     * @param  array{cluster?: string, server?: string, placement?: string}  $target
      */
     private function createOnCluster(array $target)
     {
@@ -647,6 +660,12 @@ class Select extends Component
     private function clustersSupportPublishedPorts(): bool
     {
         return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsPublishedPorts());
+    }
+
+    /** A template that mounts the Docker socket is offered when a listed cluster mounts the Podman socket in containers. The cluster is checked again on create. */
+    private function clustersSupportContainerSocket(): bool
+    {
+        return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsContainerSocket());
     }
 
     public function loadServers()

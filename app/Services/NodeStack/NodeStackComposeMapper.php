@@ -26,6 +26,12 @@ class NodeStackComposeMapper
 
     public const MAX_FILES_BYTES = 4 * 1024 * 1024;
 
+    /** Sentinel limit of `workload.container_socket.v1`. */
+    public const MAX_CONTAINER_SOCKET_PATHS = 4;
+
+    /** Sentinel does not mount the socket under these paths. */
+    private const CONTAINER_SOCKET_FORBIDDEN_PATHS = ['/proc', '/sys', '/dev', '/run/secrets'];
+
     /**
      * Service keys that a workload cannot express yet. The stack runs without them, with a note on
      * the service. `container_name`, `hostname`, `networks`, `platform`, and `logging` are ignored
@@ -119,7 +125,7 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository; see NodeStackCompose::build().
-     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, published_ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, depends_on: array<string, string>, notes: list<string>}>
+     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, published_ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, container_socket_paths: list<string>, depends_on: array<string, string>, notes: list<string>}>
      */
     public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null, array $sharedKeys = []): array
     {
@@ -161,7 +167,7 @@ class NodeStackComposeMapper
             }
             ksort($environment);
 
-            ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $files, 'notes' => $mountNotes] = $storage[$name];
+            ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $files, 'container_socket_paths' => $socketPaths, 'notes' => $mountNotes] = $storage[$name];
             foreach ($files as $file) {
                 $fileBytes += (int) (strlen($file['content_base64']) * 3 / 4);
                 $fileCount++;
@@ -198,6 +204,7 @@ class NodeStackComposeMapper
                 'volumes' => $volumes,
                 'stack_volumes' => $stackVolumes,
                 'files' => $files,
+                'container_socket_paths' => $socketPaths,
                 'depends_on' => self::dependencies($service['depends_on'] ?? []),
                 'notes' => [...$notes, ...$mountNotes],
             ];
@@ -210,9 +217,10 @@ class NodeStackComposeMapper
     }
 
     /**
-     * The configuration of the first revision of a service: its command, restart policy, and files.
+     * The configuration of the first revision of a service: its command, restart policy, files,
+     * and the paths where Sentinel mounts the Podman socket of the server.
      *
-     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>}  $service  One service of services().
+     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>, container_socket_paths: list<string>}  $service  One service of services().
      * @return array<string, mixed>
      */
     public static function revisionConfiguration(array $service): array
@@ -221,6 +229,7 @@ class NodeStackComposeMapper
             'command' => $service['command'],
             'restart_policy' => $service['restart_policy'],
             'files' => $service['files'],
+            'container_socket_paths' => $service['container_socket_paths'] ?? [],
         ], fn ($value): bool => $value !== []);
     }
 
@@ -553,6 +562,11 @@ class NodeStackComposeMapper
                         $storage['files'][] = $file;
                     }
                 }
+                foreach ($from['sockets'] as $socket) {
+                    if (! in_array($socket['path'], array_column($storage['sockets'], 'path'), true)) {
+                        $storage['sockets'][] = $socket;
+                    }
+                }
             }
 
             return $resolved[$name] = $storage;
@@ -587,24 +601,61 @@ class NodeStackComposeMapper
             if (count($volumes) + count($stackVolumes) > NodeVolume::MAX_PER_WORKLOAD) {
                 throw new RuntimeException("The service {$name} mounts more than ".NodeVolume::MAX_PER_WORKLOAD.' volumes.');
             }
-            $result[$name] = ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $storage['files'], 'notes' => $notes];
+            $socketPaths = self::containerSocketPaths($name, $storage);
+            foreach ($storage['sockets'] as $socket) {
+                if ($socket['read_only']) {
+                    $notes[] = "The Docker socket at {$socket['path']} is mounted read-write: Nodes mount the socket only read-write.";
+                }
+            }
+            $result[$name] = ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $storage['files'], 'container_socket_paths' => $socketPaths, 'notes' => array_values(array_unique($notes))];
         }
 
         return $result;
     }
 
     /**
+     * The paths where Sentinel mounts the Podman socket of the server in the container of a
+     * service, with the rules of `workload.container_socket.v1`. Sentinel always mounts the
+     * socket read-write.
+     *
+     * @param  array{mounts: list<array{path: string}>, files: list<array{path: string}>, sockets: list<array{path: string, read_only: bool}>}  $storage
+     * @return list<string>
+     */
+    private static function containerSocketPaths(string $serviceName, array $storage): array
+    {
+        $paths = array_values(array_unique(array_column($storage['sockets'], 'path')));
+        if (count($paths) > self::MAX_CONTAINER_SOCKET_PATHS) {
+            throw new RuntimeException("The service {$serviceName} mounts the Docker socket more than ".self::MAX_CONTAINER_SOCKET_PATHS.' times.');
+        }
+        $used = array_flip([...array_column($storage['mounts'], 'path'), ...array_column($storage['files'], 'path')]);
+        foreach ($paths as $path) {
+            $forbidden = collect(self::CONTAINER_SOCKET_FORBIDDEN_PATHS)->contains(fn (string $prefix): bool => $path === $prefix || str_starts_with($path, $prefix.'/'));
+            if ($forbidden || str_contains($path, ':')) {
+                throw new RuntimeException("The service {$serviceName} mounts the Docker socket at {$path}, which cannot be a mount target on Nodes.");
+            }
+            if (isset($used[$path])) {
+                throw new RuntimeException("The service {$serviceName} mounts the Docker socket and another volume or file at {$path}.");
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
      * The mounts of one service: named volumes stay named volumes, a relative bind (`./data`) is a
      * named volume of the stack, and a `content:` mount is a file that Sentinel writes (decision
-     * 0023). `key` identifies the data, so the services that mount the same key share it.
+     * 0023). `key` identifies the data, so the services that mount the same key share it. A mount
+     * of the Docker or Podman socket is in `sockets`: Sentinel mounts the Podman socket of the
+     * server there.
      *
      * @param  array<string, mixed>  $service
-     * @return array{mounts: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, notes: list<string>}
+     * @return array{mounts: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, sockets: list<array{path: string, read_only: bool}>, notes: list<string>}
      */
     private static function storage(string $serviceName, array $service): array
     {
         $mounts = [];
         $files = [];
+        $sockets = [];
         $notes = [];
         foreach (NodeStackCompose::mounts($service) as $mount) {
             $path = CreateNodeVolume::normalizeMountPath($mount['target']);
@@ -634,12 +685,15 @@ class NodeStackComposeMapper
                 case 'tmpfs':
                     $notes[] = "The tmpfs mount at {$path} is not supported on Nodes yet and is ignored.";
                     break;
+                case 'socket':
+                    $sockets[] = ['path' => $path, 'read_only' => (bool) $mount['read_only']];
+                    break;
                 default:
                     throw new RuntimeException("The service {$serviceName} mounts a host path, which Nodes do not allow.");
             }
         }
 
-        return ['mounts' => $mounts, 'files' => $files, 'notes' => $notes];
+        return ['mounts' => $mounts, 'files' => $files, 'sockets' => $sockets, 'notes' => $notes];
     }
 
     /**

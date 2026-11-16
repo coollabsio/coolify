@@ -49,6 +49,11 @@
                     <x-forms.input id="composeLocation" label="Compose file location" placeholder="/docker-compose.yaml"
                         helper="Relative to the base directory. Each service with build: builds its image on a cluster server. Each Compose service becomes an application of one stack." />
                 </div>
+                <div x-cloak x-show="$wire.buildPack === '{{ \App\Enums\NodeWorkloadSourceType::COMPOSE_BUILD_PACK }}' && String($wire.deploymentTarget).startsWith('cluster:')">
+                    <x-forms.listbox id="stackPlacement" label="Placement"
+                        helper="One server runs every service on one server of the cluster. Spread across the cluster puts each service on the least loaded server. Services that share a volume stay on one server."
+                        :options="[['value' => 'one', 'label' => 'One server'], ['value' => 'spread', 'label' => 'Spread across the cluster']]" />
+                </div>
                 <x-forms.input id="baseDirectory" label="Base directory" placeholder="/"
                     helper="Repository directory used as the build root. Leave empty for the root." />
                 <div x-cloak x-show="$wire.buildPack === 'static'">

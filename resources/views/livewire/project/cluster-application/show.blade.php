@@ -188,6 +188,11 @@
             <x-cluster-applications.sidebar :section="$section" :route-parameters="$routeParameters" :workload="$workload" />
 
             <div class="application-settings-form flex min-w-0 flex-col gap-6">
+                @if ($containerSocketServers !== null)
+                    <x-callout type="warning" title="This service mounts the Docker socket">
+                        This service mounts the Docker socket. It has full control of the {{ count($containerSocketServers) === 1 ? 'server' : 'servers' }} {{ $containerSocketServers === [] ? 'that it runs on' : implode(', ', $containerSocketServers) }}, including every container on {{ count($containerSocketServers) === 1 ? 'it' : 'them' }}.
+                    </x-callout>
+                @endif
                 @if ($imageArchitectureWarning !== null)
                     <x-callout type="warning" title="CPU architecture of the image is unknown">
                         Coolify could not read the CPU architectures of {{ $imageArchitectureWarning['image'] }}: {{ $imageArchitectureWarning['error'] }}

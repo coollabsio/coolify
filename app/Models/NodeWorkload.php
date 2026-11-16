@@ -389,6 +389,18 @@ class NodeWorkload extends BaseModel
     }
 
     /**
+     * Whether the latest revision, or the first one for a service without a revision yet, mounts
+     * the Podman socket of the server (decision 0023). Such a service controls every container
+     * on its server.
+     */
+    public function mountsContainerSocket(): bool
+    {
+        $configuration = $this->revisions()->latest('id')->first()?->configuration ?? $this->firstRevisionConfiguration();
+
+        return filled($configuration['container_socket_paths'] ?? null);
+    }
+
+    /**
      * The configuration of the revision that the first build creates. A service of a stack keeps
      * the command, restart policy, and files of its Compose service. A preview takes the latest
      * configuration of its parent at each build (decision 0025), without the mounts and the

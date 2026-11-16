@@ -111,7 +111,7 @@ class Create extends Component
                 ? DockerImage::resolveClusterTarget($project, 'node', (string) request()->query('server'))
                 : DockerImage::resolveClusterTarget($project, 'cluster', (string) request()->query('cluster'));
             try {
-                $stack = CreateClusterStack::run($project, $environment, $cluster, $compose, auth()->user(), $targetNode, template: $template);
+                $stack = CreateClusterStack::run($project, $environment, $cluster, $compose, auth()->user(), $targetNode, template: $template, spread: $targetNode === null && request()->query('placement') === 'spread');
             } catch (\RuntimeException|ValidationException $exception) {
                 // The picker renders below the reason.
                 $this->clusterErrorTitle = 'The stack could not be created';

@@ -4,6 +4,8 @@ namespace App\Actions\Node;
 
 use App\Actions\Node\Build\CreateClusterGitWorkload;
 use App\Actions\Node\Build\EnsureNodeRegistry;
+use App\Enums\AccessLevel;
+use App\Enums\NodeRole;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
 use App\Models\Environment;
@@ -15,11 +17,13 @@ use App\Models\NodeVolumeMount;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use App\Services\NodeStack\NodeStackCompose;
 use App\Services\NodeStack\NodeStackComposeMapper;
 use App\Services\NodeStack\NodeStackGitSource;
 use App\Support\CpuArchitecture;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -32,6 +36,10 @@ use RuntimeException;
  * A Compose file from Git (step 2) keeps its source on the stack. A service with `build:` is a
  * Dockerfile application of the same repository: it has no revision until its first build, and
  * the first one of a cluster creates the registry, as for a Git application.
+ *
+ * With `$spread`, the services spread across the servers of the cluster: each placement unit (the
+ * services that share a volume, decision 0024, or one service) goes to the least loaded server
+ * that can take it. Without it, every service runs on one server.
  */
 class CreateClusterStack
 {
@@ -47,7 +55,11 @@ class CreateClusterStack
         ?string $name = null,
         ?string $template = null,
         ?NodeStackGitSource $git = null,
+        bool $spread = false,
     ): NodeStack {
+        if ($spread && $targetNode !== null) {
+            throw new RuntimeException('Select the cluster, not one server, to spread the stack across the cluster.');
+        }
         if ($environment->project_id !== $project->id) {
             throw new RuntimeException('The environment does not belong to this project.');
         }
@@ -64,17 +76,20 @@ class CreateClusterStack
             throw new RuntimeException('The cluster network is not ready.');
         }
         $yaml = NodeStackCompose::parse($compose);
+        if (NodeStackCompose::mountsContainerSocket($yaml)) {
+            NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $project->team_id, 'This stack');
+        }
         $composeDirectory = $git?->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts());
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket());
         if ($reason !== null) {
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }
         $name = filled($name) ? trim($name) : ($template ?? ($git !== null ? CreateClusterGitWorkload::defaultName($git->repository) : 'stack'));
         $registryIsNew = ! $cluster->registry()->exists();
-        $architectures = self::architectures($cluster, $yaml);
+        $architectures = $spread ? null : self::architectures($cluster, $yaml);
 
-        $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory, $architectures): NodeStack {
-            $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
+        $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory, $architectures, $spread): NodeStack {
+            $node = $spread ? null : CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $architectures);
             NodeCluster::query()->whereKey($cluster->id)->lockForUpdate()->first();
             $stack = NodeStack::query()->create([
                 'team_id' => $project->team_id,
@@ -108,12 +123,15 @@ class CreateClusterStack
             if ($conflict !== null) {
                 throw new RuntimeException("This stack is not available on Nodes. {$conflict}");
             }
+            $placements = $node === null ? self::spreadPlacements($cluster, $services, $requestedBy) : array_fill_keys(array_column($services, 'service'), $node);
             $workloads = [];
             foreach ($services as $service) {
-                $workloads[$service['service']] = self::createService($stack, $node, $service, $requestedBy);
+                $workloads[$service['service']] = self::createService($stack, $placements[$service['service']], $service, $requestedBy);
             }
             self::createStackVolumes($stack, NodeStackComposeMapper::stackMounts($services), $workloads);
-            EnsureNodeWorkloadDnsNames::run($node);
+            foreach (collect($placements)->unique('id') as $placed) {
+                EnsureNodeWorkloadDnsNames::run($placed);
+            }
             if (in_array(true, array_map(fn (array $service): bool => $service['build'] !== null, $services), true)) {
                 EnsureNodeRegistry::run($cluster);
             }
@@ -143,6 +161,94 @@ class CreateClusterStack
             ->map(fn (array $service): ?array => isset($service['build'])
                 ? $cluster->builderArchitectures()
                 : (is_string($service['image'] ?? null) && ! str_contains($service['image'], '$') ? ReadImageArchitectures::run($service['image']) : null)));
+    }
+
+    /**
+     * The server of each service when the stack spreads across the cluster. A placement unit is
+     * the services that share a volume (decision 0024), or one service. Each unit goes to the
+     * server with the fewest workloads that can take it, with the checks of a normal placement:
+     * the CPU architectures of the unit, the capacity of the server, and, for a user without
+     * team-wide access, a server where the user may place resources. The units of this stack
+     * count as workloads of their server.
+     *
+     * @param  list<array{service: string, image: ?string, build: ?array<string, mixed>, stack_volumes: list<array{key: string}>}>  $services  See NodeStackComposeMapper::services().
+     * @return array<string, Node> By service.
+     */
+    public static function spreadPlacements(NodeCluster $cluster, array $services, User $requestedBy): array
+    {
+        $teamWide = app(AccessResolver::class)->allowsTeamWide($requestedBy, AccessLevel::Write, (int) $cluster->team_id);
+        $candidates = $cluster->nodes()
+            ->where('is_usable', true)
+            ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
+            ->onDeployableClusterNetwork()
+            ->withCount('workloads')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Node $node): bool => $teamWide || Gate::forUser($requestedBy)->allows('placeResource', $node))
+            ->values();
+        $load = $candidates->mapWithKeys(fn (Node $node): array => [$node->id => (int) $node->workloads_count])->all();
+        $placements = [];
+        foreach (self::placementUnits($services) as $unit) {
+            $architectures = CpuArchitecture::common(array_map(fn (array $service): ?array => $service['build'] !== null
+                ? $cluster->builderArchitectures()
+                : ReadImageArchitectures::run((string) $service['image']), $unit));
+            $node = null;
+            $reason = null;
+            foreach ($candidates->sortBy(fn (Node $candidate): array => [$load[$candidate->id], $candidate->id]) as $candidate) {
+                try {
+                    $node = CreateClusterDockerImageWorkload::placementNode($cluster, $candidate, $architectures);
+
+                    break;
+                } catch (RuntimeException|\DomainException $exception) {
+                    $reason ??= $exception->getMessage();
+                }
+            }
+            $names = implode(', ', array_column($unit, 'service'));
+            if ($node === null) {
+                throw new RuntimeException((count($unit) > 1 ? "The services {$names} share a volume and must run on one server, but no server can take them." : "No server can take the service {$names}.")
+                    .($reason === null ? ($teamWide ? '' : ' You may place resources only on servers where you have write access on a resource.') : " {$reason}"));
+            }
+            $load[$node->id] += count($unit);
+            foreach ($unit as $service) {
+                $placements[$service['service']] = $node;
+            }
+        }
+
+        return $placements;
+    }
+
+    /**
+     * The services that must run on one server: each group of services that share a volume,
+     * directly or through another service (decision 0024), and each other service alone. In the
+     * order of the Compose file.
+     *
+     * @param  list<array{service: string, stack_volumes: list<array{key: string}>}>  $services
+     * @return list<list<array<string, mixed>>>
+     */
+    public static function placementUnits(array $services): array
+    {
+        $groupOf = [];
+        $byKey = [];
+        foreach ($services as $index => $service) {
+            $groupOf[$index] = $index;
+            foreach ($service['stack_volumes'] as $mount) {
+                $byKey[$mount['key']][] = $index;
+            }
+        }
+        $root = function (int $index) use (&$groupOf, &$root): int {
+            return $groupOf[$index] === $index ? $index : $groupOf[$index] = $root($groupOf[$index]);
+        };
+        foreach ($byKey as $indexes) {
+            foreach ($indexes as $index) {
+                $groupOf[$root($index)] = $root($indexes[0]);
+            }
+        }
+        $units = [];
+        foreach ($services as $index => $service) {
+            $units[$root($index)][] = $service;
+        }
+
+        return array_values($units);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Jobs\DeployRailpackWorkloadJob;
 use App\Models\NodeBuild;
 use App\Models\NodeWorkload;
 use App\Models\User;
+use App\Services\NodeStack\NodeStackCompose;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -33,6 +34,10 @@ class StartNodeBuild
         $superseded = collect();
         $build = DB::transaction(function () use ($workload, $user, $commitSha, $rebuildOf, $skipDeploy, $fromWebhook, &$superseded): NodeBuild {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
+            // The build deploys its revision; refuse before the build, not after it.
+            if ($workload->mountsContainerSocket()) {
+                NodeStackCompose::ensureMayMountContainerSocket($user, (int) $workload->team_id);
+            }
             if ($rebuildOf !== null) {
                 if ($workload->builds()->active()->exists()) {
                     throw new RuntimeException('A build of this application is running. Wait for it or cancel it, then roll back again.');

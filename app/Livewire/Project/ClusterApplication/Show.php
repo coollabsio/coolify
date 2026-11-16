@@ -1063,6 +1063,7 @@ class Show extends Component
             ...$this->moveOptions(),
             'servers' => $this->workload->nodes->sortBy('name')->values(),
             'imageArchitectureWarning' => ReadImageArchitectures::warning($this->workload),
+            'containerSocketServers' => $this->workload->node_stack_id !== null && $this->workload->mountsContainerSocket() ? $this->workload->nodes->pluck('name')->sort()->values()->all() : null,
             'registryCredentialOptions' => $this->section === 'general' ? $this->registryCredentialOptions() : [],
             'deploymentHistory' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentHistory() : null,
             'deploymentFilterOptions' => in_array($this->section, ['deployments', 'deployment', 'build'], true) ? $this->deploymentFilterOptions() : null,

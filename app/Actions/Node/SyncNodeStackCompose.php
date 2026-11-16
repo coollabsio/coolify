@@ -53,9 +53,12 @@ class SyncNodeStackCompose
         $cluster = NodeCluster::query()->findOrFail($stack->node_cluster_id);
         $yaml = NodeStackCompose::parse($compose);
         $composeDirectory = $stack->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts());
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket());
         if ($reason !== null) {
             throw new RuntimeException("The Compose file at {$this->shortCommit($commitSha)} is not available on Nodes. {$reason}");
+        }
+        if (NodeStackCompose::mountsContainerSocket($yaml)) {
+            NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, "The Compose file at {$this->shortCommit($commitSha)}");
         }
         (new NodeStack(['compose_parsed' => $yaml]))->deployOrder();
         $actor = $this->actor($stack, $requestedBy);

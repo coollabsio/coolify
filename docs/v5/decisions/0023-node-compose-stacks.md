@@ -114,10 +114,6 @@ port publishing.
 
 ## Not decided here
 
-- Docker or Podman socket access for a stack (12 templates need only that). A
-  Podman socket gives root on the Node.
-- Placement of the services of one stack on several Nodes when the stack is
-  created.
 - Rollback of a whole stack to one point in time.
 - Conversion of a v4 service on a legacy server to a stack.
 
@@ -292,3 +288,95 @@ new. These points differ from the decision above or add to it:
 - **Timeout.** The sync can add services after the deploy is queued, so a
   deploy of a Git stack has the longest job timeout (6 hours). Each service
   still has its own wait.
+
+## Implementation (step 3, 2026-11-16)
+
+Step 3 is built: the Docker socket for stack services, and the placement of
+the services of one stack on several Nodes when the stack is created. These
+two items were open in **Not decided here**. They are decided as follows.
+
+### Docker socket
+
+- **Sentinel.** Sentinel `b0a04a5` adds `container_socket_paths` to
+  `workload.deploy` (capability `workload.container_socket.v1`). Sentinel
+  bind-mounts the host Podman socket `/run/podman/podman.sock` read-write at
+  each path. Coolify grants the capability in `IssueFluxCredential`.
+- **Availability.** A service that mounts `docker.sock` or `podman.sock` can
+  run when every usable Node of the cluster reports the capability
+  (`NodeCluster::supportsContainerSocket()`), as for `ports:`. Else the
+  reason is "mounts the Docker socket, which needs Sentinel with
+  workload.container_socket.v1 on every server of the cluster". The template
+  list, the create page, the Git create pages, and the sync of a Git stack
+  use the same check.
+- **Mapping.** `NodeStackComposeMapper` puts the target of each socket mount
+  in `container_socket_paths` of the service, also through `volumes_from`.
+  The source path in the Compose file is not used: the mount is always the
+  Podman socket of the Node. The rules of Sentinel apply: at most 4 paths,
+  absolute and normalized, not `/`, no `,` or `:`, not under `/proc`, `/sys`,
+  `/dev`, or `/run/secrets`, and not the path of a volume or a file of the
+  service. A `:ro` mount is mounted read-write, with a note on the service,
+  because Sentinel mounts the socket only read-write.
+- **Revision.** `container_socket_paths` is part of the revision
+  configuration. The sync of a Git stack owns it, like `files`.
+  `DispatchWorkloadDeployment` sends it only when it is not empty, and
+  `CreateDeploymentOperation` and `DispatchWorkloadDeployment` require the
+  capability on the Node for such a revision.
+- **Authorization.** The socket reaches every container on the Node, also
+  resources outside the access grants of a member. Only a team admin or
+  owner can create, change, or deploy a service that mounts it
+  (`NodeStackCompose::ensureMayMountContainerSocket()`). The check is at:
+  - `CreateDeploymentOperation`, for each deploy of a user: a deploy, a
+    redeploy of the same revision, a rollback, a build, and a move;
+  - `CreateMoveOperation`, for each service of the moved volume group;
+  - `StartNodeBuild`, before the build starts;
+  - `SyncNodeStackCompose`, when the new Compose file mounts the socket;
+  - `DeployNodeStackJob`, before the first service deploys, and the Deploy
+    button of the stack page;
+  - `CreateClusterStack`, which already allows only an admin or owner.
+
+  A change without a user (the reconciler, a webhook) is allowed, because
+  the team admin trusted the repository. A start, stop, or restart of an
+  existing container is allowed for a member with the access: it does not
+  make a new revision, and an admin deployed the container before.
+- **Page.** The stack page and the page of a service that mounts the socket
+  show a warning: "This service mounts the Docker socket. It has full
+  control of the server <server>, including every container on it."
+
+### Placement on several Nodes
+
+- **Choice.** The template target list has **Spread across the cluster**
+  below each cluster with more than one server. The Git create pages have
+  **Placement** for the Docker Compose build pack with a cluster target:
+  **One server** (the default, as before) or **Spread across the cluster**.
+  A target of one server always runs every service there.
+- **Units.** `CreateClusterStack::placementUnits()` makes one unit of each
+  group of services that share a volume, directly or through another service
+  (decision 0024), and one unit of each other service.
+- **Placement.** `CreateClusterStack::spreadPlacements()` puts each unit, in
+  the order of the Compose file, on the eligible Node with the fewest
+  workloads. The units of the new stack count as workloads of their Node.
+  A Node is eligible when `CreateClusterDockerImageWorkload::placementNode()`
+  accepts it: usable, a workload role, on the cluster network, a CPU
+  architecture of every image of the unit (of the builders for `build:`),
+  and `EnsureNodeAcceptsDeployment`. A user without team-wide write access
+  can use only Nodes that `NodePolicy::placeResource` allows.
+- **After the creation.** Coolify does not spread a stack again later (P7).
+  The user moves a service with **Move to another server**. A new service of
+  a Git stack goes to the Node of its shared volumes, or else to the Node of
+  the first service, as in step 2.
+- **Deploy.** `DeployNodeStackJob` deploys each service on its own Node, in
+  `depends_on` order. The search domain and the name table of the stack are
+  the same on every Node of the cluster, so services reach each other by
+  their bare names across Nodes.
+
+### Checks
+
+- `dozzle` on Node 1 as the root user: the container has
+  `/run/podman/podman.sock -> /var/run/docker.sock` read-write, and the
+  event stream of Dozzle lists the containers of the Node. A member with
+  `read`, `deploy`, and `write` access on the stack was refused for a deploy,
+  a stack deploy, and a move, and no operation was created.
+- `chibisafe` in spread mode on cluster 1 (2 Nodes): `chibisafe` on Node 1,
+  `chibisafe-server` and `caddy` (shared volume `chibisafe-uploads`) on
+  Node 3. All 3 services are healthy, and `caddy` on Node 3 serves the
+  frontend of `chibisafe` on Node 1 and the API of `chibisafe-server`.
