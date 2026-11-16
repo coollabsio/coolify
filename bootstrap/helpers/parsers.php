@@ -172,6 +172,78 @@ function composeResourceDirectory(Application|Service $resource): string
 }
 
 /**
+ * The entries of a Compose `env_file` value: paths, or long-syntax maps with a `path` key.
+ *
+ * @return list<string|array<string, mixed>>
+ */
+function composeEnvFileEntries(mixed $envFile): array
+{
+    return array_values(is_null($envFile) ? [] : (is_array($envFile) ? $envFile : [$envFile]));
+}
+
+/**
+ * The path of a Compose `env_file` entry.
+ */
+function composeEnvFileEntryPath(mixed $entry): string
+{
+    return (string) (is_array($entry) ? ($entry['path'] ?? '') : $entry);
+}
+
+/**
+ * Whether a Compose `env_file` entry is Coolify's .env file, which Coolify writes in the project directory.
+ */
+function isCoolifyComposeEnvFile(mixed $entry): bool
+{
+    return in_array(composeEnvFileEntryPath($entry), ['.env', './.env'], true);
+}
+
+/**
+ * The `env_file` list of a Compose service with Coolify's .env file at the end. The env files of the
+ * user stay in front of it, so Coolify variables override the values in them.
+ *
+ * @return list<string|array<string, mixed>>
+ */
+function composeEnvFilesWithCoolifyEnv(mixed $envFile): array
+{
+    return collect(composeEnvFileEntries($envFile))
+        ->reject(fn (mixed $entry): bool => isCoolifyComposeEnvFile($entry))
+        ->push('.env')
+        ->unique()
+        ->values()
+        ->all();
+}
+
+/**
+ * The path of a Compose `env_file` from the project directory, which is the repository directory
+ * of the deployment. Docker Compose on a local machine reads a relative path from the directory of
+ * the Compose file, so $composeDirectory is that directory, relative to the project directory.
+ * Null when the path is absolute or leaves the project directory.
+ */
+function composeEnvFileProjectPath(string $path, string $composeDirectory): ?string
+{
+    if ($path === '' || str_starts_with($path, '/')) {
+        return null;
+    }
+    $segments = [];
+    foreach (explode('/', trim($composeDirectory, '/').'/'.$path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            if ($segments === []) {
+                return null;
+            }
+            array_pop($segments);
+
+            continue;
+        }
+        $segments[] = $segment;
+    }
+
+    return $segments === [] ? null : implode('/', $segments);
+}
+
+/**
  * Renders a long-syntax bind with its resolved source. It keeps the options that Docker Compose
  * accepts, such as read_only and bind, and removes other keys, which Compose rejects. Without
  * `bind.create_host_path`, a missing source is created, as with short syntax: Docker Compose
@@ -2390,13 +2462,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         // Auto-inject .env file so Coolify environment variables are available inside containers
         // This makes Applications behave consistently with manual .env file usage
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -3645,13 +3711,7 @@ function serviceParser(Service $resource): Collection
         }
         // Auto-inject .env file so Coolify environment variables are available inside containers
         // This makes Services behave consistently with Applications
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
 
         $parsedServices->put($serviceName, $payload);
     }

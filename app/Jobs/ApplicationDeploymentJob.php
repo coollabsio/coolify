@@ -939,14 +939,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->parseComposeFileForDeployment();
-            // Always add .env file to services
-            $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
-
-                return $service;
-            });
-            $composeFile['services'] = $services->toArray();
+            $composeFile = $this->withRepositoryEnvFiles($composeFile);
 
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
@@ -1011,6 +1004,88 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->start_docker_compose_services();
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    /**
+     * Gives each Compose service its env files from the repository, then Coolify's .env file, so
+     * Coolify variables override the defaults in them. A relative path is read from the directory of
+     * the Compose file, as Docker Compose does on a local machine, and is written from the project
+     * directory. Coolify skips a file that is not in the repository (such as a gitignored .env.local),
+     * because Docker Compose stops when an env file is missing.
+     */
+    private function withRepositoryEnvFiles(Collection $composeFile): Collection
+    {
+        $services = collect(data_get($composeFile, 'services', []));
+        if ((int) $this->application->compose_parsing_version < 3) {
+            // Legacy parser versions are frozen: their services get only Coolify's .env file, as before.
+            $composeFile['services'] = $services->map(function ($service) {
+                $service['env_file'] = ['.env'];
+
+                return $service;
+            })->toArray();
+
+            return $composeFile;
+        }
+        $composeDirectory = trim(dirname($this->docker_compose_location), '/');
+        $candidates = $services
+            ->flatMap(fn ($service): array => composeEnvFileEntries(data_get($service, 'env_file')))
+            ->reject(fn (mixed $entry): bool => isCoolifyComposeEnvFile($entry))
+            ->map(fn (mixed $entry): ?string => composeEnvFileProjectPath(composeEnvFileEntryPath($entry), $composeDirectory))
+            ->filter()
+            ->unique()
+            ->values();
+        $existingFiles = $this->existingRepositoryFiles($candidates);
+
+        $composeFile['services'] = $services->map(function ($service, $name) use ($composeDirectory, $existingFiles) {
+            $envFiles = collect(composeEnvFileEntries(data_get($service, 'env_file')))
+                ->reject(fn (mixed $entry): bool => isCoolifyComposeEnvFile($entry))
+                ->map(function (mixed $entry) use ($composeDirectory, $existingFiles, $name) {
+                    $path = composeEnvFileProjectPath(composeEnvFileEntryPath($entry), $composeDirectory);
+                    if ($path === null || ! in_array($path, $existingFiles, true)) {
+                        $this->application_deployment_queue->addLogEntry('Warning: the env_file '.composeEnvFileEntryPath($entry)." of service {$name} is not a file in the repository. Coolify skips it.", 'stderr');
+
+                        return null;
+                    }
+
+                    return is_array($entry) ? [...$entry, 'path' => $path] : $path;
+                })
+                ->filter()
+                ->all();
+            $service['env_file'] = composeEnvFilesWithCoolifyEnv($envFiles);
+
+            return $service;
+        })->toArray();
+
+        return $composeFile;
+    }
+
+    /**
+     * The paths (from the repository directory) that are regular files inside the repository. A
+     * symlink counts only when its target is inside the repository too.
+     *
+     * @param  Collection<int, string>  $paths
+     * @return list<string>
+     */
+    private function existingRepositoryFiles(Collection $paths): array
+    {
+        if ($paths->isEmpty()) {
+            return [];
+        }
+        $workdir = escapeshellarg($this->workdir);
+        $quotedPaths = $paths->map(fn (string $path): string => escapeshellarg($path))->implode(' ');
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "wd=\$(readlink -f {$workdir}); for p in {$quotedPaths}; do r=\$(readlink -f \"\$wd/\$p\") && [ -f \"\$r\" ] && case \"\$r\" in \"\$wd\"/*) echo \"\$p\";; esac; done; true"),
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'repository_env_files',
+        ]);
+
+        return $this->trimmedSavedOutput('repository_env_files')
+            ->explode("\n")
+            ->map(fn (string $line): string => trim($line))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
