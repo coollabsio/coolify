@@ -117,7 +117,7 @@ services:
       retries: 3
 
   lsp:
-    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    image: ghcr.io/windmill-labs/windmill-lsp:1.603.4
     volumes:
       - lsp-cache:/root/.cache
     healthcheck:

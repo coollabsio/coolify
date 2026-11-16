@@ -7,7 +7,7 @@
 
 services:
   strapi:
-    image: "elestio/strapi-production:v5.33.4"
+    image: "elestio/strapi-production:v5.62.0"
     entrypoint: /bin/sh
     command:
       - -c

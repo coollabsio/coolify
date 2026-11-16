@@ -238,7 +238,7 @@ services:
       retries: 3
 
   telemetrystore-migrator:
-    image: signoz/signoz-otel-collector:v0.144.8
+    image: signoz/signoz-otel-collector:v0.144.15
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -263,7 +263,7 @@ services:
         max-file: "3"
 
   otel-collector:
-    image: signoz/signoz-otel-collector:v0.144.8
+    image: signoz/signoz-otel-collector:v0.144.15
     depends_on:
       clickhouse:
         condition: service_healthy

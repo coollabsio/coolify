@@ -7,7 +7,7 @@
 
 services:
   wakapi:
-    image: ghcr.io/muety/wakapi:latest
+    image: ghcr.io/muety/wakapi:2.18.2
     environment:
       - SERVICE_URL_WAKAPI_3000
       - TZ=${TIMEZONE:-Europe/Berlin}

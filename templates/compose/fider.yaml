@@ -7,7 +7,7 @@
 
 services:
   fider:
-    image: getfider/fider:stable
+    image: getfider/fider:v0.40.0
     environment:
       - SERVICE_URL_FIDER_3000
       - BASE_URL=$SERVICE_URL_FIDER

@@ -7,7 +7,7 @@
 
 services:
   nextcloud:
-    image: lscr.io/linuxserver/nextcloud:latest
+    image: lscr.io/linuxserver/nextcloud:35.0.3
     environment:
       - SERVICE_URL_NEXTCLOUD_80
       - PUID=1000

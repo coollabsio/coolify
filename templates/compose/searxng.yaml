@@ -7,7 +7,7 @@
 
 services:
   searxng:
-    image: searxng/searxng
+    image: searxng/searxng:2026.11.15-2d500cb6b
     depends_on:
       redis:
         condition: service_healthy

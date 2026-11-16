@@ -7,7 +7,7 @@
 
 services:
   pocketbase:
-    image: ghcr.io/coollabsio/pocketbase:latest
+    image: ghcr.io/coollabsio/pocketbase:0.42.2
     environment:
       - SERVICE_URL_POCKETBASE_8080
     volumes:

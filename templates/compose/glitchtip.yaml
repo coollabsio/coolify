@@ -21,7 +21,7 @@ services:
       retries: 10
 
   redis:
-    image: redis
+    image: redis:8.10.3
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

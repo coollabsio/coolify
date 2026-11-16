@@ -15,7 +15,7 @@ services:
       retries: 3
 
   paperless:
-    image: paperlessngx/paperless-ngx:latest
+    image: paperlessngx/paperless-ngx:3.4.2
     depends_on:
       redis:
         condition: service_healthy

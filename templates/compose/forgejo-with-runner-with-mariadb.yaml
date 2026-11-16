@@ -71,7 +71,7 @@ services:
       retries: 10
 
   docker-in-docker:
-    image: docker:dind
+    image: docker:29.9.3
     hostname: docker
     privileged: true
     healthcheck:
@@ -86,7 +86,7 @@ services:
       - forgejo-did-certs:/certs
 
   runner-register:
-    image: data.forgejo.org/forgejo/runner:13.2.0
+    image: data.forgejo.org/forgejo/runner:13.2.1
     restart: 'no'
     exclude_from_hc: true
     environment:
@@ -109,7 +109,7 @@ services:
       '
 
   runner:
-    image: data.forgejo.org/forgejo/runner:13.2.0
+    image: data.forgejo.org/forgejo/runner:13.2.1
     depends_on:
       forgejo:
         condition: service_healthy

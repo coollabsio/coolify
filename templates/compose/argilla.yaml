@@ -7,7 +7,7 @@
 
 services:
   argilla:
-    image: "argilla/argilla-server:v2.2.0"
+    image: "argilla/argilla-server:v2.8.0"
     environment:
       - SERVICE_URL_ARGILLA_6900
       - ARGILLA_HOME_PATH=/var/lib/argilla
@@ -42,7 +42,7 @@ services:
       timeout: 10s
       retries: 5
   worker:
-    image: "argilla/argilla-server:v2.2.0"
+    image: "argilla/argilla-server:v2.8.0"
     environment:
       - ARGILLA_HOME_PATH=/var/lib/argilla
       - ARGILLA_ELASTICSEARCH=http://elasticsearch:9200

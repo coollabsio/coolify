@@ -119,7 +119,7 @@ services:
       - UPLOAD_URL=/files
     restart: unless-stopped
   rekoni:
-    image: hardcoreeng/rekoni-service:latest
+    image: hardcoreeng/rekoni-service:v0.6.504
     deploy:
       resources:
         limits:

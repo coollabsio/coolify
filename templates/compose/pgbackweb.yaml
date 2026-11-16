@@ -7,7 +7,7 @@
 
 services:
   pgbackweb:
-    image: eduardolat/pgbackweb:latest
+    image: eduardolat/pgbackweb:0.5.2
     volumes:
       - pgbackweb_backups:/backups
     environment:

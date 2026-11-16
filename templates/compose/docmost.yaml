@@ -7,7 +7,7 @@
 
 services:
   docmost:
-    image: "docmost/docmost:latest"
+    image: "docmost/docmost:0.97.0"
     depends_on:
       postgresql:
         condition: service_healthy

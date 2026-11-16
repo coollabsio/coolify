@@ -7,7 +7,7 @@
 
 services:
   changedetection:
-    image: ghcr.io/dgtlmoon/changedetection.io
+    image: ghcr.io/dgtlmoon/changedetection.io:0.70.3
     volumes:
       - changedetection-data:/datastore
     environment:

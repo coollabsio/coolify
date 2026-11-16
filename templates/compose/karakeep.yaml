@@ -22,7 +22,7 @@ services:
       - DATA_DIR=/data
 
   chrome:
-    image: ghcr.io/karakeep-app/karakeep-chrome:release
+    image: ghcr.io/karakeep-app/karakeep-chrome:157.0.8103.78-r1
     command:
       - '--no-sandbox'
       - '--disable-gpu'

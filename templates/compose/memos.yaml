@@ -7,7 +7,7 @@
 
 services:
   memos:
-    image: neosmemo/memos:stable
+    image: neosmemo/memos:26.11.0
     volumes:
       - memos/:/var/opt/memos
     environment:

@@ -81,7 +81,7 @@ services:
       retries: 10
 
   proxy-service:
-    image: budibase/proxy
+    image: budibase/proxy:v4.0.0
     environment:
       - SERVICE_URL_BUDIBASE_10000
       - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10
@@ -104,7 +104,7 @@ services:
       start_period: 10s
 
   couchdb-service:
-    image: budibase/database
+    image: budibase/database:2.1.0
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
       - COUCHDB_USER=$SERVICE_USER_COUCHDB
@@ -119,7 +119,7 @@ services:
       - couchdb3_data:/data
 
   redis-service:
-    image: redis
+    image: redis:8.10.3
     command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     volumes:
       - redis_data:/data

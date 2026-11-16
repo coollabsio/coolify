@@ -7,7 +7,7 @@
 
 services:
   linkding:
-    image: sissbruecker/linkding:latest
+    image: sissbruecker/linkding:1.47.0
     volumes:
       - 'linkding_data:/etc/linkding/data'
     environment:

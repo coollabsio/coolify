@@ -7,7 +7,7 @@
 
 services:
   bookstack:
-    image: lscr.io/linuxserver/bookstack:latest
+    image: lscr.io/linuxserver/bookstack:26.09.3
     environment:
       - SERVICE_URL_BOOKSTACK_80
       - APP_URL=${SERVICE_URL_BOOKSTACK}

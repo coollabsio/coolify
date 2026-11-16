@@ -7,7 +7,7 @@
 
 services:
   miniflux:
-    image: ghcr.io/miniflux/miniflux:latest
+    image: ghcr.io/miniflux/miniflux:2.3.5
     environment:
       - SERVICE_URL_MINIFLUX
       - BASE_URL=${SERVICE_URL_MINIFLUX}

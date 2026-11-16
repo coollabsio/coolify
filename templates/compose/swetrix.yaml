@@ -70,7 +70,7 @@ services:
       start_period: 15s
 
   redis:
-    image: redis:8.2-alpine
+    image: redis:8.10-alpine
     environment:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_USER=${REDIS_USER:-default}

@@ -6,7 +6,7 @@
 
 services:
   sonarqube:
-    image: sonarqube:community
+    image: sonarqube:26.11.0.134175-community
     environment:
       - SERVICE_URL_SONARQUBE_9000
       - SONAR_JDBC_URL=jdbc:postgresql://postgresql:5432/${POSTGRES_DB:-sonar}

@@ -53,7 +53,7 @@ services:
     volumes:
       - firefly-mysql-data:/var/lib/mysql
   cron:
-    image: alpine
+    image: alpine:3.24.4
     entrypoint: ["/entrypoint.sh"]
     volumes:
       - type: bind

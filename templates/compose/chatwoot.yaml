@@ -90,7 +90,7 @@ services:
       retries: 3
 
   postgres:
-    image: pgvector/pgvector:pg12
+    image: pgvector/pgvector:0.7.4-pg12
     restart: always
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -105,7 +105,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.3-alpine
     restart: always
     command: ["sh", "-c", "redis-server --requirepass \"$SERVICE_PASSWORD_REDIS\""]
     volumes:

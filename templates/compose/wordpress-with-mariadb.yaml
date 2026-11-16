@@ -7,7 +7,7 @@
 
 services:
   wordpress:
-    image: wordpress:latest
+    image: wordpress:7.1.4
     volumes:
       - wordpress-files:/var/www/html
     environment:

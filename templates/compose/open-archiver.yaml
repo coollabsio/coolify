@@ -7,7 +7,7 @@
 
 services:
   open-archiver:
-    image: logiclabshq/open-archiver:latest
+    image: logiclabshq/open-archiver:v0.6.2
     environment:
       - SERVICE_URL_OPENARCHIVER_3000
       - ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTIONKEY}

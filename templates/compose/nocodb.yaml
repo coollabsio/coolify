@@ -7,7 +7,7 @@
 
 services:
   nocodb:
-    image: nocodb/nocodb
+    image: nocodb/nocodb:2026.10.1
     environment:
       - SERVICE_URL_NOCODB_8080
     volumes:

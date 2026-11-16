@@ -7,7 +7,7 @@
 
 services:
   codimd:
-    image: nabo.codimd.dev/hackmdio/hackmd:latest
+    image: nabo.codimd.dev/hackmdio/hackmd:2.6.1
     environment:
       - SERVICE_URL_CODIMD_3000
       - CMD_DOMAIN=${SERVICE_FQDN_CODIMD}

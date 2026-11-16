@@ -7,7 +7,7 @@
 
 services:
   yamtrack:
-    image: ghcr.io/fuzzygrim/yamtrack
+    image: ghcr.io/fuzzygrim/yamtrack:0.26.3
     environment:
       - SERVICE_URL_YAMTRACK_8000
       - URLS=${SERVICE_URL_YAMTRACK}

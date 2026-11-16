@@ -7,7 +7,7 @@
 
 services:
   elasticsearch:
-    image: 'elastic/elasticsearch:9.1.2'
+    image: 'elastic/elasticsearch:9.5.5'
     environment:
       - ELASTIC_USER=elastic # Default built-in superuser (can't be changed); included here to avoid confusion about the username
       - 'ELASTIC_PASSWORD=${SERVICE_PASSWORD_ELASTICSEARCH}'
@@ -26,7 +26,7 @@ services:
       timeout: 10s
       retries: 24
   kibana:
-    image: 'kibana:9.1.2'
+    image: 'kibana:9.5.5'
     environment:
       - SERVICE_URL_KIBANA_5601
       - 'KIBANA_PASSWORD=${SERVICE_PASSWORD_KIBANA}'
@@ -53,7 +53,7 @@ services:
       timeout: 10s
       retries: 120
   kibana-token-generator:
-    image: 'alpine:latest'
+    image: 'alpine:3.24.4'
     depends_on:
       elasticsearch:
         condition: service_healthy

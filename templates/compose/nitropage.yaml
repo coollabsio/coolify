@@ -7,7 +7,7 @@
 
 services:
   nitropage:
-    image: nitropage/nitropage:sqlite
+    image: nitropage/nitropage:0.70.3-sqlite
     environment:
       - SERVICE_URL_NITROPAGE_3000
       - NP_AUTH_SALT=${SERVICE_BASE64_SALT}

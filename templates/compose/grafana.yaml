@@ -7,7 +7,7 @@
 
 services:
   grafana:
-    image: grafana/grafana-oss
+    image: grafana/grafana-oss:13.0.2
     environment:
       - SERVICE_URL_GRAFANA_3000
       - GF_SERVER_ROOT_URL=${SERVICE_URL_GRAFANA}

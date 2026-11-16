@@ -7,7 +7,7 @@
 
 services:
   next-image-transformation:
-    image: ghcr.io/coollabsio/next-image-transformation:latest
+    image: ghcr.io/coollabsio/next-image-transformation:0.0.3
     environment:
       - SERVICE_URL_TRANSFORMATION_3000
       - NODE_ENV=production

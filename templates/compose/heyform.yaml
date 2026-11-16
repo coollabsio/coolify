@@ -7,7 +7,7 @@
 
 services:
   heyform:
-    image: heyform/community-edition:latest
+    image: heyform/community-edition:v3.0.6
     volumes:
       - heyform-assets:/app/static/upload
     depends_on:

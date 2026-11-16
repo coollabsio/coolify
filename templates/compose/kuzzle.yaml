@@ -28,7 +28,7 @@ services:
       nofile: 65536
 
   kuzzle:
-    image: kuzzleio/kuzzle:latest
+    image: kuzzleio/kuzzle:2.61.2
     environment:
       - SERVICE_URL_KUZZLE_7512
       - kuzzle_services__storageEngine__client__node=http://elasticsearch:9200

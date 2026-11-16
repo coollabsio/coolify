@@ -7,7 +7,7 @@
 
 services:
   denokv:
-    image: ghcr.io/denoland/denokv:latest
+    image: ghcr.io/denoland/denokv:0.14.0
     environment:
       - 'ACCESS_TOKEN=${SERVICE_PASSWORD_DENOKV}'
       - SERVICE_URL_DENOKV_4512

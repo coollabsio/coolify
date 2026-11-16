@@ -8,7 +8,7 @@
 
 services:
   mattermost:
-    image: mattermost/mattermost-team-edition:release-10
+    image: mattermost/mattermost-team-edition:10.11.26
     platform: linux/amd64
     volumes:
       - "mattermost-data-config:/mattermost/config:rw"

@@ -8,7 +8,7 @@
 
 services:
   macos:
-    image: dockurr/macos
+    image: dockurr/macos:3.12
     volumes:
       - macos-storage:/storage
     environment:

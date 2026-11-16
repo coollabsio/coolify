@@ -7,7 +7,7 @@
 
 services:
   nexus:
-    image: sonatypecommunity/nexus3
+    image: sonatypecommunity/nexus3:3.77.2
     environment:
       - SERVICE_URL_NEXUS_8081
       - NEXUS_SECURITY_RANDOMPASSWORD=false

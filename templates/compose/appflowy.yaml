@@ -7,7 +7,7 @@
 
 services:
   nginx:
-    image: nginx:1.29.2
+    image: nginx:1.31.8
     environment:
       - SERVICE_URL_ADMIN
     volumes:
@@ -333,7 +333,7 @@ services:
       - minio_data:/data
 
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.7-pg16
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-appflowy}
@@ -349,7 +349,7 @@ services:
       retries: 12
 
   redis:
-    image: redis:8.2.2-alpine3.22
+    image: redis:8.4.8-alpine3.22
     volumes:
       - "redis_data:/data"
     healthcheck:

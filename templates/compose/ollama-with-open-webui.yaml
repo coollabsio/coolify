@@ -6,7 +6,7 @@
 
 services:
   ollama-api:
-    image: "ollama/ollama:latest"
+    image: "ollama/ollama:0.40.16"
     volumes:
       - "ollama:/root/.ollama"
     healthcheck:

@@ -7,7 +7,7 @@
 
 services:
   sequin:
-    image: sequin/sequin:latest
+    image: sequin/sequin:v0.14.6
     environment:
       - SERVICE_URL_SEQUIN_7376
       - SERVER_HOST=${SERVICE_FQDN_SEQUIN}

@@ -7,7 +7,7 @@
 
 services:
   vikunja:
-    image: vikunja/vikunja
+    image: vikunja/vikunja:2.8.0
     environment:
       - SERVICE_URL_VIKUNJA
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_URL_VIKUNJA

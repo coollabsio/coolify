@@ -83,7 +83,7 @@ services:
       retries: 15
 
   postgresql:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.7-pg16
     volumes:
       - formbricks-postgresql-data:/var/lib/postgresql/data
     environment:
