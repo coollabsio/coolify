@@ -78,7 +78,7 @@ class UploadController extends BaseController
     {
         $applicationUuid = $request->input('application_uuid');
         if (filled($applicationUuid)) {
-            $application = Application::ownedByCurrentTeam()->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
+            $application = Application::query()->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
             if (! $application) {
                 return response()->json(['message' => 'Application not found.'], 404);
             }

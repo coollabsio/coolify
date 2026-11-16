@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
@@ -114,7 +116,13 @@ final class StaticSiteArchive
                     continue;
                 }
                 if ($type === 'g') {
-                    self::readData($stream, $headerSize);
+                    if ($headerSize > self::MAX_METADATA_BYTES) {
+                        self::fail('The archive has an entry with too much metadata.');
+                    }
+                    $global = self::paxRecords(self::readData($stream, $headerSize, keep: true));
+                    if (array_intersect_key($global, array_flip(['path', 'linkpath', 'size'])) !== []) {
+                        self::fail('The archive has a global header that changes entry paths or sizes.');
+                    }
 
                     continue;
                 }
@@ -245,7 +253,7 @@ final class StaticSiteArchive
 
     public static function storageDirectory(Application $application): string
     {
-        return "static-archives/{$application->uuid}";
+        return "applications/{$application->uuid}/static-archives";
     }
 
     /**
@@ -271,8 +279,13 @@ final class StaticSiteArchive
             self::fail('The upload cannot be stored. Upload the archive again.', 'upload_id');
         }
         Storage::deleteDirectory(dirname($staged));
+        $pendingCommits = ApplicationDeploymentQueue::query()
+            ->where('application_id', $application->id)
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->pluck('commit')
+            ->all();
         foreach (Storage::files($directory) as $file) {
-            if ($file !== $target) {
+            if ($file !== $target && ! in_array(basename($file), $pendingCommits, true)) {
                 Storage::delete($file);
             }
         }
