@@ -45,7 +45,10 @@ the backup schedule of a database.
    of a member and of a token apply (`VisibleThroughAccessGrants`). A resource
    of another team, or one that the grants hide, gives 404. Each submitted ID
    (project, environment, cluster, Node, GitHub App, private key, registry
-   credential, S3 storage) must belong to the team of the resource.
+   credential, S3 storage) must belong to the team of the resource. A refused
+   placement (no write access on the environment, or no `placeResource` on the
+   server) is a `NodePlacementDeniedException`, a `RuntimeException` that the
+   pages show as before, and the API answers 403.
 5. **Secrets.** A value of an environment variable, a database credential, and
    the internal database URL show only when `ApiSensitiveData` allows it (a
    team admin with a `root` or `read:sensitive` token) and the user can view
@@ -73,7 +76,10 @@ the backup schedule of a database.
   ports, move, logs, and previews (list, deploy).
 - **Cluster databases.** List, show, create (one path for each engine), update,
   delete, start, stop, restart, environment variables, and backups (list,
-  create a schedule, run now, list the runs).
+  create, change, and delete a schedule, run now, list the runs). Credentials
+  apply at the next deploy. As in v4, a changed database name (for example
+  `POSTGRES_DB`) does not change `databases_to_backup` of a schedule, because
+  the engine reads the name only for a new data volume.
 - **Cluster stacks.** List, show, create (`/template`, `/git`), update the
   Compose file, delete, deploy, start, stop, restart, environment variables, and
   services.
