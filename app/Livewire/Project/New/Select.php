@@ -145,7 +145,7 @@ class Select extends Component
         $services = get_service_templates();
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
         // Shown only when a cluster can be the destination (decision 0023).
-        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames(), $this->clustersSupportPublishedPorts(), $this->clustersSupportContainerSocket()) : [];
+        $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames(), $this->clustersSupportPublishedPorts(), $this->clustersSupportContainerSocket(), $this->clustersSupportWorkloadUser()) : [];
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap, $nodeReasons) {
             $serviceKey = (string) $key;
@@ -472,7 +472,7 @@ class Select extends Component
         }
         if (str_starts_with($type, 'one-click-service-') && $this->clusters?->isNotEmpty()) {
             $template = resolve_service_template_key(str($type)->after('one-click-service-')->value());
-            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames(), publishedPorts: $this->clustersSupportPublishedPorts(), containerSocket: $this->clustersSupportContainerSocket())[$template] ?? null;
+            $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames(), publishedPorts: $this->clustersSupportPublishedPorts(), containerSocket: $this->clustersSupportContainerSocket(), workloadUser: $this->clustersSupportWorkloadUser())[$template] ?? null;
         }
         // Clusters run Docker images, build Git repositories, databases, and one-click services; Docker servers keep their flow.
         if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) && $this->clusters?->isNotEmpty()) {
@@ -666,6 +666,12 @@ class Select extends Component
     private function clustersSupportContainerSocket(): bool
     {
         return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsContainerSocket());
+    }
+
+    /** A template with `user:` is offered when a listed cluster runs containers as that user. The cluster is checked again on create. */
+    private function clustersSupportWorkloadUser(): bool
+    {
+        return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsWorkloadUser());
     }
 
     public function loadServers()

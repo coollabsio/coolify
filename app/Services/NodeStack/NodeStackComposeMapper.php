@@ -29,6 +29,9 @@ class NodeStackComposeMapper
     /** Sentinel limit of `workload.container_socket.v1`. */
     public const MAX_CONTAINER_SOCKET_PATHS = 4;
 
+    /** The rule of Sentinel for `user` (`workload.user.v1`): a name or a uid, with an optional `:group` or `:gid`. */
+    public const USER_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,31})?\z/';
+
     /** Sentinel does not mount the socket under these paths. */
     private const CONTAINER_SOCKET_FORBIDDEN_PATHS = ['/proc', '/sys', '/dev', '/run/secrets'];
 
@@ -38,7 +41,6 @@ class NodeStackComposeMapper
      * without a note: Nodes name, connect, and log every container themselves.
      */
     private const IGNORED_KEYS = [
-        'user' => 'user',
         'shm_size' => 'shm_size',
         'ulimits' => 'ulimits',
         'tmpfs' => 'tmpfs',
@@ -125,7 +127,7 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $yaml
      * @param  array<string, string>  $variables  See variables().
      * @param  ?string  $gitComposeDirectory  The directory of the Compose file in its Git repository; see NodeStackCompose::build().
-     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, published_ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, container_socket_paths: list<string>, depends_on: array<string, string>, notes: list<string>}>
+     * @return list<array{service: string, image: ?string, build: ?array{context: string, dockerfile: string, args: array<string, string>, target: ?string}, command: list<string>, environment: array<string, string>, routes: list<array{scheme: string, host: string, port: int, path: string, noindex: bool}>, published_ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, health_check: ?array, restart_policy: string, volumes: list<array{name: string, path: string, key: string}>, stack_volumes: list<array{key: string, name: string, path: string, read_only: bool}>, files: list<array{path: string, content_base64: string, mode: string, directory: bool}>, container_socket_paths: list<string>, user: ?string, depends_on: array<string, string>, notes: list<string>}>
      */
     public static function services(array $yaml, array $variables, ?string $gitComposeDirectory = null, array $sharedKeys = []): array
     {
@@ -207,6 +209,7 @@ class NodeStackComposeMapper
                 'stack_volumes' => $stackVolumes,
                 'files' => $files,
                 'container_socket_paths' => $socketPaths,
+                'user' => self::user($name, $service['user'] ?? null, $variables),
                 'depends_on' => self::dependencies($service['depends_on'] ?? []),
                 'notes' => [...$notes, ...$mountNotes],
             ];
@@ -220,9 +223,9 @@ class NodeStackComposeMapper
 
     /**
      * The configuration of the first revision of a service: its command, restart policy, files,
-     * and the paths where Sentinel mounts the Podman socket of the server.
+     * the paths where Sentinel mounts the Podman socket of the server, and the user.
      *
-     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>, container_socket_paths: list<string>}  $service  One service of services().
+     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>, container_socket_paths: list<string>, user: ?string}  $service  One service of services().
      * @return array<string, mixed>
      */
     public static function revisionConfiguration(array $service): array
@@ -232,7 +235,8 @@ class NodeStackComposeMapper
             'restart_policy' => $service['restart_policy'],
             'files' => $service['files'],
             'container_socket_paths' => $service['container_socket_paths'] ?? [],
-        ], fn ($value): bool => $value !== []);
+            'user' => $service['user'] ?? null,
+        ], fn ($value): bool => $value !== [] && $value !== null);
     }
 
     /**
@@ -356,6 +360,33 @@ class NodeStackComposeMapper
             '+' => $value !== null ? self::interpolate($operand, $variables) : '',
             default => $value ?? '',
         };
+    }
+
+    /**
+     * The Compose `user:` of a service, with its variables resolved, or null for the user of the
+     * image. `1000` and `1000:1000` are a uid and a gid; `root` and `node:node` are names.
+     *
+     * @param  array<string, string>  $variables
+     *
+     * @throws RuntimeException When the value is not a name or a uid with an optional group.
+     */
+    private static function user(string $serviceName, mixed $user, array $variables): ?string
+    {
+        if ($user === null || $user === '') {
+            return null;
+        }
+        if (! is_string($user) && ! is_int($user)) {
+            throw new RuntimeException("The service {$serviceName} sets user: to a value that is not a name or a uid.");
+        }
+        $value = trim(self::interpolate((string) $user, $variables));
+        if ($value === '') {
+            return null;
+        }
+        if (preg_match(self::USER_PATTERN, $value) !== 1) {
+            throw new RuntimeException("The service {$serviceName} sets user: {$value}. Use a user name or a uid, with an optional group name or gid, for example 1000:1000.");
+        }
+
+        return $value;
     }
 
     /**

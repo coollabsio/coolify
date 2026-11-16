@@ -112,6 +112,10 @@ class CreateDeploymentOperation
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::CONTAINER_SOCKET_CAPABILITY);
             }
 
+            if (filled(data_get($revision->configuration, 'user'))) {
+                $node->ensureReportedCapability(DispatchWorkloadDeployment::USER_CAPABILITY);
+            }
+
             if ($workload->node_stack_id !== null) {
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY);
             }

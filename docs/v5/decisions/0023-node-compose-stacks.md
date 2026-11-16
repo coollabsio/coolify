@@ -355,7 +355,7 @@ two items were open in **Not decided here**. They are decided as follows.
   | `homepage` | Works, with a change | The template does not mount the socket (the line is a comment). With `- /var/run/docker.sock:/var/run/docker.sock:ro` and `my-docker: socket: /var/run/docker.sock`, `/api/docker/statuses` and `/api/docker/stats` return the container. |
   | `glances` | Not available | `privileged` and `pid: host`. Without them, `/api/4/containers` returns the containers with their stats. |
   | `beszel` | Not available | `network_mode: host` of `beszel-agent`. Without it, the hub reaches the agent through the shared volume `beszel_socket`, the system is `up`, and the hub stores the containers and their stats. |
-  | `authentik` | Works, without the Docker integration | The server and the worker run. The worker runs as uid 1000, because `user: root` is ignored, so it gets `Permission denied` on the socket. |
+  | `authentik` | Works | With `workload.user.v1`, the worker runs as root (`uid=0`). Its "Local Docker connection" is healthy and reports version 6.1.4. Before `user:` support, the worker ran as uid 1000 and got `Permission denied` on the socket. |
 
   The test found and fixed one mapping defect: a `${VAR}` without a default
   was empty when another service of the stack gives a default
@@ -371,10 +371,35 @@ two items were open in **Not decided here**. They are decided as follows.
     with `/var/run/docker.sock` and `/run/user/1000/podman/podman.sock`
     lists each container two times, once for each engine.
   - The socket is `root:root` with mode `0660`. A container that does not run
-    as root cannot use it. `user:` is not supported on Nodes yet (Sentinel
-    has no user field in `workload.deploy`), so the `user: root` of the
-    authentik worker is ignored and its Docker integration does not work.
+    as root cannot use it. A service that needs it sets `user: root`.
   - A `:ro` socket mount is read-write.
+
+### User of a service
+
+- **Sentinel.** Sentinel `99c9629` adds `user` (field 25) to
+  `workload.deploy` (capability `workload.user.v1`). Sentinel gives the value
+  to `podman run --user`. An empty value runs the user of the image. Flux
+  returns 409 when a Node without the capability gets a user.
+- **Value.** The Compose `user:` is a string or a number. Coolify resolves its
+  variables (`${UID:-1000}:${GID:-1000}` is `1000:1000`) and checks it with
+  the rule of Sentinel: a name or a uid, with an optional `:group` or `:gid`
+  (`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,31})?$`).
+  An invalid value fails the creation with the name of the service. An empty
+  value is the user of the image.
+- **Availability.** A service with `user:` can run when every usable Node of
+  the cluster reports the capability (`NodeCluster::supportsWorkloadUser()`).
+  Else the reason is "sets user:, which needs Sentinel with workload.user.v1
+  on every server of the cluster". Before, Coolify ignored `user:` with a
+  note.
+- **Revision.** `user` is part of the revision configuration, and the sync of
+  a Git stack owns it. `DispatchWorkloadDeployment` sends it only when it is
+  set, and the deploy requires the capability on the Node. A cluster
+  application without a stack has no `user` and does not change.
+- **Checks.** `authentik` (spread): the worker runs as root and its Docker
+  connection is healthy. `redlib` with `user: "${UID:-1000}:${GID:-1000}"`
+  instead of `nobody`, and without `security_opt`: the process runs as uid
+  1000 and gid 1000, and `/settings` returns 200. Its health check of `/`
+  fails, because Reddit does not return its JSON to the dev server.
 
 ### Placement on several Nodes
 

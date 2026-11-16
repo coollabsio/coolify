@@ -25,7 +25,7 @@ use RuntimeException;
 final readonly class NodeStackComposeDiff
 {
     /** The keys of a revision configuration that the Compose file owns. */
-    private const REVISION_KEYS = ['command', 'restart_policy', 'files', 'container_socket_paths'];
+    private const REVISION_KEYS = ['command', 'restart_policy', 'files', 'container_socket_paths', 'user'];
 
     /**
      * @param  list<array<string, mixed>>  $added  The services of the new file without a workload; see NodeStackComposeMapper::services().

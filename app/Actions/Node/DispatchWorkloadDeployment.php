@@ -7,6 +7,7 @@ use App\Enums\NodeWorkloadAction;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
+use App\Services\NodeStack\NodeStackComposeMapper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -31,6 +32,9 @@ class DispatchWorkloadDeployment
 
     /** Sentinel bind-mounts the Podman socket of the server at `container_socket_paths` (decision 0023). */
     public const CONTAINER_SOCKET_CAPABILITY = 'workload.container_socket.v1';
+
+    /** Sentinel runs the container process as `user`, the Compose `user:` (decision 0023). */
+    public const USER_CAPABILITY = 'workload.user.v1';
 
     /** Sentinel sets the uid, gid, and mode of a secret file (decision 0008 amendment). */
     public const SECRET_OWNER_CAPABILITY = 'workload.secrets.owner.v1';
@@ -96,6 +100,11 @@ class DispatchWorkloadDeployment
             // Flux refuses the field without the capability; check it here for a clear message.
             $operation->node->ensureReportedCapability(self::CONTAINER_SOCKET_CAPABILITY);
         }
+        $user = $configuration['user'] ?? '';
+        if ($user !== '') {
+            // An older Sentinel ignores the field and would start the container as the user of the image.
+            $operation->node->ensureReportedCapability(self::USER_CAPABILITY);
+        }
         $stack = $operation->workload->stack;
         $dnsSearch = $stack === null || $operation->node->node_cluster_id === null ? [] : [$stack->searchDomain()];
         if ($dnsSearch !== []) {
@@ -154,6 +163,7 @@ class DispatchWorkloadDeployment
                 ...($secrets === [] ? [] : ['secrets' => $secrets]),
                 ...($files === [] ? [] : ['files' => $files]),
                 ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
+                ...($user === '' ? [] : ['user' => $user]),
                 ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
                 ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
                 ...($healthCheck === null ? [] : ['health_check' => [
@@ -308,6 +318,7 @@ class DispatchWorkloadDeployment
             'files.*.content_base64' => ['present', 'string', 'max:1398104'],
             'files.*.mode' => ['present', 'string', 'regex:/\\A(0?[0-7]{3})?\\z/'],
             'files.*.directory' => ['required', 'boolean'],
+            'user' => ['sometimes', 'string', 'regex:'.NodeStackComposeMapper::USER_PATTERN],
             'container_socket_paths' => ['sometimes', 'array', 'max:4'],
             'container_socket_paths.*' => ['string', 'max:4096', 'distinct', 'starts_with:/', 'not_regex:/[,:\\x00]/'],
             'health_check' => ['sometimes', 'array:command,description,interval_seconds,timeout_seconds,retries,start_period_seconds'],

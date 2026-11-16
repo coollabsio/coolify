@@ -315,6 +315,18 @@ class NodeCluster extends BaseModel
     }
 
     /**
+     * Whether every usable server of the cluster runs a container as the Compose `user:`. Services
+     * of a stack can run on any server of the cluster, and Flux refuses the deploy on a server
+     * without it.
+     */
+    public function supportsWorkloadUser(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(DispatchWorkloadDeployment::USER_CAPABILITY) === true);
+    }
+
+    /**
      * The host ports that the Nodes of the cluster use, with what uses them (decision 0016). A
      * published port cannot take them, on TCP or UDP. Sentinel refuses the same ports, and it refuses
      * the full firewall reconcile for one of them.
