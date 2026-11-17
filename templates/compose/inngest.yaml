@@ -7,7 +7,7 @@
 
 services:
   inngest:
-    image: 'inngest/inngest:v1.27.0'
+    image: 'inngest/inngest:v1.53.0'
     command: 'inngest start --host 0.0.0.0'
     environment:
       - SERVICE_URL_INNGEST_8288

@@ -46,11 +46,15 @@ it('shows Sentinel status independently of optional metrics', function (bool $me
         ->assertSeeLivewire(GetLogs::class);
 })->with([false, true])->with([false, true]);
 
-it('does not offer Sentinel controls or logs on unsupported servers', function (string $setting) {
-    $this->server->settings()->update([$setting => true]);
+it('does not offer Sentinel controls or logs on unsupported servers', function (array $settings) {
+    $this->server->settings()->update($settings);
 
     Livewire::withQueryParams(['server_uuid' => $this->server->uuid])
         ->test(Logs::class)
         ->assertDontSee('Enable Sentinel')
         ->assertDontSeeLivewire(GetLogs::class);
-})->with(['is_build_server', 'is_swarm_manager', 'is_swarm_worker']);
+})->with([
+    'build server' => [['server_role' => 'build', 'is_build_server' => true]],
+    'swarm manager' => [['is_swarm_manager' => true]],
+    'swarm worker' => [['is_swarm_worker' => true]],
+]);

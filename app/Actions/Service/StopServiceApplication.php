@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -18,6 +19,7 @@ class StopServiceApplication
         $service = $serviceApplication->service;
         $server = $service->destination->server;
         $containerName = escapeshellarg($serviceApplication->name.'-'.$service->uuid);
+        NotifyResourceStoppedJob::expectStop($serviceApplication);
 
         if ($removeContainer) {
             $commands = ["docker rm -f {$containerName}"];

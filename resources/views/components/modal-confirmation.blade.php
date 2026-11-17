@@ -27,6 +27,9 @@
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
     'temporaryDisableTwoStepConfirmation' => false,
+    // Accepted so that callers' canGate/canResource are not rendered as HTML attributes (the model would leak as JSON).
+    'canGate' => null,
+    'canResource' => null,
 ])
 
 @php
@@ -34,7 +37,7 @@
     use Illuminate\View\ComponentSlot;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
-    // Skip ONLY password confirmation for OAuth users (they have no password)
+    // Skip ONLY the password step (disabled globally, OAuth users, users without a password, or recently confirmed)
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
@@ -44,9 +47,11 @@
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
     // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
     $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
+    // Show a loading state on the trigger button while the submit action runs (needs Livewire updates, so not with wire:ignore).
+    $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
-<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
+<div {{ $attributes }} {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -66,20 +71,25 @@
     dispatchAction: @js($dispatchAction),
     submitting: false,
     passwordError: '',
+    checkboxIds: @js(collect($checkboxes)->pluck('id')->values()->all()),
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
     dispatchEventType: @js($dispatchEventType),
     dispatchEventMessage: @js($dispatchEventMessage),
     disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
     skipPasswordConfirmation: @js($skipPasswordConfirmation),
-    resetModal() {
+    // A successful submit already re-rendered the component. Refreshing again
+    // after it can hit an ended session, for example after an account deletion.
+    resetModal(refresh = true) {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
         this.submitting = false;
         this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
-        $wire.$refresh();
+        if (refresh) {
+            $wire.$refresh();
+        }
     },
     step1ButtonText: @js($step1ButtonText),
     step2ButtonText: @js($effectiveStep2ButtonText),
@@ -97,14 +107,15 @@
                 return Promise.resolve(this.passwordError);
             }
         }
+        // The checkboxes are not bound with wire:model, so send their state with the call.
+        // Methods that read the properties (for example stop() with $docker_cleanup) get what the user saw.
+        this.checkboxIds.forEach(id => $wire.$set(id, this.selectedActions.includes(id), false));
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
             return Promise.resolve(true);
         }
 
-        const methodName = this.submitAction.split('(')[0];
-        const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const { method: methodName, params } = window.parseModalSubmitAction(this.submitAction);
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods
@@ -123,11 +134,9 @@
                 }
             });
     },
-    toggleAction(id) {
-        const index = this.selectedActions.indexOf(id);
-        if (index > -1) {
-            this.selectedActions.splice(index, 1);
-        } else {
+    setAction(id, checked) {
+        this.selectedActions = this.selectedActions.filter(selectedId => selectedId !== id);
+        if (checked) {
             this.selectedActions.push(id);
         }
     }
@@ -167,41 +176,41 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button class="w-full" :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError @click="modalOpen=true">
+                    <x-forms.button class="w-full" isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError @click="modalOpen=true">
+                    <x-forms.button isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target="{{ $triggerWireTarget }}">
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
@@ -233,15 +242,15 @@
                         <x-reicon name="x" class="size-4" />
                     </button>
                 </header>
-                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                    style="-webkit-overflow-scrolling: touch;">
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
-                                        x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
+                                        :domValue="$checkbox['id']" autocomplete="off"
+                                        x-on:change="setAction('{{ $checkbox['id'] }}', $event.target.checked)" :checked="$this->{$checkbox['id']}"
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
                             @endforeach
@@ -263,21 +272,21 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                    <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                    <span class="shrink-0" aria-hidden="true">-</span>
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                        <span class="shrink-0" aria-hidden="true">-</span>
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                            <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                            <span class="shrink-0" aria-hidden="true">-</span>
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>
@@ -292,17 +301,8 @@
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
                                         <div class="relative">
                                             <input type="text" x-model="decodedText" readonly class="input">
-                                            <button x-show="window.isSecureContext"
-                                                @click.prevent="navigator.clipboard.writeText(decodedText); $el.innerHTML = '<svg class=\'w-5 h-5 text-green-500\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\' /></svg>'; setTimeout(() => $el.innerHTML = '<svg class=\'w-5 h-5\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\' /></svg>', 1000)"
-                                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
-                                                title="Copy to clipboard">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                </svg>
-                                            </button>
+                                            <x-copy-button resolve="decodedText"
+                                                class="absolute top-1/2 right-2 -translate-y-1/2" />
                                         </div>
                                     </div>
 
@@ -343,7 +343,7 @@
                                         $nextTick(() => {
                                             submitForm().then((result) => {
                                                 submitting = false;
-                                                resetModal();
+                                                resetModal(result !== true);
                                             }).catch(() => {
                                                 submitting = false;
                                                 modalOpen = true;
@@ -371,13 +371,17 @@
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Your Password
                                 </label>
-                                <form @submit.prevent="false" @keydown.enter.prevent>
-                                    <input type="text" name="username" autocomplete="username"
-                                        value="{{ auth()->user()->email }}" style="display: none;">
-                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}"
-                                        x-model="password" class="w-full input" placeholder="Enter your password"
-                                        autocomplete="current-password">
-                                </form>
+                                {{-- Add the field when this step shows: password managers do not detect a hidden field that becomes visible. --}}
+                                <template x-if="step === 3">
+                                    <form @submit.prevent="false" @keydown.enter.prevent>
+                                        <input type="text" name="username" autocomplete="username"
+                                            value="{{ auth()->user()->email }}" style="display: none;">
+                                        <input type="password" id="password-confirm-{{ $passwordConfirm }}"
+                                            x-model="password" x-init="$nextTick(() => $el.focus())"
+                                            class="w-full input" placeholder="Enter your password"
+                                            autocomplete="current-password">
+                                    </form>
+                                </template>
                                 <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
                                 </p>
                                 @error('password')
@@ -401,7 +405,7 @@
                                         submitForm().then((result) => {
                                             submitting = false;
                                             if (result === true) {
-                                                resetModal();
+                                                resetModal(false);
                                             } else {
                                                 modalOpen = true;
                                                 passwordError = result;

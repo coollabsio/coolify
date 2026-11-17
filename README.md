@@ -82,7 +82,7 @@ Coolify is fully free and open source, as described in our [philosophy](https://
 | Area | Highlights |
 | :--- | :--- |
 | **Deploy** | Any stack via Railpack, Dockerfile or Compose, with auto-deploy, PR previews, rolling updates & rollbacks |
-| **Databases & services** | Deploy Postgres, MongoDB, Redis & more, plus 340+ one-click services |
+| **Databases & services** | Deploy Postgres, MongoDB, Redis & more, plus 360+ one-click services |
 | **Networking** | Reverse proxy with automatic HTTPS, custom domains & isolated Docker networks |
 | **Servers** | Manage unlimited servers over SSH, or provision new ones from hosting providers |
 | **Monitor** | Real-time metrics, logs, web terminal & health checks |
@@ -127,8 +127,6 @@ Thank you for your support!
 
 | Sponsor | Description |
 | :--- | :--- |
-| [CubePath](https://cubepath.com/coolify) | Premium dedicated servers and cloud VPS hosting |
-| [Context.dev](https://www.context.dev/) | Web scraping API for AI agents |
 | [Ginernet](https://ginernet.com/) | Hosting powerful servers in Spain |
 | [SerpAPI](https://serpapi.com) | Google Search API — Scrape Google and other search engines from our fast, easy, and complete API. |
 | [MVPS](https://www.mvps.net) | Cheap VPS servers at the highest possible quality |
@@ -153,7 +151,6 @@ Thank you for your support!
 | [Logto](https://logto.io) | The better identity infrastructure for developers |
 | [Supadata](https://supadata.ai/) | Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. |
 | [Tolgee](https://tolgee.io) | The open source localization platform |
-| [Best Consultant](https://bc.direct) | Your trusted technology consulting partner |
 | [ArcJet](https://arcjet.com) | Advanced web security and performance solutions |
 | [SupaGuide](https://supa.guide) | Your comprehensive guide to Supabase |
 | [CodeRabbit](https://coderabbit.ai) | Cut Code Review Time & Bugs in Half |
@@ -174,22 +171,21 @@ Thank you for your support!
 | [American Cloud](https://americancloud.com) | US-based cloud infrastructure services |
 | [Greptile](https://www.greptile.com) | The AI Code Reviewer |
 | [VPSDime](https://vpsdime.com/) | Cheap VPS Hosting - 4GB for $5/month |
-| [dataforest Cloud](https://cloud.dataforest.net/en) | Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany. |
 | [ISHosting](https://ishosting.com/) | Hosting and VPS solutions |
-| [PetroSky Cloud](https://petrosky.io) | Open source cloud deployment solutions |
-| [QuickSrv](https://quicksrv.io/) | Fast and reliable server hosting |
+| [NodePlus.ai](https://nodeplus.ai/) | AI that reads every system your business runs on |
+| [Groundmail](https://groundmail.dev/lp/coolify/?utm_source=github&utm_medium=readme&utm_campaign=coollabsio-coolify) | Email API and SMTP relay for the apps you deploy |
 
 <br />
 
 ### Small Sponsors
 
+<a href="https://serverside.com/?utm_source=coolify.io"><img width="60px" alt="Serverside" src="https://cdn.coollabs.io/sponsors/serverside.svg"/></a>
 <a href="https://darkvps.pro"><img width="60px" alt="DarkVPS" src="https://cdn.coollabs.io/sponsors/darkvps.png"/></a>
 <a href="https://www.opensourcealternatives.to"><img width="60px" alt="Open Source Alternatives" src="https://cdn.coollabs.io/sponsors/opensourcealternatives.png"/></a>
 <a href="https://onserva.com/"><img width="60px" alt="Onserva" src="https://onserva.com/icon.svg"/></a>
 <a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://cdn.coollabs.io/sponsors/movavi.png"/></a>
 <a href="https://usefoil.com/"><img width="60px" alt="ABXY" src="https://usefoil.com/favicon.svg"/></a>
 <a href="https://www.launchfa.st/?utm_source=coolify.io"><img width="60px" alt="LaunchFast Boilerplates" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
-<a href="https://vanaways.co.uk/?utm_source=coolify.io"><img width="60px" alt="Vanaways" src="https://github.com/Vanaways.png"/></a>
 <a href="https://www.netrouting.com/?utm_source=coolify.io"><img width="60px" alt="Netrouting" src="https://github.com/netroutingcom.png"/></a>
 <a href="https://github.com/mindedtech"><img width="60px" alt="MindEd Tech" src="https://github.com/mindedtech.png"/></a>
 <a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
@@ -201,7 +197,6 @@ Thank you for your support!
 <a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
 <a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
 <a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
-<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
 <a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
 <a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
 <a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>
@@ -221,7 +216,6 @@ Thank you for your support!
 <a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
 <a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://cdn.coollabs.io/sponsors/linkdr.svg"/></a>
 <a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://cdn.coollabs.io/sponsors/arvensis.png"/></a>
-<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://cdn.coollabs.io/sponsors/reshotai.png"/></a>
 <a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://cdn.coollabs.io/sponsors/runpod.svg"/></a>
 <a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
@@ -229,6 +223,9 @@ Thank you for your support!
 <a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://cdn.coollabs.io/sponsors/interviewpal.svg"/></a>
 <a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
+<a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
+<a href="https://bragly.io"><img width="60px" alt="Bragly" src="https://cdn.coollabs.io/sponsors/bragly.png"/></a>
+<a href="https://github.com/vaultbase-sh"><img width="60px" alt="vaultbase.sh" src="https://github.com/vaultbase-sh.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 

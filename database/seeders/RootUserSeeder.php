@@ -25,12 +25,15 @@ class RootUserSeeder extends Seeder
                 return;
             }
 
+            // The installer writes an empty ROOT_USERNAME line, so an empty value must also use the default.
+            $username = env('ROOT_USERNAME') ?: 'Root User';
+
             $validator = Validator::make([
                 'email' => env('ROOT_USER_EMAIL'),
-                'username' => env('ROOT_USERNAME', 'Root User'),
+                'username' => $username,
                 'password' => env('ROOT_USER_PASSWORD'),
             ], [
-                'email' => ['required', 'email:rfc,dns', 'max:255'],
+                'email' => ['required', 'email', 'max:255'],
                 'username' => ['required', 'string', 'min:3', 'max:255', 'regex:/^[\w\s-]+$/'],
                 'password' => ['required', 'string', 'min:8', Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised()],
             ]);
@@ -48,7 +51,7 @@ class RootUserSeeder extends Seeder
             try {
                 $user = (new User)->forceFill([
                     'id' => 0,
-                    'name' => env('ROOT_USERNAME', 'Root User'),
+                    'name' => $username,
                     'email' => env('ROOT_USER_EMAIL'),
                     'password' => Hash::make(env('ROOT_USER_PASSWORD')),
                 ]);

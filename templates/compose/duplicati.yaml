@@ -7,7 +7,7 @@
 
 services:
   duplicati:
-    image: lscr.io/linuxserver/duplicati:latest
+    image: lscr.io/linuxserver/duplicati:v2.4.1.0_stable_2026-10-29-ls318
     environment:
       - SERVICE_URL_DUPLICATI_8200
       - PUID=1000

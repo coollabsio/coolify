@@ -2,8 +2,24 @@
 
 use App\Models\GithubApp;
 
+/**
+ * The seeded "Public GitHub" source (id 0), built in memory so the test needs no database.
+ */
+function publicGithubAppForGitUrlTests(): GithubApp
+{
+    return (new GithubApp)->forceFill([
+        'id' => 0,
+        'name' => 'Public GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'is_public' => true,
+    ]);
+}
+
 test('convertGitUrlsForDeployKeyAndGithubAppAndHttpUrl', function () {
-    $githubApp = GithubApp::find(0);
+    $githubApp = publicGithubAppForGitUrlTests();
     $result = convertGitUrl('andrasbacsai/coolify-examples.git', 'deploy_key', $githubApp);
     expect($result)->toBe([
         'repository' => 'git@github.com:andrasbacsai/coolify-examples.git',
@@ -13,7 +29,7 @@ test('convertGitUrlsForDeployKeyAndGithubAppAndHttpUrl', function () {
 });
 
 test('convertGitUrlsForDeployKeyAndGithubAppAndSshUrl', function () {
-    $githubApp = GithubApp::find(0);
+    $githubApp = publicGithubAppForGitUrlTests();
     $result = convertGitUrl('git@github.com:andrasbacsai/coolify-examples.git', 'deploy_key', $githubApp);
     expect($result)->toBe([
         'repository' => 'git@github.com:andrasbacsai/coolify-examples.git',
@@ -110,5 +126,13 @@ test('convertGitUrlsForDeployKeyAndGithubAppWithCustomPortAndIpv6Host', function
     expect($result)->toBe([
         'repository' => 'ssh://git@[2001:db8::10]:22222/andrasbacsai/coolify-examples.git',
         'port' => '22222',
+    ]);
+});
+
+test('convertGitUrlsForDeployKeyAndIpv6SshUrlWithPort', function () {
+    $result = convertGitUrl('git@[fd00::5]:2222/organization/repository.git', 'deploy_key', null);
+    expect($result)->toBe([
+        'repository' => 'git@[fd00::5]:organization/repository.git',
+        'port' => '2222',
     ]);
 });

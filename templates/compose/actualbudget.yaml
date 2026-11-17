@@ -7,7 +7,7 @@
 
 services:
   actual_server:
-    image: actualbudget/actual-server:latest
+    image: actualbudget/actual-server:26.11.0
     environment:
       - SERVICE_URL_ACTUAL_5006
       - ACTUAL_LOGIN_METHOD=password

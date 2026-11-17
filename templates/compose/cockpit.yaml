@@ -7,7 +7,9 @@
 
 services:
   cockpit:
-    image: cockpithq/cockpit:core-latest
+    image: cockpithq/cockpit:core-2.14.1
+    environment:
+      - SERVICE_URL_COCKPIT_80
     volumes:
       - cockpit-config:/var/www/html/config
       - cockpit-spaces:/var/www/html/.spaces

@@ -7,14 +7,21 @@
 
 services:
   weblate:
-    image: weblate/weblate:latest
+    image: weblate/weblate:2026.11.2.0
     environment:
       - SERVICE_URL_WEBLATE_8080
       - WEBLATE_SITE_DOMAIN=$SERVICE_FQDN_WEBLATE
       - WEBLATE_ADMIN_NAME=${WEBLATE_ADMIN_NAME:-Admin}
       - WEBLATE_ADMIN_EMAIL=${WEBLATE_ADMIN_EMAIL:-admin@example.com}
       - WEBLATE_ADMIN_PASSWORD=$SERVICE_PASSWORD_WEBLATE
-      - DEFAULT_FROM_EMAIL=${WEBLATE_ADMIN_EMAIL:-admin@example.com}
+      - WEBLATE_SERVER_EMAIL=${WEBLATE_SERVER_EMAIL:-admin@example.com}
+      - WEBLATE_DEFAULT_FROM_EMAIL=${WEBLATE_DEFAULT_FROM_EMAIL:-admin@example.com}
+      - WEBLATE_EMAIL_HOST=${WEBLATE_EMAIL_HOST:-localhost}
+      - WEBLATE_EMAIL_PORT=${WEBLATE_EMAIL_PORT:-587}
+      - WEBLATE_EMAIL_HOST_USER=${WEBLATE_EMAIL_HOST_USER}
+      - WEBLATE_EMAIL_HOST_PASSWORD=${WEBLATE_EMAIL_HOST_PASSWORD}
+      - WEBLATE_EMAIL_USE_TLS=${WEBLATE_EMAIL_USE_TLS:-true}
+      - WEBLATE_EMAIL_USE_SSL=${WEBLATE_EMAIL_USE_SSL:-false}
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_DATABASE=${POSTGRES_DB:-weblate}
@@ -32,9 +39,9 @@ services:
       timeout: 10s
       retries: 30
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - postgresql-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
@@ -45,7 +52,7 @@ services:
       timeout: 20s
       retries: 10
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:9-alpine
     command: >
       --appendonly yes --requirepass ${SERVICE_PASSWORD_REDIS}
     environment:

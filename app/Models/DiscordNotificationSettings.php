@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class DiscordNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -32,6 +33,7 @@ class DiscordNotificationSettings extends Model
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
         'traefik_outdated_discord_notifications',
+        'image_vulnerabilities_discord_notifications',
         'discord_ping_enabled',
     ];
 
@@ -57,6 +59,7 @@ class DiscordNotificationSettings extends Model
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
         'traefik_outdated_discord_notifications' => 'boolean',
+        'image_vulnerabilities_discord_notifications' => 'boolean',
         'discord_ping_enabled' => 'boolean',
     ];
 
@@ -73,5 +76,15 @@ class DiscordNotificationSettings extends Model
     public function isPingEnabled()
     {
         return $this->discord_ping_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Discord';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->discord_enabled = false;
     }
 }

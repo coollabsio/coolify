@@ -10,7 +10,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListDeployments extends Tool
 {
     protected string $name = 'list_deployments';
@@ -118,6 +120,7 @@ class ListDeployments extends Tool
             'force_rebuild' => $deployment->force_rebuild,
             'is_webhook' => $deployment->is_webhook,
             'is_api' => $deployment->is_api,
+            'is_mcp' => $deployment->is_mcp,
             'deployment_url' => $deployment->deployment_url,
             'created_at' => $deployment->created_at,
             'updated_at' => $deployment->updated_at,

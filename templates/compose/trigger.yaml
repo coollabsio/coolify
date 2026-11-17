@@ -7,7 +7,7 @@
 
 services:
   trigger:
-    image: ghcr.io/triggerdotdev/trigger.dev:v4.3.0
+    image: ghcr.io/triggerdotdev/trigger.dev:v4.8.5
     # Root user is required for bootstrap and shared volume permissions
     # See: https://github.com/triggerdotdev/trigger.dev/blob/main/hosting/docker/webapp/docker-compose.yml
     user: root
@@ -15,9 +15,9 @@ services:
       sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
     environment:
       - SERVICE_URL_TRIGGER_3000
-      - APP_ORIGIN=${SERVICE_URL_TRIGGER_3000}
-      - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER_3000}
-      - API_ORIGIN=${SERVICE_URL_TRIGGER_3000}
+      - APP_ORIGIN=${SERVICE_URL_TRIGGER}
+      - LOGIN_ORIGIN=${SERVICE_URL_TRIGGER}
+      - API_ORIGIN=${SERVICE_URL_TRIGGER}
       - SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
       - MAGIC_LINK_SECRET=${SERVICE_PASSWORD_64_MAGICLINK}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
@@ -88,7 +88,7 @@ services:
         condition: service_healthy
 
   supervisor:
-    image: ghcr.io/triggerdotdev/supervisor:v4.3.0
+    image: ghcr.io/triggerdotdev/supervisor:v4.8.5
     user: root
     command: |
       sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
@@ -126,7 +126,7 @@ services:
         condition: service_healthy
 
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.4.2
+    image: tecnativa/docker-socket-proxy:v0.5.0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -177,7 +177,7 @@ services:
       retries: 5
 
   electric:
-    image: electricsql/electric:1.2.9
+    image: electricsql/electric:1.8.1
     environment:
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-trigger-db}?sslmode=disable
       - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
@@ -196,7 +196,7 @@ services:
         condition: service_healthy
 
   clickhouse:
-    image: clickhouse/clickhouse-server:25.8
+    image: clickhouse/clickhouse-server:26.2
     environment:
       - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
       - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}

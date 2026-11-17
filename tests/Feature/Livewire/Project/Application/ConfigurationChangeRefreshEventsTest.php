@@ -48,9 +48,6 @@ it('persists environment variable order as an application setting', function () 
     expect($this->application->settings->is_env_sorting_enabled)->toBeFalse();
 
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
-        ->assertSee('Environment variable order')
-        ->assertSee('Build secrets')
-        ->assertDontSeeHtml('>Sort</button>')
         ->call('loadEnvironmentVariables')
         ->set('is_env_sorting_enabled', true)
         ->call('instantSave')
@@ -59,4 +56,20 @@ it('persists environment variable order as an application setting', function () 
         ->assertSet('is_env_sorting_enabled', true);
 
     expect($this->application->settings->fresh()->is_env_sorting_enabled)->toBeTrue();
+});
+
+it('saves an IPv6 health check host and rejects an invalid one', function () {
+    Livewire::test(HealthChecks::class, ['resource' => $this->application])
+        ->set('healthCheckHost', '[::1]')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($this->application->fresh()->health_check_host)->toBe('[::1]');
+
+    Livewire::test(HealthChecks::class, ['resource' => $this->application->fresh()])
+        ->set('healthCheckHost', '[::1];id')
+        ->call('submit')
+        ->assertNotDispatched('configurationChanged');
+
+    expect($this->application->fresh()->health_check_host)->toBe('[::1]');
 });

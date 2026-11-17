@@ -10,10 +10,11 @@
     $styles = [
         'warning' => [
             'icon' => 'alert-triangle',
-            'shell' => 'border-warning/25 bg-warning/[0.07] dark:border-warning/20 dark:bg-warning/[0.06]',
-            'iconClass' => 'text-warning-700 dark:text-warning',
-            'titleClass' => 'text-warning-900 dark:text-warning',
-            'textClass' => 'text-warning-900/75 dark:text-warning/70',
+            // Numbered warning shades: the custom theme maps the plain warning color to its accent.
+            'shell' => 'border-warning-700/25 bg-warning-700/[0.07] dark:border-warning-400/20 dark:bg-warning-400/[0.06]',
+            'iconClass' => 'text-warning-700 dark:text-warning-400',
+            'titleClass' => 'text-warning-900 dark:text-warning-400',
+            'textClass' => 'text-warning-900/75 dark:text-warning-400/70',
         ],
         'danger' => [
             'icon' => 'alert-circle',
@@ -24,9 +25,9 @@
         ],
         'info' => [
             'icon' => 'info-circle',
-            'shell' => 'border-coollabs/20 bg-coollabs/[0.055] dark:border-warning/15 dark:bg-warning/[0.045]',
-            'iconClass' => 'text-coollabs dark:text-warning',
-            'titleClass' => 'text-coollabs dark:text-warning',
+            'shell' => 'border-coollabs/20 bg-coollabs/[0.055] dark:border-brand-light/15 dark:bg-brand/[0.06]',
+            'iconClass' => 'text-coollabs dark:text-brand-light',
+            'titleClass' => 'text-coollabs dark:text-brand-light',
             'textClass' => 'text-neutral-600 dark:text-fg-dim',
         ],
         'success' => [

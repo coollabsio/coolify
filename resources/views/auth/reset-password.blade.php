@@ -20,9 +20,9 @@
                 @csrf
                 <input hidden id="token" name="token" value="{{ request()->route('token') }}">
                 <input hidden value="{{ request()->query('email') }}" type="email" name="email" />
-                <x-forms.input required type="password" id="password" name="password" autocomplete="new-password"
+                <x-forms.input required type="password" :copyable="false" id="password" name="password" autocomplete="new-password"
                     autofocus label="{{ __('input.password') }}" />
-                <x-forms.input required type="password" id="password_confirmation" name="password_confirmation"
+                <x-forms.input required type="password" :copyable="false" id="password_confirmation" name="password_confirmation"
                     autocomplete="new-password" label="{{ __('input.password.again') }}" />
 
                 <div class="auth-guidance">

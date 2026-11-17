@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\User;
 use App\Models\WebhookNotificationSettings;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Once;
 
@@ -35,6 +36,13 @@ beforeEach(function () {
 
     $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
+
+    // Webhook URLs and the SMTP host are resolved during validation: answer without DNS.
+    SafeWebhookUrl::resolveHostsUsing(fn (): array => ['93.184.216.34']);
+});
+
+afterEach(function () {
+    SafeWebhookUrl::resolveHostsUsing(null);
 });
 
 function authHeaders(string $token): array
@@ -190,6 +198,31 @@ describe('PATCH /api/v1/notifications/*', function () {
             ->and($settings->smtp_ehlo_domain)->toBe('coolify.example.com')
             ->and($settings->smtp_port)->toBe(587)
             ->and($settings->deployment_failure_email_notifications)->toBeFalse();
+    });
+
+    test('updates the deployment commit details email setting', function () {
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->getJson('/api/v1/notifications/email')
+            ->assertSuccessful()
+            ->assertJsonPath('deployment_commit_details_email_notifications', false);
+
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/email', [
+                'deployment_commit_details_email_notifications' => true,
+            ])
+            ->assertSuccessful()
+            ->assertJsonPath('deployment_commit_details_email_notifications', true);
+
+        expect(EmailNotificationSettings::query()->where('team_id', $this->team->id)->value('deployment_commit_details_email_notifications'))->toBeTruthy();
+    });
+
+    test('validates the deployment commit details email setting', function () {
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/email', [
+                'deployment_commit_details_email_notifications' => 'not-a-boolean',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('deployment_commit_details_email_notifications');
     });
 
     test('validates the smtp ehlo domain', function () {

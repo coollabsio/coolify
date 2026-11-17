@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Log;
  * 2. Restarting → degraded:unhealthy (or restarting:unknown if preserveRestarting=true)
  * 3. Mixed (running + exited) → degraded:unhealthy
  * 4. Mixed (running + starting) → starting:unknown
- * 5. Running → running:healthy/unhealthy/unknown
+ * 5. Running → running:unhealthy/starting/unknown/healthy (health check still in its start period → starting)
  * 6. Dead/Removing → degraded:unhealthy
  * 7. Paused → paused:unknown
  * 8. Starting/Created → starting:unknown
@@ -35,6 +36,44 @@ use Illuminate\Support\Facades\Log;
  */
 class ContainerStatusAggregator
 {
+    use CalculatesExcludedStatus;
+
+    /**
+     * Status string of one container from `docker container inspect` output
+     * (e.g. "running:healthy", "restarting:unknown", "exited").
+     *
+     * Every status writer (the full server check and the targeted check after a start)
+     * uses this, so they store the same strings.
+     */
+    public static function containerStatus(array|object $container): string
+    {
+        $state = data_get($container, 'State.Status');
+        if ($state === 'exited') {
+            return $state;
+        }
+
+        return $state.':'.(data_get($container, 'State.Health.Status') ?? 'unknown');
+    }
+
+    /**
+     * Aggregate the container statuses of one Compose-based resource (application, service
+     * application or service database). Containers excluded from health checks in the Compose
+     * file are ignored; when every container is excluded, the result has the :excluded suffix.
+     *
+     * @param  Collection<string, string>  $containerStatuses  Status strings keyed by Compose service name
+     */
+    public function aggregateForCompose(Collection $containerStatuses, ?string $dockerComposeRaw, int $maxRestartCount = 0): string
+    {
+        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
+        $relevantStatuses = $containerStatuses->reject(fn ($status, $containerName) => $excludedContainers->contains($containerName));
+
+        if ($relevantStatuses->isEmpty()) {
+            return $this->calculateExcludedStatusFromStrings($containerStatuses);
+        }
+
+        return $this->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
+    }
+
     /**
      * Aggregate container statuses from status strings into a single status.
      *
@@ -62,6 +101,7 @@ class ContainerStatusAggregator
         $hasRestarting = false;
         $hasUnhealthy = false;
         $hasUnknown = false;
+        $hasHealthStarting = false;
         $hasExited = false;
         $hasStarting = false;
         $hasPaused = false;
@@ -85,6 +125,9 @@ class ContainerStatusAggregator
                 if (str($status)->contains('unknown')) {
                     $hasUnknown = true;
                 }
+                if (str($status)->contains('starting')) {
+                    $hasHealthStarting = true;
+                }
             } elseif (str($status)->contains('exited')) {
                 $hasExited = true;
             } elseif (str($status)->contains('created') || str($status)->contains('starting')) {
@@ -102,6 +145,7 @@ class ContainerStatusAggregator
             $hasRestarting,
             $hasUnhealthy,
             $hasUnknown,
+            $hasHealthStarting,
             $hasExited,
             $hasStarting,
             $hasPaused,
@@ -139,6 +183,7 @@ class ContainerStatusAggregator
         $hasRestarting = false;
         $hasUnhealthy = false;
         $hasUnknown = false;
+        $hasHealthStarting = false;
         $hasExited = false;
         $hasStarting = false;
         $hasPaused = false;
@@ -155,7 +200,9 @@ class ContainerStatusAggregator
                 $hasRunning = true;
                 if ($health === 'unhealthy') {
                     $hasUnhealthy = true;
-                } elseif (is_null($health) || $health === 'starting') {
+                } elseif ($health === 'starting') {
+                    $hasHealthStarting = true;
+                } elseif (is_null($health)) {
                     $hasUnknown = true;
                 }
             } elseif ($state === 'exited') {
@@ -175,6 +222,7 @@ class ContainerStatusAggregator
             $hasRestarting,
             $hasUnhealthy,
             $hasUnknown,
+            $hasHealthStarting,
             $hasExited,
             $hasStarting,
             $hasPaused,
@@ -192,6 +240,7 @@ class ContainerStatusAggregator
      * @param  bool  $hasRestarting  Has at least one restarting container
      * @param  bool  $hasUnhealthy  Has at least one unhealthy container
      * @param  bool  $hasUnknown  Has at least one container with unknown health
+     * @param  bool  $hasHealthStarting  Has at least one running container whose health check is still in its start period
      * @param  bool  $hasExited  Has at least one exited container
      * @param  bool  $hasStarting  Has at least one starting/created container
      * @param  bool  $hasPaused  Has at least one paused container
@@ -206,6 +255,7 @@ class ContainerStatusAggregator
         bool $hasRestarting,
         bool $hasUnhealthy,
         bool $hasUnknown,
+        bool $hasHealthStarting,
         bool $hasExited,
         bool $hasStarting,
         bool $hasPaused,
@@ -242,6 +292,8 @@ class ContainerStatusAggregator
         if ($hasRunning) {
             if ($hasUnhealthy) {
                 return 'running:unhealthy';
+            } elseif ($hasHealthStarting) {
+                return 'running:starting';
             } elseif ($hasUnknown) {
                 return 'running:unknown';
             } else {

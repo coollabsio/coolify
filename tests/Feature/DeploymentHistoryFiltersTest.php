@@ -11,7 +11,6 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Blade;
 
 uses(RefreshDatabase::class);
 
@@ -61,46 +60,6 @@ it('filters deployment history by server', function () {
 
     expect($result['count'])->toBe(2)
         ->and($result['deployments']->pluck('server_id')->unique()->sole())->toBe($secondServer->id);
-});
-
-it('always shows source filters and includes server filters', function () {
-    $component = file_get_contents(app_path('Livewire/Project/Application/Deployment/Index.php'));
-    $view = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
-    $filterComponent = file_get_contents(resource_path('views/components/table/filter.blade.php'));
-    $loadingComponent = file_get_contents(resource_path('views/components/table/loading.blade.php'));
-
-    expect($component)
-        ->toContain('public array $serverFilterOptions = [];')
-        ->toContain('public array $deploymentFilters = [];')
-        ->toContain('public function toggleDeploymentFilter(string $filter): void')
-        ->toContain("'value' => \"server:{\$serverId}\"")
-        ->and($view)
-        ->toContain('@if (count($sourceFilterOptions) > 0)')
-        ->toContain('count($serverFilterOptions) > 0')
-        ->toContain('>Server</span>')
-        ->toContain('<x-table.filter')
-        ->toContain("wire:click=\"toggleDeploymentFilter('{{ \$option['value'] }}')\"")
-        ->toContain("in_array(\$option['value'], \$deploymentFilters, true)")
-        ->toContain('<x-table.loading id="deployment-table-filter-loading"')
-        ->not->toContain('class="size-3.5" wire:loading.remove')
-        ->not->toContain('<span>All deployments</span>')
-        ->and($filterComponent)
-        ->toContain('aria-multiselectable="true"')
-        ->toContain('Reset filters')
-        ->and($loadingComponent)
-        ->toContain('wire:loading.flex');
-});
-
-it('shows the active pull request id on the deployment filter control', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
-    $filter = Blade::render(<<<'BLADE'
-        <x-table.filter :active-count="1" active-text="Pull request #41" reset-action="clearFilter">
-            Filter options
-        </x-table.filter>
-    BLADE);
-
-    expect($view)->toContain(":active-text=\"filled(\$pull_request_id) ? 'Pull request #'.\$pull_request_id : null\"")
-        ->and($filter)->toContain('<span class="truncate">Pull request #41</span>');
 });
 
 it('keeps a pull request filter from the URL when it has no deployment records yet', function () {

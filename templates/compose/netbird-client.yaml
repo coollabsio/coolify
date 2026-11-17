@@ -6,7 +6,7 @@
 
 services:
   netbird-client:
-    image: 'netbirdio/netbird:latest'
+    image: 'netbirdio/netbird:0.83.1'
     network_mode: host
     environment:
       - 'NB_SETUP_KEY=${NB_SETUP_KEY}'

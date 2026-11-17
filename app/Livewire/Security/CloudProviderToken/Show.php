@@ -67,7 +67,7 @@ class Show extends Component
         ]);
 
         auditLog('ui.cloud_token.updated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,
@@ -85,6 +85,7 @@ class Show extends Component
             'hetzner' => $this->validateHetznerToken($this->cloudProviderToken->token),
             'digitalocean' => $this->validateDigitalOceanToken($this->cloudProviderToken->token),
             'vultr' => $this->validateVultrToken($this->cloudProviderToken->token),
+            'hostinger' => $this->validateHostingerToken($this->cloudProviderToken->token),
             default => false,
         };
 
@@ -98,7 +99,7 @@ class Show extends Component
         );
 
         auditLog('ui.cloud_token.validated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,
@@ -118,7 +119,7 @@ class Show extends Component
         }
 
         auditLog('ui.cloud_token.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudProviderToken->team_id,
             'cloud_token_uuid' => $this->cloudProviderToken->uuid,
             'cloud_token_name' => $this->cloudProviderToken->name,
             'provider' => $this->cloudProviderToken->provider,
@@ -141,6 +142,7 @@ class Show extends Component
         return match ($this->cloudProviderToken->provider) {
             'digitalocean' => 'DigitalOcean',
             'vultr' => 'Vultr',
+            'hostinger' => 'Hostinger',
             default => 'Hetzner',
         };
     }
@@ -175,6 +177,19 @@ class Show extends Component
             return Http::withToken($token)
                 ->timeout(10)
                 ->get('https://api.vultr.com/v2/account')
+                ->successful();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function validateHostingerToken(string $token): bool
+    {
+        try {
+            return Http::withToken($token)
+                ->acceptJson()
+                ->timeout(10)
+                ->get('https://developers.hostinger.com/api/vps/v1/virtual-machines')
                 ->successful();
         } catch (\Throwable) {
             return false;

@@ -7,7 +7,7 @@
 
 services:
   calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
+    image: lscr.io/linuxserver/calibre-web:0.6.27
     environment:
       - SERVICE_URL_CALIBRE_8083
       - PUID=1000
