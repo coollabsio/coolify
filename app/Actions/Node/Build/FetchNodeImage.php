@@ -65,12 +65,15 @@ class FetchNodeImage
     }
 
     /**
-     * Returns the source Node, or null when nothing had to be copied: the image is not local, or
-     * the target built it.
+     * Returns the copy: the source Node, the seconds it took, the uncompressed size of the image, and
+     * the bytes that the source sent (the layers that the target did not have). Null when nothing had
+     * to be copied: the image is not local, or the target has it.
+     *
+     * @return array{source: Node, seconds: float, size_bytes: int, bytes_sent: int}|null
      *
      * @throws RuntimeException When no source could copy the image.
      */
-    public function handle(Node $target, NodeWorkloadRevision $revision, ?Carbon $deadline = null): ?Node
+    public function handle(Node $target, NodeWorkloadRevision $revision, ?Carbon $deadline = null): ?array
     {
         $image = $revision->image;
         if (! NodeImages::isLocalImage($image)) {
@@ -107,9 +110,10 @@ class FetchNodeImage
                 break;
             }
             try {
-                $this->fetchFrom($source, $target, $image, $deadline);
+                $started = microtime(true);
+                $copy = $this->fetchFrom($source, $target, $image, $deadline);
 
-                return $source;
+                return ['source' => $source, 'seconds' => round(microtime(true) - $started, 1), ...$copy];
             } catch (Throwable $exception) {
                 $errors[] = "{$source->name}: ".mb_substr($exception->getMessage(), 0, 500);
             }
@@ -184,10 +188,12 @@ class FetchNodeImage
             ->where('status', NodeOperationStatus::SUCCEEDED);
     }
 
-    private function fetchFrom(Node $source, Node $target, string $image, Carbon $deadline): void
+    /** @return array{size_bytes: int, bytes_sent: int} */
+    private function fetchFrom(Node $source, Node $target, string $image, Carbon $deadline): array
     {
         $transferId = (string) Str::uuid();
         $secret = Str::random(64);
+        $copy = ['size_bytes' => 0, 'bytes_sent' => 0];
         try {
             $served = RunImageBuild::flux('image.serve', [
                 'server_id' => $source->uuid,
@@ -210,6 +216,7 @@ class FetchNodeImage
                 throw new RuntimeException('Flux returned an invalid image service.');
             }
             $service = $service->validated();
+            $copy['size_bytes'] = (int) data_get($served, 'size_bytes', 0);
 
             while (true) {
                 $state = RunImageBuild::flux('image.fetch', [
@@ -230,7 +237,7 @@ class FetchNodeImage
                         throw new RuntimeException('The copied image has another image ID than on the source.');
                     }
 
-                    return;
+                    break;
                 }
                 if ($status === 'failed') {
                     throw new RuntimeException(trim((string) data_get($state, 'error')) ?: 'The copy failed.');
@@ -244,12 +251,16 @@ class FetchNodeImage
                 Sleep::for(self::POLL_SECONDS)->seconds();
             }
         } finally {
-            rescue(fn () => RunImageBuild::flux('image.serve', [
+            // The stop returns the bytes that the source sent: only the layers that the target did not have.
+            $stopped = rescue(fn () => RunImageBuild::flux('image.serve', [
                 'server_id' => $source->uuid,
                 'command_id' => (string) Str::uuid(),
                 'transfer_id' => $transferId,
                 'stop' => true,
             ], 30));
+            $copy['bytes_sent'] = (int) data_get($stopped, 'bytes_sent', 0);
         }
+
+        return $copy;
     }
 }

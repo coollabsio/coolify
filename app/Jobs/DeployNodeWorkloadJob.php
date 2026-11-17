@@ -125,7 +125,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             $deadline = $this->waitUntil;
         }
         try {
-            $source = FetchNodeImage::run($operation->node, $operation->revision, $deadline);
+            $copy = FetchNodeImage::run($operation->node, $operation->revision, $deadline);
         } catch (Throwable $exception) {
             if ($operation->refresh()->status->canTransitionTo(NodeOperationStatus::FAILED)) {
                 TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
@@ -133,10 +133,15 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
             return null;
         }
-        if ($source === null) {
+        if ($copy === null) {
             return [];
         }
-        $fetched = ['fetched_image' => $source->name];
+        $fetched = [
+            'fetched_image' => $copy['source']->name,
+            'fetched_image_seconds' => $copy['seconds'],
+            'fetched_image_size' => $copy['size_bytes'],
+            'fetched_image_sent' => $copy['bytes_sent'],
+        ];
         $operation->update(['result' => [...($operation->refresh()->result ?? []), ...$fetched]]);
 
         return $fetched;

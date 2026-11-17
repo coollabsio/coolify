@@ -186,7 +186,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 $deployments[$workload->id] = $deploymentOperation;
                 if ($workload->id === $operation->workload->id && filled(data_get($deploymentOperation->result, 'fetched_image'))) {
                     // The deployment copied the local image from a peer (decision 0030); the move log shows it.
-                    self::checkpoint($operation, ['fetched_image' => data_get($deploymentOperation->result, 'fetched_image')]);
+                    self::checkpoint($operation, collect($deploymentOperation->result)->only(['fetched_image', 'fetched_image_seconds', 'fetched_image_size', 'fetched_image_sent'])->all());
                 }
                 if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
                     $verification = data_get($deploymentOperation->result, 'verification', []);

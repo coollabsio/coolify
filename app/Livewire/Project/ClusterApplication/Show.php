@@ -835,6 +835,32 @@ class Show extends Component
     }
 
     /**
+     * The log line of a copy from a peer (decision 0030), for example "The image was copied from
+     * server node-1 in 2.8 s: 12 MB of 61 MB sent. The server had the other layers already."
+     *
+     * @param  array<string, mixed>  $result
+     */
+    public static function fetchedImageLine(array $result): string
+    {
+        $line = 'The image was copied from server '.data_get($result, 'fetched_image');
+        $seconds = data_get($result, 'fetched_image_seconds');
+        if (is_numeric($seconds)) {
+            $line .= ' in '.rtrim(rtrim(number_format((float) $seconds, 1, '.', ''), '0'), '.').' s';
+        }
+        $size = (int) data_get($result, 'fetched_image_size', 0);
+        $sent = (int) data_get($result, 'fetched_image_sent', 0);
+        if ($size > 0 && $sent === 0) {
+            return $line.'. The server had every layer already, so nothing was sent.';
+        }
+        if ($size > 0) {
+            return $line.': '.formatBytes($sent).' of '.formatBytes($size).' sent.'
+                .($sent < $size * 0.95 ? ' The server had the other layers already.' : '');
+        }
+
+        return $line.'.';
+    }
+
+    /**
      * The deployment log of an active deployment, for the "Deploying… View log" indicator.
      */
     public function getRunningDeploymentUrlProperty(): ?string
@@ -1251,7 +1277,7 @@ class Show extends Component
         }
         if (filled(data_get($operation->result, 'fetched_image'))) {
             // The copy from a peer runs before the command goes to Sentinel (decision 0030).
-            $add($operation->dispatched_at ?? $operation->updated_at, 'The image was copied from server '.data_get($operation->result, 'fetched_image').'.');
+            $add($operation->dispatched_at ?? $operation->updated_at, self::fetchedImageLine((array) $operation->result));
         }
         if ($operation->dispatched_at) {
             $attempt = $operation->attempt_count > 1 ? " (attempt {$operation->attempt_count})" : '';
