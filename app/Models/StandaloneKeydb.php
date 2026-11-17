@@ -2,23 +2,96 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneKeydb extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'keydb_password',
+        'keydb_conf',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+        'public_port_timeout',
+        'enable_ssl',
+        'custom_docker_run_options',
+        'destination_type',
+        'destination_id',
+        'environment_id',
+        'health_check_enabled',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
+    ];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'keydb_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'keydb_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
+        'internal_db_url',
+        'external_db_url',
+        // Internal start-command state, not part of the API.
+        'legacy_password_quoting',
+    ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+        'health_check_enabled' => 'boolean',
+        'health_check_interval' => 'integer',
+        'health_check_timeout' => 'integer',
+        'health_check_retries' => 'integer',
+        'health_check_start_period' => 'integer',
         'keydb_password' => 'encrypted',
+        'legacy_password_quoting' => 'boolean',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -44,7 +117,10 @@ class StandaloneKeydb extends BaseModel
         });
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
-                $database->forceFill(['last_online_at' => now()]);
+                $database->last_online_at = now();
+            }
+            if ($database->exists && $database->isDirty('keydb_password')) {
+                $database->legacy_password_quoting = false;
             }
         });
     }
@@ -80,7 +156,8 @@ class StandaloneKeydb extends BaseModel
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->keydb_conf;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= $this->healthCheckConfigurationHash();
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -135,7 +212,7 @@ class StandaloneKeydb extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 
@@ -251,7 +328,7 @@ class StandaloneKeydb extends BaseModel
             get: function () {
                 $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                 $port = $this->enable_ssl ? 6380 : 6379;
-                $encodedPass = rawurlencode($this->keydb_password);
+                $encodedPass = rawurlencode($this->connectionPassword());
                 $url = "{$scheme}://:{$encodedPass}@{$this->uuid}:{$port}/0";
 
                 if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
@@ -272,9 +349,10 @@ class StandaloneKeydb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
-                    $encodedPass = rawurlencode($this->keydb_password);
-                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $encodedPass = rawurlencode($this->connectionPassword());
+                    $url = "{$scheme}://:{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
@@ -306,6 +384,69 @@ class StandaloneKeydb extends BaseModel
     public function runtime_environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
+    {
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
+     * The REDIS_PASSWORD variable that sets the server password instead of the stored password.
+     * Databases created before this release (legacy_password_quoting) keep their v4.3.23 server
+     * password, the stored one, unless the variable reads a remote secret.
+     */
+    public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
+    {
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
+
+        if (! $environmentVariable) {
+            return null;
+        }
+
+        if ($this->legacy_password_quoting && ! $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return null;
+        }
+
+        return $environmentVariable;
+    }
+
+    /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->serverPasswordEnvironmentVariable()?->isLockedForLogs();
+    }
+
+    /**
+     * The server password for connection URLs. A remote secret is not fetched here, so the URL
+     * shows its reference instead of a stale or wrong password.
+     */
+    public function connectionPassword(): string
+    {
+        $environmentVariable = $this->serverPasswordEnvironmentVariable();
+
+        if ($environmentVariable) {
+            $password = $this->environmentVariableUsesSecretManager($environmentVariable)
+                ? (string) $environmentVariable->value
+                : (string) $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+            if ($password !== '') {
+                return $password;
+            }
+        }
+
+        return (string) $this->keydb_password;
     }
 
     public function persistentStorages()

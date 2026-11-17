@@ -2,9 +2,24 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+
 class SwarmDocker extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'name',
+        'network',
+    ];
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
+    }
 
     public function applications()
     {
@@ -36,6 +51,11 @@ class SwarmDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function sqlites()
+    {
+        return $this->morphMany(StandaloneSqlite::class, 'destination');
+    }
+
     public function mongodbs()
     {
         return $this->morphMany(StandaloneMongodb::class, 'destination');
@@ -54,6 +74,16 @@ class SwarmDocker extends BaseModel
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
     }
 
     /**
@@ -93,12 +123,13 @@ class SwarmDocker extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
     }
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
     }
 }

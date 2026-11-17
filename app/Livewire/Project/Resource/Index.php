@@ -2,36 +2,22 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use RemembersCanvasView;
+
     public Project $project;
 
     public Environment $environment;
-
-    public Collection $applications;
-
-    public Collection $postgresqls;
-
-    public Collection $redis;
-
-    public Collection $mongodbs;
-
-    public Collection $mysqls;
-
-    public Collection $mariadbs;
-
-    public Collection $keydbs;
-
-    public Collection $dragonflies;
-
-    public Collection $clickhouses;
-
-    public Collection $services;
 
     public Collection $allProjects;
 
@@ -39,9 +25,34 @@ class Index extends Component
 
     public array $parameters;
 
-    public function mount()
+    protected Collection $applications;
+
+    protected Collection $postgresqls;
+
+    protected Collection $redis;
+
+    protected Collection $mongodbs;
+
+    protected Collection $mysqls;
+
+    protected Collection $mariadbs;
+
+    protected Collection $keydbs;
+
+    protected Collection $dragonflies;
+
+    protected Collection $clickhouses;
+
+    protected Collection $sqlites;
+
+    protected Collection $services;
+
+    /** @var array<string, array{status: string, text: string, label: string, tooltip: ?string}> */
+    private array $markers = [];
+
+    public function mount(): void
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->sqlites = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -53,33 +64,34 @@ class Index extends Component
             ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
 
+        if ($this->prefersCanvasView('environment')) {
+            $this->redirectRoute('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid], navigate: true);
+
+            return;
+        }
+
         $this->project = $project;
 
-        // Load projects and environments for breadcrumb navigation (avoids inline queries in view)
+        // Load projects and environments for breadcrumb navigation
         $this->allProjects = Project::ownedByCurrentTeamCached();
+        $environmentRelations = [
+            'applications:id,uuid,name,environment_id',
+            'services:id,uuid,name,environment_id',
+            'postgresqls:id,uuid,name,environment_id',
+            'redis:id,uuid,name,environment_id',
+            'mongodbs:id,uuid,name,environment_id',
+            'mysqls:id,uuid,name,environment_id',
+            'mariadbs:id,uuid,name,environment_id',
+            'keydbs:id,uuid,name,environment_id',
+            'dragonflies:id,uuid,name,environment_id',
+            'clickhouses:id,uuid,name,environment_id',
+            'sqlites:id,uuid,name,environment_id',
+        ];
+
         $this->allEnvironments = $project->environments()
-            ->with([
-                'applications.additional_servers',
-                'applications.destination.server',
-                'services',
-                'services.destination.server',
-                'postgresqls',
-                'postgresqls.destination.server',
-                'redis',
-                'redis.destination.server',
-                'mongodbs',
-                'mongodbs.destination.server',
-                'mysqls',
-                'mysqls.destination.server',
-                'mariadbs',
-                'mariadbs.destination.server',
-                'keydbs',
-                'keydbs.destination.server',
-                'dragonflies',
-                'dragonflies.destination.server',
-                'clickhouses',
-                'clickhouses.destination.server',
-            ])->get();
+            ->select('id', 'uuid', 'name', 'project_id')
+            ->with($environmentRelations)
+            ->get();
 
         $this->environment = $environment->loadCount([
             'applications',
@@ -91,14 +103,13 @@ class Index extends Component
             'clickhouses',
             'mariadbs',
             'mongodbs',
+            'sqlites',
             'services',
         ]);
 
-        // Eager load all relationships for applications including nested ones
+        // Eager load relationships for applications
         $this->applications = $this->environment->applications()->with([
             'tags',
-            'additional_servers.settings',
-            'additional_networks',
             'destination.server.settings',
             'settings',
         ])->get()->sortBy('name');
@@ -113,6 +124,7 @@ class Index extends Component
 
             return $application;
         });
+        $this->applications = $this->applications->sortBy('name');
 
         // Load all database resources in a single query per type
         $databaseTypes = [
@@ -124,6 +136,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'sqlites' => 'sqlites',
         ];
 
         foreach ($databaseTypes as $property => $relation) {
@@ -160,6 +173,65 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.project.resource.index');
+        $this->markers = VulnerabilityMarkers::for(collect([
+            $this->applications, $this->postgresqls, $this->redis, $this->mongodbs, $this->mysqls, $this->mariadbs,
+            $this->keydbs, $this->dragonflies, $this->clickhouses, $this->sqlites, $this->services,
+        ])->flatten(1));
+
+        return view('livewire.project.resource.index', [
+            'applications' => $this->applications,
+            'postgresqls' => $this->postgresqls,
+            'redis' => $this->redis,
+            'mongodbs' => $this->mongodbs,
+            'mysqls' => $this->mysqls,
+            'mariadbs' => $this->mariadbs,
+            'keydbs' => $this->keydbs,
+            'dragonflies' => $this->dragonflies,
+            'clickhouses' => $this->clickhouses,
+            'sqlites' => $this->sqlites,
+            'services' => $this->services,
+            'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
+            'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'Database'),
+            'redisJs' => $this->toSearchableArray($this->redis, 'database', 'Database'),
+            'mongodbsJs' => $this->toSearchableArray($this->mongodbs, 'database', 'Database'),
+            'mysqlsJs' => $this->toSearchableArray($this->mysqls, 'database', 'Database'),
+            'mariadbsJs' => $this->toSearchableArray($this->mariadbs, 'database', 'Database'),
+            'keydbsJs' => $this->toSearchableArray($this->keydbs, 'database', 'Database'),
+            'dragonfliesJs' => $this->toSearchableArray($this->dragonflies, 'database', 'Database'),
+            'clickhousesJs' => $this->toSearchableArray($this->clickhouses, 'database', 'Database'),
+            'sqlitesJs' => $this->toSearchableArray($this->sqlites, 'database', 'Database'),
+            'servicesJs' => $this->toSearchableArray($this->services, 'service', 'Service'),
+        ]);
+    }
+
+    private function toSearchableArray(Collection $items, string $type, string $typeLabel): array
+    {
+        return $items->map(fn ($item) => [
+            'uuid' => $item->uuid,
+            'name' => $item->name,
+            'type' => $type,
+            'typeLabel' => $typeLabel,
+            'fqdn' => $item->fqdn ?? null,
+            'description' => $item->description ?? null,
+            'status' => $item->status ?? '',
+            'restartLimitReached' => method_exists($item, 'stoppedAfterRestartLimit') && $item->stoppedAfterRestartLimit(),
+            'restartCount' => method_exists($item, 'stoppedAfterRestartLimit') && $item->stoppedAfterRestartLimit()
+                ? max($item->restart_count ?? 0, $item->max_restart_count ?? 0)
+                : ($item->restart_count ?? 0),
+            'maxRestartCount' => $item->max_restart_count ?? 0,
+            'server_status' => $item->server_status ?? null,
+            'hrefLink' => $item->hrefLink ?? '',
+            'logoHtml' => Blade::render('<x-resource-logo :resource="$resource" />', ['resource' => $item]),
+            'destination' => [
+                'server' => [
+                    'name' => $item->destination?->server?->name ?? 'Unknown',
+                ],
+            ],
+            'tags' => $item->tags->map(fn ($tag) => [
+                'id' => $tag->id,
+                'name' => $tag->name,
+            ])->values()->toArray(),
+            'security' => $this->markers[ResourceScans::key($item)] ?? null,
+        ])->values()->toArray();
     }
 }

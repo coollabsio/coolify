@@ -33,10 +33,19 @@ class ValidHostname implements ValidationRule
             return;
         }
 
+        // Reject ASCII control characters (including embedded newlines, which
+        // would otherwise slip through the trailing-newline-tolerant `$` anchor
+        // in the per-label regex below).
+        if (preg_match('/[\x00-\x1f\x7f]/', $hostname) === 1) {
+            $fail('The :attribute contains invalid characters. Only letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
+
+            return;
+        }
+
         // Check for dangerous shell metacharacters
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
-            '<', '>', '\n', '\r', '\0', '"', "'", '\\',
+            '<', '>', "\n", "\r", "\0", '"', "'", '\\',
             '!', '*', '?', '[', ']', '~', '^', ':', '#',
             '@', '%', '=', '+', ',', ' ',
         ];
@@ -62,11 +71,14 @@ class ValidHostname implements ValidationRule
                     // Ignore errors when facades are not available (e.g., in unit tests)
                 }
 
-                $fail('The :attribute contains invalid characters. Only lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
+                $fail('The :attribute contains invalid characters. Only letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
 
                 return;
             }
         }
+
+        // Normalize to lowercase for validation (RFC 1123 hostnames are case-insensitive)
+        $hostname = strtolower($hostname);
 
         // Additional validation: hostname should not start or end with a dot
         if (str_starts_with($hostname, '.') || str_ends_with($hostname, '.')) {
@@ -100,9 +112,9 @@ class ValidHostname implements ValidationRule
                 return;
             }
 
-            // Check if label contains only valid characters (lowercase letters, digits, hyphens)
-            if (! preg_match('/^[a-z0-9-]+$/', $label)) {
-                $fail('The :attribute contains invalid characters. Only lowercase letters (a-z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
+            // Check if label contains only valid characters (letters, digits, hyphens)
+            if (! preg_match('/^[a-z0-9-]+$/D', $label)) {
+                $fail('The :attribute contains invalid characters. Only letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
 
                 return;
             }

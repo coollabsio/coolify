@@ -1,52 +1,66 @@
 <div align="center">
 
-# Coolify
-An open-source & self-hostable Heroku / Netlify / Vercel alternative. 
+<img src="./public/coolify-logo.svg" alt="Coolify logo" width="120" />
 
-![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
-) [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
+# Coolify
+
+**An open-source platform to deploy applications, databases, and services on your own servers.**
+
+Open source & free forever, backed by our [philosophy](https://coolify.io/philosophy).
+
+![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=stable.coolify.version&style=for-the-badge
+)
+
+[Website](https://coolify.io) · [Documentation](https://coolify.io/docs) · [Cloud](https://app.coolify.io) · [Discord](https://coollabs.io/discord) · [Community](https://github.com/coollabsio/coolify/discussions)
+
 </div>
 
-## About the Project
+## What is Coolify?
 
-Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc.
+Coolify is an open-source and self-hostable alternative to Heroku, Netlify, and Vercel. It helps you manage servers, applications, and databases on your own hardware. You only need an SSH connection.
 
-It helps you manage your servers, applications, and databases on your own hardware; you only need an SSH connection. You can manage VPS, Bare Metal, Raspberry PIs, and anything else.
+You can use a VPS, a bare-metal server, a Raspberry Pi, or any other server that accepts SSH connections. Coolify gives you the convenience of a cloud platform while you keep control of your infrastructure.
 
-Imagine having the ease of a cloud but with your own servers. That is **Coolify**.
+Your configurations stay on your servers. If you stop using Coolify, your running resources continue to work and remain manageable.
 
-No vendor lock-in, which means that all the configurations for your applications/databases/etc are saved to your server. So, if you decide to stop using Coolify (oh nooo), you could still manage your running resources. You lose the automations and all the magic. 🪄️
+## What can Coolify do?
 
-For more information, take a look at our landing page at [coolify.io](https://coolify.io).
+- **Deploy any application:** Build from GitHub, GitLab, Bitbucket, or Gitea with Nixpacks, Railpack, Dockerfile, Docker Compose, or a prebuilt Docker image.
+- **Run databases and services:** Deploy managed databases and more than 360 one-click services with persistent storage and generated credentials.
+- **Automate deployments:** Deploy on every Git push, create pull-request previews, call deployment webhooks, and roll back to retained application images.
+- **Manage networking:** Configure custom domains, automatic HTTPS certificates, reverse proxies, health checks, and container networks.
+- **Operate your infrastructure:** Manage multiple servers, inspect deployment and runtime logs, open container terminals, and monitor resource status.
+- **Protect your workloads:** Configure database and storage backups, scheduled tasks, environment variables, secrets, and notifications.
+- **Integrate with your workflow:** Manage resources through the dashboard, API, CLI, MCP, and team-based access controls.
 
-## Installation
+## Quick start
+
+Install Coolify on a supported server with one command:
 
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
-You can find the installation script source [here](./scripts/install.sh).
 
-> [!NOTE]
-> Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
+Read the [installation guide](https://coolify.io/docs/installation) for requirements and detailed instructions. You can also review the [installation script](./scripts/install.sh) before you run it.
 
-## Support
+## Self-hosted or Cloud
 
-Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).
+| Self-hosted | Coolify Cloud |
+| --- | --- |
+| Install Coolify on your own server. | Use a Coolify instance that we maintain. |
+| Control and maintain the complete platform. | Get high availability and less maintenance. |
+| Free and open source. | Paid service with email notifications and additional support. |
 
-## Cloud
+The recommended self-hosted setup uses one server for Coolify and one or more servers for deployed resources. If you do not want to maintain the Coolify server, use [Coolify Cloud](https://app.coolify.io). See [coolify.io](https://coolify.io) for current pricing.
 
-If you do not want to self-host Coolify, there is a paid cloud version available: [app.coolify.io](https://app.coolify.io)
+## Community and support
 
-For more information & pricing, take a look at our landing page [coolify.io](https://coolify.io).
-
-## Why should I use the Cloud version?
-The recommended way to use Coolify is to have one server for Coolify and one (or more) for the resources you are deploying. A server is around 4-5$/month.
-
-By subscribing to the cloud version, you get the Coolify server for the same price, but with:
-- High-availability
-- Free email notifications
-- Better support
-- Less maintenance for you
+- Read the [documentation](https://coolify.io/docs).
+- Join the community on [Discord](https://coollabs.io/discord).
+- Ask questions in [GitHub Discussions](https://github.com/coollabsio/coolify/discussions).
+- Read the [contribution guide](./CONTRIBUTING.md) before you submit a change.
+- Review the [code of conduct](./CODE_OF_CONDUCT.md).
+- Contact the team through the [support page](https://coolify.io/docs/contact).
 
 ## Donations
 To stay completely free and open-source, with no feature behind the paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the project's future development.
@@ -57,129 +71,100 @@ Thank you so much!
 
 ### Huge Sponsors
 
-* [MVPS](https://www.mvps.net?ref=coolify.io) - Cheap VPS servers at the highest possible quality
-* [SerpAPI](https://serpapi.com?ref=coolify.io) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API
-*
+* [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
+* [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
+* [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
+* [ScreenshotOne](https://screenshotone.com) - Screenshot API for devs
+* [PrivateAlps](https://privatealps.net) - Cloud Services Provider, VPS, servers infrastructure for people who care about privacy and control
+* [Seibert Group](https://seibert.link/coolifysoftware) - Boost productivity company-wide with AI agents like Claude Code
+* [Contabo](https://contabo.com/en/coolify-vps/) - Cloud VPS & dedicated servers at unbeatable prices
 
 ### Big Sponsors
 
-* [23M](https://23m.com?ref=coolify.io) - Your experts for high-availability hosting solutions!
-* [Algora](https://algora.io?ref=coolify.io) - Open source contribution platform
-* [American Cloud](https://americancloud.com?ref=coolify.io) - US-based cloud infrastructure services
-* [Arcjet](https://arcjet.com?ref=coolify.io) - Advanced web security and performance solutions
-* [BC Direct](https://bc.direct?ref=coolify.io) - Your trusted technology consulting partner
-* [Blacksmith](https://blacksmith.sh?ref=coolify.io) - Infrastructure automation platform
-* [Brand.dev](https://brand.dev?ref=coolify.io) - API to personalize your product with logos, colors, and company info from any domain
-* [ByteBase](https://www.bytebase.com?ref=coolify.io) - Database CI/CD and Security at Scale
-* [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
-* [COMIT](https://comit.international?ref=coolify.io) - New York Times award–winning contractor
-* [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
-* [Convex](https://convex.link/coolify.io) - Open-source reactive database for web app developers
-* [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
-* [Darweb](https://darweb.nl/?ref=coolify.io) - 3D CPQ solutions for ecommerce design
-* [Dataforest Cloud](https://cloud.dataforest.net/en?ref=coolify.io) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
-* [Formbricks](https://formbricks.com?ref=coolify.io) - The open source feedback platform
-* [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
-* [Greptile](https://www.greptile.com?ref=coolify.io) - The AI Code Reviewer
+* [Vanaways](https://www.vanaways.co.uk) - New vans for sale and lease across the UK
+* [Cloudways](https://www.cloudways.com/en/?id=2125302) - Managed cloud hosting platform by DigitalOcean
+* [ByteBase](https://www.bytebase.com) - Database CI/CD and Security at Scale
+* [Ramnode](https://ramnode.com/) - High Performance Cloud VPS Hosting
+* [23M](https://23m.com) - Your experts for high-availability hosting solutions!
+* [Macarne](https://macarne.com) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - Server, cloud, hosting, and data center solutions
-* [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - Web hosting and VPS solutions
-* [JobsCollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - 30,000+ remote jobs for developers
-* [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital PR & AI Authority Building Agency
-* [LiquidWeb](https://liquidweb.com?ref=coolify.io) - Premium managed hosting solutions
-* [Logto](https://logto.io?ref=coolify.io) - The better identity infrastructure for developers
-* [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
-* [Mobb](https://vibe.mobb.ai/?ref=coolify.io) - Secure Your AI-Generated Code to Unlock Dev Productivity
-* [PFGLabs](https://pfglabs.com?ref=coolify.io) - Build Real Projects with Golang
-* [Ramnode](https://ramnode.com/?ref=coolify.io) - High Performance Cloud VPS Hosting
-* [SaasyKit](https://saasykit.com?ref=coolify.io) - Complete SaaS starter kit for developers
-* [SupaGuide](https://supa.guide?ref=coolify.io) - Your comprehensive guide to Supabase
-* [Supadata AI](https://supadata.ai/?ref=coolify.io) - Scrape YouTube, web, and files. Get AI-ready, clean data
-* [Syntax.fm](https://syntax.fm?ref=coolify.io) - Podcast for web developers
-* [Tigris](https://www.tigrisdata.com?ref=coolify.io) - Modern developer data platform
-* [Tolgee](https://tolgee.io?ref=coolify.io) - The open source localization platform
-* [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
-* [VPSDime](https://vpsdime.com?ref=coolify.io) - Affordable high-performance VPS hosting solutions
-
+* [Logto](https://logto.io) - The better identity infrastructure for developers
+* [Supadata](https://supadata.ai/) - Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. 
+* [Tolgee](https://tolgee.io) - The open source localization platform
+* [ArcJet](https://arcjet.com) - Advanced web security and performance solutions
+* [SupaGuide](https://supa.guide) - Your comprehensive guide to Supabase
+* [CodeRabbit](https://coderabbit.ai) - Cut Code Review Time & Bugs in Half
+* [Convex](https://convex.link/coolify.io) - Convex is the open-source reactive database for web app developers.
+* [GoldenVM](https://billing.goldenvm.com) - Premium virtual machine hosting solutions
+* [Comit International](https://comit.international) - New York Times award–winning contractor!
+* [Compai](https://www.trycomp.ai) - The open source compliance automation platform that does everything you need to get compliant, fast. Open source alternative to Drata & Vanta.
+* [Tigris](https://www.tigrisdata.com) - Modern S3 Alternative
+* [Blacksmith](https://blacksmith.sh) - Infrastructure automation platform
+* [JobsCollider](https://jobscollider.com/remote-jobs) - 30,000+ remote jobs for developers
+* [Darweb](https://darweb.nl/?ref=coolify.io&utm_source=coolify.io) - Design. Develop. Deliver. Specialized in 3D CPQ Solutions for eCommerce.
+* [Hostinger](https://www.hostinger.com/vps/coolify-hosting) - Web hosting and VPS solutions
+* [Mobb](https://vibe.mobb.ai/) - Secure Your AI-Generated Code to Unlock Dev Productivity
+* [Ubicloud](https://www.ubicloud.com) - Open source cloud infrastructure platform
+* [PFGLabs](https://pfglabs.com) - Build Real Projects with Golang
+* [JuxtDigital](https://juxtdigital.com) - Digital PR & AI Authority Building Agency
+* [SaasyKit](https://saasykit.com) - Complete SaaS starter kit for developers
+* [American Cloud](https://americancloud.com) - US-based cloud infrastructure services
+* [Greptile](https://www.greptile.com) - The AI Code Reviewer
+* [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
+* [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
+* [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
+* [NodePlus.ai](https://nodeplus.ai/) - AI that reads every system your business runs on
 
 ### Small Sponsors
 
-<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
-<a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="XamanApp" src="https://github.com/XamanApp.png"/></a>
-<a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
-<a href="https://evercam.io/?utm_source=coolify.io"><img width="60px" alt="Evercam" src="https://github.com/evercam.png"/></a>
-<a href="https://github.com/iujlaki"><img width="60px" alt="Imre Ujlaki" src="https://github.com/iujlaki.png"/></a>
-<a href="https://bsky.app/profile/jyc.dev"><img width="60px" alt="jyc.dev" src="https://github.com/jycouet.png"/></a>
-<a href="https://github.com/therealjp?utm_source=coolify.io"><img width="60px" alt="TheRealJP" src="https://github.com/therealjp.png"/></a>
-<a href="https://360creators.com/?utm_source=coolify.io"><img width="60px" alt="360Creators" src="https://opencollective-production.s3.us-west-1.amazonaws.com/account-avatar/503e0953-bff7-4296-b4cc-5e36d40eecc0/icon-360creators.png"/></a>
-<a href="https://github.com/aniftyco"><img width="60px" alt="NiftyCo" src="https://github.com/aniftyco.png"/></a>
-<a href="https://dry.software/?utm_source=coolify.io"><img width="60px" alt="Dry Software" src="https://github.com/dry-software.png"/></a>
-<a href="https://lightspeed.run/?utm_source=coolify.io"><img width="60px" alt="Lightspeed.run" src="https://github.com/lightspeedrun.png"/></a>
-<a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://github.com/LLM-Inc.png"/></a>
-<a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
-<a href="https://bitlaunch.io/?utm_source=coolify.io"><img width="60px" alt="BitLaunch" src="https://github.com/bitlaunchio.png"/></a>
-<a href="https://bestforandroid.com/?utm_source=coolify.io"><img width="60px" alt="Best for Android" src="https://github.com/bestforandroid.png"/></a>
-<a href="https://il.ly/?utm_source=coolify.io"><img width="60px" alt="Ilias Ism" src="https://github.com/Illyism.png"/></a>
-<a href="https://formbricks.com/?utm_source=coolify.io"><img width="60px" alt="Formbricks" src="https://github.com/formbricks.png"/></a>
-<a href="https://www.serversearcher.com/"><img width="60px" alt="Server Searcher" src="https://github.com/serversearcher.png"/></a>
-<a href="https://www.reshot.ai/?utm_source=coolify.io"><img width="60px" alt="Reshot" src="https://coolify.io/images/reshotai.png"/></a>
-<a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://coolify.io/images/cirun-logo.png"/></a>
-<a href="https://typebot.io/?utm_source=coolify.io"><img width="60px" alt="Typebot" src="https://cdn.bsky.app/img/avatar/plain/did:plc:gwxcta3pccyim4z5vuultdqx/bafkreig23hci7e2qpdxicsshnuzujbcbcgmydxhbybkewszdezhdodv42m@jpeg"/></a>
-<a href="https://cccareers.org/?utm_source=coolify.io"><img width="60px" alt="Creating Coding Careers" src="https://github.com/cccareers.png"/></a>
-<a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://coolify.io/images/internetgarden.ico"/></a>
-<a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://coolify.io/images/web3jobs.png"/></a>
-<a href="https://codext.link/coolify-io?utm_source=coolify.io"><img width="60px" alt="Codext" src="https://coolify.io/images/codext.jpg"/></a>
-<a href="https://github.com/monocursive"><img width="60px" alt="Michael Mazurczak" src="https://github.com/monocursive.png"/></a>
-<a href="https://fider.io/?utm_source=coolify.io"><img width="60px" alt="Fider" src="https://github.com/getfider.png"/></a>
-<a href="https://www.flint.sh/en/home?utm_source=coolify.io"><img width="60px" alt="Flint" src="https://github.com/Flint-company.png"/></a>
-<a href="https://github.com/urtho"><img width="60px" alt="Paweł Pierścionek" src="https://github.com/urtho.png"/></a>
-<a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://coolify.io/images/runpod.svg"/></a>
-<a href="https://dartnode.com/?utm_source=coolify.io"><img width="60px" alt="DartNode" src="https://github.com/dartnode.png"/></a>
-<a href="https://github.com/whitesidest"><img width="60px" alt="Tyler Whitesides" src="https://avatars.githubusercontent.com/u/12365916?s=52&v=4"/></a>
-<a href="https://aquarela.io"><img width="60px" alt="Aquarela" src="https://github.com/aquarela-io.png"/></a>
-<a href="https://cryptojobslist.com/?utm_source=coolify.io"><img width="60px" alt="Crypto Jobs List" src="https://github.com/cryptojobslist.png"/></a>
-<a href="https://www.youtube.com/@AlfredNutile?utm_source=coolify.io"><img width="60px" alt="Alfred Nutile" src="https://github.com/alnutile.png"/></a>
-<a href="https://startupfa.me?utm_source=coolify.io"><img width="60px" alt="Startup Fame" src="https://github.com/startupfame.png"/></a>
-<a href="https://barrad.me/?utm_source=coolify.io"><img width="60px" alt="Younes Barrad" src="https://github.com/Flowko.png"/></a>
-<a href="https://jonasjaeger.com?utm_source=coolify.io"><img width="60px" alt="Jonas Jaeger" src="https://github.com/toxin20.png"/></a>
-<a href="https://pixel.ao/?utm_source=coolify.io"><img width="60px" alt="Pixel Infinito" src="https://github.com/pixelinfinito.png"/></a>
-<a href="https://github.com/corentinclichy"><img width="60px" alt="Corentin Clichy" src="https://github.com/corentinclichy.png"/></a>
-<a href="https://x.com/mrsmith9ja?utm_source=coolify.io"><img width="60px" alt="Thompson Edolo" src="https://github.com/verygreenboi.png"/></a>
-<a href="https://devhuset.no?utm_source=coolify.io"><img width="60px" alt="Devhuset" src="https://github.com/devhuset.png"/></a>
-<a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://coolify.io/images/arvensis.png"/></a>
-<a href="https://github.com/Niki2k1"><img width="60px" alt="Niklas Lausch" src="https://github.com/Niki2k1.png"/></a>
-<a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
-<a href="https://interviewpal.com/?utm_source=coolify.io"><img width="60px" alt="InterviewPal" src="/public/svgs/interviewpal.svg"/></a>
+<a href="https://serverside.com/?utm_source=coolify.io"><img width="60px" alt="Serverside" src="https://cdn.coollabs.io/sponsors/serverside.svg"/></a>
+<a href="https://darkvps.pro"><img width="60px" alt="DarkVPS" src="https://cdn.coollabs.io/sponsors/darkvps.png"/></a>
+<a href="https://www.opensourcealternatives.to"><img width="60px" alt="Open Source Alternatives" src="https://cdn.coollabs.io/sponsors/opensourcealternatives.png"/></a>
+<a href="https://onserva.com/"><img width="60px" alt="Onserva" src="https://onserva.com/icon.svg"/></a>
+<a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://cdn.coollabs.io/sponsors/movavi.png"/></a>
+<a href="https://usefoil.com/"><img width="60px" alt="ABXY" src="https://usefoil.com/favicon.svg"/></a>
+<a href="https://www.launchfa.st/?utm_source=coolify.io"><img width="60px" alt="LaunchFast Boilerplates" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
+<a href="https://www.netrouting.com/?utm_source=coolify.io"><img width="60px" alt="Netrouting" src="https://github.com/netroutingcom.png"/></a>
+<a href="https://github.com/mindedtech"><img width="60px" alt="MindEd Tech" src="https://github.com/mindedtech.png"/></a>
+<a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
 <a href="https://transcript.lol/?utm_source=coolify.io"><img width="60px" alt="Transcript LOL" src="https://transcript.lol/logo.png"/></a>
-
+<a href="https://www.autom.dev/?utm_source=coolify.io"><img width="60px" alt="Autom" src="https://cdn.coollabs.io/sponsors/autom.png"/></a>
+<a href="https://www.huntapi.com/?utm_source=coolify.io"><img width="60px" alt="HuntAPI" src="https://cdn.coollabs.io/sponsors/huntapi.png"/></a>
+<a href="https://ultraservers.com/?utm_source=coolify.io"><img width="60px" alt="ULTRASERVERS" src="https://github.com/ULTRASERVERS.png"/></a>
+<a href="https://vibetone.com/?utm_source=coolify.io"><img width="60px" alt="VibeTone" src="https://github.com/vibetonefm.png"/></a>
+<a href="https://www.piloterr.com/?utm_source=coolify.io"><img width="60px" alt="Piloterr" src="https://cdn.coollabs.io/sponsors/piloterr.svg"/></a>
+<a href="https://yoxel.com/?utm_source=coolify.io"><img width="60px" alt="Alexey Panteleev" src="https://github.com/aspantel.png"/></a>
+<a href="https://summyt.app?utm_source=coolify.io"><img width="60px" alt="SummYT - YouTube Summarizer" src="https://summyt.app/logo.svg"/></a>
+<a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="Xaman" src="https://github.com/XamanApp.png"/></a>
+<a href="https://monadical.com/?utm_source=coolify.io"><img width="60px" alt="Monadical" src="https://github.com/Monadical-SAS.png"/></a>
+<a href="https://maas.engineering/?utm_source=coolify.io"><img width="60px" alt="Magic as a Service" src="https://github.com/magicasaservice.png"/></a>
+<a href="https://fivemanage.com?utm_source=coolify.io"><img width="60px" alt="FiveManage" src="https://cdn.coollabs.io/sponsors/fivemanage.jpg"/></a>
+<a href="https://cryptojobslist.com/?utm_source=coolify.io"><img width="60px" alt="Crypto Jobs List" src="https://github.com/cryptojobslist.png"/></a>
+<a href="https://serpapi.com/?utm_source=coolify.io"><img width="60px" alt="SerpAPI" src="https://github.com/serpapi.png"/></a>
+<a href="https://typebot.io/?utm_source=coolify.io"><img width="60px" alt="typebot" src="https://cdn.bsky.app/img/avatar/plain/did:plc:gwxcta3pccyim4z5vuultdqx/bafkreig23hci7e2qpdxicsshnuzujbcbcgmydxhbybkewszdezhdodv42m@jpeg"/></a>
+<a href="https://360creators.com/?utm_source=coolify.io"><img width="60px" alt="360Creators" src="https://opencollective-production.s3.us-west-1.amazonaws.com/account-avatar/503e0953-bff7-4296-b4cc-5e36d40eecc0/icon-360creators.png"/></a>
+<a href="https://capgo.app/?utm_source=coolify.io"><img width="60px" alt="Cap-go" src="https://github.com/cap-go.png"/></a>
+<a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://cdn.coollabs.io/sponsors/cirun-logo.png"/></a>
+<a href="https://github.com/puls-digital-group"><img width="60px" alt="Puls Digital Group" src="https://github.com/puls-digital-group.png"/></a>
+<a href="https://github.com/jonathanprl"><img width="60px" alt="Jonathan Pereira" src="https://github.com/jonathanprl.png"/></a>
+<a href="https://outboundgateway.com/"><img width="60px" alt="OutboundGateway" src="https://github.com/OutboundGateway.png"/></a>
+<a href="https://github.com/t4dt"><img width="60px" alt="T4DT GmbH" src="https://github.com/t4dt.png"/></a>
+<a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://cdn.coollabs.io/sponsors/internetgarden.ico"/></a>
+<a href="https://evercam.io/?utm_source=coolify.io"><img width="60px" alt="Evercam" src="https://github.com/evercam.png"/></a>
+<a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
+<a href="https://linkdr.com?utm_source=coolify.io"><img width="60px" alt="LinkDr" src="https://cdn.coollabs.io/sponsors/linkdr.svg"/></a>
+<a href="https://arvensis.systems/?utm_source=coolify.io"><img width="60px" alt="Arvensis Systems" src="https://cdn.coollabs.io/sponsors/arvensis.png"/></a>
+<a href="https://www.runpod.io/?utm_source=coolify.io"><img width="60px" alt="RunPod" src="https://cdn.coollabs.io/sponsors/runpod.svg"/></a>
+<a href="http://gravitywiz.com/?utm_source=coolify.io"><img width="60px" alt="Gravity Wiz" src="https://github.com/gravitywiz.png"/></a>
+<a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
+<a href="https://codext.link/coolify-io?utm_source=coolify.io"><img width="60px" alt="Codext" src="https://cdn.coollabs.io/sponsors/codext.jpg"/></a>
+<a href="https://interviewpal.com"><img width="60px" alt="InterviewPal" src="https://cdn.coollabs.io/sponsors/interviewpal.svg"/></a>
+<a href="https://decidable.no?utm_source=coolify.io"><img width="60px" alt="Decidable" src="https://github.com/Decidable-AS.png"/></a>
+<a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
+<a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
+<a href="https://bragly.io"><img width="60px" alt="Bragly" src="https://cdn.coollabs.io/sponsors/bragly.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
-
-## Recognitions
-
-<p>
-<a href="https://news.ycombinator.com/item?id=26624341">
-  <img
-    style="width: 250px; height: 54px;" width="250" height="54"
-    alt="Featured on Hacker News"
-    src="https://hackernews-badge.vercel.app/api?id=26624341"
-  />
-</a>
-</p>
-
-<a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-
-<a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-## Core Maintainers
-
-| Andras Bacsai | 🏔️ Peak |
-|------------|------------|
-| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="peaklabs-dev" /> |
-| <a href="https://github.com/andrasbacsai"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/heyandras"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/heyandras.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> | <a href="https://github.com/peaklabs-dev"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/peaklabs_dev"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/peaklabs.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> |
-
-## Repo Activity
-
-![Alt](https://repobeats.axiom.co/api/embed/eab1c8066f9c59d0ad37b76c23ebb5ccac4278ae.svg "Repobeats analytics image")
 
 ## Star History
 

@@ -6,6 +6,7 @@ use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -15,10 +16,12 @@ use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use App\Services\AutoUpdateNotifier;
+use App\Support\ResourceStartActivity;
+use App\Support\RootSetupWindow;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class Init extends Command
@@ -35,6 +38,12 @@ class Init extends Command
     {
         Artisan::call('optimize:clear');
         Artisan::call('optimize');
+
+        try {
+            RootSetupWindow::openIfNoUserExists();
+        } catch (\Throwable $e) {
+            echo "Could not open the root setup window: {$e->getMessage()}\n";
+        }
 
         try {
             $this->pullTemplatesFromCDN();
@@ -67,6 +76,12 @@ class Init extends Command
         }
         get_public_ips();
 
+        try {
+            AutoUpdateNotifier::checkResult();
+        } catch (\Throwable $e) {
+            echo "Could not check the automatic update result: {$e->getMessage()}\n";
+        }
+
         // Backward compatibility
         $this->replaceSlashInEnvironmentName();
         $this->restoreCoolifyDbBackup();
@@ -92,18 +107,36 @@ class Init extends Command
             echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
-            $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
+            $stuckDeployments = ApplicationDeploymentQueue::whereIn('status', [
                 ApplicationDeploymentStatus::IN_PROGRESS->value,
                 ApplicationDeploymentStatus::QUEUED->value,
-            ])->update([
+            ])->get(['id', 'application_id', 'parent_deployment_uuid']);
+            $updatedCount = ApplicationDeploymentQueue::whereKey($stuckDeployments->modelKeys())->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
 
             if ($updatedCount > 0) {
                 echo "Marked {$updatedCount} stuck deployments as failed\n";
             }
+
+            // The query update above fires no model event, so GitHub would show them in progress forever.
+            try {
+                $stuckDeployments->each(fn (ApplicationDeploymentQueue $deployment) => SyncGithubDeploymentJob::dispatchFor($deployment));
+            } catch (\Throwable $e) {
+                echo "Could not queue the GitHub deployment sync of stuck deployments: {$e->getMessage()}\n";
+            }
         } catch (\Throwable $e) {
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
+        try {
+            $interruptedStartCount = ResourceStartActivity::failInterrupted();
+
+            if ($interruptedStartCount > 0) {
+                echo "Marked {$interruptedStartCount} interrupted database/service starts and database imports as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup interrupted database/service starts and database imports: {$e->getMessage()}\n";
         }
 
         try {
@@ -161,10 +194,12 @@ class Init extends Command
 
     private function pullTemplatesFromCDN()
     {
-        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        $response = Http::retry(3, 1000, throw: false)
+            ->timeout(60)
+            ->connectTimeout(10)
+            ->get(config('constants.services.official'));
         if ($response->successful()) {
-            $services = $response->json();
-            File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
+            store_service_templates_bundle($response->body());
         }
     }
 
@@ -212,18 +247,19 @@ class Init extends Command
                 $removeNetworks = $allNetworks->diff($networks);
                 $commands = collect();
                 foreach ($removeNetworks as $network) {
-                    $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                    $safe = escapeshellarg($network);
+                    $out = instant_remote_process(["docker network inspect -f json {$safe} | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
                     if (empty($out)) {
-                        $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                        $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                        $commands->push("docker network disconnect {$safe} coolify-proxy >/dev/null 2>&1 || true");
+                        $commands->push("docker network rm {$safe} >/dev/null 2>&1 || true");
                     } else {
                         $data = collect(json_decode($out, true));
                         if ($data->count() === 1) {
                             // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
                             $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
                             if ($isCoolifyProxyItself) {
-                                $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                                $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                                $commands->push("docker network disconnect {$safe} coolify-proxy >/dev/null 2>&1 || true");
+                                $commands->push("docker network rm {$safe} >/dev/null 2>&1 || true");
                             }
                         }
                     }
@@ -244,15 +280,13 @@ class Init extends Command
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
                     $database->restore();
-                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
-                    if (! $scheduledBackup) {
+                    if (! $database->scheduledBackups()->exists()) {
                         ScheduledDatabaseBackup::create([
-                            'id' => 0,
                             'enabled' => true,
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => \App\Models\StandalonePostgresql::class,
+                            'database_type' => StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }

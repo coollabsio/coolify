@@ -2,6 +2,9 @@
 
 use App\Jobs\ScheduledJobManager;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 it('uses WithoutOverlapping middleware with expireAfter to prevent stale locks', function () {
     $job = new ScheduledJobManager;
@@ -40,21 +43,4 @@ it('uses WithoutOverlapping middleware with expireAfter to prevent stale locks',
     $key = $keyProperty->getValue($overlappingMiddleware);
 
     expect($key)->toBe('scheduled-job-manager');
-});
-
-it('prevents stale locks by ensuring expireAfter is always set', function () {
-    $job = new ScheduledJobManager;
-    $middleware = $job->middleware();
-
-    $overlappingMiddleware = $middleware[0];
-    $reflection = new ReflectionClass($overlappingMiddleware);
-
-    $expiresAfterProperty = $reflection->getProperty('expiresAfter');
-    $expiresAfterProperty->setAccessible(true);
-    $expiresAfter = $expiresAfterProperty->getValue($overlappingMiddleware);
-
-    // Critical check: expireAfter MUST be set to prevent GitHub issue #4539
-    expect($expiresAfter)->not->toBeNull(
-        'expireAfter() is required to prevent stale locks (see GitHub #4539)'
-    );
 });

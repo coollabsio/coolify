@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -12,7 +14,7 @@ use Livewire\Component;
 
 class Slack extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -25,7 +27,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['required_if:slackEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -36,6 +38,9 @@ class Slack extends Component
 
     #[Validate(['boolean'])]
     public bool $statusChangeSlackNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedSlackNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $backupSuccessSlackNotifications = false;
@@ -68,7 +73,13 @@ class Slack extends Component
     public bool $serverPatchSlackNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateSlackNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedSlackNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesSlackNotifications = false;
 
     public function mount()
     {
@@ -82,17 +93,17 @@ class Slack extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->slack_enabled = $this->slackEnabled;
             $this->settings->slack_webhook_url = $this->slackWebhookUrl;
 
             $this->settings->deployment_success_slack_notifications = $this->deploymentSuccessSlackNotifications;
             $this->settings->deployment_failure_slack_notifications = $this->deploymentFailureSlackNotifications;
             $this->settings->status_change_slack_notifications = $this->statusChangeSlackNotifications;
+            $this->settings->restart_limit_reached_slack_notifications = $this->restartLimitReachedSlackNotifications;
             $this->settings->backup_success_slack_notifications = $this->backupSuccessSlackNotifications;
             $this->settings->backup_failure_slack_notifications = $this->backupFailureSlackNotifications;
             $this->settings->scheduled_task_success_slack_notifications = $this->scheduledTaskSuccessSlackNotifications;
@@ -103,17 +114,24 @@ class Slack extends Component
             $this->settings->server_reachable_slack_notifications = $this->serverReachableSlackNotifications;
             $this->settings->server_unreachable_slack_notifications = $this->serverUnreachableSlackNotifications;
             $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
+            $this->settings->server_auto_update_slack_notifications = $this->serverAutoUpdateSlackNotifications;
             $this->settings->traefik_outdated_slack_notifications = $this->traefikOutdatedSlackNotifications;
+            $this->settings->image_vulnerabilities_slack_notifications = $this->imageVulnerabilitiesSlackNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->slackEnabled = $this->settings->slack_enabled;
-            $this->slackWebhookUrl = $this->settings->slack_webhook_url;
+            $this->slackWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->slack_webhook_url
+                : null;
 
             $this->deploymentSuccessSlackNotifications = $this->settings->deployment_success_slack_notifications;
             $this->deploymentFailureSlackNotifications = $this->settings->deployment_failure_slack_notifications;
             $this->statusChangeSlackNotifications = $this->settings->status_change_slack_notifications;
+            $this->restartLimitReachedSlackNotifications = $this->settings->restart_limit_reached_slack_notifications;
             $this->backupSuccessSlackNotifications = $this->settings->backup_success_slack_notifications;
             $this->backupFailureSlackNotifications = $this->settings->backup_failure_slack_notifications;
             $this->scheduledTaskSuccessSlackNotifications = $this->settings->scheduled_task_success_slack_notifications;
@@ -124,7 +142,9 @@ class Slack extends Component
             $this->serverReachableSlackNotifications = $this->settings->server_reachable_slack_notifications;
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;
             $this->serverPatchSlackNotifications = $this->settings->server_patch_slack_notifications;
+            $this->serverAutoUpdateSlackNotifications = $this->settings->server_auto_update_slack_notifications;
             $this->traefikOutdatedSlackNotifications = $this->settings->traefik_outdated_slack_notifications;
+            $this->imageVulnerabilitiesSlackNotifications = $this->settings->image_vulnerabilities_slack_notifications;
         }
     }
 
@@ -138,7 +158,33 @@ class Slack extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->slackEnabled = false;
+            $this->slackEnabled = (bool) $this->settings->refresh()->slack_enabled;
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
+    public function toggleSlackEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->slackEnabled) {
+                $this->slackEnabled = false;
+            } else {
+                $this->validate([
+                    'slackWebhookUrl' => 'required',
+                ], [
+                    'slackWebhookUrl.required' => 'Slack Webhook URL is required.',
+                ]);
+                $this->slackEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {
@@ -149,6 +195,7 @@ class Slack extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -161,6 +208,7 @@ class Slack extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -170,6 +218,8 @@ class Slack extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
@@ -189,5 +239,12 @@ class Slack extends Component
     public function render()
     {
         return view('livewire.notifications.slack');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.slack.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

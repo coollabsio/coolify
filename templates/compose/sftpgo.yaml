@@ -1,5 +1,6 @@
 # documentation: https://docs.sftpgo.com/2.7/
 # slogan: SFTPGo is an event-driven SFTP, FTP/S, HTTP/S and WebDAV server.
+# category: storage
 # tags: sftpgo,sftp,ftp,file,webdav
 # logo: svgs/sftpgo.png
 # port: 8080

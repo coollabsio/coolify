@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -21,11 +24,28 @@ use OpenApi\Attributes as OA;
 )]
 class Environment extends BaseModel
 {
-    use ClearsGlobalSearchCache;
-    use HasFactory;
+    use Auditable, HasFactory;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'project_id',
+        'uuid',
+    ];
+
+    /**
+     * Moving cards on the environment canvas is layout, not a change worth an audit event.
+     */
+    protected array $auditExclude = ['canvas_positions'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_positions' => 'array',
+        ];
+    }
 
     protected static function booted()
     {
@@ -37,9 +57,26 @@ class Environment extends BaseModel
         });
     }
 
+    /**
+     * Sort order of environment names: production, staging, and development first, then the others by name.
+     * resources/js/environment-order.js has the same order for the canvases.
+     */
+    public static function compareNames(string $first, string $second): int
+    {
+        $order = ['production', 'staging', 'development'];
+        $rank = fn (string $name): int => ($index = array_search(strtolower($name), $order, true)) === false ? count($order) : $index;
+
+        return $rank($first) <=> $rank($second) ?: strnatcasecmp($first, $second);
+    }
+
     public static function ownedByCurrentTeam()
     {
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function isEmpty()
@@ -53,12 +90,13 @@ class Environment extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
     }
 
     public function applications()
@@ -106,6 +144,11 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneClickhouse::class);
     }
 
+    public function sqlites()
+    {
+        return $this->hasMany(StandaloneSqlite::class);
+    }
+
     public function databases()
     {
         $postgresqls = $this->postgresqls;
@@ -116,8 +159,9 @@ class Environment extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
     }
 
     public function project()
@@ -128,6 +172,11 @@ class Environment extends BaseModel
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function resourceLinks(): HasMany
+    {
+        return $this->hasMany(ResourceLink::class);
     }
 
     protected function customizeName($value)

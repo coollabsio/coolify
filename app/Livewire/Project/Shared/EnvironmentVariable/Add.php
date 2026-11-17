@@ -2,22 +2,52 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
+use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
+use App\Traits\HasSecretManagerAutocomplete;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Add extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableAnalyzer;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, HasSecretManagerAutocomplete;
 
+    protected function secretManagerResource(): ?Model
+    {
+        if ($this->shared || ! $this->resource) {
+            return null;
+        }
+
+        return $this->resource;
+    }
+
+    public $resource;
+
+    #[Locked]
     public $parameters;
 
     public bool $shared = false;
 
     public bool $is_preview = false;
+
+    /** The resource has preview deployments, so a new variable also gets a preview copy. */
+    #[Locked]
+    public bool $showPreview = false;
+
+    public bool $copy_value_to_preview = true;
+
+    /** The application copies production values to new preview variables, so one variable can opt out. */
+    #[Locked]
+    public bool $canLeavePreviewValueEmpty = false;
 
     public string $key;
 
@@ -37,15 +67,24 @@ class Add extends Component
 
     protected $listeners = ['clearAddEnv' => 'clear'];
 
-    protected $rules = [
-        'key' => 'required|string',
-        'value' => 'nullable',
-        'is_multiline' => 'required|boolean',
-        'is_literal' => 'required|boolean',
-        'is_runtime' => 'required|boolean',
-        'is_buildtime' => 'required|boolean',
-        'comment' => 'nullable|string|max:256',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
+            'value' => 'nullable',
+            'is_multiline' => 'required|boolean',
+            'is_literal' => 'required|boolean',
+            'is_runtime' => 'required|boolean',
+            'is_buildtime' => 'required|boolean',
+            'comment' => 'nullable|string|max:256',
+            'copy_value_to_preview' => 'required|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return ValidationPatterns::environmentVariableKeyMessages('key');
+    }
 
     protected $validationAttributes = [
         'key' => 'key',
@@ -61,16 +100,20 @@ class Add extends Component
     {
         $this->parameters = get_route_parameters();
         $this->problematicVariables = self::getProblematicVariablesForFrontend();
+        $this->canLeavePreviewValueEmpty = $this->showPreview
+            && $this->resource instanceof Application
+            && $this->resource->settings?->use_production_values_in_previews !== false;
     }
 
     #[Computed]
     public function availableSharedVariables(): array
     {
-        $team = currentTeam();
+        $team = $this->resource ? $this->resource->team() : currentTeam();
         $result = [
             'team' => [],
             'project' => [],
             'environment' => [],
+            'server' => [],
         ];
 
         // Early return if no team
@@ -80,11 +123,11 @@ class Add extends Component
 
         // Check if user can view team variables
         try {
-            $this->authorize('view', $team);
+            $this->authorize('viewSharedVariables', $team);
             $result['team'] = $team->environment_variables()
                 ->pluck('key')
                 ->toArray();
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User not authorized to view team variables
         }
 
@@ -97,31 +140,91 @@ class Add extends Component
 
             if ($project) {
                 try {
-                    $this->authorize('view', $project);
+                    $this->authorize('viewSharedVariables', $project);
                     $result['project'] = $project->environment_variables()
                         ->pluck('key')
                         ->toArray();
+                } catch (AuthorizationException $e) {
+                    // User not authorized to view project variables
+                }
 
-                    // Get environment variables if we have an environment_uuid in route
-                    $environmentUuid = data_get($this->parameters, 'environment_uuid');
-                    if ($environmentUuid) {
-                        $environment = $project->environments()
-                            ->where('uuid', $environmentUuid)
-                            ->first();
+                // Get environment variables if we have an environment_uuid in route
+                $environmentUuid = data_get($this->parameters, 'environment_uuid');
+                if ($environmentUuid) {
+                    $environment = $project->environments()
+                        ->where('uuid', $environmentUuid)
+                        ->first();
 
-                        if ($environment) {
-                            try {
-                                $this->authorize('view', $environment);
-                                $result['environment'] = $environment->environment_variables()
-                                    ->pluck('key')
-                                    ->toArray();
-                            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-                                // User not authorized to view environment variables
-                            }
+                    if ($environment) {
+                        try {
+                            $this->authorize('viewSharedVariables', $environment);
+                            $result['environment'] = $environment->environment_variables()
+                                ->pluck('key')
+                                ->toArray();
+                        } catch (AuthorizationException $e) {
+                            // User not authorized to view environment variables
                         }
                     }
-                } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-                    // User not authorized to view project variables
+                }
+            }
+        }
+
+        // Get server variables
+        $serverUuid = data_get($this->parameters, 'server_uuid');
+        if ($serverUuid) {
+            // If we have a specific server_uuid, show variables for that server
+            $server = Server::where('team_id', $team->id)
+                ->where('uuid', $serverUuid)
+                ->first();
+
+            if ($server) {
+                try {
+                    $this->authorize('viewSharedVariables', $server);
+                    $result['server'] = $server->environment_variables()
+                        ->pluck('key')
+                        ->toArray();
+                } catch (AuthorizationException $e) {
+                    // User not authorized to view server variables
+                }
+            }
+        } else {
+            // For application environment variables, try to use the application's destination server
+            $applicationUuid = data_get($this->parameters, 'application_uuid');
+            if ($applicationUuid) {
+                $application = Application::whereRelation('environment.project.team', 'id', $team->id)
+                    ->where('uuid', $applicationUuid)
+                    ->with('destination.server')
+                    ->first();
+
+                if ($application && $application->destination && $application->destination->server) {
+                    try {
+                        $this->authorize('viewSharedVariables', $application->destination->server);
+                        $result['server'] = $application->destination->server->environment_variables()
+                            ->pluck('key')
+                            ->toArray();
+                    } catch (AuthorizationException $e) {
+                        // User not authorized to view server variables
+                    }
+                }
+            } else {
+                // For service environment variables, try to use the service's server
+                $serviceUuid = data_get($this->parameters, 'service_uuid');
+                if ($serviceUuid) {
+                    $service = Service::whereRelation('environment.project.team', 'id', $team->id)
+                        ->where('uuid', $serviceUuid)
+                        ->with('server')
+                        ->first();
+
+                    if ($service && $service->server) {
+                        try {
+                            $this->authorize('viewSharedVariables', $service->server);
+                            $result['server'] = $service->server->environment_variables()
+                                ->pluck('key')
+                                ->toArray();
+                        } catch (AuthorizationException $e) {
+                            // User not authorized to view server variables
+                        }
+                    }
                 }
             }
         }
@@ -131,6 +234,7 @@ class Add extends Component
 
     public function submit()
     {
+        $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
         $this->validate();
         $this->dispatch('saveKey', [
             'key' => $this->key,
@@ -141,6 +245,7 @@ class Add extends Component
             'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
             'comment' => $this->comment,
+            'copy_value_to_preview' => $this->canLeavePreviewValueEmpty ? $this->copy_value_to_preview : null,
         ]);
         $this->clear();
     }
@@ -154,5 +259,6 @@ class Add extends Component
         $this->is_runtime = true;
         $this->is_buildtime = true;
         $this->comment = null;
+        $this->copy_value_to_preview = true;
     }
 }

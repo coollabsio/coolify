@@ -6,6 +6,7 @@ enum NewResourceTypes: string
 {
     case PUBLIC = 'public';
     case PRIVATE_GH_APP = 'private-gh-app';
+    case PRIVATE_GITEA_APP = 'private-gitea-app';
     case PRIVATE_DEPLOY_KEY = 'private-deploy-key';
     case DOCKERFILE = 'dockerfile';
     case DOCKERCOMPOSE = 'dockercompose';
@@ -19,4 +20,5 @@ enum NewResourceTypes: string
     case KEYDB = 'keydb';
     case DRAGONFLY = 'dragonfly';
     case CLICKHOUSE = 'clickhouse';
+    case SQLITE = 'sqlite';
 }

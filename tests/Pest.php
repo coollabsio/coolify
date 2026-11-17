@@ -1,7 +1,13 @@
 <?php
 
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Once;
+use Livewire\Features\SupportTesting\Testable;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,23 +19,103 @@ use Illuminate\Support\Once;
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(Tests\TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
+
+/*
+|--------------------------------------------------------------------------
+| Shared Helpers
+|--------------------------------------------------------------------------
+|
+| Helper functions shared across multiple test files.
+|
+*/
+
+require_once __DIR__.'/Support/BrowserTestHelpers.php';
+require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
+require_once __DIR__.'/Support/StripeTestHelpers.php';
+require_once __DIR__.'/Support/RemoteProcessTestHelpers.php';
+
+function remoteOutputSource(string $path): string
+{
+    $fixturePath = dirname(__DIR__).'/'.$path;
+
+    if (! is_readable($fixturePath)) {
+        throw new RuntimeException("Unable to read source fixture: {$fixturePath}");
+    }
+
+    $source = file_get_contents($fixturePath);
+
+    if ($source === false) {
+        throw new RuntimeException("Unable to read source fixture: {$fixturePath}");
+    }
+
+    return $source;
+}
+
+/**
+ * Trigger the deferred mount of a #[Lazy] Livewire component the way the browser would
+ * via its x-intersect `__lazyLoad(...)` call, so assertions can run against the real
+ * (post-mount) render instead of the placeholder.
+ */
+function loadLazy(Testable $component): Testable
+{
+    preg_match('/__lazyLoad\(&#039;([^&]+)&#039;\)/', $component->html(), $matches);
+
+    if (empty($matches)) {
+        // No trigger means the component isn't lazy (or the placeholder markup changed).
+        // Fail loudly rather than silently asserting against the un-mounted placeholder,
+        // which would turn a lazy-load regression into a false-positive pass.
+        throw new RuntimeException('loadLazy: no __lazyLoad trigger found — component is not #[Lazy] or its placeholder markup changed.');
+    }
+
+    return $component->call('__lazyLoad', $matches[1]);
+}
 
 /*
 |--------------------------------------------------------------------------
 | Test Hooks
 |--------------------------------------------------------------------------
 |
-| Global hooks that run before/after each test.
+| Global hooks that run before/after each test. A bare beforeEach() in this file
+| only applies to tests in this file, so register them with uses()->in().
 |
 */
-beforeEach(function () {
+uses()->beforeEach(function () {
     // Flush the Once memoization cache to ensure tests get fresh data
     Once::flush();
 
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
-});
+
+})->in('Feature', 'Unit', 'v4');
+
+uses()->beforeEach(function () {
+    // Browser Livewire actions often dispatch events; disable broadcasting for host-side runs.
+    config(['broadcasting.default' => 'null']);
+})->in('v4/Browser');
+
+function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
+{
+    $page = visit('/login')
+        ->fill('email', $email)
+        ->fill('password', $password)
+        ->click('Login')
+        ->wait(1.5);
+
+    // First-login root users land on onboarding; skip when the control exists.
+    $page->script(<<<'JS'
+        (() => {
+            const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+            const skip = candidates.find((el) => (el.textContent || '').trim().toLowerCase() === 'skip setup');
+            if (skip) {
+                skip.click();
+            }
+        })()
+    JS);
+    $page->wait(1.5);
+
+    return $page;
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -61,3 +147,59 @@ beforeEach(function () {
 // {
 //     // ..
 // }
+
+/**
+ * Fakes all processes and keeps the content of every file that Server::uploadProxyFile()
+ * copies with scp, keyed by the remote upload path.
+ */
+function fakeProxyFileUploads(): void
+{
+    $GLOBALS['proxyFileUploads'] = [];
+    Process::fake(function (PendingProcess $process) {
+        if (preg_match("#'(/[^']*coolify-proxy-file-[^']+)'.*'(/tmp/coolify-upload-[0-9a-f]+)'#", (string) $process->command, $matches)) {
+            $GLOBALS['proxyFileUploads'][$matches[2]] = file_get_contents($matches[1]);
+        }
+
+        return Process::result();
+    });
+}
+
+/**
+ * The last content written to $file on the server, with Server::uploadProxyFile() or with
+ * `echo '<base64>' | base64 -d | tee $file`.
+ *
+ * @param  array<int, string>  $lines  remote script lines (see Process::assertRan)
+ */
+function writtenProxyFile(array $lines, string $file): ?string
+{
+    $content = null;
+    foreach ($lines as $line) {
+        if (preg_match('#mv -f (/tmp/coolify-upload-[0-9a-f]+) '.preg_quote($file, '#').'$#', $line, $matches)) {
+            $content = $GLOBALS['proxyFileUploads'][$matches[1]] ?? null;
+        } elseif (str_contains($line, "tee $file") && preg_match("/echo '([A-Za-z0-9+\/=]+)'/", $line, $matches)) {
+            $content = base64_decode($matches[1]);
+        }
+    }
+
+    return $content;
+}
+
+/**
+ * Inserts an environment variable next to one with the same key, like older versions could do.
+ * The model refuses such a row, so the insert skips it.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function insertDuplicateEnvironmentVariable(array $attributes): EnvironmentVariable
+{
+    $id = DB::table('environment_variables')->insertGetId([
+        'uuid' => new_public_id(),
+        'is_preview' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+        ...$attributes,
+        'value' => encrypt((string) ($attributes['value'] ?? '')),
+    ]);
+
+    return EnvironmentVariable::query()->findOrFail($id);
+}

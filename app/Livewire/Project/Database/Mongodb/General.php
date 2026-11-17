@@ -4,14 +4,11 @@ namespace App\Livewire\Project\Database\Mongodb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneMongodb;
 use App\Support\ValidationPatterns;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
@@ -40,32 +37,15 @@ class General extends Component
 
     public ?bool $isPublic = null;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
 
-    public ?int $publicPortTimeout = 3600;
+    public mixed $publicPortTimeout = 3600;
 
     public bool $isLogDrainEnabled = false;
 
     public ?string $customDockerRunOptions = null;
 
-    public bool $enableSsl = false;
-
-    public ?string $sslMode = null;
-
-    public ?string $db_url = null;
-
-    public ?string $db_url_public = null;
-
-    public ?Carbon $certificateValidUntil = null;
-
-    public function getListeners()
-    {
-        $userId = Auth::id();
-
-        return [
-            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-        ];
-    }
+    public bool $isPasswordHiddenForMember = false;
 
     protected function rules(): array
     {
@@ -73,18 +53,22 @@ class General extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'mongoConf' => 'nullable',
-            'mongoInitdbRootUsername' => 'required',
-            'mongoInitdbRootPassword' => 'required',
-            'mongoInitdbDatabase' => 'required',
+            'mongoInitdbRootUsername' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mongoInitdbRootUsername !== $this->database->mongo_initdb_root_username,
+            ),
+            'mongoInitdbRootPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->mongoInitdbRootPassword !== $this->database->mongo_initdb_root_password,
+            ),
+            'mongoInitdbDatabase' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->mongoInitdbDatabase !== $this->database->mongo_initdb_database,
+            ),
             'image' => 'required',
-            'portsMappings' => 'nullable',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
-            'publicPort' => 'nullable|integer',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'isLogDrainEnabled' => 'nullable|boolean',
             'customDockerRunOptions' => 'nullable',
-            'enableSsl' => 'boolean',
-            'sslMode' => 'nullable|string|in:allow,prefer,require,verify-full',
         ];
     }
 
@@ -92,16 +76,18 @@ class General extends Component
     {
         return array_merge(
             ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'mongoInitdbRootUsername.required' => 'The Root Username field is required.',
-                'mongoInitdbRootPassword.required' => 'The Root Password field is required.',
-                'mongoInitdbDatabase.required' => 'The MongoDB Database field is required.',
+                ...ValidationPatterns::databaseIdentifierMessages('mongoInitdbRootUsername', 'Root Username'),
+                ...ValidationPatterns::databasePasswordMessages('mongoInitdbRootPassword', 'Root Password'),
+                ...ValidationPatterns::databaseIdentifierMessages('mongoInitdbDatabase', 'MongoDB Database'),
                 'image.required' => 'The Docker Image field is required.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
                 'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
                 'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
-                'sslMode.in' => 'The SSL Mode must be one of: allow, prefer, require, verify-full.',
             ]
         );
     }
@@ -119,8 +105,6 @@ class General extends Component
         'publicPort' => 'Public Port',
         'publicPortTimeout' => 'Public Port Timeout',
         'customDockerRunOptions' => 'Custom Docker Run Options',
-        'enableSsl' => 'Enable SSL',
-        'sslMode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -134,18 +118,14 @@ class General extends Component
 
                 return;
             }
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if ($existingCert) {
-                $this->certificateValidUntil = $existingCert->valid_until;
-            }
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -158,22 +138,19 @@ class General extends Component
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
-            $this->database->public_port = $this->publicPort;
-            $this->database->public_port_timeout = $this->publicPortTimeout;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
-            $this->database->enable_ssl = $this->enableSsl;
-            $this->database->ssl_mode = $this->sslMode;
             $this->database->save();
-
-            $this->db_url = $this->database->internal_db_url;
-            $this->db_url_public = $this->database->external_db_url;
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mongoConf = $this->database->mongo_conf;
+            $this->mongoConf = $canSeeCredentials ? $this->database->mongo_conf : null;
             $this->mongoInitdbRootUsername = $this->database->mongo_initdb_root_username;
-            $this->mongoInitdbRootPassword = $this->database->mongo_initdb_root_password;
+            $this->mongoInitdbRootPassword = $canSeeCredentials ? $this->database->mongo_initdb_root_password : '';
             $this->mongoInitdbDatabase = $this->database->mongo_initdb_database;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
@@ -181,11 +158,7 @@ class General extends Component
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
-            $this->enableSsl = $this->database->enable_ssl;
-            $this->sslMode = $this->database->ssl_mode;
-            $this->db_url = $this->database->internal_db_url;
-            $this->db_url_public = $this->database->external_db_url;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 
@@ -213,6 +186,9 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }
@@ -221,6 +197,7 @@ class General extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
@@ -257,61 +234,12 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
-            return handleError($e, $this);
-        }
-    }
-
-    public function updatedSslMode()
-    {
-        $this->instantSaveSSL();
-    }
-
-    public function instantSaveSSL()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $this->syncData(true);
-            $this->dispatch('success', 'SSL configuration updated.');
-        } catch (Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function regenerateSslCertificate()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if (! $existingCert) {
-                $this->dispatch('error', 'No existing SSL certificate found for this database.');
-
-                return;
-            }
-
-            $caCert = $this->server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            SslHelper::generateSslCertificate(
-                commonName: $existingCert->common_name,
-                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
-                resourceType: $existingCert->resource_type,
-                resourceId: $existingCert->resource_id,
-                serverId: $existingCert->server_id,
-                caCert: $caCert->ssl_certificate,
-                caKey: $caCert->ssl_private_key,
-                configurationDir: $existingCert->configuration_dir,
-                mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
-            );
-
-            $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
-        } catch (Exception $e) {
             return handleError($e, $this);
         }
     }

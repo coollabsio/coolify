@@ -1,12 +1,27 @@
 <?php
 
+use App\Models\Application;
+use App\Models\ApplicationSetting;
+
 /**
- * Security tests for git ref validation (GHSA-mw5w-2vvh-mgf4).
+ * Split a command into words the way /bin/sh does. The words are only printed,
+ * so a correctly quoted command cannot run any part of its payload.
+ *
+ * @return array<int, string>
+ */
+function gitRefShellWords(string $command): array
+{
+    $output = shell_exec('for word in '.$command.'; do printf "%s\\0" "$word"; done');
+
+    return explode("\0", rtrim((string) $output, "\0"));
+}
+
+/**
+ * Tests for git ref validation.
  *
  * Ensures that git_commit_sha and related inputs are validated
  * to prevent OS command injection via shell metacharacters.
  */
-
 describe('validateGitRef', function () {
     test('accepts valid hex commit SHAs', function () {
         expect(validateGitRef('abc123def456'))->toBe('abc123def456');
@@ -93,31 +108,33 @@ describe('validateGitRef', function () {
 describe('executeInDocker git log escaping', function () {
     test('git log command escapes commit SHA to prevent injection', function () {
         $maliciousCommit = "HEAD'; id; #";
-        $command = "cd /workdir && git log -1 ".escapeshellarg($maliciousCommit).' --pretty=%B';
+        $command = 'cd /workdir && git log -1 '.escapeshellarg($maliciousCommit).' --pretty=%B';
         $result = executeInDocker('test-container', $command);
 
-        // The malicious payload must not be able to break out of quoting
-        expect($result)->not->toContain("id;");
-        expect($result)->toContain("'HEAD'\\''");
+        // The whole git command stays one bash -c argument.
+        expect(gitRefShellWords($result))->toBe(['docker', 'exec', 'test-container', 'bash', '-c', $command]);
+
+        // Inside bash -c, the malicious payload stays one git log argument.
+        expect(gitRefShellWords(str($command)->after('&& ')->toString()))
+            ->toBe(['git', 'log', '-1', $maliciousCommit, '--pretty=%B']);
     });
 });
 
 describe('buildGitCheckoutCommand escaping', function () {
     test('checkout command escapes target to prevent injection', function () {
-        $app = new \App\Models\Application;
-        $app->forceFill(['uuid' => 'test-uuid']);
+        $app = new Application;
+        $app->fill(['uuid' => 'test-uuid']);
 
-        $settings = new \App\Models\ApplicationSetting;
+        $settings = new ApplicationSetting;
         $settings->is_git_submodules_enabled = false;
         $app->setRelation('settings', $settings);
 
-        $method = new \ReflectionMethod($app, 'buildGitCheckoutCommand');
+        $method = new ReflectionMethod($app, 'buildGitCheckoutCommand');
 
-        $result = $method->invoke($app, 'abc123');
+        $result = $method->invoke($app, 'abc123', gitSshCommand('test-uuid'));
         expect($result)->toContain("git checkout 'abc123'");
 
-        $result = $method->invoke($app, "abc'; id; #");
-        expect($result)->not->toContain("id;");
-        expect($result)->toContain("git checkout 'abc'");
+        $result = $method->invoke($app, "abc'; id; #", gitSshCommand('test-uuid'));
+        expect(gitRefShellWords($result))->toBe(['git', 'checkout', "abc'; id; #"]);
     });
 });

@@ -70,3 +70,18 @@
   src: url('../fonts/inter-v13-cyrillic_cyrillic-ext_greek_greek-ext_latin_latin-ext_vietnamese-regular.woff2') format('woff2');
 }
 
+@font-face {
+  font-display: swap;
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('../fonts/geist-mono-variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('../fonts/geist-sans-variable.woff2') format('woff2');
+}

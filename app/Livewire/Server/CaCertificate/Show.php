@@ -71,8 +71,13 @@ class Show extends Component
             $this->certificateContent = $cleanedCertificate;
 
             if ($this->caCertificate) {
+                if (! openssl_x509_check_private_key($this->certificateContent, $this->caCertificate->ssl_private_key)) {
+                    throw new \Exception('This certificate does not match the CA private key of this server. Coolify signs database certificates with that key, so clients would fail with a certificate signature error.');
+                }
+
                 $this->caCertificate->ssl_certificate = $this->certificateContent;
                 $this->caCertificate->save();
+                auditLog('ui.server.ca_certificate.updated', $this->auditContext());
 
                 $this->loadCaCertificate();
 
@@ -99,6 +104,7 @@ class Show extends Component
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
+            auditLog('ui.server.ca_certificate.regenerated', $this->auditContext());
 
             $this->loadCaCertificate();
 
@@ -118,20 +124,23 @@ class Show extends Component
 
     private function writeCertificateToServer()
     {
-        $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-        $base64Cert = base64_encode($this->certificateContent);
-
-        $commands = collect([
-            "mkdir -p $caCertPath",
-            "chown -R 9999:root $caCertPath",
-            "chmod -R 700 $caCertPath",
-            "rm -rf $caCertPath/coolify-ca.crt",
-            "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-            "chmod 644 $caCertPath/coolify-ca.crt",
-        ]);
+        $commands = SslHelper::caCertificateFileCommands($this->certificateContent);
 
         remote_process($commands, $this->server);
+    }
+
+    /**
+     * Identifies the server only. Certificate and key contents must never reach the audit log.
+     *
+     * @return array<string, mixed>
+     */
+    private function auditContext(): array
+    {
+        return [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ];
     }
 
     public function render()

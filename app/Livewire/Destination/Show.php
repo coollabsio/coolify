@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Destination;
 
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -20,42 +20,43 @@ class Show extends Component
     #[Validate(['string', 'required'])]
     public string $name;
 
-    #[Validate(['string', 'required'])]
+    #[Locked]
     public string $network;
 
-    #[Validate(['string', 'required'])]
+    #[Locked]
     public string $serverIp;
 
     public function mount(string $destination_uuid)
     {
         try {
-            $destination = StandaloneDocker::whereUuid($destination_uuid)->first() ??
-                SwarmDocker::whereUuid($destination_uuid)->firstOrFail();
-
-            $ownedByTeam = Server::ownedByCurrentTeam()->each(function ($server) use ($destination) {
-                if ($server->standaloneDockers->contains($destination) || $server->swarmDockers->contains($destination)) {
-                    $this->destination = $destination;
-                    $this->syncData();
-                }
-            });
-            if ($ownedByTeam === false) {
+            $destination = find_destination_for_current_team($destination_uuid);
+            if (! $destination) {
                 return redirect()->route('destination.index');
             }
+            $this->authorize('view', $destination);
+
             $this->destination = $destination;
             $this->syncData();
+        } catch (AuthorizationException) {
+            abort(403);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
             $this->destination->name = $this->name;
-            $this->destination->network = $this->network;
-            $this->destination->server->ip = $this->serverIp;
+            $changedFields = auditChangedFields($this->destination);
             $this->destination->save();
+            $this->dispatch('name-changed', uuid: $this->destination->uuid, name: $this->destination->name);
+            if ($changedFields !== []) {
+                auditLog('ui.destination.updated', $this->auditContext([
+                    'changed_fields' => $changedFields,
+                ]));
+            }
         } else {
             $this->name = $this->destination->name;
             $this->network = $this->destination->network;
@@ -80,19 +81,37 @@ class Show extends Component
         try {
             $this->authorize('delete', $this->destination);
 
-            if ($this->destination->getMorphClass() === \App\Models\StandaloneDocker::class) {
+            if ($this->destination->getMorphClass() === StandaloneDocker::class) {
                 if ($this->destination->attachedTo()) {
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
                 }
-                instant_remote_process(["docker network disconnect {$this->destination->network} coolify-proxy"], $this->destination->server, throwError: false);
-                instant_remote_process(['docker network rm -f '.$this->destination->network], $this->destination->server);
+                $safeNetwork = escapeshellarg($this->destination->network);
+                instant_remote_process(["docker network disconnect {$safeNetwork} coolify-proxy"], $this->destination->server, throwError: false);
+                instant_remote_process([dockerNetworkRemoveCommand($this->destination->network)], $this->destination->server);
             }
+            $auditContext = $this->auditContext();
             $this->destination->delete();
+            auditLog('ui.destination.deleted', $auditContext);
 
-            return redirect()->route('destination.index');
+            return redirectRoute($this, 'destination.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->destination->server?->team_id,
+            'destination_uuid' => $this->destination->uuid,
+            'destination_name' => $this->destination->name,
+            'destination_type' => $this->destination instanceof SwarmDocker ? 'swarm' : 'standalone',
+            'server_uuid' => $this->destination->server?->uuid,
+        ], $context);
     }
 
     public function render()

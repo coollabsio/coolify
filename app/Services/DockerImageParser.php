@@ -20,15 +20,15 @@ class DockerImageParser
             $this->tag = $matches[2];
             $this->isImageHash = true;
         } else {
-            // Split by : to handle the tag, but be careful with registry ports
-            $lastColon = strrpos($imageString, ':');
-            $hasSlash = str_contains($imageString, '/');
+            // The tag starts at the first colon after the last slash. A colon before
+            // the last slash is a registry port, and a later colon can be part of a
+            // ${VAR:-default} tag.
+            $lastSlash = strrpos($imageString, '/');
+            $tagColon = strpos($imageString, ':', $lastSlash === false ? 0 : $lastSlash + 1);
 
-            // If the last colon appears after the last slash, it's a tag
-            // Otherwise it might be a port in the registry URL
-            if ($lastColon !== false && (! $hasSlash || $lastColon > strrpos($imageString, '/'))) {
-                $mainPart = substr($imageString, 0, $lastColon);
-                $this->tag = substr($imageString, $lastColon + 1);
+            if ($tagColon !== false) {
+                $mainPart = substr($imageString, 0, $tagColon);
+                $this->tag = substr($imageString, $tagColon + 1);
 
                 // Check if the tag is a SHA256 hash
                 $this->isImageHash = $this->isSha256Hash($this->tag);

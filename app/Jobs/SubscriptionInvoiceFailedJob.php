@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
 class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -27,7 +28,7 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
             $subscription = $this->team->subscription;
             if ($subscription && $subscription->stripe_customer_id) {
                 try {
-                    $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                    $stripe = app(StripeClient::class);
 
                     if ($subscription->stripe_subscription_id) {
                         $stripeSubscription = $stripe->subscriptions->retrieve($subscription->stripe_subscription_id);
@@ -42,21 +43,23 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 
                             return;
                         }
-                    }
 
-                    $invoices = $stripe->invoices->all([
-                        'customer' => $subscription->stripe_customer_id,
-                        'limit' => 3,
-                    ]);
+                        // Only an invoice of this subscription proves payment, not one of an older subscription of the customer.
+                        $invoices = $stripe->invoices->all([
+                            'customer' => $subscription->stripe_customer_id,
+                            'subscription' => $subscription->stripe_subscription_id,
+                            'limit' => 3,
+                        ]);
 
-                    foreach ($invoices->data as $invoice) {
-                        if ($invoice->paid && $invoice->created > (time() - 3600)) {
-                            $subscription->update([
-                                'stripe_invoice_paid' => true,
-                                'stripe_past_due' => false,
-                            ]);
+                        foreach ($invoices->data as $invoice) {
+                            if ($invoice->paid && $invoice->created > (time() - 3600)) {
+                                $subscription->update([
+                                    'stripe_invoice_paid' => true,
+                                    'stripe_past_due' => false,
+                                ]);
 
-                            return;
+                                return;
+                            }
                         }
                     }
                 } catch (\Exception $e) {

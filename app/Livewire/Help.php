@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Validate;
@@ -15,7 +16,7 @@ class Help extends Component
     #[Validate(['required', 'min:10', 'max:1000'])]
     public string $description;
 
-    #[Validate(['required', 'min:3'])]
+    #[Validate(['required', 'min:3', 'max:600'])]
     public string $subject;
 
     public function submit()
@@ -38,9 +39,18 @@ class Help extends Component
             // Sending feedback through Cloud API
             if (blank($type)) {
                 $url = 'https://app.coolify.io/api/feedback';
-                Http::post($url, [
-                    'content' => 'User: `'.auth()->user()?->email.'` with subject: `'.$this->subject.'` has the following problem: `'.$this->description.'`',
-                ]);
+                try {
+                    $response = Http::timeout(10)->post($url, [
+                        'content' => 'User: `'.auth()->user()?->email.'` with subject: `'.$this->subject.'` has the following problem: `'.$this->description.'`',
+                    ]);
+                } catch (ConnectionException) {
+                    $response = null;
+                }
+                if (! $response?->successful()) {
+                    $this->dispatch('error', 'Feedback could not be sent.', 'Please try again later or contact us on Discord.');
+
+                    return;
+                }
             } else {
                 send_user_an_email($mail, auth()->user()?->email, 'feedback@coollabs.io');
             }
