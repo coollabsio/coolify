@@ -1557,6 +1557,13 @@ class Show extends Component
         return NodeOperation::query()
             ->where('node_workload_id', $this->workload->id)
             ->whereIn('command_type', self::DEPLOYMENT_COMMAND_TYPES)
+            // The deploy on the target of a move is part of the move row, not a row of its own.
+            ->where(fn (Builder $query) => $query->whereNull('request->part_of_move')->orWhere('request->part_of_move', false))
+            ->whereNotIn('uuid', NodeOperation::query()
+                ->where('node_workload_id', $this->workload->id)
+                ->where('command_type', 'workload.move.v1')
+                ->whereNotNull('result->deployment_operation_uuid')
+                ->select('result->deployment_operation_uuid'))
             ->when($statuses->isNotEmpty(), fn (Builder $query) => $query->whereIn('status', $statuses->all()))
             ->when($serverUuids->isNotEmpty(), fn (Builder $query) => $query->whereHas('node', fn (Builder $node) => $node->whereIn('uuid', $serverUuids->all())))
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match

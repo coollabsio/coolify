@@ -131,7 +131,8 @@ class CreateDeploymentOperation
                 "deploy:{$node->uuid}:{$revision->uuid}:".Str::uuid(),
                 $workload,
                 $revision,
-                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash, 'pull_policy' => $pullPolicy],
+                // A move shows its own row in the deployment history; its deploy is part of it.
+                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash, 'pull_policy' => $pullPolicy, ...($partOfMove ? ['part_of_move' => true] : [])],
                 $requestedBy,
             );
             if ($notificationGroup !== null) {
