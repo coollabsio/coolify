@@ -2,7 +2,6 @@
 
 namespace App\Actions\Node\Build;
 
-use App\Actions\Node\CleanupNodeImages;
 use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
@@ -88,9 +87,10 @@ class FetchNodeImage
             ->where('image', $image)
             ->pluck('id');
         $ranOnTarget = $this->ranOn($target, $revisionIds);
-        if ($ranOnTarget && (NodeContainer::query()->where('node_id', $target->id)->whereIn('node_workload_revision_id', $revisionIds)->exists()
-            || in_array($image, CleanupNodeImages::keepList($target), true))) {
-            // The target has the image: it runs it, or the image cleanup keeps it there (decision 0027).
+        if (NodeContainer::query()->where('node_id', $target->id)->whereIn('node_workload_revision_id', $revisionIds)->exists()) {
+            // A container of the image is on the target, so Podman keeps the image there. Without
+            // one, the image can be gone (a prune or a manual removal): the copy then checks it, and
+            // Sentinel succeeds at once when the target has the image.
             return null;
         }
         $deadline ??= now()->addSeconds(self::MAX_SECONDS);
