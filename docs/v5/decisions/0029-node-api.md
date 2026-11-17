@@ -97,6 +97,17 @@ the backup schedule of a database.
     already is a Node of the team. They need a team admin. The UI asks for the
     password before it deletes a cluster. The API does not, as for the other
     deletes of v4, because the token is the proof.
+12. **Node delete and the recovery actions of a cluster.** `DELETE /nodes/{uuid}`
+    calls `DeleteNode`, the action of the Node page: the Node must be in no
+    cluster and run no applications, else the API answers 400 with the message
+    of the page. The delete removes only the record. Coolify runs no command on
+    the server, so Sentinel and the data stay on it. A Node has no server
+    transfer, so the rule of `Server::isTransferredAway()` does not apply.
+    `POST /clusters/{uuid}/network/reconcile`, `.../network/repair`, and
+    `.../sentinel/upgrade` call `ManageNodeClusterNetwork`, the action of the
+    cluster page. The repair runs over SSH and waits for each server. The
+    Sentinel upgrade runs one server at a time (decision 0013), and answers 400
+    when each server is up to date. Each call needs a team admin.
 
 ## Endpoints
 
@@ -122,8 +133,9 @@ the backup schedule of a database.
   execute now, and list the runs with their output.
 - **Clusters and Nodes.** List and show. For admins: create, change the
   settings, and delete a cluster, add a server to a cluster and remove it, list,
-  add, and delete the firewall rules, set the ingress and builder roles of a
-  Node, start an image cleanup, and upgrade Sentinel.
+  add, and delete the firewall rules, reconcile and repair the network, upgrade
+  Sentinel on the cluster, delete a Node, set the ingress and builder roles of
+  a Node, start an image cleanup, and upgrade Sentinel on a Node.
 
 ## Consequences
 
@@ -137,12 +149,8 @@ the backup schedule of a database.
 - **Terminal and exec.** A terminal session is interactive. v4 has no exec
   call in its API, so the cluster API has none. A scheduled task with
   `execute` runs one command in the container of a workload.
-- **Create and delete of a Node.** A new Node needs the onboarding steps of the
-  UI: an SSH key, an SSH check, and the install of Sentinel with the answers of
-  the user. No shared action does these steps without the UI. The delete of a
-  Node is logic of the Node page, not a shared action.
-- **Network repair, network reconcile, and the Sentinel upgrade of a cluster.**
-  These are recovery buttons of the cluster page. Their logic is in the page,
-  not in a shared action.
+- **Create of a Node.** A new Node needs the onboarding steps of the UI: an
+  SSH key, an SSH check, and the install of Sentinel with the answers of the
+  user. No shared action does these steps without the UI.
 - **The delete of one backup run.** The page asks for the password, and the
   delete of the files in S3 is logic of the page.
