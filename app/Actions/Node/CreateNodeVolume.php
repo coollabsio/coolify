@@ -16,11 +16,19 @@ class CreateNodeVolume
 {
     use AsAction;
 
+    public const MOUNT_PATH_ERROR = 'Enter an absolute path inside the container, for example /data. It cannot be /, contain .., a comma, or a null byte.';
+
+    /**
+     * The caller validates the name: the add form and the API with nameRules(), a Compose file
+     * with its own rules.
+     *
+     * @throws ValidationException `mount_path`.
+     */
     public function handle(NodeWorkload $workload, string $name, string $mountPath): NodeVolume
     {
         $path = self::normalizeMountPath($mountPath);
         if ($path === null) {
-            throw ValidationException::withMessages(['mount_path' => 'Enter an absolute path inside the container, for example /data. It cannot be /, contain .., a comma, or a null byte.']);
+            throw ValidationException::withMessages(['mount_path' => self::MOUNT_PATH_ERROR]);
         }
 
         return DB::transaction(function () use ($workload, $name, $path): NodeVolume {
@@ -45,6 +53,18 @@ class CreateNodeVolume
                 'mount_path' => $path,
             ]);
         });
+    }
+
+    /** @return list<string> The rules of a volume name of the add form and the API. */
+    public static function nameRules(): array
+    {
+        return ['required', 'string', 'max:255', 'regex:/\A[\pL\pN ._-]+\z/u'];
+    }
+
+    /** @return array<string, string> */
+    public static function nameMessages(): array
+    {
+        return ['name.regex' => 'Use letters, numbers, spaces, dots, dashes, and underscores.'];
     }
 
     /**

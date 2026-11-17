@@ -7,14 +7,12 @@ use App\Actions\Node\Build\InspectNodeRegistry;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchLatestSentinelRelease;
-use App\Actions\Node\QueueNodeClusterNetworkRevision;
+use App\Actions\Node\ManageNodeClusterSettings;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
-use App\Actions\Node\UpdateNodeCluster;
 use App\Actions\Node\UpgradeSentinel;
-use App\Enums\NodeImageStorage;
 use App\Enums\NodeWorkloadState;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Jobs\UpgradeClusterSentinelJob;
@@ -22,20 +20,16 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\RegistryCredential;
-use App\Rules\PrivateIpv4Cidr;
-use App\Services\DockerRegistryLogins;
-use App\Support\ValidationPatterns;
 use DomainException;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -113,31 +107,17 @@ class Show extends Component
     public function saveSettings(): void
     {
         $this->authorize('update', $this->cluster);
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('node_clusters')->where('team_id', $this->cluster->team_id)->ignore($this->cluster->id)],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'cidr' => ['required', new PrivateIpv4Cidr],
-            'wireguardInterface' => ['required', 'regex:/^[a-zA-Z0-9_.-]{1,15}$/'],
-            'wireguardPort' => ['required', 'integer', 'between:1,65535'],
-        ]);
-        if ($this->cluster->hasActivatedNetwork()) {
-            foreach (['cidr' => 'cidr', 'wireguardInterface' => 'wireguard_interface', 'wireguardPort' => 'wireguard_port'] as $field => $column) {
-                if ($validated[$field] !== $this->cluster->{$column}) {
-                    $this->addError($field, 'This network setting cannot be changed on an active cluster.');
-
-                    return;
-                }
-            }
-        }
-        if ($validated['cidr'] !== $this->cluster->cidr && $this->cluster->nodes()->exists()) {
-            $this->addError('cidr', 'Remove all servers from this cluster before changing its CIDR.');
-
-            return;
-        }
+        $this->resetErrorBag();
         try {
-            $this->cluster = UpdateNodeCluster::run($this->cluster, $validated['name'], blank($validated['description']) ? null : $validated['description'], $validated['cidr'], $validated['wireguardInterface'], $validated['wireguardPort']);
-        } catch (DomainException $exception) {
-            $this->addError('cidr', $exception->getMessage());
+            $this->cluster = ManageNodeClusterSettings::make()->updateSettings($this->cluster, [
+                'name' => $this->name,
+                'description' => $this->description,
+                'cidr' => $this->cidr,
+                'wireguard_interface' => $this->wireguardInterface,
+                'wireguard_port' => $this->wireguardPort,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addErrors($exception, ['wireguard_interface' => 'wireguardInterface', 'wireguard_port' => 'wireguardPort']);
 
             return;
         }
@@ -166,19 +146,24 @@ class Show extends Component
     public function savePressurePolicy(): void
     {
         $this->authorize('update', $this->cluster);
-        $validated = $this->validate([
-            'cpuPressureThreshold' => ['required', 'integer', 'between:1,100'],
-            'memoryPressureThreshold' => ['required', 'integer', 'between:1,100'],
-            'diskPressureThreshold' => ['required', 'integer', 'between:1,100'],
-            'resourceStaleAfterMinutes' => ['required', 'integer', 'between:1,60'],
-        ]);
-        $this->cluster->update([
-            'cpu_pressure_threshold' => $validated['cpuPressureThreshold'],
-            'memory_pressure_threshold' => $validated['memoryPressureThreshold'],
-            'disk_pressure_threshold' => $validated['diskPressureThreshold'],
-            'resource_stale_after_minutes' => $validated['resourceStaleAfterMinutes'],
-        ]);
-        $this->cluster->refresh();
+        $this->resetErrorBag();
+        try {
+            $this->cluster = ManageNodeClusterSettings::make()->updatePressurePolicy($this->cluster, [
+                'cpu_pressure_threshold' => $this->cpuPressureThreshold,
+                'memory_pressure_threshold' => $this->memoryPressureThreshold,
+                'disk_pressure_threshold' => $this->diskPressureThreshold,
+                'resource_stale_after_minutes' => $this->resourceStaleAfterMinutes,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addErrors($exception, [
+                'cpu_pressure_threshold' => 'cpuPressureThreshold',
+                'memory_pressure_threshold' => 'memoryPressureThreshold',
+                'disk_pressure_threshold' => 'diskPressureThreshold',
+                'resource_stale_after_minutes' => 'resourceStaleAfterMinutes',
+            ]);
+
+            return;
+        }
         $this->fillFromCluster();
         $this->dispatch('success', 'Deployment pressure policy saved.');
     }
@@ -242,22 +227,19 @@ class Show extends Component
     public function setRegistryNode(string $nodeUuid = ''): void
     {
         $this->authorize('update', $this->cluster);
-        $registry = $this->cluster->registry;
-        if ($registry === null) {
-            $this->dispatch('error', 'The cluster has no image registry yet. It is created with the first Git application.');
-
-            return;
-        }
-        $nodeId = $nodeUuid === '' ? null : Node::query()
+        $node = $nodeUuid === '' ? null : Node::query()
             ->where('team_id', $this->cluster->team_id)
             ->where('node_cluster_id', $this->cluster->id)
             ->where('uuid', $nodeUuid)
-            ->firstOrFail()->id;
-        $registry->update(['selected_node_id' => $nodeId]);
-        if ($this->cluster->refresh()->syncRegistryNode()) {
-            QueueNodeClusterNetworkRevision::run($this->cluster, auth()->user());
+            ->firstOrFail();
+        try {
+            ManageNodeClusterSettings::make()->setRegistryNode($this->cluster, $node, auth()->user());
+        } catch (RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
         }
-        $this->dispatch('success', $nodeId === null
+        $this->dispatch('success', $node === null
             ? 'The registry runs on the first available server.'
             : 'The registry moves to the selected server. Images stored on the previous server are rebuilt on the next deploy.');
     }
@@ -269,46 +251,17 @@ class Show extends Component
     public function saveImageStorage(): void
     {
         $this->authorize('update', $this->cluster);
-        $external = $this->imageStorage === NodeImageStorage::EXTERNAL->value;
-        $validated = $this->validate([
-            'imageStorage' => ['required', Rule::in([NodeImageStorage::EXTERNAL->value, NodeImageStorage::BUILT_IN->value])],
-            'imageRepository' => $external
-                ? [...ValidationPatterns::dockerImageNameRules(required: true), 'not_regex:/@/', 'not_regex:/:[^\/]*$/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//']
-                : ['nullable'],
-            'imageRegistryCredentialUuid' => ['nullable', 'string'],
-        ], [
-            'imageRepository.not_regex' => 'Enter a repository without a tag or digest, outside the cluster, for example ghcr.io/acme/coolify-builds.',
-        ], [
-            'imageStorage' => 'image storage',
-            'imageRepository' => 'repository',
-            'imageRegistryCredentialUuid' => 'registry credential',
-        ]);
-        $repository = $external ? trim($validated['imageRepository']) : null;
-        $credential = null;
-        if ($external && $this->imageRegistryCredentialUuid !== '') {
-            $credential = RegistryCredential::query()->where('team_id', $this->cluster->team_id)->where('uuid', $this->imageRegistryCredentialUuid)->first();
-            if ($credential === null) {
-                $this->addError('imageRegistryCredentialUuid', 'Select a registry credential of this team.');
+        $this->resetErrorBag();
+        try {
+            $changed = ManageNodeClusterSettings::make()->updateImageStorage($this->cluster, $this->imageStorage, $this->imageRepository, $this->imageRegistryCredentialUuid, auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addErrors($exception, ['image_storage' => 'imageStorage', 'image_repository' => 'imageRepository', 'image_registry_credential_uuid' => 'imageRegistryCredentialUuid']);
 
-                return;
-            }
-            if (! $credential->matchesImage($repository)) {
-                $this->addError('imageRegistryCredentialUuid', "This credential is for {$credential->registry}, but the repository is in ".DockerRegistryLogins::registryFromImage($repository).'.');
-
-                return;
-            }
+            return;
         }
-        $previous = $this->cluster->image_storage;
-        $this->cluster->update([
-            'image_storage' => $validated['imageStorage'],
-            'image_repository' => $repository,
-            'image_registry_credential_id' => $credential?->id,
-        ]);
-        if ($this->cluster->refresh()->syncRegistryNode()) {
-            QueueNodeClusterNetworkRevision::run($this->cluster, auth()->user());
-        }
+        $this->cluster->refresh();
         $this->fillFromCluster();
-        $this->dispatch('success', $previous !== null && $previous !== $this->cluster->image_storage
+        $this->dispatch('success', $changed
             ? 'Image storage saved. Deploy each Git application again, so that its image is in the new storage.'
             : 'Image storage saved.');
     }
@@ -374,64 +327,23 @@ class Show extends Component
     public function createFirewallRule(string $sourceType, string $sourceUuid, string $destinationUuid, string $protocol, int $port): ?array
     {
         $this->authorize('update', $this->cluster);
-        $validated = validator([
-            'sourceType' => $sourceType,
-            'sourceUuid' => $sourceUuid,
-            'destinationUuid' => $destinationUuid,
-            'protocol' => $protocol,
-            'port' => $protocol === 'icmp' ? 0 : $port,
-        ], [
-            'sourceType' => ['required', Rule::in(['workload', 'node'])],
-            'sourceUuid' => ['required', 'string'],
-            'destinationUuid' => ['required', 'string'],
-            'protocol' => ['required', Rule::in(['tcp', 'udp', 'icmp'])],
-            'port' => $protocol === 'icmp' ? ['required', 'integer', 'in:0'] : ['required', 'integer', 'between:1,65535'],
-        ])->validate();
+        try {
+            $result = ManageNodeClusterSettings::make()->addFirewallRule($this->cluster, $sourceType, $sourceUuid, $destinationUuid, $protocol, $port, auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addErrors($exception, ['source' => 'firewallSourceUuid', 'destination' => 'firewallDestinationUuid', 'source_type' => 'firewallSourceUuid', 'protocol' => 'firewallProtocol', 'port' => 'firewallPort']);
 
-        $sourceWorkload = $sourceType === 'workload' ? $this->meshWorkloads()->where('uuid', $sourceUuid)->first() : null;
-        $sourceNode = $sourceType === 'node'
-            ? Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $sourceUuid)->first()
-            : null;
-        $destination = $this->meshWorkloads()->where('uuid', $validated['destinationUuid'])->first();
-        if ($sourceWorkload === null && $sourceNode === null) {
-            $this->addError('firewallSourceUuid', 'Select a workload or server from this mesh.');
-        }
-        if ($destination === null) {
-            $this->addError('firewallDestinationUuid', 'Select a workload from this mesh.');
-        }
-        if ($sourceWorkload?->id === $destination?->id) {
-            $this->addError('firewallDestinationUuid', 'The source and destination must be different applications.');
-        }
-        if ($this->getErrorBag()->isNotEmpty()) {
             return null;
         }
-
-        $result = DB::transaction(function () use ($validated, $sourceWorkload, $sourceNode, $destination): array {
-            $rule = NodeFirewallRule::query()->firstOrCreate([
-                'node_cluster_id' => $this->cluster->id,
-                'source_workload_id' => $sourceWorkload?->id,
-                'source_node_id' => $sourceNode?->id,
-                'destination_workload_id' => $destination->id,
-                'protocol' => $validated['protocol'],
-                'port' => $validated['port'],
-            ]);
-            if ($rule->wasRecentlyCreated) {
-                $this->cluster->increment('desired_revision');
-            }
-
-            return ['created' => $rule->wasRecentlyCreated, 'rule' => $rule];
-        });
         if ($result['created']) {
-            $this->queueNetworkReconciliation();
             $this->dispatchFirewallRulesChanged();
         }
         $this->dispatch('success', $result['created'] ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
 
         return [
             'uuid' => $result['rule']->uuid,
-            'sourceType' => $validated['sourceType'],
-            'sourceUuid' => $validated['sourceUuid'],
-            'destinationUuid' => $validated['destinationUuid'],
+            'sourceType' => $sourceType,
+            'sourceUuid' => $sourceUuid,
+            'destinationUuid' => $destinationUuid,
             'protocol' => $result['rule']->protocol,
             'port' => $result['rule']->port,
         ];
@@ -440,15 +352,8 @@ class Show extends Component
     public function removeFirewallRule(string $ruleUuid): void
     {
         $this->authorize('update', $this->cluster);
-        DB::transaction(function () use ($ruleUuid): void {
-            NodeFirewallRule::query()
-                ->where('node_cluster_id', $this->cluster->id)
-                ->where('uuid', $ruleUuid)
-                ->firstOrFail()
-                ->delete();
-            $this->cluster->increment('desired_revision');
-        });
-        $this->queueNetworkReconciliation();
+        $rule = NodeFirewallRule::query()->where('node_cluster_id', $this->cluster->id)->where('uuid', $ruleUuid)->firstOrFail();
+        ManageNodeClusterSettings::make()->removeFirewallRule($this->cluster, $rule, auth()->user());
         $this->dispatchFirewallRulesChanged();
         $this->dispatch('success', 'Firewall rule removed and reconciliation queued.');
     }
@@ -701,17 +606,19 @@ class Show extends Component
 
     private function meshWorkloads(): Builder
     {
-        // A preview gets the outbound rules of its parent (decision 0025), so it is not a rule endpoint or a listed resource.
-        return NodeWorkload::query()
-            ->where('team_id', $this->cluster->team_id)
-            ->whereNull('preview_of_id')
-            ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $this->cluster->id));
+        return ManageNodeClusterSettings::meshWorkloads($this->cluster);
     }
 
-    private function queueNetworkReconciliation(): void
+    /**
+     * Shows the errors of a settings action on the fields of the form.
+     *
+     * @param  array<string, string>  $fields  The action field names to the property names.
+     */
+    private function addErrors(ValidationException $exception, array $fields): void
     {
-        $this->cluster->refresh()->update(['network_status' => 'reconciling']);
-        ReconcileNodeClusterNetworkJob::dispatch($this->cluster->id, auth()->id());
+        foreach ($exception->errors() as $key => $messages) {
+            $this->addError($fields[$key] ?? $key, $messages[0]);
+        }
     }
 
     private function fillFromCluster(): void

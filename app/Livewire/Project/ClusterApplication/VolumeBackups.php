@@ -2,10 +2,8 @@
 
 namespace App\Livewire\Project\ClusterApplication;
 
-use App\Actions\Node\BackupNodeVolume;
-use App\Actions\Node\RestoreNodeVolume;
+use App\Actions\Node\ManageNodeVolumeBackups;
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
-use App\Jobs\VolumeBackupJob;
 use App\Models\Node;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
@@ -15,7 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -91,46 +89,22 @@ class VolumeBackups extends Component
             'newFrequency' => ['required', 'string'],
             'newS3StorageId' => ['required', 'integer'],
         ]);
-        if (! validate_cron_expression($this->newFrequency)) {
-            $this->addError('newFrequency', 'The frequency must be a valid cron or human expression.');
+        try {
+            $backup = ManageNodeVolumeBackups::make()->createSchedule(
+                $this->workload,
+                $this->volumes()->firstWhere('uuid', $this->newVolumeUuid),
+                $this->newFrequency,
+                $this->storages()->whereKey((int) $this->newS3StorageId)->first(),
+                auth()->user(),
+            );
+        } catch (ValidationException $exception) {
+            $fields = ['frequency' => 'newFrequency', 'volume' => 'newVolumeUuid', 's3_storage' => 'newS3StorageId'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
 
             return;
         }
-        $volume = $this->volumes()->firstWhere('uuid', $this->newVolumeUuid);
-        if ($volume === null || $volume->scheduledBackups()->exists()) {
-            $this->addError('newVolumeUuid', 'Select a volume of this application without a backup schedule.');
-
-            return;
-        }
-        $s3 = $this->storages()->whereKey((int) $this->newS3StorageId)->first();
-        if ($s3 === null) {
-            $this->addError('newS3StorageId', 'Select a usable S3 storage of the team.');
-
-            return;
-        }
-        $this->authorizeS3Storage($s3);
-
-        $backup = $volume->scheduledBackups()->create([
-            'team_id' => $this->workload->team_id,
-            's3_storage_id' => $s3->id,
-            'frequency' => $this->newFrequency,
-            'enabled' => true,
-            'save_s3' => true,
-            'disable_local_backup' => true,
-            'retention_amount_locally' => 0,
-            'retention_days_locally' => 0,
-            'retention_max_storage_locally' => 0,
-        ]);
-        $backup->syncS3Storages([$s3->id]);
-        auditLog('ui.volume_backup.schedule_set', [
-            'team_id' => $this->workload->team_id,
-            'resource_type' => 'cluster-application',
-            'resource_uuid' => $this->workload->uuid,
-            'resource_name' => $this->workload->name,
-            'storage_uuid' => $volume->uuid,
-            'backup_uuid' => $backup->uuid,
-            'created' => true,
-        ]);
         $this->dispatch('success', 'Storage backup schedule created.');
         $this->redirectRoute('project.cluster-application.backup.show', [...$this->routeParameters(), 'backup_uuid' => $backup->uuid], navigate: true);
     }
@@ -149,46 +123,24 @@ class VolumeBackups extends Component
             'timeout' => ['required', 'integer', 'min:60', 'max:36000'],
             'missingBackupNotificationDays' => ['required', 'integer', 'min:0', 'max:365'],
         ]);
-        if (! validate_cron_expression($this->frequency)) {
-            $this->addError('frequency', 'The frequency must be a valid cron or human expression.');
+        try {
+            ManageNodeVolumeBackups::make()->updateSchedule($this->workload, $backup, [
+                'frequency' => $this->frequency,
+                'stop_during_backup' => $this->stopDuringBackup,
+                's3_storage' => $this->storages($backup->s3_storage_id)->whereKey((int) $this->s3StorageId)->first(),
+                'retention_amount_s3' => $this->retentionAmountS3,
+                'retention_days_s3' => $this->retentionDaysS3,
+                'retention_max_storage_s3' => $this->retentionMaxStorageS3,
+                'timeout' => $this->timeout,
+                'missing_backup_notification_days' => $this->missingBackupNotificationDays,
+            ], auth()->user());
+        } catch (ValidationException $exception) {
+            $fields = ['frequency' => 'frequency', 'stop_during_backup' => 'stopDuringBackup', 's3_storage' => 's3StorageId'];
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
 
             return;
-        }
-        if ($this->stopDuringBackup && $backup->backupable instanceof NodeVolume && $backup->backupable->isStackVolume()) {
-            $this->addError('stopDuringBackup', BackupNodeVolume::SHARED_STOP_ERROR);
-
-            return;
-        }
-        // The current storage stays selectable while it is unusable, so other settings can be saved.
-        $s3 = $this->storages($backup->s3_storage_id)->whereKey((int) $this->s3StorageId)->first();
-        if ($s3 === null) {
-            $this->addError('s3StorageId', 'Select a usable S3 storage of the team.');
-
-            return;
-        }
-        $this->authorizeS3Storage($s3);
-
-        $backup->fill([
-            'frequency' => $this->frequency,
-            'stop_during_backup' => $this->stopDuringBackup,
-            'retention_amount_s3' => $this->retentionAmountS3,
-            'retention_days_s3' => $this->retentionDaysS3,
-            'retention_max_storage_s3' => $this->retentionMaxStorageS3,
-            'timeout' => $this->timeout,
-            'missing_backup_notification_days' => $this->missingBackupNotificationDays,
-        ]);
-        $changedFields = auditChangedFields($backup);
-        $backup->save();
-        $backup->syncS3Storages([$s3->id]);
-        if ($changedFields !== []) {
-            auditLog('ui.volume_backup.schedule_set', [
-                'team_id' => $this->workload->team_id,
-                'resource_type' => 'cluster-application',
-                'resource_uuid' => $this->workload->uuid,
-                'backup_uuid' => $backup->uuid,
-                'created' => false,
-                'changed_fields' => $changedFields,
-            ]);
         }
         $this->dispatch('success', 'Storage backup schedule saved.');
     }
@@ -211,24 +163,12 @@ class VolumeBackups extends Component
         $this->authorize('update', $this->workload);
         $backup = $this->backup();
         try {
-            $node = $backup->backupable?->node;
-            if ($node === null) {
-                throw new \RuntimeException('The volume has no data yet. Deploy the application first.');
-            }
-            BackupNodeVolume::ensureNodeSupportsBackups($node);
-            BackupNodeVolume::storage($backup, $this->workload);
+            ManageNodeVolumeBackups::make()->runNow($this->workload, $backup);
         } catch (Throwable $exception) {
             $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        VolumeBackupJob::dispatch($backup);
-        auditLog('ui.volume_backup.started', [
-            'team_id' => $this->workload->team_id,
-            'resource_uuid' => $this->workload->uuid,
-            'resource_name' => $this->workload->name,
-            'backup_uuid' => $backup->uuid,
-        ]);
         $this->dispatch('success', 'Storage backup queued.');
     }
 
@@ -237,26 +177,17 @@ class VolumeBackups extends Component
         $this->authorize('update', $this->workload);
         $backup = $this->backup();
         $execution = $backup->executions()->whereKey($executionId)->firstOrFail();
-        $target = $this->restoreTargets($backup)->firstWhere('uuid', $this->restoreNodeUuid);
-        if ($target === null) {
-            $this->addError('restoreNodeUuid', 'Select a server of the cluster.');
+        try {
+            $operation = ManageNodeVolumeBackups::make()->restore($this->workload, $backup, $execution, $this->restoreTargets($backup)->firstWhere('uuid', $this->restoreNodeUuid), auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addError('restoreNodeUuid', collect($exception->errors())->flatten()->first());
 
             return;
-        }
-        try {
-            $operation = RestoreNodeVolume::queue($backup->backupable, $execution, $target, auth()->user(), $this->workload);
         } catch (Throwable $exception) {
             $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        auditLog('ui.volume_backup.restore_started', [
-            'team_id' => $this->workload->team_id,
-            'resource_uuid' => $this->workload->uuid,
-            'backup_uuid' => $backup->uuid,
-            'execution_uuid' => $execution->uuid,
-            'node_uuid' => $target->uuid,
-        ]);
         $this->dispatch('close-modal');
         $this->dispatch('success', 'Restore queued.');
         $this->redirectRoute('project.cluster-application.deployment.show', [...$this->routeParameters(), 'deployment_uuid' => $operation->uuid], navigate: true);
@@ -336,14 +267,6 @@ class VolumeBackups extends Component
         ]);
     }
 
-    /** An S3 storage that no backup schedule of this application uses yet is a team credential. */
-    private function authorizeS3Storage(S3Storage $s3): void
-    {
-        if (! $this->schedules()->where('s3_storage_id', $s3->id)->exists()) {
-            $this->authorize('useTeamCredentials', $this->workload);
-        }
-    }
-
     private function backup(): ScheduledVolumeBackup
     {
         return $this->schedules()->with('backupable.node')->where('uuid', $this->backupUuid)->firstOrFail();
@@ -352,64 +275,30 @@ class VolumeBackups extends Component
     /** @return Builder<ScheduledVolumeBackup> */
     private function schedules(): Builder
     {
-        return ScheduledVolumeBackup::query()
-            ->where('backupable_type', (new NodeVolume)->getMorphClass())
-            ->whereIn('backupable_id', NodeVolume::query()
-                ->where('node_workload_id', $this->workload->id)
-                ->orWhereHas('mounts', fn (Builder $mounts) => $mounts->where('node_workload_id', $this->workload->id))
-                ->select('id'));
+        return ManageNodeVolumeBackups::schedulesOf($this->workload);
     }
 
-    /**
-     * The volumes that the application mounts: its own ones that are not detached, and the stack
-     * volumes that it shares with other services (decision 0024), which have one schedule each.
-     * `mount_path` is the path in this application.
-     *
-     * @return Collection<int, NodeVolume>
-     */
+    /** @return Collection<int, NodeVolume> */
     private function volumes(): Collection
     {
-        $own = $this->workload->volumes()->with('node')->whereNull('detached_at')->get();
-        $shared = $this->workload->stackVolumes()->with('node')->get()
-            ->each(fn (NodeVolume $volume) => $volume->setAttribute('mount_path', $volume->pivot->mount_path));
-
-        return $own->concat($shared)->sortBy('mount_path')->values();
+        return ManageNodeVolumeBackups::volumesOf($this->workload);
     }
 
-    /** Usable S3 storages of the team of the workload, plus the current one. */
+    /** @return Builder<S3Storage> */
     private function storages(?int $currentId = null): Builder
     {
-        return S3Storage::query()
-            ->where('team_id', $this->workload->team_id)
-            ->where(fn (Builder $query) => $query->where('is_usable', true)->when($currentId !== null, fn (Builder $query) => $query->orWhere('id', $currentId)));
+        return ManageNodeVolumeBackups::storages($this->workload, $currentId);
     }
 
-    /**
-     * Servers of the cluster of the volume that can take the restored volume: the server of the
-     * volume first.
-     *
-     * @return Collection<int, Node>
-     */
+    /** @return Collection<int, Node> */
     private function restoreTargets(ScheduledVolumeBackup $backup): Collection
     {
-        $current = $backup->backupable?->node;
-        if ($current === null || $current->node_cluster_id === null) {
-            return collect();
-        }
-
-        return Node::query()
-            ->where('team_id', $this->workload->team_id)
-            ->where('node_cluster_id', $current->node_cluster_id)
-            ->orderBy('name')
-            ->get()
-            ->filter(fn (Node $node): bool => $node->role->runsWorkloads() && $this->supportsBackups($node) && Gate::allows('placeResource', $node))
-            ->sortBy(fn (Node $node): int => $node->id === $current->id ? 0 : 1)
-            ->values();
+        return ManageNodeVolumeBackups::restoreTargets($this->workload, $backup, auth()->user());
     }
 
     private function supportsBackups(?Node $node): bool
     {
-        return $node !== null && collect(BackupNodeVolume::CAPABILITIES)->every(fn (string $capability): bool => $node->supportsCapability($capability) === true);
+        return ManageNodeVolumeBackups::supportsBackups($node);
     }
 
     private function fillForm(ScheduledVolumeBackup $backup): void

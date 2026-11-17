@@ -553,7 +553,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->workload);
         $validated = $this->validate([
-            'newVolumeName' => ['required', 'string', 'max:255', 'regex:/\A[\pL\pN ._-]+\z/u'],
+            'newVolumeName' => CreateNodeVolume::nameRules(),
             'newVolumeMountPath' => ['required', 'string', 'max:4096'],
         ], [
             'newVolumeName.regex' => 'Use letters, numbers, spaces, dots, dashes, and underscores.',
