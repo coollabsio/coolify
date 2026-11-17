@@ -12051,6 +12051,2394 @@
                 ]
             }
         },
+        "\/cluster-applications\/{uuid}\/volumes": {
+            "get": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "List Volumes",
+                "description": "List the volumes of a cluster application.",
+                "operationId": "list-volumes-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volumes.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolume"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Create Volume",
+                "description": "Add a volume to a cluster application. The next deployment creates and mounts it.",
+                "operationId": "create-volume-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "mount_path"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volumes": {
+            "get": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "List Volumes",
+                "description": "List the volumes of a cluster database.",
+                "operationId": "list-volumes-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volumes.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolume"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Create Volume",
+                "description": "Add a volume to a cluster database. The next deployment creates and mounts it.",
+                "operationId": "create-volume-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "mount_path"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volumes": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Volumes",
+                "description": "List the volumes of a cluster stack. Without `service`, the volumes of the stack and the services that mount them.",
+                "operationId": "list-volumes-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack. Without it, the volumes of the stack.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volumes.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolume"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Create Volume",
+                "description": "Add a volume to a cluster stack. The next deployment creates and mounts it.",
+                "operationId": "create-volume-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "mount_path"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volumes\/{volume_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Delete Volume",
+                "description": "Remove a volume from a cluster application. The data stays until you delete it with `delete_data=true`. Redeploy first when the current deployment mounts the volume.",
+                "operationId": "delete-volume-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_data",
+                        "in": "query",
+                        "description": "Also delete the data. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volume is removed.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Update Volume",
+                "description": "Rename a volume of a cluster application or change its mount path. The data stays. The next deployment mounts it at the new path.",
+                "operationId": "update-volume-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volumes\/{volume_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Delete Volume",
+                "description": "Remove a volume from a cluster database. The data stays until you delete it with `delete_data=true`. Redeploy first when the current deployment mounts the volume.",
+                "operationId": "delete-volume-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_data",
+                        "in": "query",
+                        "description": "Also delete the data. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volume is removed.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Update Volume",
+                "description": "Rename a volume of a cluster database or change its mount path. The data stays. The next deployment mounts it at the new path.",
+                "operationId": "update-volume-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volumes\/{volume_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Delete Volume",
+                "description": "Remove a volume from a cluster stack. The data stays until you delete it with `delete_data=true`. Redeploy first when the current deployment mounts the volume. Without `service`, delete a volume of the stack that no service mounts.",
+                "operationId": "delete-volume-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack. Without it, delete a volume of the stack that no service mounts.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_data",
+                        "in": "query",
+                        "description": "Also delete the data. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The volume is removed.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Update Volume",
+                "description": "Rename a volume of a cluster stack or change its mount path. The data stays. The next deployment mounts it at the new path.",
+                "operationId": "update-volume-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "volume_uuid",
+                        "in": "path",
+                        "description": "UUID of the volume.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "name": {
+                                        "description": "Letters, numbers, spaces, dots, dashes, and underscores.",
+                                        "type": "string"
+                                    },
+                                    "mount_path": {
+                                        "description": "An absolute path in the container, for example \/data.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The volume.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolume"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volume-backups": {
+            "get": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "List Volume Backups",
+                "description": "List the volume backup schedules of a cluster application.",
+                "operationId": "list-volume-backups-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedules.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Create Volume Backup",
+                "description": "Create a backup schedule of a volume of a cluster application. Backups go to one S3 storage of the team.",
+                "operationId": "create-volume-backup-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "volume_uuid",
+                                    "frequency",
+                                    "s3_storage_uuid"
+                                ],
+                                "properties": {
+                                    "volume_uuid": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volume-backups": {
+            "get": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "List Volume Backups",
+                "description": "List the volume backup schedules of a cluster database.",
+                "operationId": "list-volume-backups-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedules.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Create Volume Backup",
+                "description": "Create a backup schedule of a volume of a cluster database. Backups go to one S3 storage of the team.",
+                "operationId": "create-volume-backup-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "volume_uuid",
+                                    "frequency",
+                                    "s3_storage_uuid"
+                                ],
+                                "properties": {
+                                    "volume_uuid": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volume-backups": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Volume Backups",
+                "description": "List the volume backup schedules of a cluster stack.",
+                "operationId": "list-volume-backups-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedules.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Create Volume Backup",
+                "description": "Create a backup schedule of a volume of a cluster stack. Backups go to one S3 storage of the team.",
+                "operationId": "create-volume-backup-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "volume_uuid",
+                                    "frequency",
+                                    "s3_storage_uuid"
+                                ],
+                                "properties": {
+                                    "volume_uuid": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volume-backups\/{backup_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Delete Volume Backup",
+                "description": "Delete a volume backup schedule of a cluster application and its runs. With `delete_s3=true`, also the files of the runs in S3.",
+                "operationId": "delete-volume-backup-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_s3",
+                        "in": "query",
+                        "description": "Also delete the files in S3. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedule is deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Update Volume Backup",
+                "description": "Change a volume backup schedule of a cluster application. Send only the fields to change.",
+                "operationId": "update-volume-backup-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "stop_during_backup": {
+                                        "description": "Stop the workload during the backup. Needs a token with the deploy permission. Not for a volume that services of a stack share.",
+                                        "type": "boolean"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    },
+                                    "retention_amount_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_days_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_max_storage_s3": {
+                                        "type": "number"
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds, 60 to 36000.",
+                                        "type": "integer"
+                                    },
+                                    "missing_backup_notification_days": {
+                                        "description": "Alert after this many days without a run. 0 disables the alert.",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volume-backups\/{backup_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Delete Volume Backup",
+                "description": "Delete a volume backup schedule of a cluster database and its runs. With `delete_s3=true`, also the files of the runs in S3.",
+                "operationId": "delete-volume-backup-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_s3",
+                        "in": "query",
+                        "description": "Also delete the files in S3. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedule is deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Update Volume Backup",
+                "description": "Change a volume backup schedule of a cluster database. Send only the fields to change.",
+                "operationId": "update-volume-backup-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "stop_during_backup": {
+                                        "description": "Stop the workload during the backup. Needs a token with the deploy permission. Not for a volume that services of a stack share.",
+                                        "type": "boolean"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    },
+                                    "retention_amount_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_days_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_max_storage_s3": {
+                                        "type": "number"
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds, 60 to 36000.",
+                                        "type": "integer"
+                                    },
+                                    "missing_backup_notification_days": {
+                                        "description": "Alert after this many days without a run. 0 disables the alert.",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volume-backups\/{backup_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Delete Volume Backup",
+                "description": "Delete a volume backup schedule of a cluster stack and its runs. With `delete_s3=true`, also the files of the runs in S3.",
+                "operationId": "delete-volume-backup-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "delete_s3",
+                        "in": "query",
+                        "description": "Also delete the files in S3. The default is false.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The schedule is deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Update Volume Backup",
+                "description": "Change a volume backup schedule of a cluster stack. Send only the fields to change.",
+                "operationId": "update-volume-backup-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "stop_during_backup": {
+                                        "description": "Stop the workload during the backup. Needs a token with the deploy permission. Not for a volume that services of a stack share.",
+                                        "type": "boolean"
+                                    },
+                                    "s3_storage_uuid": {
+                                        "description": "An S3 storage of the team.",
+                                        "type": "string"
+                                    },
+                                    "retention_amount_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_days_s3": {
+                                        "type": "integer"
+                                    },
+                                    "retention_max_storage_s3": {
+                                        "type": "number"
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds, 60 to 36000.",
+                                        "type": "integer"
+                                    },
+                                    "missing_backup_notification_days": {
+                                        "description": "Alert after this many days without a run. 0 disables the alert.",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterVolumeBackup"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volume-backups\/{backup_uuid}\/run": {
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Run Volume Backup",
+                "description": "Run a volume backup schedule of a cluster application now.",
+                "operationId": "run-volume-backup-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The backup is queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volume-backups\/{backup_uuid}\/run": {
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Run Volume Backup",
+                "description": "Run a volume backup schedule of a cluster database now.",
+                "operationId": "run-volume-backup-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The backup is queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volume-backups\/{backup_uuid}\/run": {
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Run Volume Backup",
+                "description": "Run a volume backup schedule of a cluster stack now.",
+                "operationId": "run-volume-backup-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The backup is queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volume-backups\/{backup_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "List Volume Backup Runs",
+                "description": "List the runs of a volume backup schedule of a cluster application, newest first.",
+                "operationId": "list-volume-backup-executions-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackupExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volume-backups\/{backup_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "List Volume Backup Runs",
+                "description": "List the runs of a volume backup schedule of a cluster database, newest first.",
+                "operationId": "list-volume-backup-executions-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackupExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volume-backups\/{backup_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Volume Backup Runs",
+                "description": "List the runs of a volume backup schedule of a cluster stack, newest first.",
+                "operationId": "list-volume-backup-executions-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterVolumeBackupExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/volume-backups\/{backup_uuid}\/executions\/{execution_uuid}\/restore": {
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Restore Volume Backup",
+                "description": "Restore a backup run to a server of the cluster. The restore stops the workload, replaces the data of the volume, and starts the workload again.",
+                "operationId": "restore-volume-backup-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "execution_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup run.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "server_uuid": {
+                                        "description": "A server of the cluster. The default is the server of the volume.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The restore is queued."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/volume-backups\/{backup_uuid}\/executions\/{execution_uuid}\/restore": {
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Restore Volume Backup",
+                "description": "Restore a backup run to a server of the cluster. The restore stops the workload, replaces the data of the volume, and starts the workload again.",
+                "operationId": "restore-volume-backup-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "execution_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup run.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "server_uuid": {
+                                        "description": "A server of the cluster. The default is the server of the volume.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The restore is queued."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/volume-backups\/{backup_uuid}\/executions\/{execution_uuid}\/restore": {
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Restore Volume Backup",
+                "description": "Restore a backup run to a server of the cluster. The restore stops the workload, replaces the data of the volume, and starts the workload again.",
+                "operationId": "restore-volume-backup-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "backup_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup schedule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "execution_uuid",
+                        "in": "path",
+                        "description": "UUID of the backup run.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [],
+                                "properties": {
+                                    "server_uuid": {
+                                        "description": "A server of the cluster. The default is the server of the volume.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The restore is queued."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token or the user may not do this."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/clusters": {
             "get": {
                 "tags": [
@@ -12075,6 +14463,71 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Create",
+                "description": "Create a cluster, like the Clusters page. Without `cidr`, Coolify selects a free range. Needs a team admin. A server joins the cluster with `POST \/clusters\/{uuid}\/servers`.",
+                "operationId": "create-cluster",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "cidr": {
+                                        "description": "A private IPv4 range, for example 10.240.0.0\/24.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The cluster.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Cluster"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -12119,6 +14572,184 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Delete",
+                "description": "Delete a cluster. Its servers leave the cluster first. Remove every workload from the cluster before. Needs a team admin.",
+                "operationId": "delete-cluster-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The cluster is deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Update",
+                "description": "Change the settings of a cluster, like the cluster pages: the name and the network (General), the deployment pressure policy and the image storage (Advanced), and the server of the built-in registry. Send only the fields to change. Coolify saves the groups in this order and stops at the first error: general, pressure policy, image storage, registry server. Needs a team admin. The network fields cannot change on an active cluster, and the CIDR cannot change while the cluster has servers.",
+                "operationId": "update-cluster-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "cidr": {
+                                        "type": "string"
+                                    },
+                                    "wireguard_interface": {
+                                        "type": "string"
+                                    },
+                                    "wireguard_port": {
+                                        "type": "integer"
+                                    },
+                                    "cpu_pressure_threshold": {
+                                        "description": "Percent, 1 to 100.",
+                                        "type": "integer"
+                                    },
+                                    "memory_pressure_threshold": {
+                                        "description": "Percent, 1 to 100.",
+                                        "type": "integer"
+                                    },
+                                    "disk_pressure_threshold": {
+                                        "description": "Percent, 1 to 100.",
+                                        "type": "integer"
+                                    },
+                                    "resource_stale_after_minutes": {
+                                        "description": "1 to 60.",
+                                        "type": "integer"
+                                    },
+                                    "image_storage": {
+                                        "type": "string",
+                                        "enum": [
+                                            "external",
+                                            "built_in"
+                                        ]
+                                    },
+                                    "image_repository": {
+                                        "description": "For `external`: a repository without a tag, for example ghcr.io\/acme\/coolify-builds.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "image_registry_credential_uuid": {
+                                        "description": "For `external`: a registry credential of the team for the registry of the repository.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "registry_server_uuid": {
+                                        "description": "The server of the cluster that runs the built-in registry. Null selects the first available server.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The cluster.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Cluster"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -12374,6 +15005,347 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/clusters\/{uuid}\/servers": {
+            "post": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Add Server",
+                "description": "Add a server of the team that is in no cluster to a cluster, like the Servers tab of the cluster page. Coolify then sets up the network of the cluster on it. Needs a team admin.",
+                "operationId": "add-cluster-server",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "server_uuid"
+                                ],
+                                "properties": {
+                                    "server_uuid": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The cluster.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Cluster"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/clusters\/{uuid}\/servers\/{server_uuid}": {
+            "delete": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Remove Server",
+                "description": "Remove a server from a cluster, like the Servers tab of the cluster page. Move or delete its workloads first. Needs a team admin.",
+                "operationId": "remove-cluster-server",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "path",
+                        "description": "UUID of the server.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The cluster.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Cluster"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/clusters\/{uuid}\/firewall-rules": {
+            "get": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "List Firewall Rules",
+                "description": "List the firewall rules of a cluster. A rule lets a workload or a server reach a workload of the mesh on one port.",
+                "operationId": "list-cluster-firewall-rules",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The rules.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ClusterFirewallRule"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Add Firewall Rule",
+                "description": "Let a workload or a server of the mesh reach a workload on one port, like the Firewall tab of the cluster page. Coolify then reconciles the network. Needs a team admin.",
+                "operationId": "add-cluster-firewall-rule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "source_type",
+                                    "source_uuid",
+                                    "destination_uuid",
+                                    "protocol"
+                                ],
+                                "properties": {
+                                    "source_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "workload",
+                                            "node"
+                                        ]
+                                    },
+                                    "source_uuid": {
+                                        "description": "A workload in the mesh, or a server of the cluster.",
+                                        "type": "string"
+                                    },
+                                    "destination_uuid": {
+                                        "description": "A workload in the mesh.",
+                                        "type": "string"
+                                    },
+                                    "protocol": {
+                                        "type": "string",
+                                        "enum": [
+                                            "tcp",
+                                            "udp",
+                                            "icmp"
+                                        ]
+                                    },
+                                    "port": {
+                                        "description": "Required for `tcp` and `udp`.",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The rule is added.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterFirewallRule"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "The rule exists already.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ClusterFirewallRule"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not an admin or owner of the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/clusters\/{uuid}\/firewall-rules\/{rule_uuid}": {
+            "delete": {
+                "tags": [
+                    "Clusters"
+                ],
+                "summary": "Delete Firewall Rule",
+                "description": "Delete a firewall rule of a cluster. Coolify then reconciles the network. Needs a team admin.",
+                "operationId": "delete-cluster-firewall-rule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "rule_uuid",
+                        "in": "path",
+                        "description": "UUID of the rule.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The rule is deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -22637,6 +25609,1182 @@
                     },
                     "403": {
                         "description": "The token needs the deploy ability."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/scheduled-tasks": {
+            "get": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "List Tasks",
+                "description": "List the scheduled tasks of a cluster application. `command` shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-tasks-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled tasks.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTask"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Create Task",
+                "description": "Create a scheduled task of a cluster application. It runs the command in the container of the workload.",
+                "operationId": "create-scheduled-task-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/scheduled-tasks": {
+            "get": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "List Tasks",
+                "description": "List the scheduled tasks of a cluster database. `command` shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-tasks-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled tasks.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTask"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Create Task",
+                "description": "Create a scheduled task of a cluster database. It runs the command in the container of the workload.",
+                "operationId": "create-scheduled-task-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/scheduled-tasks": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Tasks",
+                "description": "List the scheduled tasks of a cluster stack. `command` shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-tasks-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled tasks.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTask"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Create Task",
+                "description": "Create a scheduled task of a cluster stack. It runs the command in the container of the workload.",
+                "operationId": "create-scheduled-task-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/scheduled-tasks\/{task_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Delete Task",
+                "description": "Delete a scheduled task of a cluster application.",
+                "operationId": "delete-scheduled-task-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task is deleted."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Update Task",
+                "description": "Update a scheduled task of a cluster application.",
+                "operationId": "update-scheduled-task-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/scheduled-tasks\/{task_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Delete Task",
+                "description": "Delete a scheduled task of a cluster database.",
+                "operationId": "delete-scheduled-task-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task is deleted."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Update Task",
+                "description": "Update a scheduled task of a cluster database.",
+                "operationId": "update-scheduled-task-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/scheduled-tasks\/{task_uuid}": {
+            "delete": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Delete Task",
+                "description": "Delete a scheduled task of a cluster stack.",
+                "operationId": "delete-scheduled-task-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task is deleted."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Update Task",
+                "description": "Update a scheduled task of a cluster stack.",
+                "operationId": "update-scheduled-task-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "frequency": {
+                                        "description": "A cron expression, or `daily`, `hourly`, and so on.",
+                                        "type": "string"
+                                    },
+                                    "container": {
+                                        "description": "Not used: a cluster workload has one container.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timeout": {
+                                        "description": "Seconds. The default is 300.",
+                                        "type": "integer"
+                                    },
+                                    "use_shell": {
+                                        "type": "boolean"
+                                    },
+                                    "enabled": {
+                                        "description": "An enabled task needs a token with the deploy permission.",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The scheduled task.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ScheduledTask"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/scheduled-tasks\/{task_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "List Executions",
+                "description": "List the runs of a scheduled task of a cluster application. `message` (the output) shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-task-executions-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTaskExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/scheduled-tasks\/{task_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "List Executions",
+                "description": "List the runs of a scheduled task of a cluster database. `message` (the output) shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-task-executions-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTaskExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/scheduled-tasks\/{task_uuid}\/executions": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Executions",
+                "description": "List the runs of a scheduled task of a cluster stack. `message` (the output) shows only for a token that may read sensitive data.",
+                "operationId": "list-scheduled-task-executions-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The runs.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ScheduledTaskExecution"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-applications\/{uuid}\/scheduled-tasks\/{task_uuid}\/execute": {
+            "post": {
+                "tags": [
+                    "Cluster Applications"
+                ],
+                "summary": "Execute Task",
+                "description": "Queue a run of a scheduled task of a cluster application now. Requires the deploy ability.",
+                "operationId": "execute-scheduled-task-by-application-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The run is queued."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-databases\/{uuid}\/scheduled-tasks\/{task_uuid}\/execute": {
+            "post": {
+                "tags": [
+                    "Cluster Databases"
+                ],
+                "summary": "Execute Task",
+                "description": "Queue a run of a scheduled task of a cluster database now. Requires the deploy ability.",
+                "operationId": "execute-scheduled-task-by-database-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The run is queued."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/scheduled-tasks\/{task_uuid}\/execute": {
+            "post": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "Execute Task",
+                "description": "Queue a run of a scheduled task of a cluster stack now. Requires the deploy ability.",
+                "operationId": "execute-scheduled-task-by-stack-cluster-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "task_uuid",
+                        "in": "path",
+                        "description": "UUID of the scheduled task.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service",
+                        "in": "query",
+                        "description": "The service of the stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The run is queued."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -33422,7 +37570,44 @@
                         ],
                         "format": "date-time"
                     },
+                    "wireguard_interface": {
+                        "type": "string"
+                    },
+                    "wireguard_port": {
+                        "type": "integer"
+                    },
+                    "cpu_pressure_threshold": {
+                        "type": "integer"
+                    },
+                    "memory_pressure_threshold": {
+                        "type": "integer"
+                    },
+                    "disk_pressure_threshold": {
+                        "type": "integer"
+                    },
+                    "resource_stale_after_minutes": {
+                        "type": "integer"
+                    },
                     "image_storage": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "image_repository": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "image_registry_credential_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "registry_server_uuid": {
+                        "description": "The server that the user selected for the built-in registry. Null is the first available server.",
                         "type": [
                             "string",
                             "null"
@@ -33465,6 +37650,60 @@
                         "format": "date-time"
                     },
                     "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "ClusterFirewallRule": {
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": [
+                            "workload",
+                            "node"
+                        ]
+                    },
+                    "source_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "source_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "destination_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "destination_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "protocol": {
+                        "type": "string",
+                        "enum": [
+                            "tcp",
+                            "udp",
+                            "icmp"
+                        ]
+                    },
+                    "port": {
+                        "type": "integer"
+                    },
+                    "created_at": {
                         "type": "string",
                         "format": "date-time"
                     }
@@ -33994,6 +38233,173 @@
                     },
                     "preview": {
                         "$ref": "#\/components\/schemas\/ApplicationPreview"
+                    }
+                },
+                "type": "object"
+            },
+            "ClusterVolume": {
+                "properties": {
+                    "uuid": {
+                        "description": "The volumes and the volume backups of cluster applications, databases, and the services of\nstacks (decision 0029). The calls use the actions of the storage pages, so the rules of\ndecisions 0007, 0009, and 0024 apply: a volume is a Podman volume (no host bind mount), and a\nrestore stops the workload. A stack call names the `service`. Without `service`, the volume\nlist and the volume delete work on the volumes of the stack.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "mount_path": {
+                        "description": "The path in this workload. Null for a volume of a stack.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "read_only": {
+                        "type": "boolean"
+                    },
+                    "shared": {
+                        "description": "A volume of a stack that services share.",
+                        "type": "boolean"
+                    },
+                    "detached": {
+                        "description": "Removed from the configuration. The data stays until you delete it.",
+                        "type": "boolean"
+                    },
+                    "server_uuid": {
+                        "description": "Null until a deployment creates the volume.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "server_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "not created",
+                            "unknown",
+                            "ready",
+                            "missing"
+                        ]
+                    },
+                    "backup_schedule_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mounts": {
+                        "description": "Only for a volume of a stack: the services that mount it.",
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "service": {
+                                    "type": "string"
+                                },
+                                "mount_path": {
+                                    "type": "string"
+                                },
+                                "read_only": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ClusterVolumeBackup": {
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "volume_uuid": {
+                        "type": "string"
+                    },
+                    "frequency": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "stop_during_backup": {
+                        "type": "boolean"
+                    },
+                    "s3_storage_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "retention_amount_s3": {
+                        "type": "integer"
+                    },
+                    "retention_days_s3": {
+                        "type": "integer"
+                    },
+                    "retention_max_storage_s3": {
+                        "type": "number"
+                    },
+                    "timeout": {
+                        "type": "integer"
+                    },
+                    "missing_backup_notification_days": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "ClusterVolumeBackupExecution": {
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "size": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "filename": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "s3_uploaded": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "finished_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
                     }
                 },
                 "type": "object"

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ClusterDatabasesController;
 use App\Http\Controllers\Api\ClusterEnvironmentVariablesController;
 use App\Http\Controllers\Api\ClustersController;
 use App\Http\Controllers\Api\ClusterStacksController;
+use App\Http\Controllers\Api\ClusterVolumesController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
@@ -258,6 +259,25 @@ Route::group([
     Route::delete('/cluster-stacks/{uuid}/envs/{env_uuid}', [ClusterEnvironmentVariablesController::class, 'destroy'])
         ->defaults('cluster_kind', 'stack')
         ->middleware(['api.ability:delete']);
+    foreach (['cluster-applications' => 'application', 'cluster-databases' => 'database', 'cluster-stacks' => 'stack'] as $clusterPrefix => $clusterKind) {
+        Route::get("/{$clusterPrefix}/{uuid}/volumes", [ClusterVolumesController::class, 'listVolumes'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:read']);
+        Route::post("/{$clusterPrefix}/{uuid}/volumes", [ClusterVolumesController::class, 'createVolume'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::patch("/{$clusterPrefix}/{uuid}/volumes/{volume_uuid}", [ClusterVolumesController::class, 'updateVolume'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::delete("/{$clusterPrefix}/{uuid}/volumes/{volume_uuid}", [ClusterVolumesController::class, 'deleteVolume'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:delete']);
+        Route::get("/{$clusterPrefix}/{uuid}/volume-backups", [ClusterVolumesController::class, 'listBackups'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:read']);
+        Route::post("/{$clusterPrefix}/{uuid}/volume-backups", [ClusterVolumesController::class, 'createBackup'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::patch("/{$clusterPrefix}/{uuid}/volume-backups/{backup_uuid}", [ClusterVolumesController::class, 'updateBackup'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::delete("/{$clusterPrefix}/{uuid}/volume-backups/{backup_uuid}", [ClusterVolumesController::class, 'deleteBackup'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:delete']);
+        Route::post("/{$clusterPrefix}/{uuid}/volume-backups/{backup_uuid}/run", [ClusterVolumesController::class, 'runBackup'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write', 'api.ability:deploy']);
+        Route::get("/{$clusterPrefix}/{uuid}/volume-backups/{backup_uuid}/executions", [ClusterVolumesController::class, 'backupExecutions'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:read']);
+        Route::post("/{$clusterPrefix}/{uuid}/volume-backups/{backup_uuid}/executions/{execution_uuid}/restore", [ClusterVolumesController::class, 'restore'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write', 'api.ability:deploy']);
+        Route::get("/{$clusterPrefix}/{uuid}/scheduled-tasks", [ScheduledTasksController::class, 'clusterTasks'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:read']);
+        Route::post("/{$clusterPrefix}/{uuid}/scheduled-tasks", [ScheduledTasksController::class, 'createClusterTask'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::patch("/{$clusterPrefix}/{uuid}/scheduled-tasks/{task_uuid}", [ScheduledTasksController::class, 'updateClusterTask'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:write']);
+        Route::delete("/{$clusterPrefix}/{uuid}/scheduled-tasks/{task_uuid}", [ScheduledTasksController::class, 'deleteClusterTask'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:delete']);
+        Route::get("/{$clusterPrefix}/{uuid}/scheduled-tasks/{task_uuid}/executions", [ScheduledTasksController::class, 'clusterTaskExecutions'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:read']);
+        Route::post("/{$clusterPrefix}/{uuid}/scheduled-tasks/{task_uuid}/execute", [ScheduledTasksController::class, 'executeClusterTask'])->defaults('cluster_kind', $clusterKind)->middleware(['api.ability:deploy']);
+    }
     Route::get('/cluster-stacks', [ClusterStacksController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'show'])->middleware(['api.ability:read']);
     Route::get('/cluster-stacks/{uuid}/services', [ClusterStacksController::class, 'services'])->middleware(['api.ability:read']);
@@ -271,6 +291,14 @@ Route::group([
     Route::post('/cluster-stacks/{uuid}/restart', [ClusterStacksController::class, 'restart'])->middleware(['api.ability:deploy']);
     Route::get('/clusters', [ClustersController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/clusters/{uuid}', [ClustersController::class, 'show'])->middleware(['api.ability:read']);
+    Route::post('/clusters', [ClustersController::class, 'store'])->middleware(['api.ability:write']);
+    Route::patch('/clusters/{uuid}', [ClustersController::class, 'update'])->middleware(['api.ability:write']);
+    Route::delete('/clusters/{uuid}', [ClustersController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::post('/clusters/{uuid}/servers', [ClustersController::class, 'addServer'])->middleware(['api.ability:write']);
+    Route::delete('/clusters/{uuid}/servers/{server_uuid}', [ClustersController::class, 'removeServer'])->middleware(['api.ability:delete']);
+    Route::get('/clusters/{uuid}/firewall-rules', [ClustersController::class, 'firewallRules'])->middleware(['api.ability:read']);
+    Route::post('/clusters/{uuid}/firewall-rules', [ClustersController::class, 'addFirewallRule'])->middleware(['api.ability:write']);
+    Route::delete('/clusters/{uuid}/firewall-rules/{rule_uuid}', [ClustersController::class, 'deleteFirewallRule'])->middleware(['api.ability:delete']);
     Route::get('/nodes', [ClustersController::class, 'nodes'])->middleware(['api.ability:read']);
     Route::get('/nodes/{uuid}', [ClustersController::class, 'node'])->middleware(['api.ability:read']);
     Route::patch('/nodes/{uuid}/roles', [ClustersController::class, 'roles'])->middleware(['api.ability:write']);

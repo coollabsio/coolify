@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\HandlesClusterResourcesApi;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
+use App\Models\NodeWorkload;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use OpenApi\Attributes as OA;
 
 class ScheduledTasksController extends Controller
 {
+    use HandlesClusterResourcesApi;
     use RequiresDeployAbility;
 
     private function removeSensitiveData($task)
@@ -23,6 +27,7 @@ class ScheduledTasksController extends Controller
             'team_id',
             'application_id',
             'service_id',
+            'node_workload_id',
         ]);
         if (! $this->canReadSensitive()) {
             $task->makeHidden(['command']);
@@ -33,7 +38,20 @@ class ScheduledTasksController extends Controller
 
     private function canReadSensitive(): bool
     {
-        return request()->attributes->get('can_read_sensitive', false) === true;
+        return request()->attributes->get('can_read_sensitive', false) === true
+            && ($this->clusterResource === null || Gate::allows('viewSensitive', $this->clusterResource));
+    }
+
+    /** The cluster workload of the current request, for canReadSensitive(). */
+    private ?NodeWorkload $clusterResource = null;
+
+    private function resourceType(Application|Service|NodeWorkload $resource): string
+    {
+        return match (true) {
+            $resource instanceof Application => 'application',
+            $resource instanceof Service => 'service',
+            default => 'cluster-application',
+        };
     }
 
     /**
@@ -58,7 +76,7 @@ class ScheduledTasksController extends Controller
         return Service::whereRelation('environment.project.team', 'id', $teamId)->where('uuid', $request->uuid)->first();
     }
 
-    private function listTasks(Application|Service $resource): JsonResponse
+    private function listTasks(Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('view', $resource);
 
@@ -69,7 +87,7 @@ class ScheduledTasksController extends Controller
         return response()->json($tasks);
     }
 
-    private function createTask(Request $request, Application|Service $resource): JsonResponse
+    private function createTask(Request $request, Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
@@ -133,6 +151,8 @@ class ScheduledTasksController extends Controller
             $task->application_id = $resource->id;
         } elseif ($resource instanceof Service) {
             $task->service_id = $resource->id;
+        } else {
+            $task->node_workload_id = $resource->id;
         }
 
         $task->save();
@@ -141,14 +161,14 @@ class ScheduledTasksController extends Controller
             'team_id' => $teamId,
             'task_uuid' => $task->uuid,
             'task_name' => $task->name,
-            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_type' => $this->resourceType($resource),
             'resource_uuid' => $resource->uuid,
         ]);
 
         return response()->json($this->removeSensitiveData($task), 201);
     }
 
-    private function updateTask(Request $request, Application|Service $resource): JsonResponse
+    private function updateTask(Request $request, Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
@@ -217,7 +237,7 @@ class ScheduledTasksController extends Controller
             'team_id' => getTeamIdFromToken(),
             'task_uuid' => $task->uuid,
             'task_name' => $task->name,
-            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_type' => $this->resourceType($resource),
             'resource_uuid' => $resource->uuid,
             'changed_fields' => $changedFields,
         ]);
@@ -225,7 +245,7 @@ class ScheduledTasksController extends Controller
         return response()->json($this->removeSensitiveData($task), 200);
     }
 
-    private function deleteTask(Request $request, Application|Service $resource): JsonResponse
+    private function deleteTask(Request $request, Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('delete', $resource);
 
@@ -242,14 +262,14 @@ class ScheduledTasksController extends Controller
             'team_id' => getTeamIdFromToken(),
             'task_uuid' => $taskUuid,
             'task_name' => $taskName,
-            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_type' => $this->resourceType($resource),
             'resource_uuid' => $resource->uuid,
         ]);
 
         return response()->json(['message' => 'Scheduled task deleted.']);
     }
 
-    private function getExecutions(Request $request, Application|Service $resource): JsonResponse
+    private function getExecutions(Request $request, Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('view', $resource);
 
@@ -270,7 +290,7 @@ class ScheduledTasksController extends Controller
         return response()->json($executions);
     }
 
-    private function executeTask(Request $request, Application|Service $resource): JsonResponse
+    private function executeTask(Request $request, Application|Service|NodeWorkload $resource): JsonResponse
     {
         $this->authorize('update', $resource);
 
@@ -285,7 +305,7 @@ class ScheduledTasksController extends Controller
             'team_id' => getTeamIdFromToken(),
             'task_uuid' => $task->uuid,
             'task_name' => $task->name,
-            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_type' => $this->resourceType($resource),
             'resource_uuid' => $resource->uuid,
         ]);
 
@@ -1102,5 +1122,383 @@ class ScheduledTasksController extends Controller
         }
 
         return $this->executeTask($request, $service);
+    }
+
+    #[OA\Get(
+        summary: 'List Tasks',
+        description: 'List the scheduled tasks of a cluster application. `command` shows only for a token that may read sensitive data.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks',
+        operationId: 'list-scheduled-tasks-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled tasks.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTask'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Get(
+        summary: 'List Tasks',
+        description: 'List the scheduled tasks of a cluster database. `command` shows only for a token that may read sensitive data.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks',
+        operationId: 'list-scheduled-tasks-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled tasks.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTask'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Get(
+        summary: 'List Tasks',
+        description: 'List the scheduled tasks of a cluster stack. `command` shows only for a token that may read sensitive data.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks',
+        operationId: 'list-scheduled-tasks-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled tasks.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTask'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function clusterTasks(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->listTasks($workload);
+    }
+
+    #[OA\Post(
+        summary: 'Create Task',
+        description: 'Create a scheduled task of a cluster application. It runs the command in the container of the workload.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks',
+        operationId: 'create-scheduled-task-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 201, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Create Task',
+        description: 'Create a scheduled task of a cluster database. It runs the command in the container of the workload.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks',
+        operationId: 'create-scheduled-task-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 201, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Create Task',
+        description: 'Create a scheduled task of a cluster stack. It runs the command in the container of the workload.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks',
+        operationId: 'create-scheduled-task-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 201, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function createClusterTask(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->createTask($request, $workload);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Task',
+        description: 'Update a scheduled task of a cluster application.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'update-scheduled-task-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    #[OA\Patch(
+        summary: 'Update Task',
+        description: 'Update a scheduled task of a cluster database.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'update-scheduled-task-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    #[OA\Patch(
+        summary: 'Update Task',
+        description: 'Update a scheduled task of a cluster stack.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'update-scheduled-task-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'command', type: 'string'),
+            new OA\Property(property: 'frequency', type: 'string', description: 'A cron expression, or `daily`, `hourly`, and so on.'),
+            new OA\Property(property: 'container', type: 'string', nullable: true, description: 'Not used: a cluster workload has one container.'),
+            new OA\Property(property: 'timeout', type: 'integer', description: 'Seconds. The default is 300.'),
+            new OA\Property(property: 'use_shell', type: 'boolean'),
+            new OA\Property(property: 'enabled', type: 'boolean', description: 'An enabled task needs a token with the deploy permission.'),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task.', content: new OA\JsonContent(ref: '#/components/schemas/ScheduledTask')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function updateClusterTask(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->updateTask($request, $workload);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Task',
+        description: 'Delete a scheduled task of a cluster application.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'delete-scheduled-task-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task is deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Delete(
+        summary: 'Delete Task',
+        description: 'Delete a scheduled task of a cluster database.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'delete-scheduled-task-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task is deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Delete(
+        summary: 'Delete Task',
+        description: 'Delete a scheduled task of a cluster stack.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks/{task_uuid}',
+        operationId: 'delete-scheduled-task-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The scheduled task is deleted.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function deleteClusterTask(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->deleteTask($request, $workload);
+    }
+
+    #[OA\Get(
+        summary: 'List Executions',
+        description: 'List the runs of a scheduled task of a cluster application. `message` (the output) shows only for a token that may read sensitive data.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks/{task_uuid}/executions',
+        operationId: 'list-scheduled-task-executions-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The runs.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTaskExecution'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Get(
+        summary: 'List Executions',
+        description: 'List the runs of a scheduled task of a cluster database. `message` (the output) shows only for a token that may read sensitive data.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks/{task_uuid}/executions',
+        operationId: 'list-scheduled-task-executions-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The runs.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTaskExecution'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Get(
+        summary: 'List Executions',
+        description: 'List the runs of a scheduled task of a cluster stack. `message` (the output) shows only for a token that may read sensitive data.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks/{task_uuid}/executions',
+        operationId: 'list-scheduled-task-executions-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The runs.', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ScheduledTaskExecution'))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function clusterTaskExecutions(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->getExecutions($request, $workload);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Task',
+        description: 'Queue a run of a scheduled task of a cluster application now. Requires the deploy ability.',
+        path: '/cluster-applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
+        operationId: 'execute-scheduled-task-by-application-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Applications'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster application.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The run is queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Execute Task',
+        description: 'Queue a run of a scheduled task of a cluster database now. Requires the deploy ability.',
+        path: '/cluster-databases/{uuid}/scheduled-tasks/{task_uuid}/execute',
+        operationId: 'execute-scheduled-task-by-database-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Databases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster database.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The run is queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Execute Task',
+        description: 'Queue a run of a scheduled task of a cluster stack now. Requires the deploy ability.',
+        path: '/cluster-stacks/{uuid}/scheduled-tasks/{task_uuid}/execute',
+        operationId: 'execute-scheduled-task-by-stack-cluster-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the cluster stack.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'service', in: 'query', required: true, description: 'The service of the stack.', schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The run is queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function executeClusterTask(Request $request): JsonResponse
+    {
+        $workload = $this->kindWorkload($request);
+        if ($workload instanceof JsonResponse) {
+            return $workload;
+        }
+        $this->clusterResource = $workload;
+
+        return $this->executeTask($request, $workload);
     }
 }

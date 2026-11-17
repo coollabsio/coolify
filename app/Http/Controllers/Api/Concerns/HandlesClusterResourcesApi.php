@@ -66,6 +66,37 @@ trait HandlesClusterResourcesApi
     }
 
     /**
+     * The workload of a route with the `cluster_kind` default: a cluster application, a cluster
+     * database, or the service of a cluster stack, named by `service` in the query or the body.
+     * The `service` field is removed from the request after the lookup.
+     */
+    protected function kindWorkload(Request $request): NodeWorkload|JsonResponse
+    {
+        $kind = (string) $request->route('cluster_kind');
+        if ($kind !== 'stack') {
+            return $this->clusterWorkload($request, $kind)
+                ?? response()->json(['message' => $kind === 'database' ? 'Cluster database not found.' : 'Cluster application not found.'], 404);
+        }
+        $stack = $this->clusterStack($request);
+        if ($stack === null) {
+            return response()->json(['message' => 'Cluster stack not found.'], 404);
+        }
+        $service = (string) $request->input('service', $request->query('service', ''));
+        foreach ([$request->query, $request->request] as $bag) {
+            $bag->remove('service');
+        }
+        if ($request->isJson()) {
+            $request->json()->remove('service');
+        }
+        if ($service === '') {
+            return response()->json(['message' => 'Validation failed.', 'errors' => ['service' => ['The service field is required.']]], 422);
+        }
+
+        return $stack->workloads()->where('stack_service', $service)->first()
+            ?? response()->json(['message' => 'Service not found.'], 404);
+    }
+
+    /**
      * The project, environment, cluster, and optional server of a new resource. Each UUID must be
      * of the team of the token. `server_uuid` places it on one server of the cluster.
      *
