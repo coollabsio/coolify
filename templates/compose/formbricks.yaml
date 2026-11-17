@@ -5,87 +5,1680 @@
 # logo: svgs/formbricks.png
 # port: 3000
 
+x-app-env: &app-env
+  WEBAPP_URL: ${SERVICE_URL_FORMBRICKS}
+  BETTER_AUTH_URL: ${SERVICE_URL_FORMBRICKS}
+  NEXTAUTH_URL: ${SERVICE_URL_FORMBRICKS}
+  DATABASE_URL: postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}?schema=public
+  BETTER_AUTH_SECRET: ${SERVICE_BASE64_NEXTAUTH}
+  NEXTAUTH_SECRET: ${SERVICE_BASE64_NEXTAUTH}
+  ENCRYPTION_KEY: ${SERVICE_BASE64_ENCRYPTION}
+  CRON_SECRET: ${SERVICE_BASE64_CRON}
+  REDIS_URL: redis://valkey:6379
+  HUB_API_KEY: ${SERVICE_PASSWORD_64_HUBAPIKEY}
+  HUB_API_URL: http://hub:8080
+  CUBEJS_API_URL: http://cube:4000
+  CUBEJS_API_SECRET: ${SERVICE_PASSWORD_64_CUBEJS}
+  CUBEJS_JWT_ISSUER: formbricks-web
+  CUBEJS_JWT_AUDIENCE: formbricks-cube
+  AUTHZED_ENABLED: "true"
+  AUTHZED_ENDPOINT: spicedb:50051
+  AUTHZED_TOKEN: ${SERVICE_PASSWORD_64_AUTHZEDTOKEN}
+  AUTHZED_SYSTEM_KEY: formbricks
+  AUTHZED_INSECURE: "true"
+  AUTHZED_CONSISTENCY: fully_consistent
+  ENTERPRISE_LICENSE_KEY: ${ENTERPRISE_LICENSE_KEY}
+  MAIL_FROM: ${MAIL_FROM:-test@example.com}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Formbricks}
+  SMTP_HOST: ${SMTP_HOST:-test.example.com}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-test}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-test}
+  SMTP_SECURE_ENABLED: ${SMTP_SECURE_ENABLED:-0}
+  SMTP_REJECT_UNAUTHORIZED_TLS: ${SMTP_REJECT_UNAUTHORIZED_TLS:-1}
+  EMAIL_VERIFICATION_DISABLED: ${EMAIL_VERIFICATION_DISABLED:-1}
+  PASSWORD_RESET_DISABLED: ${PASSWORD_RESET_DISABLED:-1}
+  EMAIL_AUTH_DISABLED: ${EMAIL_AUTH_DISABLED:-0}
+  INVITE_DISABLED: ${INVITE_DISABLED:-0}
+  ASSET_PREFIX_URL: ${ASSET_PREFIX_URL}
+  UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY}
+  GITHUB_ID: ${GITHUB_ID}
+  GITHUB_SECRET: ${GITHUB_SECRET}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+  AZUREAD_CLIENT_ID: ${AZUREAD_CLIENT_ID}
+  AZUREAD_CLIENT_SECRET: ${AZUREAD_CLIENT_SECRET}
+  AZUREAD_TENANT_ID: ${AZUREAD_TENANT_ID}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+  OIDC_ISSUER: ${OIDC_ISSUER}
+  OIDC_DISPLAY_NAME: ${OIDC_DISPLAY_NAME}
+  OIDC_SIGNING_ALGORITHM: ${OIDC_SIGNING_ALGORITHM}
+  NOTION_OAUTH_CLIENT_ID: ${NOTION_OAUTH_CLIENT_ID}
+  NOTION_OAUTH_CLIENT_SECRET: ${NOTION_OAUTH_CLIENT_SECRET}
+  GOOGLE_SHEETS_CLIENT_ID: ${GOOGLE_SHEETS_CLIENT_ID}
+  GOOGLE_SHEETS_CLIENT_SECRET: ${GOOGLE_SHEETS_CLIENT_SECRET}
+  GOOGLE_SHEETS_REDIRECT_URL: ${GOOGLE_SHEETS_REDIRECT_URL}
+  AIRTABLE_CLIENT_ID: ${AIRTABLE_CLIENT_ID}
+  SLACK_CLIENT_ID: ${SLACK_CLIENT_ID}
+  SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET}
+  PRIVACY_URL: ${PRIVACY_URL}
+  TERMS_URL: ${TERMS_URL}
+  IMPRINT_URL: ${IMPRINT_URL}
+  RATE_LIMITING_DISABLED: ${RATE_LIMITING_DISABLED:-0}
+  TELEMETRY_DISABLED: ${TELEMETRY_DISABLED:-0}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+  S3_ACCESS_KEY: ${SERVICE_USER_MINIO}
+  S3_SECRET_KEY: ${SERVICE_PASSWORD_MINIO}
+  S3_REGION: us-east-1
+  S3_BUCKET_NAME: formbricks
+  S3_ENDPOINT_URL: ${MINIO_SERVER_URL} # This has to be publicly accessible by the Formbricks frontend, http://minio:9000 does not work.
+  S3_FORCE_PATH_STYLE: "1"
+
+x-hub-env: &hub-env
+  DATABASE_URL: postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}?sslmode=disable
+  API_KEY: ${SERVICE_PASSWORD_64_HUBAPIKEY}
+
+x-spicedb-env: &spicedb-env
+  SPICEDB_DATASTORE_ENGINE: postgres
+  SPICEDB_DATASTORE_CONN_URI: postgresql://spicedb:${SERVICE_PASSWORD_SPICEDB}@postgresql:5432/spicedb?sslmode=disable
+
 services:
   formbricks:
-    image: ghcr.io/formbricks/formbricks:4.5.0 # Released on Jan 5 2026
+    image: ghcr.io/formbricks/formbricks:6.2.0 # Released on Nov 13 2026
     environment:
-      - SERVICE_URL_FORMBRICKS_3000
-      - WEBAPP_URL=$SERVICE_URL_FORMBRICKS
-      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - NEXTAUTH_SECRET=$SERVICE_BASE64_NEXTAUTH
-      - NEXTAUTH_URL=$SERVICE_URL_FORMBRICKS
-      - ENCRYPTION_KEY=$SERVICE_BASE64_ENCRYPTION
-      - CRON_SECRET=$SERVICE_BASE64_CRON
-      - ENTERPRISE_LICENSE_KEY=${ENTERPRISE_LICENSE_KEY}
-      - MAIL_FROM=${MAIL_FROM:-test@example.com}
-      - SMTP_HOST=${SMTP_HOST:-test.example.com}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-test}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-test}
-      - SMTP_SECURE_ENABLED=${SMTP_SECURE_ENABLED:-0}
-      - SMTP_REJECT_UNAUTHORIZED_TLS=${SMTP_REJECT_UNAUTHORIZED_TLS:-1}
-      - SHORT_URL_BASE=${SHORT_URL_BASE}
-      - EMAIL_VERIFICATION_DISABLED=${EMAIL_VERIFICATION_DISABLED:-1}
-      - PASSWORD_RESET_DISABLED=${PASSWORD_RESET_DISABLED:-1}
-      - EMAIL_AUTH_DISABLED=${EMAIL_AUTH_DISABLED:-0}
-      - INVITE_DISABLED=${INVITE_DISABLED:-0}
-      - ASSET_PREFIX_URL=${ASSET_PREFIX_URL}
-      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
-      - GITHUB_ID=${GITHUB_ID}
-      - GITHUB_SECRET=${GITHUB_SECRET}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - AZUREAD_CLIENT_ID=${AZUREAD_CLIENT_ID}
-      - AZUREAD_CLIENT_SECRET=${AZUREAD_CLIENT_SECRET}
-      - AZUREAD_TENANT_ID=${AZUREAD_TENANT_ID}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - OIDC_ISSUER=${OIDC_ISSUER}
-      - OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME}
-      - OIDC_SIGNING_ALGORITHM=${OIDC_SIGNING_ALGORITHM}
-      - NOTION_OAUTH_CLIENT_ID=${NOTION_OAUTH_CLIENT_ID}
-      - NOTION_OAUTH_CLIENT_SECRET=${NOTION_OAUTH_CLIENT_SECRET}
-      - GOOGLE_SHEETS_CLIENT_ID=${GOOGLE_SHEETS_CLIENT_ID}
-      - GOOGLE_SHEETS_CLIENT_SECRET=${GOOGLE_SHEETS_CLIENT_SECRET}
-      - GOOGLE_SHEETS_REDIRECT_URL=${GOOGLE_SHEETS_REDIRECT_URL}
-      - AIRTABLE_CLIENT_ID=${AIRTABLE_CLIENT_ID}
-      - SLACK_CLIENT_ID=${SLACK_CLIENT_ID}
-      - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET}
-      - PRIVACY_URL=${PRIVACY_URL}
-      - TERMS_URL=${TERMS_URL}
-      - IMPRINT_URL=${IMPRINT_URL}
-      - RATE_LIMITING_DISABLED=${RATE_LIMITING_DISABLED:-0}
-      - OPENTELEMETRY_LISTENER_URL=${OPENTELEMETRY_LISTENER_URL}
-      - 'REDIS_URL=redis://valkey:6379'
-      - DEFAULT_ORGANIZATION_ID=${DEFAULT_ORGANIZATION_ID}
-      - DEFAULT_ORGANIZATION_ROLE=${DEFAULT_ORGANIZATION_ROLE:-owner}
-      - S3_ACCESS_KEY=$SERVICE_USER_MINIO
-      - S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
-      - S3_REGION=us-east-1
-      - S3_BUCKET_NAME=formbricks
-      - S3_ENDPOINT_URL=$MINIO_SERVER_URL # This has to be publically accessible by frombricks frontend, using http://minio:9000 doesn't work!!
-      - 'S3_FORCE_PATH_STYLE=1'
-    volumes:
-      - formbricks-uploads:/apps/web/uploads/
+      <<: *app-env
+      SERVICE_URL_FORMBRICKS_3000: ${SERVICE_URL_FORMBRICKS_3000}
+      SKIP_STARTUP_MIGRATION: "true"
     depends_on:
       postgresql:
         condition: service_healthy
       valkey:
         condition: service_healthy
+      cube:
+        condition: service_healthy
       minio:
         condition: service_healthy
-
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
-      interval: 2s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
       timeout: 10s
-      retries: 15
+      retries: 30
+      start_period: 30s
+
+  formbricks-migrate:
+    image: ghcr.io/formbricks/formbricks:6.2.0
+    entrypoint: ["sh", "-c"]
+    command: ["node /home/nextjs/validate-env.mjs && node packages/database/dist/scripts/apply-migrations.js"]
+    environment:
+      <<: *app-env
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    restart: "no"
+    exclude_from_hc: true
+
+  authzed-initialize:
+    image: ghcr.io/formbricks/formbricks:6.2.0
+    entrypoint: ["formbricks-authzed"]
+    command: ["upgrade", "prepare"]
+    environment:
+      <<: *app-env
+      LOG_LEVEL: fatal
+    depends_on:
+      formbricks-migrate:
+        condition: service_completed_successfully
+      spicedb:
+        condition: service_healthy
+    restart: "no"
+    exclude_from_hc: true
+
+  hub-migrate:
+    image: ghcr.io/formbricks/hub:0.14.3
+    entrypoint: ["sh", "-c"]
+    command: ['/usr/local/bin/goose -dir /app/migrations postgres "$$DATABASE_URL" up && /usr/local/bin/river migrate-up --database-url "$$DATABASE_URL"']
+    environment:
+      <<: *hub-env
+    depends_on:
+      formbricks-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    exclude_from_hc: true
+
+  hub:
+    image: ghcr.io/formbricks/hub:0.14.3
+    environment:
+      <<: *hub-env
+    depends_on:
+      hub-migrate:
+        condition: service_completed_successfully
+
+  hub-worker:
+    image: ghcr.io/formbricks/hub:0.14.3
+    entrypoint: ["/app/hub-worker"]
+    environment:
+      <<: *hub-env
+    depends_on:
+      hub-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+
+  cube:
+    image: ghcr.io/formbricks/cube:1.8.8-3
+    environment:
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: postgresql
+      CUBEJS_DB_NAME: ${POSTGRESQL_DATABASE:-formbricks}
+      CUBEJS_DB_USER: ${SERVICE_USER_POSTGRESQL}
+      CUBEJS_DB_PASS: ${SERVICE_PASSWORD_POSTGRESQL}
+      CUBEJS_DB_PORT: 5432
+      CUBEJS_API_SECRET: ${SERVICE_PASSWORD_64_CUBEJS}
+      CUBEJS_JWT_ISSUER: formbricks-web
+      CUBEJS_JWT_AUDIENCE: formbricks-cube
+      CUBEJS_DEFAULT_API_SCOPES: meta,data
+      CUBEJS_EXTERNAL_DEFAULT: "false"
+      CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+      CUBEJS_DB_QUERY_TIMEOUT: ${CUBEJS_DB_QUERY_TIMEOUT:-60s}
+    depends_on:
+      hub-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4000/readyz', (res) => { res.resume(); process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - type: bind
+        source: ./cube/cube.js
+        target: /cube/conf/cube.js
+        read_only: true
+        content: |
+          /* eslint-env es2022 */
+
+          const crypto = require("crypto");
+
+          const TENANT_MEMBERS = ["FeedbackRecords.tenantId"];
+          const REQUIRED_SCOPE = "xm:cube:query";
+
+          function assertRequiredEnvironmentVariable(name) {
+            const value = process.env[name];
+
+            if (typeof value !== "string" || value.trim().length === 0) {
+              throw new Error(`${name} is required to run Cube`);
+            }
+          }
+
+          assertRequiredEnvironmentVariable("CUBEJS_API_SECRET");
+
+          function getStringClaim(securityContext, claim) {
+            const value = securityContext?.[claim];
+            if (typeof value !== "string") {
+              return null;
+            }
+
+            const trimmedValue = value.trim();
+            return trimmedValue.length > 0 ? trimmedValue : null;
+          }
+
+          function getRequiredStringClaim(securityContext, claim) {
+            const value = getStringClaim(securityContext, claim);
+
+            if (!value) {
+              throw new Error(`Cube query rejected: missing ${claim} security context`);
+            }
+
+            return value;
+          }
+
+          function collectFilterMembers(filters) {
+            if (!Array.isArray(filters)) {
+              return [];
+            }
+
+            return filters.flatMap((filter) => [
+              ...(typeof filter?.member === "string" ? [filter.member] : []),
+              ...(typeof filter?.dimension === "string" ? [filter.dimension] : []),
+              ...collectFilterMembers(filter?.and),
+              ...collectFilterMembers(filter?.or),
+            ]);
+          }
+
+          function collectOrderMembers(order) {
+            if (!order) {
+              return [];
+            }
+
+            if (Array.isArray(order)) {
+              return order
+                .map((orderEntry) => (Array.isArray(orderEntry) ? orderEntry[0] : null))
+                .filter((member) => typeof member === "string");
+            }
+
+            if (typeof order === "object") {
+              return Object.keys(order);
+            }
+
+            return [];
+          }
+
+          function collectTimeDimensionMembers(timeDimensions) {
+            if (!Array.isArray(timeDimensions)) {
+              return [];
+            }
+
+            return timeDimensions
+              .map((timeDimension) => timeDimension?.dimension)
+              .filter((dimension) => typeof dimension === "string");
+          }
+
+          function collectQueryMembers(query) {
+            const cubeQuery = query ?? {};
+            const members = [
+              ...(Array.isArray(cubeQuery.measures) ? cubeQuery.measures : []),
+              ...(Array.isArray(cubeQuery.dimensions) ? cubeQuery.dimensions : []),
+              ...(Array.isArray(cubeQuery.segments) ? cubeQuery.segments : []),
+              ...collectTimeDimensionMembers(cubeQuery.timeDimensions),
+              ...collectFilterMembers(cubeQuery.filters),
+              ...collectOrderMembers(cubeQuery.order),
+            ].filter((member) => typeof member === "string");
+
+            return Array.from(new Set(members)).sort((a, b) => a.localeCompare(b));
+          }
+
+          function hasClaim(securityContext, claim) {
+            return securityContext?.[claim] !== undefined && securityContext?.[claim] !== null;
+          }
+
+          // Who the query runs for: a user (session or OAuth) or an API key, which has no user behind it. The token
+          // carries exactly one of the two claims, so the audit line can never attribute a key's query to a person;
+          // a token naming both, or neither, is refused rather than guessed at.
+          function getActor(securityContext) {
+            const hasUser = hasClaim(securityContext, "userId");
+            const hasApiKey = hasClaim(securityContext, "apiKeyId");
+
+            if (hasUser && hasApiKey) {
+              throw new Error("Cube query rejected: userId and apiKeyId security context are mutually exclusive");
+            }
+            if (hasApiKey) {
+              return { type: "apiKey", id: getRequiredStringClaim(securityContext, "apiKeyId") };
+            }
+            if (hasUser) {
+              return { type: "user", id: getRequiredStringClaim(securityContext, "userId") };
+            }
+
+            throw new Error("Cube query rejected: missing userId or apiKeyId security context");
+          }
+
+          function assertValidSecurityContext(securityContext) {
+            const tenantId = getRequiredStringClaim(securityContext, "tenantId");
+            const feedbackDirectoryId = getRequiredStringClaim(securityContext, "feedbackDirectoryId");
+            const workspaceId = getRequiredStringClaim(securityContext, "workspaceId");
+            const scope = getRequiredStringClaim(securityContext, "scope");
+
+            if (scope !== REQUIRED_SCOPE) {
+              throw new Error("Cube query rejected: invalid Cube query scope");
+            }
+            if (tenantId !== feedbackDirectoryId) {
+              throw new Error("Cube query rejected: tenantId/feedbackDirectoryId mismatch");
+            }
+
+            return {
+              tenantId,
+              feedbackDirectoryId,
+              workspaceId,
+              organizationId: getRequiredStringClaim(securityContext, "organizationId"),
+              actor: getActor(securityContext),
+              requestId: getRequiredStringClaim(securityContext, "jti"),
+              source: getRequiredStringClaim(securityContext, "source"),
+            };
+          }
+
+          function assertNoCallerTenantMember(query) {
+            for (const member of collectQueryMembers(query)) {
+              if (TENANT_MEMBERS.includes(member)) {
+                throw new Error("Cube query rejected: tenant filters are enforced by Cube");
+              }
+            }
+          }
+
+          function logCubeQueryAuditEvent(context, query, { error, status = "success" } = {}) {
+            const errorName = error instanceof Error ? error.name : undefined;
+            const errorMessage = error instanceof Error ? error.message : error ? String(error) : undefined;
+
+            console.log(
+              JSON.stringify({
+                type: "audit",
+                event: "cube.query",
+                status,
+                timestamp: new Date().toISOString(),
+                tenantId: context.tenantId,
+                feedbackDirectoryId: context.feedbackDirectoryId,
+                workspaceId: context.workspaceId,
+                organizationId: context.organizationId,
+                actor: context.actor,
+                requestId: context.requestId,
+                source: context.source,
+                members: collectQueryMembers(query),
+                ...(errorName ? { errorName } : {}),
+                ...(errorMessage ? { errorMessage } : {}),
+              })
+            );
+          }
+
+          function logCubeQuerySecurityContextFailure(query, error) {
+            console.log(
+              JSON.stringify({
+                type: "audit",
+                event: "cube.query",
+                status: "failure",
+                timestamp: new Date().toISOString(),
+                members: collectQueryMembers(query),
+                errorName: error instanceof Error ? error.name : undefined,
+                errorMessage: error instanceof Error ? error.message : String(error),
+              })
+            );
+          }
+
+          // String dimensions whose `equals` / `notEquals` filters should be case- and
+          // whitespace-insensitive. Each maps to a hidden companion dimension defined in
+          // schema/FeedbackRecords.js as LOWER(TRIM(<column>)). The visible dimension is left
+          // untouched (so grouping/display keep the original-cased value); only exact-match
+          // filters are rewritten onto the normalized companion. Keep this map in sync with
+          // the *Normalized dimensions in schema/FeedbackRecords.js.
+          const CASE_INSENSITIVE_EQUALS_DIMENSIONS = {
+            "FeedbackRecords.sourceType": "FeedbackRecords.sourceTypeNormalized",
+            "FeedbackRecords.sourceName": "FeedbackRecords.sourceNameNormalized",
+            "FeedbackRecords.fieldType": "FeedbackRecords.fieldTypeNormalized",
+            "FeedbackRecords.fieldLabel": "FeedbackRecords.fieldLabelNormalized",
+            "FeedbackRecords.fieldGroupLabel": "FeedbackRecords.fieldGroupLabelNormalized",
+            "FeedbackRecords.language": "FeedbackRecords.languageNormalized",
+            "FeedbackRecords.valueText": "FeedbackRecords.valueTextNormalized",
+            "FeedbackRecords.metadataSource": "FeedbackRecords.metadataSourceNormalized",
+            "FeedbackRecords.metadataBrowser": "FeedbackRecords.metadataBrowserNormalized",
+            "FeedbackRecords.metadataOs": "FeedbackRecords.metadataOsNormalized",
+            "FeedbackRecords.metadataDevice": "FeedbackRecords.metadataDeviceNormalized",
+            "FeedbackRecords.metadataCountry": "FeedbackRecords.metadataCountryNormalized",
+            "FeedbackRecords.metadataAction": "FeedbackRecords.metadataActionNormalized",
+          };
+
+          const CASE_INSENSITIVE_OPERATORS = new Set(["equals", "notEquals"]);
+
+          function normalizeFilterValue(value) {
+            return typeof value === "string" ? value.trim().toLowerCase() : value;
+          }
+
+          // Rewrites a single filter node: exact-match filters on a normalizable string
+          // dimension are redirected to the *Normalized companion with lowercased/trimmed
+          // values; nested and/or groups recurse; everything else is returned unchanged.
+          function normalizeCaseInsensitiveFilter(filter) {
+            if (!filter || typeof filter !== "object") {
+              return filter;
+            }
+
+            if (Array.isArray(filter.and)) {
+              return { ...filter, and: filter.and.map(normalizeCaseInsensitiveFilter) };
+            }
+
+            if (Array.isArray(filter.or)) {
+              return { ...filter, or: filter.or.map(normalizeCaseInsensitiveFilter) };
+            }
+
+            const normalizedMember = CASE_INSENSITIVE_EQUALS_DIMENSIONS[filter.member];
+            if (
+              typeof filter.member === "string" &&
+              normalizedMember &&
+              typeof filter.operator === "string" &&
+              CASE_INSENSITIVE_OPERATORS.has(filter.operator)
+            ) {
+              return {
+                ...filter,
+                member: normalizedMember,
+                ...(Array.isArray(filter.values) ? { values: filter.values.map(normalizeFilterValue) } : {}),
+              };
+            }
+
+            return filter;
+          }
+
+          function normalizeCaseInsensitiveFilters(filters) {
+            if (!Array.isArray(filters)) {
+              return filters;
+            }
+
+            return filters.map(normalizeCaseInsensitiveFilter);
+          }
+
+          // ── Embedded data ────────────────────────────────────────────────────────────────────────────────
+          // Each Feedback Dataset compiles its own FeedbackRecords model: the app passes the dataset's most
+          // frequent embedded-data keys in the signed token (`edKeys`), `contextToAppId` gives every distinct
+          // (dataset, key set) its own compiled model, and schema/FeedbackRecords.js turns each key into one
+          // `FeedbackRecords.ed_<slug>_<hash>` dimension through `getEmbeddedDimensionSpecs`. Cube never looks
+          // keys up itself, and one dataset's key names never reach another dataset's `/meta`.
+
+          /**
+           * Most keys one token compiles: the app sends a dataset's 100 most frequent keys plus at most one bucket
+           * of 10 rarer keys a saved query names (apps/web `MAX_TOKEN_EMBEDDED_KEYS`).
+           */
+          const MAX_EMBEDDED_KEYS = 110;
+          /**
+           * Most UTF-8 bytes the keys of one token may take as JSON writes them (apps/web
+           * `MAX_TOKEN_EMBEDDED_KEYS_BYTES`). The app stays within it; this guard keeps a token that does not from
+           * compiling a model bigger than the app ever asks for.
+           */
+          const MAX_EMBEDDED_KEYS_BYTES = 8192;
+          /** Longest key compiled. A longer one is dropped rather than truncated, so names stay exact. */
+          const MAX_EMBEDDED_KEY_LENGTH = 128;
+          const EMBEDDED_MEMBER_PREFIX = "ed_";
+          /**
+           * Hidden twin of an embedded dimension that only `equals` filters are moved onto. Its FILTER_PARAMS
+           * containment predicate (`@>`) is what a GIN index on `metadata->'embedded_data'` can serve; it lives on
+           * a twin because FILTER_PARAMS hands the predicate the filter's values whatever its operator, and a
+           * `notEquals` or `contains` must never be narrowed by a containment.
+           */
+          const EMBEDDED_EQUALS_MEMBER_PREFIX = "edc_";
+          /**
+           * Numeric twin of an embedded dimension: the key's value as a number, NULL where it is not one. A dashboard
+           * filter comparing a key with a number (`gt`, `gte`, `lt`, `lte`) names it (apps/web
+           * `EMBEDDED_NUMBER_MEMBER_PREFIX`), so "> 10" compares numbers rather than text.
+           */
+          const EMBEDDED_NUMBER_MEMBER_PREFIX = "edn_";
+          /**
+           * The text a Postgres numeric reads: an optional sign, digits with an optional point (or a point and
+           * digits), an optional exponent of at most three digits, blanks around. Written without `?`, which Cube
+           * rewrites in generated SQL.
+           */
+          const NUMERIC_TEXT_PATTERN =
+            "^\\s*[-+]{0,1}([0-9]+[.]{0,1}[0-9]*|[.][0-9]+)([eE][-+]{0,1}[0-9]{1,3}){0,1}\\s*$";
+
+          /**
+           * SQL reading `textSql` as a number, NULL when it is not one, so a value like "n/a" never fails the query
+           * with a cast error.
+           */
+          function toSafeNumericSql(textSql) {
+            return `CASE WHEN ${textSql} ~ '${NUMERIC_TEXT_PATTERN}' THEN (${textSql})::numeric END`;
+          }
+          const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+          // C0 and C1 control characters (NUL included): never a key anyone means, and a title or log line breaker.
+          // eslint-disable-next-line no-control-regex -- matching control characters is the point
+          const CONTROL_CHARACTER = /[\u0000-\u001F\u007F-\u009F]/;
+
+          /**
+           * The keys a token names, in the one order every caller sees: strings only, no blank key (a blank
+           * dimension title breaks the whole model, and failed compiles are not cached), none longer than
+           * `MAX_EMBEDDED_KEY_LENGTH`, no control character, none Postgres text cannot hold, no duplicates, at most
+           * `MAX_EMBEDDED_KEYS` keys and `MAX_EMBEDDED_KEYS_BYTES` bytes.
+           */
+          function getEmbeddedKeys(securityContext) {
+            const claim = securityContext?.edKeys;
+            if (!Array.isArray(claim)) {
+              return [];
+            }
+
+            const keys = new Set();
+            let bytes = 0;
+            for (const key of claim) {
+              if (keys.size >= MAX_EMBEDDED_KEYS) break;
+              if (typeof key !== "string" || key.trim().length === 0 || key.length > MAX_EMBEDDED_KEY_LENGTH) continue;
+              if (CONTROL_CHARACTER.test(key) || LONE_SURROGATE.test(key) || keys.has(key)) continue;
+              const keyBytes = Buffer.byteLength(JSON.stringify(key), "utf8");
+              if (bytes + keyBytes > MAX_EMBEDDED_KEYS_BYTES) continue;
+              bytes += keyBytes;
+              keys.add(key);
+            }
+
+            return Array.from(keys).sort();
+          }
+
+          const sha256Hex = (value) => crypto.createHash("sha256").update(value, "utf8").digest("hex");
+
+          /**
+           * `ed_<ascii slug, at most 24 characters>_<first 8 hex of sha256(key)>`. The slug keeps the name
+           * readable; the hash keeps it unique and stable, so `Plan`, `plan` and `plan ` are three members and
+           * a key keeps its member name in every dataset and over time. apps/web mirrors this function
+           * (`getEmbeddedMemberName`) and a test keeps the two equal.
+           */
+          function getEmbeddedMemberSuffix(key) {
+            const slug = key
+              .normalize("NFKD")
+              .replace(/[̀-ͯ]/g, "")
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_")
+              .replace(/^_+|_+$/g, "")
+              .slice(0, 24)
+              .replace(/_+$/, "");
+            const hash = sha256Hex(key).slice(0, 8);
+            return slug ? `${slug}_${hash}` : hash;
+          }
+
+          /**
+           * A Postgres string literal for `value` that holds nothing but letters, digits, spaces, `_` and `-`:
+           * every other character is a `\uXXXX` / `\UXXXXXXXX` escape. A key is respondent-controlled text, and
+           * besides quotes Cube itself rewrites `$<n>$` and `?` sequences in generated SQL, so none of those may
+           * reach it verbatim.
+           */
+          function toSafeSqlStringLiteral(value) {
+            let literal = "";
+            for (const character of value) {
+              if (/^[A-Za-z0-9 _-]$/.test(character)) {
+                literal += character;
+                continue;
+              }
+              const codePoint = character.codePointAt(0);
+              literal +=
+                codePoint > 0xffff
+                  ? `\\U${codePoint.toString(16).padStart(8, "0")}`
+                  : `\\u${codePoint.toString(16).padStart(4, "0")}`;
+            }
+            return `E'${literal}'`;
+          }
+
+          /**
+           * What schema/FeedbackRecords.js compiles for the token's keys: one dimension per key, its hidden `equals`
+           * twin, its hidden numeric twin (`toSafeNumericSql` over the value, in the dimension's SQL) and the SQL its
+           * containment predicate needs. Two keys whose names would collide (an 8-hex collision among 100 keys)
+           * keep the first, because a duplicate member fails the whole model.
+           */
+          function getEmbeddedDimensionSpecs(compileContext) {
+            const names = new Set();
+            const specs = [];
+            for (const key of getEmbeddedKeys(compileContext?.securityContext)) {
+              const suffix = getEmbeddedMemberSuffix(key);
+              if (names.has(suffix)) continue;
+              names.add(suffix);
+              const keyLiteral = toSafeSqlStringLiteral(key);
+              const valueSql = `metadata->'embedded_data'->>${keyLiteral}`;
+              specs.push({
+                key,
+                name: `${EMBEDDED_MEMBER_PREFIX}${suffix}`,
+                equalsName: `${EMBEDDED_EQUALS_MEMBER_PREFIX}${suffix}`,
+                numberName: `${EMBEDDED_NUMBER_MEMBER_PREFIX}${suffix}`,
+                valueSql,
+                keyLiteral,
+              });
+            }
+            return specs;
+          }
+
+          /**
+           * The containment predicate for one `equals` filter on an embedded key, as a superset of
+           * `metadata->'embedded_data'->>key IN (values)`: a value stored as a JSON number or boolean reads as the
+           * same text, so a numeric- or boolean-looking value is also tried in that type. Exact-case, like the
+           * dimension itself.
+           */
+          function getEmbeddedContainmentSql(keyLiteral, values) {
+            const object = (value) => `metadata->'embedded_data' @> jsonb_build_object(${keyLiteral}, ${value})`;
+            const alternatives = values.map((value) =>
+              [
+                object(`${value}::text`),
+                object(
+                  `CASE WHEN ${value}::text ~ '^\\s*[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]{1,3})?\\s*$' THEN (${value}::text)::numeric END`
+                ),
+                object(`CASE WHEN ${value}::text IN ('true', 'false') THEN (${value}::text)::boolean END`),
+              ].join(" OR ")
+            );
+            return alternatives.length > 0 ? `(${alternatives.join(" OR ")})` : "1 = 1";
+          }
+
+          const EMBEDDED_MEMBER_PATTERN = /^FeedbackRecords\.ed_[a-z0-9_]+$/;
+
+          /**
+           * `equals` on an embedded dimension moves to its hidden twin; everything else is left as written. Cube
+           * accepts a filter's member as `member` or as the older `dimension`, so both are moved.
+           */
+          function moveEmbeddedEqualsFilter(filter) {
+            if (!filter || typeof filter !== "object") {
+              return filter;
+            }
+            if (Array.isArray(filter.and)) {
+              return { ...filter, and: filter.and.map(moveEmbeddedEqualsFilter) };
+            }
+            if (Array.isArray(filter.or)) {
+              return { ...filter, or: filter.or.map(moveEmbeddedEqualsFilter) };
+            }
+            const memberKey = typeof filter.member === "string" ? "member" : "dimension";
+            const member = filter[memberKey];
+            if (filter.operator === "equals" && typeof member === "string" && EMBEDDED_MEMBER_PATTERN.test(member)) {
+              return {
+                ...filter,
+                [memberKey]: member.replace(
+                  `FeedbackRecords.${EMBEDDED_MEMBER_PREFIX}`,
+                  `FeedbackRecords.${EMBEDDED_EQUALS_MEMBER_PREFIX}`
+                ),
+              };
+            }
+            return filter;
+          }
+
+          /**
+           * One compiled model per dataset and key set. A dataset without keys compiles the plain model, which is
+           * the same for every dataset, so they all share it.
+           */
+          function contextToAppId({ securityContext } = {}) {
+            const keys = getEmbeddedKeys(securityContext);
+            const tenantId = getStringClaim(securityContext, "tenantId");
+            if (keys.length === 0 || !tenantId) {
+              return "FB_BASE";
+            }
+            return `FB_ED_${sha256Hex(JSON.stringify([tenantId, keys])).slice(0, 32)}`;
+          }
+
+          // ── Answer filters ──────────────────────────────────────────────────────────────────────────────
+          // A chart filters by how the same submission answered another question with ONE public condition on
+          // the virtual member `FeedbackRecords.answer`, values "<questionId>:<valueKey>". queryRewrite gives each
+          // rule its own `AnswerFilterN` join (schema/FeedbackRecords.js, on tenant + submission) and expands it
+          // onto the typed plain column the question's kind stores its answer in; COALESCE'd columns were 3-25x
+          // slower. The kind comes from the token (`answerKinds`, from the app's field catalog). A submission that
+          // did not answer the question has no joined row, so it matches no rule — "is not" included.
+
+          const ANSWER_MEMBER = "FeedbackRecords.answer";
+          const ANSWER_FILTER_ALIAS_COUNT = 25;
+          const ANSWER_FILTER_CUBE = /^AnswerFilter\d+$/;
+          const NUMERIC_VALUE = /^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/;
+
+          function getAnswerKind(securityContext, questionId) {
+            const kinds = securityContext?.answerKinds;
+            const kind =
+              kinds && typeof kinds === "object" && Object.hasOwn(kinds, questionId) ? kinds[questionId] : undefined;
+            if (!["choice", "multi", "number"].includes(kind)) {
+              throw new Error("Cube query rejected: an answer rule names a question with no known kind");
+            }
+            return kind;
+          }
+
+          function parseAnswerRule(filter) {
+            if (filter.operator !== "equals" && filter.operator !== "notEquals") {
+              throw new Error("Cube query rejected: an answer rule takes equals or notEquals");
+            }
+            if (!Array.isArray(filter.values) || filter.values.length === 0) {
+              throw new Error("Cube query rejected: an answer rule needs at least one value");
+            }
+
+            const questions = new Set();
+            const valueKeys = filter.values.map((value) => {
+              const separator = typeof value === "string" ? value.indexOf(":") : -1;
+              if (separator <= 0 || separator === value.length - 1) {
+                throw new Error("Cube query rejected: an answer rule value is <questionId>:<valueKey>");
+              }
+              questions.add(value.slice(0, separator));
+              return value.slice(separator + 1);
+            });
+            if (questions.size !== 1) {
+              throw new Error("Cube query rejected: an answer rule names exactly one question");
+            }
+
+            return { questionId: Array.from(questions)[0], operator: filter.operator, valueKeys };
+          }
+
+          function expandAnswerRule(rule, kind, alias) {
+            const condition = (member, operator, values) => ({ member: `${alias}.${member}`, operator, values });
+
+            switch (kind) {
+              case "multi":
+                // One record per selected option: field_id `<question>__<option>`, field_group_id the question.
+                // "Does not contain" is not offered: a join cannot express it.
+                if (rule.operator !== "equals") {
+                  throw new Error("Cube query rejected: a multi-select answer rule takes equals only");
+                }
+                return {
+                  and: [
+                    condition("fieldGroupId", "equals", [rule.questionId]),
+                    condition(
+                      "fieldId",
+                      "equals",
+                      rule.valueKeys.map((valueKey) => `${rule.questionId}__${valueKey}`)
+                    ),
+                  ],
+                };
+              case "number":
+                if (!rule.valueKeys.every((valueKey) => NUMERIC_VALUE.test(valueKey))) {
+                  throw new Error("Cube query rejected: a number answer rule takes numbers");
+                }
+                return {
+                  and: [
+                    condition("fieldId", "equals", [rule.questionId]),
+                    condition("valueNumber", rule.operator, rule.valueKeys),
+                  ],
+                };
+              default:
+                return {
+                  and: [
+                    condition("fieldId", "equals", [rule.questionId]),
+                    condition("valueId", rule.operator, rule.valueKeys),
+                  ],
+                };
+            }
+          }
+
+          /** Expands every answer rule in `filters`, numbering the aliases in the order the rules appear. */
+          function expandAnswerRules(filters, securityContext) {
+            if (!Array.isArray(filters)) {
+              return filters;
+            }
+
+            let aliasCount = 0;
+            const expand = (filter) => {
+              if (!filter || typeof filter !== "object") {
+                return filter;
+              }
+              if (Array.isArray(filter.and)) {
+                return { ...filter, and: filter.and.map(expand) };
+              }
+              if (Array.isArray(filter.or)) {
+                return { ...filter, or: filter.or.map(expand) };
+              }
+              if (filter.member !== ANSWER_MEMBER && filter.dimension !== ANSWER_MEMBER) {
+                return filter;
+              }
+
+              aliasCount += 1;
+              if (aliasCount > ANSWER_FILTER_ALIAS_COUNT) {
+                throw new Error(`Cube query rejected: at most ${ANSWER_FILTER_ALIAS_COUNT} answer rules`);
+              }
+              const rule = parseAnswerRule(filter);
+              return expandAnswerRule(
+                rule,
+                getAnswerKind(securityContext, rule.questionId),
+                `AnswerFilter${aliasCount}`
+              );
+            };
+
+            return filters.map(expand);
+          }
+
+          /**
+           * Members only the rewrite may write: the answer-filter joins, the embedded `equals` twins, and the
+           * answer member anywhere but a filter (it has no column to select or sort by).
+           */
+          function assertNoReservedMember(query) {
+            const cubeQuery = query ?? {};
+            for (const member of collectQueryMembers(cubeQuery)) {
+              const [cubeName, memberName = ""] = member.split(".");
+              if (ANSWER_FILTER_CUBE.test(cubeName) || memberName.startsWith(EMBEDDED_EQUALS_MEMBER_PREFIX)) {
+                throw new Error("Cube query rejected: reserved member");
+              }
+            }
+            const selected = [
+              ...(Array.isArray(cubeQuery.measures) ? cubeQuery.measures : []),
+              ...(Array.isArray(cubeQuery.dimensions) ? cubeQuery.dimensions : []),
+              ...(Array.isArray(cubeQuery.segments) ? cubeQuery.segments : []),
+              ...collectTimeDimensionMembers(cubeQuery.timeDimensions),
+              ...collectOrderMembers(cubeQuery.order),
+            ];
+            if (selected.includes(ANSWER_MEMBER)) {
+              throw new Error("Cube query rejected: FeedbackRecords.answer is a filter only");
+            }
+          }
+
+          /**
+           * Compiled-model cache limits for one Cube process. Every dataset with embedded keys is its own model,
+           * measured at about 2-5 MB each once compiled (more keys, more members), so the defaults (250 models, no
+           * member budget) can outgrow the Helm chart's 1 GiB limit. 60 models at 500 members each keep the cache
+           * within about 300 MB; a dataset whose model was evicted compiles again on its next query. The operator's
+           * CUBEJS_COMPILER_CACHE_SIZE / CUBEJS_MAX_COMPILED_MEMBERS win when set.
+           */
+          const DEFAULT_COMPILER_CACHE_SIZE = 60;
+          const DEFAULT_MAX_COMPILED_MEMBERS = DEFAULT_COMPILER_CACHE_SIZE * 500;
+
+          function getCompilerCacheOptions() {
+            return {
+              ...(process.env.CUBEJS_COMPILER_CACHE_SIZE ? {} : { compilerCacheSize: DEFAULT_COMPILER_CACHE_SIZE }),
+              ...(process.env.CUBEJS_MAX_COMPILED_MEMBERS ? {} : { maxCompiledMembers: DEFAULT_MAX_COMPILED_MEMBERS }),
+            };
+          }
+
+          function queryRewrite(query, rewriteContext) {
+            const cubeQuery = query ?? {};
+            let context;
+
+            try {
+              context = assertValidSecurityContext(rewriteContext?.securityContext);
+            } catch (error) {
+              logCubeQuerySecurityContextFailure(cubeQuery, error);
+              throw error;
+            }
+
+            let expandedFilters;
+            try {
+              assertNoCallerTenantMember(cubeQuery);
+              assertNoReservedMember(cubeQuery);
+              expandedFilters = expandAnswerRules(cubeQuery.filters, rewriteContext.securityContext);
+            } catch (error) {
+              logCubeQueryAuditEvent(context, cubeQuery, { error, status: "failure" });
+              throw error;
+            }
+
+            const queriedCubePrefixes = new Set(collectQueryMembers(cubeQuery).map((member) => member.split(".")[0]));
+            const normalizedFilters = normalizeCaseInsensitiveFilters(expandedFilters);
+            const embeddedFilters = Array.isArray(normalizedFilters)
+              ? normalizedFilters.map(moveEmbeddedEqualsFilter)
+              : normalizedFilters;
+            const rewrittenQuery = {
+              ...cubeQuery,
+              filters: [
+                ...(Array.isArray(embeddedFilters) ? embeddedFilters : []),
+                ...TENANT_MEMBERS.filter((member) => queriedCubePrefixes.has(member.split(".")[0])).map((member) => ({
+                  member,
+                  operator: "equals",
+                  values: [context.tenantId],
+                })),
+              ],
+            };
+
+            logCubeQueryAuditEvent(context, rewrittenQuery);
+            return rewrittenQuery;
+          }
+
+          module.exports = {
+            queryRewrite,
+            contextToAppId,
+            ...getCompilerCacheOptions(),
+          };
+
+          // Cube validates its options strictly, so what schema/FeedbackRecords.js needs from this file rides along
+          // as non-enumerable properties Cube does not see.
+          for (const [name, value] of Object.entries({
+            getEmbeddedDimensionSpecs,
+            getEmbeddedContainmentSql,
+            getEmbeddedMemberSuffix,
+            getEmbeddedKeys,
+            toSafeSqlStringLiteral,
+            toSafeNumericSql,
+            ANSWER_FILTER_ALIAS_COUNT,
+            MAX_EMBEDDED_KEYS,
+            MAX_EMBEDDED_KEYS_BYTES,
+            MAX_EMBEDDED_KEY_LENGTH,
+          })) {
+            Object.defineProperty(module.exports, name, { value, enumerable: false });
+          }
+      - type: bind
+        source: ./cube/schema/FeedbackRecords.js
+        target: /cube/conf/model/FeedbackRecords.js
+        read_only: true
+        content: |
+          // This schema maps to the `feedback_records` table owned by the Formbricks Hub Postgres.
+          // If the Hub changes column names or types, this schema must be updated to match.
+          //
+          // Compiled once per Feedback Dataset and embedded-data key set (cube.js `contextToAppId`): the dataset's
+          // keys arrive in the signed token and each becomes one `ed_<slug>_<hash>` dimension, with hidden `edc_`
+          // (equals) and `edn_` (number) twins. A dataset without keys compiles exactly the plain model. The helpers
+          // live in cube.js, as non-enumerable exports.
+          const {
+            ANSWER_FILTER_ALIAS_COUNT,
+            getEmbeddedContainmentSql,
+            getEmbeddedDimensionSpecs,
+            toSafeNumericSql,
+          } = require("/cube/conf/cube.js");
+
+          asyncModule(async () => {
+            const embeddedSpecs = getEmbeddedDimensionSpecs(COMPILE_CONTEXT);
+
+            const embeddedDimensions = {};
+            for (const spec of embeddedSpecs) {
+              embeddedDimensions[spec.name] = {
+                sql: (CUBE) => `${CUBE}.${spec.valueSql}`,
+                type: `string`,
+                title: spec.key,
+                description: `Embedded data: ${spec.key}`,
+                meta: { embeddedDataKey: spec.key },
+              };
+              // `equals` filters are moved onto this twin by queryRewrite; its containment predicate is in `sql`.
+              embeddedDimensions[spec.equalsName] = {
+                sql: (CUBE) => `${CUBE}.${spec.valueSql}`,
+                type: `string`,
+                shown: false,
+              };
+              // The key's value as a number, NULL where it is not one: what a dashboard's "> 10" on the key compares.
+              embeddedDimensions[spec.numberName] = {
+                sql: (CUBE) => toSafeNumericSql(`${CUBE}.${spec.valueSql}`),
+                type: `number`,
+                shown: false,
+              };
+            }
+
+            cube(`FeedbackRecords`, {
+              // Each `equals` filter on an embedded key also narrows the scan with a containment predicate a GIN
+              // index on `metadata->'embedded_data'` can serve. A filter FILTER_PARAMS cannot place (one nested
+              // under `or`) renders `1 = 1`, never a wrong narrowing: the filter itself still applies.
+              sql: (FILTER_PARAMS) => {
+                const predicates = embeddedSpecs.map((spec) =>
+                  FILTER_PARAMS.FeedbackRecords[spec.equalsName].filter((...values) =>
+                    getEmbeddedContainmentSql(spec.keyLiteral, values)
+                  )
+                );
+                return predicates.length > 0
+                  ? `SELECT * FROM feedback_records WHERE ${predicates.join(" AND ")}`
+                  : `SELECT * FROM feedback_records`;
+              },
+
+              // One AnswerFilterN join per answer rule, written out because Cube reads a join's target
+              // from the template. The tenant is part of the key, so a submission id never reaches another tenant.
+              // ANSWER_FILTER_ALIAS_COUNT in cube.js is how many there are; a test keeps the two equal.
+              joins: {
+                AnswerFilter1: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter1}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter1}.submission_id`,
+                },
+                AnswerFilter2: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter2}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter2}.submission_id`,
+                },
+                AnswerFilter3: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter3}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter3}.submission_id`,
+                },
+                AnswerFilter4: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter4}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter4}.submission_id`,
+                },
+                AnswerFilter5: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter5}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter5}.submission_id`,
+                },
+                AnswerFilter6: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter6}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter6}.submission_id`,
+                },
+                AnswerFilter7: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter7}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter7}.submission_id`,
+                },
+                AnswerFilter8: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter8}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter8}.submission_id`,
+                },
+                AnswerFilter9: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter9}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter9}.submission_id`,
+                },
+                AnswerFilter10: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter10}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter10}.submission_id`,
+                },
+                AnswerFilter11: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter11}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter11}.submission_id`,
+                },
+                AnswerFilter12: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter12}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter12}.submission_id`,
+                },
+                AnswerFilter13: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter13}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter13}.submission_id`,
+                },
+                AnswerFilter14: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter14}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter14}.submission_id`,
+                },
+                AnswerFilter15: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter15}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter15}.submission_id`,
+                },
+                AnswerFilter16: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter16}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter16}.submission_id`,
+                },
+                AnswerFilter17: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter17}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter17}.submission_id`,
+                },
+                AnswerFilter18: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter18}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter18}.submission_id`,
+                },
+                AnswerFilter19: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter19}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter19}.submission_id`,
+                },
+                AnswerFilter20: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter20}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter20}.submission_id`,
+                },
+                AnswerFilter21: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter21}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter21}.submission_id`,
+                },
+                AnswerFilter22: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter22}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter22}.submission_id`,
+                },
+                AnswerFilter23: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter23}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter23}.submission_id`,
+                },
+                AnswerFilter24: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter24}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter24}.submission_id`,
+                },
+                AnswerFilter25: {
+                  relationship: `one_to_many`,
+                  sql: `${CUBE}.tenant_id = ${AnswerFilter25}.tenant_id AND ${CUBE}.submission_id = ${AnswerFilter25}.submission_id`,
+                },
+              },
+
+              measures: {
+                count: {
+                  type: `count`,
+                  description: `Total number of feedback records`,
+                },
+
+                uniqueRespondents: {
+                  type: `countDistinct`,
+                  sql: `${CUBE}.user_id`,
+                  description: `Unique identified people who gave feedback, deduplicated by person — one respondent answering 3 questions counts once. Anonymous feedback (no identified respondent) isn't counted here, even though it counts as a Feedback Record.`,
+                },
+
+                uniqueResponses: {
+                  type: `countDistinct`,
+                  sql: `${CUBE}.submission_id`,
+                  description: `Unique survey submissions, deduplicated by submission — one respondent submitting twice counts twice`,
+                },
+
+                // The three NPS buckets must partition every non-null value_number, so that
+                // promoterCount + passiveCount + detractorCount always equals the number of answered NPS
+                // records. value_number is an unbounded numeric, so the buckets are half-open ranges rather
+                // than the BETWEEN ranges the 0-10 scale suggests: a 6.5 used to fall in no bucket at all
+                // while still counting in npsScore's denominator, silently dragging the score toward 0.
+                promoterCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'nps' AND ${CUBE}.value_number >= 9` }],
+                  description: `Number of NPS promoters (score >= 9; NPS scale is 0-10)`,
+                },
+
+                detractorCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'nps' AND ${CUBE}.value_number < 7` }],
+                  description: `Number of NPS detractors (score < 7; NPS scale is 0-10)`,
+                },
+
+                passiveCount: {
+                  type: `count`,
+                  filters: [
+                    { sql: `${CUBE}.field_type = 'nps' AND ${CUBE}.value_number >= 7 AND ${CUBE}.value_number < 9` },
+                  ],
+                  description: `Number of NPS passives (score >= 7 and < 9; NPS scale is 0-10)`,
+                },
+
+                npsCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'nps' AND ${CUBE}.value_number IS NOT NULL` }],
+                  description: `Answered NPS responses (field_type = 'nps' with a numeric value). The denominator of npsScore.`,
+                },
+
+                npsScore: {
+                  type: `number`,
+                  sql: `
+                    CASE
+                      WHEN COUNT(CASE WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number IS NOT NULL THEN 1 END) = 0 THEN NULL
+                      ELSE ROUND(
+                        (
+                          (COUNT(CASE WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number >= 9 THEN 1 END)::numeric -
+                           COUNT(CASE WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number < 7 THEN 1 END)::numeric)
+                          / COUNT(CASE WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number IS NOT NULL THEN 1 END)::numeric
+                        ) * 100,
+                        2
+                      )
+                    END
+                  `,
+                  description: `Net Promoter Score: ((Promoters - Detractors) / Answered NPS responses) * 100. NULL when there are no answered NPS responses.`,
+                },
+
+                npsAverage: {
+                  type: `avg`,
+                  sql: `${CUBE}.value_number`,
+                  filters: [{ sql: `${CUBE}.field_type = 'nps'` }],
+                  description: `Average NPS rating (0-10)`,
+                },
+
+                csatCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'csat' AND ${CUBE}.value_number IS NOT NULL` }],
+                  description: `Number of answered CSAT responses (dismissed responses excluded).`,
+                },
+
+                // Same partition rule as the NPS buckets above: satisfied + neutral + dissatisfied always
+                // equals the number of answered CSAT records, for any non-null value_number.
+                csatSatisfiedCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'csat' AND ${CUBE}.value_number >= 4` }],
+                  description: `Number of satisfied CSAT responses (score >= 4; CSAT scale is 1-5)`,
+                },
+
+                csatDissatisfiedCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'csat' AND ${CUBE}.value_number < 3` }],
+                  description: `Number of dissatisfied CSAT responses (score < 3; CSAT scale is 1-5)`,
+                },
+
+                csatNeutralCount: {
+                  type: `count`,
+                  filters: [
+                    { sql: `${CUBE}.field_type = 'csat' AND ${CUBE}.value_number >= 3 AND ${CUBE}.value_number < 4` },
+                  ],
+                  description: `Number of neutral CSAT responses (score >= 3 and < 4; CSAT scale is 1-5)`,
+                },
+
+                csatScore: {
+                  type: `number`,
+                  sql: `
+                    CASE
+                      WHEN COUNT(CASE WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number IS NOT NULL THEN 1 END) = 0 THEN NULL
+                      ELSE ROUND(
+                        (
+                          COUNT(CASE WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number >= 4 THEN 1 END)::numeric
+                          / COUNT(CASE WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number IS NOT NULL THEN 1 END)::numeric
+                        ) * 100,
+                        2
+                      )
+                    END
+                  `,
+                  description: `CSAT Score: % of answered CSAT responses scoring >= 4 (CSAT scale is 1-5). NULL when there are no answered CSAT responses.`,
+                },
+
+                csatAverage: {
+                  type: `avg`,
+                  sql: `${CUBE}.value_number`,
+                  filters: [{ sql: `${CUBE}.field_type = 'csat'` }],
+                  description: `Average CSAT rating (1-5)`,
+                },
+
+                cesCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'ces' AND ${CUBE}.value_number IS NOT NULL` }],
+                  description: `Number of answered CES responses (dismissed responses excluded).`,
+                },
+
+                cesAverage: {
+                  type: `avg`,
+                  sql: `${CUBE}.value_number`,
+                  filters: [{ sql: `${CUBE}.field_type = 'ces'` }],
+                  description: `Average CES rating (scale is 1-5 or 1-7 depending on the question)`,
+                },
+
+                ratingCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.field_type = 'rating' AND ${CUBE}.value_number IS NOT NULL` }],
+                  description: `Number of answered rating responses (dismissed responses excluded).`,
+                },
+
+                ratingAverage: {
+                  type: `avg`,
+                  sql: `${CUBE}.value_number`,
+                  filters: [{ sql: `${CUBE}.field_type = 'rating'` }],
+                  description: `Average rating value (scale depends on the question, e.g. 1-5 or 1-10)`,
+                },
+
+                sentimentAverage: {
+                  type: `avg`,
+                  sql: `${CUBE}.sentiment_score`,
+                  description: `Average sentiment score (-1 to 1, negative to positive). Only enriched records count; "mixed" records score near 0 and are included.`,
+                },
+
+                // Emotion counts: a record carries 0..6 emotions (multi-label), so these
+                // counts are not mutually exclusive and can sum to more than the record count.
+                joyCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['joy']::text[]` }],
+                  description: `Number of feedback records tagged with the "joy" emotion`,
+                },
+
+                angerCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['anger']::text[]` }],
+                  description: `Number of feedback records tagged with the "anger" emotion`,
+                },
+
+                sadnessCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['sadness']::text[]` }],
+                  description: `Number of feedback records tagged with the "sadness" emotion`,
+                },
+
+                fearCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['fear']::text[]` }],
+                  description: `Number of feedback records tagged with the "fear" emotion`,
+                },
+
+                surpriseCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['surprise']::text[]` }],
+                  description: `Number of feedback records tagged with the "surprise" emotion`,
+                },
+
+                disgustCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.emotions @> ARRAY['disgust']::text[]` }],
+                  description: `Number of feedback records tagged with the "disgust" emotion`,
+                },
+
+                // Sentiment label counts: sentiment is a single-value column (not multi-label), so unlike the
+                // emotion counts these ARE mutually exclusive — they partition the enriched records and sum to
+                // the enriched record count. NULL (not-yet-enriched) records fall into none of them.
+                veryNegativeCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'very_negative'` }],
+                  description: `Number of feedback records with "very_negative" sentiment`,
+                },
+
+                negativeCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'negative'` }],
+                  description: `Number of feedback records with "negative" sentiment`,
+                },
+
+                neutralCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'neutral'` }],
+                  description: `Number of feedback records with "neutral" sentiment`,
+                },
+
+                positiveCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'positive'` }],
+                  description: `Number of feedback records with "positive" sentiment`,
+                },
+
+                veryPositiveCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'very_positive'` }],
+                  description: `Number of feedback records with "very_positive" sentiment`,
+                },
+
+                mixedCount: {
+                  type: `count`,
+                  filters: [{ sql: `${CUBE}.sentiment = 'mixed'` }],
+                  description: `Number of feedback records with "mixed" sentiment`,
+                },
+              },
+
+              dimensions: {
+                id: {
+                  sql: `id`,
+                  type: `string`,
+                  primaryKey: true,
+                },
+
+                sourceType: {
+                  sql: `source_type`,
+                  type: `string`,
+                  description: `Source type of the feedback (e.g., nps_campaign, survey)`,
+                },
+
+                sourceName: {
+                  sql: `source_name`,
+                  type: `string`,
+                  description: `Human-readable name of the source`,
+                },
+
+                sourceId: {
+                  sql: `source_id`,
+                  type: `string`,
+                  description: `Stable id of the source (e.g. the survey id). Group/filter to disambiguate sources with the same name.`,
+                },
+
+                fieldType: {
+                  sql: `field_type`,
+                  type: `string`,
+                  description: `Type of feedback field (e.g., nps, text, rating)`,
+                },
+
+                fieldLabel: {
+                  sql: `field_label`,
+                  type: `string`,
+                  description: `Human-readable label of the question/field (e.g., "How satisfied are you with support?")`,
+                },
+
+                fieldId: {
+                  sql: `field_id`,
+                  type: `string`,
+                  description: `Stable identifier of the question/field (the source survey element id). Unlike fieldLabel it does not change across languages or when the label is edited, so group/filter by this to keep identical or translated labels as one question.`,
+                },
+
+                fieldGroupLabel: {
+                  sql: `field_group_label`,
+                  type: `string`,
+                  description: `Label of the parent composite question for matrix/ranking rows`,
+                },
+
+                language: {
+                  sql: `language`,
+                  type: `string`,
+                  description: `Response language code (e.g., "en", "de"). NULL when language is "default".`,
+                },
+
+                // ── Response context (ENG-1554 metadata) ──────────────────────────────────
+                // Projections of the allowlisted keys `HUB_METADATA_FIELDS`
+                // (apps/web/lib/feedback-source/response-metadata.ts) writes onto every record of a
+                // submission. `metadata` is a free-form jsonb column that the public API, CSV import and MCP
+                // can also fill, so the two non-text dimensions read their value through a CASE that yields
+                // NULL for anything unparseable: a bare cast fails the whole query on a single malformed row.
+                // Records ingested before those keys existed carry no metadata and read as NULL here.
+                metadataSource: {
+                  sql: `${CUBE}.metadata->>'source'`,
+                  type: `string`,
+                  description: `Channel the response came in through (e.g. link, app, email). Distinct from sourceType, which names the system the record came from (formbricks_survey, csv).`,
+                },
+
+                metadataUrl: {
+                  sql: `${CUBE}.metadata->>'url'`,
+                  type: `string`,
+                  description: `Page the survey was answered on, reduced to origin + path — the query string and any personal-link token are stripped at ingestion. High cardinality: one bucket per path.`,
+                },
+
+                metadataBrowser: {
+                  sql: `${CUBE}.metadata->>'browser'`,
+                  type: `string`,
+                  description: `Browser reported by the respondent's user agent (e.g. Chrome, Safari)`,
+                },
+
+                metadataOs: {
+                  sql: `${CUBE}.metadata->>'os'`,
+                  type: `string`,
+                  description: `Operating system reported by the respondent's user agent (e.g. macOS, Android)`,
+                },
+
+                metadataDevice: {
+                  sql: `${CUBE}.metadata->>'device'`,
+                  type: `string`,
+                  description: `Device class reported by the respondent's user agent (e.g. desktop, mobile)`,
+                },
+
+                metadataCountry: {
+                  sql: `${CUBE}.metadata->>'country'`,
+                  type: `string`,
+                  description: `Country the response was collected from, as resolved at collection time`,
+                },
+
+                metadataAction: {
+                  sql: `${CUBE}.metadata->>'action'`,
+                  type: `string`,
+                  description: `Name of the action that triggered the survey. App surveys only; NULL for link surveys.`,
+                },
+
+                metadataFinished: {
+                  // LOWER on the extracted text rather than a jsonb_typeof check: a boolean stored as jsonb
+                  // renders as 'true'/'false' here anyway, and this also accepts the string form a CSV or API
+                  // writer can put in the same key. Anything else is NULL rather than a failed cast.
+                  sql: `
+                    CASE
+                      WHEN LOWER(${CUBE}.metadata->>'finished') IN ('true', 'false')
+                        THEN LOWER(${CUBE}.metadata->>'finished')::boolean
+                    END
+                  `,
+                  type: `boolean`,
+                  description: `Whether the respondent completed the survey. Live ingestion runs on responseFinished only, so this is true for everything except records from a historical import run over all responses.`,
+                },
+
+                metadataDurationSeconds: {
+                  // The regex accepts both a jsonb number (rendered '42' / '42.5' by ->>) and the string form;
+                  // everything else, including exponent notation, reads as no value instead of failing the cast.
+                  // The digit counts are the cast guard, not cosmetic: an unbounded run of digits still matches
+                  // "a number" but overflows double precision (400 nines) or underflows it (400 zeros after the
+                  // point), and either raises 22003 for the whole query rather than nulling that one row. 15
+                  // integer digits sit far inside the type's range and a duration in seconds never approaches
+                  // them — ingestion clamps its own at a week.
+                  //
+                  // \A and \Z, not ^ and $, and that is load-bearing. Cube splices a dimension's SQL into its
+                  // filter templates with String.prototype.replace, where this string is the REPLACEMENT
+                  // argument — so a trailing `$'` is not a literal, it is the "everything after the match"
+                  // token. Ending the pattern in `)?$'` made `set` / `notSet` on this dimension expand into
+                  // the middle of the string literal and come back as HTTP 400. The Postgres string anchors
+                  // carry no meaning to `replace` and match identically here.
+                  sql: `
+                    CASE
+                      WHEN ${CUBE}.metadata->>'duration_seconds' ~ '\\A-?[0-9]{1,15}(\\.[0-9]{1,6})?\\Z'
+                        THEN (${CUBE}.metadata->>'duration_seconds')::double precision
+                    END
+                  `,
+                  type: `number`,
+                  description: `Seconds the respondent took to complete the survey. A response-level value repeated on every record of the submission, so an average across records is weighted by question count.`,
+                },
+
+                metadataEndingId: {
+                  sql: `${CUBE}.metadata->>'ending_id'`,
+                  type: `string`,
+                  description: `Id of the ending the respondent reached — the branch they came out of. Stored as the id, not the ending's text.`,
+                },
+
+                metadataSurveyType: {
+                  sql: `${CUBE}.metadata->>'survey_type'`,
+                  type: `string`,
+                  description: `Type of the survey the response came from (link, app, website). Distinct from sourceType, which names the ingesting system.`,
+                },
+
+                // ── Hub enrichment fields ─────────────────────────────────────────────────
+                // Server-generated by the Hub enrichment workers (migrations 014/015); NULL
+                // until a record is enriched. Values are machine-generated lowercase tokens.
+                sentiment: {
+                  sql: `sentiment`,
+                  type: `string`,
+                  description: `Sentiment label from Hub enrichment: very_negative, negative, neutral, positive, very_positive, or mixed. NULL until enriched.`,
+                },
+
+                sentimentScore: {
+                  sql: `sentiment_score`,
+                  type: `number`,
+                  description: `Signed sentiment polarity score (-1 to 1), set together with the sentiment label. NULL until enriched.`,
+                },
+
+                emotions: {
+                  sql: `ARRAY_TO_STRING(${CUBE}.emotions, ', ')`,
+                  type: `string`,
+                  description: `Detected emotions as a comma-separated multi-label set from: joy, anger, sadness, fear, surprise, disgust. NULL when not enriched or no emotion was detected. Filter a single emotion with "contains".`,
+                },
+
+                collectedAt: {
+                  sql: `collected_at`,
+                  type: `time`,
+                  description: `Timestamp when the feedback was collected`,
+                },
+
+                createdAt: {
+                  sql: `created_at`,
+                  type: `time`,
+                  description: `Timestamp when the feedback record was created in Hub`,
+                },
+
+                updatedAt: {
+                  sql: `updated_at`,
+                  type: `time`,
+                  description: `Timestamp when the feedback record was last updated in Hub`,
+                },
+
+                valueNumber: {
+                  sql: `value_number`,
+                  type: `number`,
+                  description: `Numeric answer value (NPS 0-10, CSAT 1-5, CES 1-5 or 1-7, rating, generic number). Pair with a fieldType filter to keep scales consistent.`,
+                },
+
+                // Each arm is the verbatim filter of the matching *Count bucket measure above, so a band and
+                // its bucket count can never disagree (schema-definition.test.ts compares them textually).
+                valueBand: {
+                  sql: `CASE
+                    WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number >= 9 THEN 'promoter'
+                    WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number >= 7 AND ${CUBE}.value_number < 9 THEN 'passive'
+                    WHEN ${CUBE}.field_type = 'nps' AND ${CUBE}.value_number < 7 THEN 'detractor'
+                    WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number >= 4 THEN 'satisfied'
+                    WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number >= 3 AND ${CUBE}.value_number < 4 THEN 'neutral'
+                    WHEN ${CUBE}.field_type = 'csat' AND ${CUBE}.value_number < 3 THEN 'dissatisfied'
+                    ELSE NULL
+                  END`,
+                  type: `string`,
+                  description: `Named band of a numeric answer, derived from field_type and value_number: nps → promoter (9–10), passive (7–8), detractor (0–6); csat → satisfied (4–5), neutral (3), dissatisfied (1–2). NULL for every other field type and for unanswered records.`,
+                },
+
+                valueText: {
+                  sql: `value_text`,
+                  type: `string`,
+                  description: `Text answer value (open text, or the label of a multiple-choice/categorical answer). Buckets by the exact text, so a translated label, an edited label or a free-text 'other' answer each becomes its own bucket — for choice questions prefer valueId. Pair with a fieldType filter to keep types consistent.`,
+                },
+
+                valueId: {
+                  sql: `value_id`,
+                  type: `string`,
+                  description: `Recommended for single-select and multi-select answers: the stable option id keeps one option in one bucket across languages, after a label edit, and for free-text 'other' answers. Charts show the option's label, not the id.`,
+                },
+
+                valueBoolean: {
+                  sql: `value_boolean`,
+                  type: `boolean`,
+                  description: `Boolean answer value (yes/no questions). Pair with a fieldType filter.`,
+                },
+
+                valueDate: {
+                  sql: `value_date`,
+                  type: `time`,
+                  description: `Date answer value (e.g., "preferred meeting date"). Pair with a fieldType filter.`,
+                },
+
+                responseId: {
+                  sql: `submission_id`,
+                  type: `string`,
+                  description: `Unique identifier linking related feedback records (submission_id in Hub)`,
+                },
+
+                userId: {
+                  sql: `user_id`,
+                  type: `string`,
+                  description: `Identifier of the user who provided feedback`,
+                },
+
+                // Every embedded-data key a record carries, one row per key (a set-returning function). Only the
+                // app's key discovery reads it, grouped and counted, to rank a dataset's keys by frequency.
+                embeddedDataKey: {
+                  sql: `jsonb_object_keys(CASE WHEN jsonb_typeof(${CUBE}.metadata->'embedded_data') = 'object' THEN ${CUBE}.metadata->'embedded_data' END)`,
+                  type: `string`,
+                  public: true,
+                },
+
+                tenantId: {
+                  sql: `tenant_id`,
+                  type: `string`,
+                  description: `Tenant ID linking to FeedbackDirectory`,
+                },
+
+                // ── Normalized (LOWER+TRIM) companions ────────────────────────────────────
+                // Hidden helper dimensions for case- and whitespace-insensitive EXACT matching.
+                // The Cube queryRewrite (docker/cube/cube.js) transparently swaps a user's
+                // `equals`/`notEquals` filter on the visible dimension to its *Normalized
+                // companion (and lowercases/trims the value), so exact-match filtering is not
+                // defeated by casing/whitespace drift in human-entered source/field text. The
+                // visible dimensions above are left untouched for grouping and display.
+                // Keep this set in sync with CASE_INSENSITIVE_EQUALS_DIMENSIONS in cube.js.
+                sourceTypeNormalized: {
+                  sql: `LOWER(TRIM(source_type))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                sourceNameNormalized: {
+                  sql: `LOWER(TRIM(source_name))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                fieldTypeNormalized: {
+                  // field_type is a Postgres enum (field_type_enum); TRIM/LOWER only accept text, so cast
+                  // first (btrim(field_type_enum) does not exist). The other companions are text columns.
+                  sql: `LOWER(TRIM(field_type::text))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                fieldLabelNormalized: {
+                  sql: `LOWER(TRIM(field_label))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                fieldGroupLabelNormalized: {
+                  sql: `LOWER(TRIM(field_group_label))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                languageNormalized: {
+                  sql: `LOWER(TRIM(language))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                valueTextNormalized: {
+                  sql: `LOWER(TRIM(value_text))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                // Response-context companions. Only the values a person, a user agent or an importing client
+                // supplies get one; metadataEndingId and metadataSurveyType are values this product generates,
+                // so they cannot drift in casing. metadataUrl is excluded for a different reason: scheme and
+                // host are case-insensitive but the path is not, so folding case there would make /Foo and /foo
+                // the same bucket for an exact filter when they are two different pages.
+                metadataSourceNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'source'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                metadataBrowserNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'browser'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                metadataOsNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'os'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                metadataDeviceNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'device'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                metadataCountryNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'country'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                metadataActionNormalized: {
+                  sql: `LOWER(TRIM(${CUBE}.metadata->>'action'))`,
+                  type: `string`,
+                  shown: false,
+                },
+
+                ...embeddedDimensions,
+              },
+            });
+          });
+
+          // The rows an answer rule tests: the same Feedback Records, joined on the submission. Only queryRewrite
+          // writes these members (cube.js); a caller naming one is refused.
+          for (let index = 1; index <= ANSWER_FILTER_ALIAS_COUNT; index += 1) {
+            cube(`AnswerFilter${index}`, {
+              sql: `SELECT id, tenant_id, submission_id, field_id, field_group_id, value_id, value_number FROM feedback_records`,
+
+              dimensions: {
+                id: { sql: `id`, type: `string`, primaryKey: true, shown: false },
+                fieldId: { sql: `field_id`, type: `string`, shown: false },
+                fieldGroupId: { sql: `field_group_id`, type: `string`, shown: false },
+                valueId: { sql: `value_id`, type: `string`, shown: false },
+                valueNumber: { sql: `value_number`, type: `number`, shown: false },
+              },
+            });
+          }
 
   postgresql:
-    image: pgvector/pgvector:0.8.7-pg16
+    image: pgvector/pgvector:0.8.7-pg18
+    shm_size: 512mb
     volumes:
-      - formbricks-postgresql-data:/var/lib/postgresql/data
+      - formbricks-postgresql-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
@@ -96,9 +1689,91 @@ services:
       timeout: 20s
       retries: 10
 
+  authzed-db-bootstrap:
+    image: pgvector/pgvector:0.8.7-pg18
+    entrypoint: ["/bin/sh", "/usr/local/bin/authzed-postgres-bootstrap.sh"]
+    environment:
+      - POSTGRES_ADMIN_URL=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/postgres?sslmode=disable
+      - AUTHZED_DATABASE_NAME=spicedb
+      - AUTHZED_DATABASE_USERNAME=spicedb
+      - AUTHZED_DATABASE_PASSWORD=${SERVICE_PASSWORD_SPICEDB}
+    volumes:
+      - type: bind
+        source: ./authzed-postgres-bootstrap.sh
+        target: /usr/local/bin/authzed-postgres-bootstrap.sh
+        read_only: true
+        content: |
+          #!/bin/sh
+
+          set -eu
+
+          : "${POSTGRES_ADMIN_URL:?POSTGRES_ADMIN_URL is required}"
+          : "${AUTHZED_DATABASE_PASSWORD:?AUTHZED_DATABASE_PASSWORD is required}"
+
+          AUTHZED_DATABASE_NAME="${AUTHZED_DATABASE_NAME:-spicedb}"
+          AUTHZED_DATABASE_USERNAME="${AUTHZED_DATABASE_USERNAME:-spicedb}"
+
+          psql "${POSTGRES_ADMIN_URL}" \
+            --set=ON_ERROR_STOP=1 \
+            --set=database_name="${AUTHZED_DATABASE_NAME}" \
+            --set=database_username="${AUTHZED_DATABASE_USERNAME}" \
+            --set=database_password="${AUTHZED_DATABASE_PASSWORD}" <<'SQL'
+          SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'database_username', :'database_password')
+          WHERE NOT EXISTS (
+            SELECT 1 FROM pg_roles WHERE rolname = :'database_username'
+          ) \gexec
+
+          SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'database_username', :'database_password') \gexec
+
+          SELECT format('CREATE DATABASE %I OWNER %I', :'database_name', :'database_username')
+          WHERE NOT EXISTS (
+            SELECT 1 FROM pg_database WHERE datname = :'database_name'
+          ) \gexec
+
+          SELECT format('ALTER DATABASE %I OWNER TO %I', :'database_name', :'database_username') \gexec
+          SQL
+
+          printf '%s\n' "AuthZed database bootstrap completed."
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    restart: "no"
+    exclude_from_hc: true
+
+  spicedb-migrate:
+    image: authzed/spicedb:v1.57.0
+    command: datastore migrate head
+    environment:
+      <<: *spicedb-env
+    depends_on:
+      authzed-db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+    exclude_from_hc: true
+
+  spicedb:
+    image: authzed/spicedb:v1.57.0
+    command: serve
+    mem_limit: 512m
+    environment:
+      <<: *spicedb-env
+      SPICEDB_GRPC_PRESHARED_KEY: ${SERVICE_PASSWORD_64_AUTHZEDTOKEN}
+      SPICEDB_LOG_FORMAT: json
+      SPICEDB_LOG_LEVEL: info
+      SPICEDB_TELEMETRY_ENDPOINT: ""
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50051"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   valkey:
-    image: valkey/valkey:8-alpine
-    command: valkey-server --appendonly yes
+    image: valkey/valkey:9.1.2-alpine
+    command: valkey-server --appendonly yes --maxmemory-policy noeviction
     volumes:
       - formbricks-valkey:/data
     healthcheck:
@@ -125,7 +1800,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-      
+
   minio-init:
     image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z
     depends_on:

@@ -34,7 +34,7 @@ services:
       retries: 15
 
   nextcloud-db:
-    image: mariadb:11
+    image: mariadb:12
     volumes:
       - nextcloud-mariadb-data:/var/lib/mysql
     environment:

@@ -31,7 +31,7 @@ services:
       retries: 10
 
   coder-database:
-    image: postgres:16.4-alpine
+    image: postgres:17.12-alpine
     environment:
       POSTGRES_USER: "${SERVICE_USER_POSTGRES}"
       POSTGRES_PASSWORD: "${SERVICE_PASSWORD_POSTGRES}"

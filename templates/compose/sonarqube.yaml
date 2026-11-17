@@ -20,7 +20,7 @@ services:
       - sonarqube-logs:/opt/sonarqube/logs
       - sonarqube-bundled-plugins:/opt/sonarqube/lib/bundled-plugins
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9000"]
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:9000/api/system/status"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -28,7 +28,7 @@ services:
       postgresql:
         condition: service_healthy
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:

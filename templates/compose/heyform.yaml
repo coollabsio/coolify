@@ -31,7 +31,7 @@ services:
       retries: 3
 
   mongo:
-    image: percona/percona-server-mongodb:latest
+    image: percona/percona-server-mongodb:8.3.13
     volumes:
       - heyform-mongo-data:/data/db
     healthcheck:

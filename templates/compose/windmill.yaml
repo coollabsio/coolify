@@ -7,10 +7,10 @@
 
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     shm_size: 1g
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}

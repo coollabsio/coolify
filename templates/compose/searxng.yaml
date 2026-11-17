@@ -9,7 +9,7 @@ services:
   searxng:
     image: searxng/searxng:2026.11.15-2d500cb6b
     depends_on:
-      redis:
+      valkey:
         condition: service_healthy
     environment:
       - SERVICE_URL_SEARXNG_8080
@@ -18,7 +18,7 @@ services:
       - SEARXNG_URL=${SERVICE_URL_SEARXNG_8080}
       - SEARXNG_BIND_ADDRESS=${SEARXNG_BIND_ADDRESS:-0.0.0.0}
       - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNGSECRET}
-      - SEARXNG_REDIS_URL=redis://redis:6379/0
+      - SEARXNG_VALKEY_URL=valkey://valkey:6379/0
     healthcheck:
       test:
         - CMD
@@ -58,15 +58,16 @@ services:
           # activate link_token method in the ip_limit method
           link_token = true
 
-  redis:
-    image: "redis:7"
+  valkey:
+    image: "valkey/valkey:9-alpine"
+    command: valkey-server --save 300 1 --save 60 1000 --loglevel warning
     restart: always
     volumes:
-      - "redis-data:/data"
+      - "valkey-data:/data"
     healthcheck:
       test:
         - CMD
-        - redis-cli
+        - valkey-cli
         - ping
       interval: 5s
       timeout: 5s

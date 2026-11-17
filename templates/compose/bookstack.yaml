@@ -47,7 +47,7 @@ services:
         condition: service_healthy
 
   mariadb:
-    image: lscr.io/linuxserver/mariadb:latest
+    image: lscr.io/linuxserver/mariadb:11.8.9
     environment:
       - PUID=1000
       - PGID=1000

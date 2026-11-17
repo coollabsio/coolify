@@ -7,7 +7,7 @@
 
 services:
   app-service:
-    image: budibase.docker.scarf.sh/budibase/apps
+    image: budibase.docker.scarf.sh/budibase/apps:v4.0.1
     environment:
       - SELF_HOSTED=1
       - COUCH_DB_URL=http://$SERVICE_USER_COUCHDB:$SERVICE_PASSWORD_COUCHDB@couchdb-service:5984
@@ -38,7 +38,7 @@ services:
       start_period: 10s
 
   worker-service:
-    image: budibase.docker.scarf.sh/budibase/worker
+    image: budibase.docker.scarf.sh/budibase/worker:v4.0.1
     environment:
       - SELF_HOSTED=1
       - PORT=4003
@@ -81,7 +81,7 @@ services:
       retries: 10
 
   proxy-service:
-    image: budibase/proxy:v4.0.0
+    image: budibase/proxy:v4.0.1
     environment:
       - SERVICE_URL_BUDIBASE_10000
       - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10

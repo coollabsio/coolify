@@ -7,7 +7,7 @@
 
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     command: redis-server --appendonly yes
     volumes:
       - elastic-redis-data:/data

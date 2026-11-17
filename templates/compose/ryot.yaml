@@ -23,9 +23,9 @@ services:
       retries: 10
 
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - ryot_postgresql_data:/var/lib/postgresql/data
+      - ryot_postgresql_data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}

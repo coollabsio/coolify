@@ -34,7 +34,7 @@ services:
 
   browser-sockpuppet-chrome:
     hostname: browser-sockpuppet-chrome
-    image: dgtlmoon/sockpuppetbrowser:latest
+    image: dgtlmoon/sockpuppetbrowser:0.0.5
     cap_add:
       - SYS_ADMIN
     environment:

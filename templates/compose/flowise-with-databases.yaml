@@ -7,7 +7,7 @@
 
 services:
   flowise:
-    image: flowiseai/flowise:latest
+    image: flowiseai/flowise:3.1.3
     depends_on:
       pg-record-manager:
         condition: service_healthy
@@ -20,15 +20,15 @@ services:
       - DEBUG=${DEBUG:-false}
       - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
       - PORT=${PORT:-3001}
-      - DATABASE_PATH=/root/.flowise
-      - APIKEY_PATH=/root/.flowise
-      - SECRETKEY_PATH=/root/.flowise
-      - LOG_PATH=/root/.flowise/logs
-      - BLOB_STORAGE_PATH=/root/.flowise/storage
+      - DATABASE_PATH=/home/node/.flowise
+      - APIKEY_PATH=/home/node/.flowise
+      - SECRETKEY_PATH=/home/node/.flowise
+      - LOG_PATH=/home/node/.flowise/logs
+      - BLOB_STORAGE_PATH=/home/node/.flowise/storage
       - FLOWISE_USERNAME=${SERVICE_USER_FLOWISE}
       - FLOWISE_PASSWORD=${SERVICE_PASSWORD_FLOWISE}
     volumes:
-      - flowise-data:/root/.flowise
+      - flowise-data:/home/node
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001 || exit 1"]
       interval: 5s

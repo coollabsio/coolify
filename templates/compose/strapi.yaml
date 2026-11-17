@@ -65,7 +65,7 @@ services:
       postgresql:
         condition: service_healthy
   postgresql:
-    image: "elestio/postgres:latest"
+    image: "elestio/postgres:16"
     environment:
       - "POSTGRES_DB=${POSTGRESQL_DATABASE:-strapi}"
       - POSTGRES_USER=$SERVICE_USER_POSTGRESQL

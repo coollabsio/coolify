@@ -7,7 +7,7 @@
 
 services:
   whoogle:
-    image: benbusby/whoogle-search:latest
+    image: benbusby/whoogle-search:1.2.4
     environment:
       - SERVICE_URL_WHOOGLE_5000
     healthcheck:

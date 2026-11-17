@@ -6,7 +6,7 @@
 
 services:
   redis:
-    image: redis:7.4
+    image: valkey/valkey:9-alpine
     volumes:
       - paperless-redis:/data
     healthcheck:

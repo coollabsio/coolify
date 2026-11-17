@@ -7,7 +7,7 @@
 
 services:
   spacebot:
-    image: "ghcr.io/spacedriveapp/spacebot:full"
+    image: "ghcr.io/spacedriveapp/spacebot:v0.5.0"
     environment:
       - SERVICE_FQDN_SPACEBOT_19898
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

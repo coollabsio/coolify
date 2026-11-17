@@ -7,7 +7,7 @@
 
 services:
   heimdall:
-    image: lscr.io/linuxserver/heimdall:latest
+    image: lscr.io/linuxserver/heimdall:2.8.4
     environment:
       - SERVICE_URL_HEIMDALL
       - PUID=1000

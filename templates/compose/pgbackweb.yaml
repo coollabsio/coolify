@@ -21,13 +21,13 @@ services:
     exclude_from_hc: true
 
   postgres:
-    image: postgres:17
+    image: postgres:18
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-pgbackweb-db}
     volumes:
-      - pgbackweb_postgres_data:/var/lib/postgresql/data
+      - pgbackweb_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES} -d pgbackweb"]
       interval: 5s

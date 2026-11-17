@@ -42,7 +42,7 @@ services:
       retries: 10
 
   meilisearch:
-    image: getmeili/meilisearch:v1.12.8
+    image: getmeili/meilisearch:v1.13.3
     environment:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
     volumes:

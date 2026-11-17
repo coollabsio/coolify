@@ -32,7 +32,7 @@ services:
       - '--window-size=1440,900'
 
   meilisearch:
-    image: getmeili/meilisearch:v1.41.0
+    image: getmeili/meilisearch:v1.55.0
     environment:
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}

@@ -54,7 +54,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     volumes:
       - yamtrack_redis_data:/data
     healthcheck:

@@ -26,6 +26,9 @@ services:
       - 'CLICKHOUSE_HOST=http://rybbit_clickhouse:8123'
       - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
       - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - REDIS_HOST=rybbit_redis
+      - REDIS_PORT=6379
+      - 'REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}'
       - POSTGRES_HOST=rybbit_postgres
       - POSTGRES_PORT=5432
       - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
@@ -34,6 +37,8 @@ services:
       rybbit_clickhouse:
         condition: service_healthy
       rybbit_postgres:
+        condition: service_healthy
+      rybbit_redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
@@ -72,12 +77,26 @@ services:
       timeout: 10s
       retries: 3
 
+  rybbit_redis:
+    image: 'redis:8.6.4-alpine'
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS} --appendonly yes --appendfsync everysec --maxmemory-policy noeviction
+    environment:
+      - 'REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}'
+    volumes:
+      - 'redis_data:/data'
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   rybbit_clickhouse:
-    image: 'clickhouse/clickhouse-server:25.4.2'
+    image: 'clickhouse/clickhouse-server:26.3.17.4'
     environment:
       - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
       - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
       - 'CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}'
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
       interval: 30s
@@ -86,15 +105,6 @@ services:
       start_period: 10s
     volumes:
       - 'clickhouse_data:/var/lib/clickhouse'
-      - type: bind
-        source: ./clickhouse_config/enable_json.xml
-        target: /etc/clickhouse-server/config.d/enable_json.xml
-        content: |
-          <clickhouse>
-              <settings>
-                  <enable_json_type>1</enable_json_type>
-              </settings>
-          </clickhouse>
       - type: bind
         source: ./clickhouse_config/logging_rules.xml
         target: /etc/clickhouse-server/config.d/logging_rules.xml
@@ -106,6 +116,10 @@ services:
               </logger>
               <query_thread_log remove="remove"/>
               <query_log remove="remove"/>
+              <query_views_log remove="remove"/>
+              <query_metric_log remove="remove"/>
+              <error_log remove="remove"/>
+              <opentelemetry_span_log remove="remove"/>
               <text_log remove="remove"/>
               <trace_log remove="remove"/>
               <metric_log remove="remove"/>
@@ -123,15 +137,30 @@ services:
               <listen_host>0.0.0.0</listen_host>
           </clickhouse>
       - type: bind
-        source: ./clickhouse_config/user_logging.xml
-        target: /etc/clickhouse-server/config.d/user_logging.xml
+        source: ./clickhouse_config/resource_limits.xml
+        target: /etc/clickhouse-server/config.d/resource_limits.xml
+        content: |
+          <clickhouse>
+              <max_server_memory_usage_to_ram_ratio>0.80</max_server_memory_usage_to_ram_ratio>
+              <concurrent_threads_soft_limit_ratio_to_cores>1</concurrent_threads_soft_limit_ratio_to_cores>
+              <merges_mutations_memory_usage_to_ram_ratio>0.25</merges_mutations_memory_usage_to_ram_ratio>
+          </clickhouse>
+      # Profile settings are read only from users.d, not from config.d
+      - type: bind
+        source: ./clickhouse_config/user_settings.xml
+        target: /etc/clickhouse-server/users.d/user_settings.xml
         content: |
           <clickhouse>
               <profiles>
                   <default>
+                      <enable_json_type>1</enable_json_type>
+                      <async_insert>1</async_insert>
+                      <wait_for_async_insert>1</wait_for_async_insert>
                       <log_queries>0</log_queries>
                       <log_query_threads>0</log_query_threads>
                       <log_processors_profiles>0</log_processors_profiles>
+                      <max_memory_usage>32000000000</max_memory_usage>
+                      <max_threads>16</max_threads>
                   </default>
               </profiles>
           </clickhouse>

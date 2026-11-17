@@ -7,7 +7,7 @@
 
 services:
   firefly:
-    image: fireflyiii/core:latest
+    image: fireflyiii/core:version-6.7.9
     environment:
       - SERVICE_URL_FIREFLY_8080
       - APP_KEY=$SERVICE_BASE64_APPKEY
@@ -30,7 +30,7 @@ services:
       mysql:
         condition: service_healthy
   mysql:
-    image: mariadb:11
+    image: mariadb:12
     environment:
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
