@@ -9584,6 +9584,40 @@ paths:
       security:
         -
           bearerAuth: []
+    delete:
+      tags:
+        - Clusters
+      summary: 'Delete Node'
+      description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. Needs a team admin.'
+      operationId: delete-node-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the Node.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The Node is deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '400':
+          description: 'The Node is in a cluster or runs applications.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/nodes/{uuid}/roles':
     patch:
       tags:
@@ -9915,6 +9949,114 @@ paths:
                 properties:
                   message: { type: string }
                 type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/clusters/{uuid}/network/reconcile':
+    post:
+      tags:
+        - Clusters
+      summary: 'Reconcile Network'
+      description: 'Queue a reconciliation of the network of a cluster, like the button on the cluster page. Needs a team admin.'
+      operationId: reconcile-cluster-network
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The reconciliation is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  network_status: { type: string }
+                type: object
+        '400':
+          description: 'A reconciliation runs already, or the cluster has no server.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/clusters/{uuid}/network/repair':
+    post:
+      tags:
+        - Clusters
+      summary: 'Repair Network'
+      description: 'Restore the last good network state on each server of a cluster over SSH, like the button on the cluster page. The call waits until each server is done. Reconcile the network after it to verify the state. Needs a team admin.'
+      operationId: repair-cluster-network
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The network state is restored.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  network_status: { type: string }
+                type: object
+        '400':
+          description: 'A reconciliation runs, or a server could not be repaired.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/clusters/{uuid}/sentinel/upgrade':
+    post:
+      tags:
+        - Clusters
+      summary: 'Upgrade Sentinel'
+      description: 'Upgrade Sentinel on each server of a cluster that runs an older version, one server at a time, like the button on the cluster page. The upgrade stops at the first failure. Needs a team admin.'
+      operationId: upgrade-cluster-sentinel
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the cluster.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The upgrade is queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  server_uuids: { type: array, items: { type: string } }
+                type: object
+        '400':
+          description: 'Sentinel is up to date on each server, or an upgrade runs already.'
         '401':
           $ref: '#/components/responses/401'
         '403':

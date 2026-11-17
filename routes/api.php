@@ -299,8 +299,12 @@ Route::group([
     Route::get('/clusters/{uuid}/firewall-rules', [ClustersController::class, 'firewallRules'])->middleware(['api.ability:read']);
     Route::post('/clusters/{uuid}/firewall-rules', [ClustersController::class, 'addFirewallRule'])->middleware(['api.ability:write']);
     Route::delete('/clusters/{uuid}/firewall-rules/{rule_uuid}', [ClustersController::class, 'deleteFirewallRule'])->middleware(['api.ability:delete']);
+    Route::post('/clusters/{uuid}/network/reconcile', [ClustersController::class, 'reconcileNetwork'])->middleware(['api.ability:write']);
+    Route::post('/clusters/{uuid}/network/repair', [ClustersController::class, 'repairNetwork'])->middleware(['api.ability:write']);
+    Route::post('/clusters/{uuid}/sentinel/upgrade', [ClustersController::class, 'upgradeClusterSentinel'])->middleware(['api.ability:write']);
     Route::get('/nodes', [ClustersController::class, 'nodes'])->middleware(['api.ability:read']);
     Route::get('/nodes/{uuid}', [ClustersController::class, 'node'])->middleware(['api.ability:read']);
+    Route::delete('/nodes/{uuid}', [ClustersController::class, 'destroyNode'])->middleware(['api.ability:delete']);
     Route::patch('/nodes/{uuid}/roles', [ClustersController::class, 'roles'])->middleware(['api.ability:write']);
     Route::post('/nodes/{uuid}/image-cleanup', [ClustersController::class, 'cleanupImages'])->middleware(['api.ability:write']);
     Route::post('/nodes/{uuid}/sentinel/upgrade', [ClustersController::class, 'upgradeSentinel'])->middleware(['api.ability:write']);

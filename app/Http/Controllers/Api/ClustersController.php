@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CleanupNodeImages;
 use App\Actions\Node\CreateNodeCluster;
+use App\Actions\Node\DeleteNode;
 use App\Actions\Node\DeleteNodeCluster;
+use App\Actions\Node\ManageNodeClusterNetwork;
 use App\Actions\Node\ManageNodeClusterSettings;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\SetNodeBuilder;
@@ -20,6 +22,7 @@ use App\Models\NodeFirewallRule;
 use App\Models\Team;
 use App\Rules\PrivateIpv4Cidr;
 use DomainException;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -620,6 +623,143 @@ class ClustersController extends Controller
             ManageNodeClusterSettings::make()->removeFirewallRule($cluster, $rule, $request->user());
 
             return response()->json(['message' => 'Firewall rule deleted.']);
+        });
+    }
+
+    #[OA\Post(
+        summary: 'Reconcile Network',
+        description: 'Queue a reconciliation of the network of a cluster, like the button on the cluster page. Needs a team admin.',
+        path: '/clusters/{uuid}/network/reconcile',
+        operationId: 'reconcile-cluster-network',
+        security: [['bearerAuth' => []]],
+        tags: ['Clusters'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster.', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The reconciliation is queued.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string'), new OA\Property(property: 'network_status', type: 'string')])),
+            new OA\Response(response: 400, description: 'A reconciliation runs already, or the cluster has no server.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function reconcileNetwork(Request $request): JsonResponse
+    {
+        $cluster = $this->findCluster($request);
+        if ($cluster === null) {
+            return response()->json(['message' => 'Cluster not found.'], 404);
+        }
+        $this->authorize('update', $cluster);
+
+        return $this->runClusterAction(function () use ($request, $cluster): JsonResponse {
+            if (! ManageNodeClusterNetwork::make()->reconcile($cluster, $request->user())) {
+                return response()->json(['message' => 'Cluster network reconciliation is already running.'], 400);
+            }
+            auditLog('api.cluster.network_reconcile', ['team_id' => $cluster->team_id, 'cluster_uuid' => $cluster->uuid]);
+
+            return response()->json(['message' => 'Cluster network reconciliation queued.', 'network_status' => $cluster->refresh()->network_status]);
+        });
+    }
+
+    #[OA\Post(
+        summary: 'Repair Network',
+        description: 'Restore the last good network state on each server of a cluster over SSH, like the button on the cluster page. The call waits until each server is done. Reconcile the network after it to verify the state. Needs a team admin.',
+        path: '/clusters/{uuid}/network/repair',
+        operationId: 'repair-cluster-network',
+        security: [['bearerAuth' => []]],
+        tags: ['Clusters'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster.', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The network state is restored.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string'), new OA\Property(property: 'network_status', type: 'string')])),
+            new OA\Response(response: 400, description: 'A reconciliation runs, or a server could not be repaired.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function repairNetwork(Request $request): JsonResponse
+    {
+        $cluster = $this->findCluster($request);
+        if ($cluster === null) {
+            return response()->json(['message' => 'Cluster not found.'], 404);
+        }
+        $this->authorize('update', $cluster);
+
+        return $this->runClusterAction(function () use ($request, $cluster): JsonResponse {
+            try {
+                ManageNodeClusterNetwork::make()->repair($cluster, $request->user());
+            } catch (LockTimeoutException $exception) {
+                return response()->json(['message' => $exception->getMessage()], 400);
+            }
+            auditLog('api.cluster.network_repair', ['team_id' => $cluster->team_id, 'cluster_uuid' => $cluster->uuid]);
+
+            return response()->json(['message' => 'Cluster network state restored over SSH. Reconcile the network to verify current state.', 'network_status' => $cluster->refresh()->network_status]);
+        });
+    }
+
+    #[OA\Post(
+        summary: 'Upgrade Sentinel',
+        description: 'Upgrade Sentinel on each server of a cluster that runs an older version, one server at a time, like the button on the cluster page. The upgrade stops at the first failure. Needs a team admin.',
+        path: '/clusters/{uuid}/sentinel/upgrade',
+        operationId: 'upgrade-cluster-sentinel',
+        security: [['bearerAuth' => []]],
+        tags: ['Clusters'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster.', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The upgrade is queued.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string'), new OA\Property(property: 'server_uuids', type: 'array', items: new OA\Items(type: 'string'))])),
+            new OA\Response(response: 400, description: 'Sentinel is up to date on each server, or an upgrade runs already.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function upgradeClusterSentinel(Request $request): JsonResponse
+    {
+        $cluster = $this->findCluster($request);
+        if ($cluster === null) {
+            return response()->json(['message' => 'Cluster not found.'], 404);
+        }
+        $this->authorize('update', $cluster);
+
+        return $this->runClusterAction(function () use ($request, $cluster): JsonResponse {
+            $nodes = ManageNodeClusterNetwork::make()->upgradeSentinel($cluster, $request->user());
+            if ($nodes->isEmpty()) {
+                return response()->json(['message' => 'Sentinel is up to date on every server of this cluster.'], 400);
+            }
+            auditLog('api.cluster.sentinel_upgrade', ['team_id' => $cluster->team_id, 'cluster_uuid' => $cluster->uuid]);
+
+            return response()->json(['message' => 'Sentinel upgrade queued. Servers are upgraded one at a time.', 'server_uuids' => $nodes->pluck('uuid')->values()->all()]);
+        });
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Node',
+        description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. Needs a team admin.',
+        path: '/nodes/{uuid}',
+        operationId: 'delete-node-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Clusters'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the Node.', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The Node is deleted.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string')])),
+            new OA\Response(response: 400, description: 'The Node is in a cluster or runs applications.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function destroyNode(Request $request): JsonResponse
+    {
+        $node = $this->findNode($request);
+        if ($node === null) {
+            return response()->json(['message' => 'Node not found.'], 404);
+        }
+        $this->authorize('delete', $node);
+
+        return $this->runClusterAction(function () use ($request, $node): JsonResponse {
+            DeleteNode::run($node, $request->user());
+            auditLog('api.node.deleted', ['team_id' => $node->team_id, 'node_uuid' => $node->uuid, 'node_name' => $node->name]);
+
+            return response()->json(['message' => 'Node deleted.']);
         });
     }
 
