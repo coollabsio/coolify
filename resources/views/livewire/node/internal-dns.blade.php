@@ -36,7 +36,7 @@
                             <div>Address</div>
                             <div>Server</div>
                             <div>Status</div>
-                            <div>Expires</div>
+                            <div>Last update</div>
                         </div>
                         @foreach ($endpoints as $endpoint)
                             @php
@@ -44,7 +44,7 @@
                                 $health = $isExpired ? 'expired' : data_get($endpoint, 'health', 'unknown');
                                 $status = $health === 'unknown' ? data_get($endpoint, 'state', 'unknown') : $health;
                                 $ownerNodeIp = data_get($endpoint, 'owner_node_ip');
-                                $expiresAt = \Carbon\Carbon::createFromTimestamp(data_get($endpoint, 'expires_at'));
+                                $updatedAt = \Carbon\Carbon::createFromTimestamp(data_get($endpoint, 'updated_at'));
                             @endphp
                             <div wire:key="node-dns-{{ data_get($endpoint, 'hostname') }}-{{ data_get($endpoint, 'container_ip') }}"
                                 class="grid min-h-12 min-w-[850px] grid-cols-[minmax(15rem,1.8fr)_minmax(8rem,0.8fr)_minmax(10rem,1fr)_7rem_8rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]">
@@ -73,8 +73,8 @@
                                         default => 'warning',
                                     }" />
                                 </div>
-                                <span class="text-neutral-500 dark:text-fg-faint" title="{{ $expiresAt->toIso8601String() }}">
-                                    {{ $expiresAt->diffForHumans() }}
+                                <span class="text-neutral-500 dark:text-fg-faint" title="{{ $updatedAt->toIso8601String() }}">
+                                    {{ $updatedAt->diffForHumans() }}
                                 </span>
                             </div>
                         @endforeach
