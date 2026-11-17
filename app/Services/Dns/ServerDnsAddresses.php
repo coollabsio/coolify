@@ -13,8 +13,8 @@ final class ServerDnsAddresses
     /**
      * @param  string|null  $address  The resolved IP, or the configured value when it does not resolve.
      * @param  string|null  $configured  The address as configured (can be a hostname).
-     * @param  string|null  $publicIpv4  The public IPv4 set for the server (instance settings for the server that runs Coolify).
-     * @param  string|null  $publicIpv6  The public IPv6 set for the server (instance settings for the server that runs Coolify).
+     * @param  string|null  $publicIpv4  The IPv4 for DNS records (see ipsByFamily()).
+     * @param  string|null  $publicIpv6  The IPv6 for DNS records (see ipsByFamily()).
      */
     public function __construct(
         public readonly ?string $address,
@@ -37,7 +37,7 @@ final class ServerDnsAddresses
         $configured = $publicIpv4 ?? $publicIpv6 ?? $server->ip;
         $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
 
-        return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], $publicIpv4, $publicIpv6);
+        return new self($resolved['ip'] ?? $resolved['configured'], $resolved['configured'], ...self::ipsByFamily($server));
     }
 
     /**
@@ -50,6 +50,28 @@ final class ServerDnsAddresses
         $settings = $server?->id === 0 ? instanceSettings() : $server?->settings;
 
         return [data_get($settings, 'public_ipv4') ?: null, data_get($settings, 'public_ipv6') ?: null];
+    }
+
+    /**
+     * The IPv4 and IPv6 for DNS records of a server: the public IP of each family, or else the server IP when it is
+     * of that family. A public IPv6 alone must not hide the IPv4 of the server, and the other way around.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public static function ipsByFamily(?Server $server): array
+    {
+        [$ipv4, $ipv6] = self::publicIps($server);
+        if ($server === null || ($ipv4 !== null && $ipv6 !== null)) {
+            return [$ipv4, $ipv6];
+        }
+
+        $serverIp = resolveServerIpAddress(is_string($server->ip) ? $server->ip : null)['ip'];
+        if (is_string($serverIp)) {
+            $ipv4 ??= filter_var($serverIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false ? $serverIp : null;
+            $ipv6 ??= filter_var($serverIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? $serverIp : null;
+        }
+
+        return [$ipv4, $ipv6];
     }
 
     /**

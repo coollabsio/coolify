@@ -218,7 +218,7 @@ trait InteractsWithCloudflareDomainConnect
 
     protected function serverDnsAddresses(): ServerDnsAddresses
     {
-        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, ...ServerDnsAddresses::publicIps($this->dnsTargetServer()));
+        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, ...ServerDnsAddresses::ipsByFamily($this->dnsTargetServer()));
     }
 
     protected function defaultDnsHostname(): string

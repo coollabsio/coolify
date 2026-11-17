@@ -15,6 +15,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     InstanceSettings::forceCreate([
         'id' => 0,
         'is_api_enabled' => true,
@@ -80,6 +81,23 @@ it('offers the public IPs of the server as DNS record content instead of its pri
     $addresses = ServerDnsAddresses::forServer($this->server->fresh());
 
     expect($addresses->publicAddresses())->toBe(['95.217.1.10', '2a01:4f8::10']);
+});
+
+it('keeps the IPv4 of the server when only a public IPv6 is set', function () {
+    $this->server->update(['ip' => '95.217.1.20']);
+    $this->server->settings->update(['public_ipv6' => '2a01:4f8::10']);
+
+    $addresses = ServerDnsAddresses::forServer($this->server->fresh());
+
+    expect($addresses->addresses())->toBe(['95.217.1.20', '2a01:4f8::10'])
+        ->and($addresses->publicAddresses())->toBe(['95.217.1.20', '2a01:4f8::10']);
+});
+
+it('keeps the IPv6 of the server when only a public IPv4 is set', function () {
+    $this->server->update(['ip' => '2a01:4f8::20']);
+    $this->server->settings->update(['public_ipv4' => '95.217.1.10']);
+
+    expect(ServerDnsAddresses::forServer($this->server->fresh())->addresses())->toBe(['95.217.1.10', '2a01:4f8::20']);
 });
 
 it('saves the public IPs from the server page', function () {
