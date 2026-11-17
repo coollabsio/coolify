@@ -256,8 +256,9 @@ trait ExecuteRemoteCommand
                 // This prevents premature status changes during retryable SSH errors
                 $error = $process_result->errorOutput();
                 if (empty($error)) {
-                    // At LogLevel=ERROR, ssh prints nothing when sshd closes the connection before the key exchange (MaxStartups, PerSourcePenalties).
-                    $error = $process_result->output() ?: ($process_result->exitCode() === 255 ? 'SSH command failed with exit code: 255' : 'Command failed with no error output');
+                    // A silent exit 255 can be a refused SSH handshake or the remote command itself (a PHP fatal error in a
+                    // pre-deployment command), so it must not look like a retryable SSH error: a retry would run the command again.
+                    $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
             }

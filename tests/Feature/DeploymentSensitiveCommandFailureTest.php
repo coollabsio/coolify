@@ -298,7 +298,7 @@ it('reports the exit code and explains a lost SSH connection when a command ends
         ->toContain('SSH connection to the server closed');
 });
 
-it('retries a command when ssh exits with 255 and prints nothing, as when sshd closes the connection before the key exchange', function () {
+it('does not retry a command that exits with 255 and prints nothing, because the remote command can have run', function () {
     config()->set('constants.ssh.max_retries', 3);
     config()->set('constants.ssh.retry_base_delay', 0);
     config()->set('constants.ssh.host_key_checking', 'off');
@@ -308,7 +308,29 @@ it('retries a command when ssh exits with 255 and prints nothing, as when sshd c
     Process::fake(function () use (&$runs) {
         $runs++;
 
-        return $runs === 1 ? Process::result(exitCode: 255) : Process::result(output: 'ok');
+        return Process::result(exitCode: 255);
+    });
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command(['command' => 'docker exec app php artisan migrate']));
+
+    expect($runs)->toBe(1)
+        ->and($exception->getCode())->toBe(255)
+        ->and($exception->getMessage())->toContain('Command failed with no error output');
+});
+
+it('retries a command when ssh exits with 255 and reports a refused key exchange', function () {
+    config()->set('constants.ssh.max_retries', 3);
+    config()->set('constants.ssh.retry_base_delay', 0);
+    config()->set('constants.ssh.host_key_checking', 'off');
+    [$job] = makeSensitiveCommandFailureJob();
+
+    $runs = 0;
+    Process::fake(function () use (&$runs) {
+        $runs++;
+
+        return $runs === 1
+            ? Process::result(errorOutput: 'kex_exchange_identification: read: Connection reset by peer', exitCode: 255)
+            : Process::result(output: 'ok');
     });
 
     $job->execute_remote_command(['command' => 'echo ok']);
