@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Marks accounts that an invitation created. Existing accounts that may
-     * come from an invitation are marked too: a
-     * password but no SSO identity, and a pending password reset or, except
-     * for root (id 0), no verified email. Password registration on self-hosted
-     * instances marks the email verified, an invitation link does not.
+     * Marks accounts that an invitation created. Of the existing accounts, only
+     * those with a pending invitation password are marked: a password, a
+     * pending password reset (only an invitation sets it), and no SSO identity.
+     * A missing verified email is no sign of an invitation, because password
+     * sign-ups on older self-hosted instances never verified the email.
      */
     public function up(): void
     {
@@ -22,8 +22,7 @@ return new class extends Migration
 
         DB::table('users')
             ->whereNotNull('password')
-            ->where(fn ($query) => $query->where('force_password_reset', true)
-                ->orWhere(fn ($query) => $query->whereNull('email_verified_at')->where('id', '!=', 0)))
+            ->where('force_password_reset', true)
             ->whereNotExists(fn ($query) => $query->select(DB::raw(1))
                 ->from('oauth_identities')
                 ->whereColumn('oauth_identities.user_id', 'users.id'))

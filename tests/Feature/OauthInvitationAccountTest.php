@@ -10,9 +10,11 @@ use App\Models\OauthSetting;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Services\Auth\OauthLoginService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
 use Livewire\Livewire;
@@ -193,4 +195,19 @@ it('refuses to change an account that no invitation created', function () {
     $this->artisan('user:allow-sso-link', ['email' => 'victim@example.com', '--force' => true])->assertFailed();
 
     expect($user->refresh()->password)->toBe($passwordHash);
+});
+
+it('backfills only accounts with a pending invitation password, not older password sign-ups without a verified email', function () {
+    $pendingInvitation = User::factory()->create(['email' => 'pending@example.com', 'force_password_reset' => true, 'email_verified_at' => null]);
+    $legacySignUp = User::factory()->create(['email' => 'victim@example.com', 'force_password_reset' => false, 'email_verified_at' => null]);
+    Schema::table('users', fn (Blueprint $table) => $table->dropColumn('created_by_invitation'));
+
+    (require database_path('migrations/2026_11_15_170000_add_created_by_invitation_to_users_table.php'))->up();
+
+    expect($pendingInvitation->refresh()->created_by_invitation)->toBeTrue()
+        ->and($legacySignUp->refresh()->created_by_invitation)->toBeFalse()
+        ->and($this->inviter->refresh()->created_by_invitation)->toBeFalse();
+
+    signInWithOidcAsVictim()->assertRedirect('/');
+    $this->assertAuthenticatedAs($legacySignUp);
 });
