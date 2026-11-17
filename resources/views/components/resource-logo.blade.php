@@ -6,6 +6,7 @@
     $icon = match (true) {
         $resource instanceof \App\Models\Application => 'browser-code',
         $resource instanceof \App\Models\Service => 'layers',
+        $resource instanceof \App\Models\NodeWorkload => $resource->isDatabase() ? 'database' : 'browser-code',
         default => 'database',
     };
 @endphp

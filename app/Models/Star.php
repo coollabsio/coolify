@@ -25,6 +25,7 @@ class Star extends Model
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
         StandaloneSqlite::class,
+        NodeWorkload::class,
     ];
 
     protected $fillable = [
