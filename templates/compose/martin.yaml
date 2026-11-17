@@ -4,6 +4,7 @@
 # tags: postgis, vector, tiles
 # logo: svgs/martin.png
 # port: 3000
+# outdated: true
 
 services:
   martin:

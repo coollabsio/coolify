@@ -4,6 +4,7 @@
 # tags: nitropage, builder, editor, wysiwyg, cms, content, management
 # logo: svgs/nitropage.svg
 # port: 3000
+# outdated: true
 
 services:
   nitropage:

@@ -4,6 +4,7 @@
 # tags: supertokens,login,authentication,authorization,oauth,user-management,session-management,access-control,otp,magic-link,passwordless
 # logo: svgs/supertokens.svg
 # port: 3567
+# outdated: true
 
 services:
   supertokens:

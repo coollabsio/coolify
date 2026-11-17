@@ -3,6 +3,7 @@
 # category: productivity
 # tags: links, shortener, sharing, url, short, link, sharing
 # port: 5231
+# outdated: true
 
 services:
   slash:

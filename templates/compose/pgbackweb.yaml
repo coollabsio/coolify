@@ -4,6 +4,7 @@
 # tags: backup, postgresql, web-interface
 # logo: svgs/pgbackweb.svg
 # port: 8085
+# outdated: true
 
 services:
   pgbackweb:

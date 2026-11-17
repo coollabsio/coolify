@@ -4,6 +4,7 @@
 # tags: analytics, insights, privacy
 # logo: svgs/goatcounter.svg
 # port: 8080
+# outdated: true
 
 services:
   goatcounter:

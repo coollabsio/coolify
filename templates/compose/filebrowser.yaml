@@ -4,6 +4,7 @@
 # tags: file-management, storage-access, data-organization, file-utilization, administration-tool
 # logo: svgs/filebrowser.svg
 # port: 80
+# outdated: true
 
 services:
   filebrowser:

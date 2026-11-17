@@ -4,6 +4,7 @@
 # tags: it-tools,management,self-hosted
 # logo: svgs/it-tools.svg
 # port: 80
+# outdated: true
 
 services:
   it-tools:

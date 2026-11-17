@@ -4,6 +4,7 @@
 # tags: monitoring,server,uptime,healthcheck
 # logo: svgs/checkmate.png
 # port: 52345
+# outdated: true
 
 services:
   checkmate:

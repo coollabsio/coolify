@@ -3,6 +3,7 @@
 # category: analytics
 # tags: analytics, insights, statistics, web, traffic
 # port: 6555
+# outdated: true
 
 services:
   embystat:

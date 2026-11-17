@@ -4,6 +4,7 @@
 # tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot, flows
 # logo: svgs/flowise.png
 # port: 3001
+# outdated: true
 
 services:
   flowise:

@@ -4,6 +4,7 @@
 # tags: ai, agent, anthropic, openai, discord, slack, llm, agentic
 # logo: svgs/spacebot.png
 # port: 19898
+# outdated: true
 
 services:
   spacebot:

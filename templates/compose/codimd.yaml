@@ -4,6 +4,7 @@
 # tags: markdown, md, editor, opensource, collaborative, realtime-collaboration, notes
 # logo: svgs/codimd.png
 # port: 3000
+# outdated: true
 
 services:
   codimd:

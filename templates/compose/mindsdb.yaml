@@ -4,6 +4,7 @@
 # tags: mysql, postgresdb, machine-learning, ai
 # logo: svgs/mindsdb.svg
 # port: 47334
+# outdated: true
 
 services:
   mindsdb:

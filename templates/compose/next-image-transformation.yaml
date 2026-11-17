@@ -4,6 +4,7 @@
 # tags: nextjs,image,transformation,service
 # logo: coolify-logo.svg
 # port: 3000
+# outdated: true
 
 services:
   next-image-transformation:

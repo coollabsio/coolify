@@ -4,6 +4,7 @@
 # tags: self-hosted, automation, tracker, media, movies, shows, anime, manga, games, books, comics
 # logo: svgs/yamtrack.svg
 # port: 8000
+# outdated: true
 
 services:
   yamtrack:

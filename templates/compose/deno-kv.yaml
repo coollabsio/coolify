@@ -4,6 +4,7 @@
 # tags: deno, kv, key-value, database
 # logo: svgs/deno-kv.svg
 # port: 4512
+# outdated: true
 
 services:
   denokv:

@@ -4,6 +4,7 @@
 # tags: rss, feed
 # logo: svgs/linkding.svg
 # port: 9090
+# outdated: true
 
 services:
   linkding:

@@ -4,6 +4,7 @@
 # tags: evolution-api,evo-api,evolution,whatsapp,api,postgres,redis
 # logo: svgs/evolution-api.svg
 # port: 8080
+# outdated: true
 
 services:
   api:

@@ -4,6 +4,7 @@
 # tags: analytics,bi,dashboard,database,sql,unofficial
 # logo: svgs/superset.svg
 # port: 8088
+# outdated: true
 
 services:
   superset:

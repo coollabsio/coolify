@@ -4,6 +4,7 @@
 # tags: privacy, search engine
 # logo: svgs/whoogle.png
 # port: 5000
+# outdated: true
 
 services:
   whoogle:

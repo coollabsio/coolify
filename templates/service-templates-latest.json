@@ -66,7 +66,8 @@
         "logo": "svgs/affine.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3010"
+        "port": "3010",
+        "outdated": true
     },
     "alexandrie": {
         "documentation": "https://github.com/Smaug6739/Alexandrie/tree/main/docs?utm_source=coolify.io",
@@ -106,7 +107,7 @@
         "category": "ai",
         "logo": "svgs/anythingllm.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3001"
     },
     "appflowy": {
@@ -196,7 +197,8 @@
         "logo": "svgs/argilla.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "6900"
+        "port": "6900",
+        "outdated": true
     },
     "audiobookshelf": {
         "documentation": "https://www.audiobookshelf.org/?utm_source=coolify.io",
@@ -367,7 +369,7 @@
         "category": "cms",
         "logo": "svgs/bookstack.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "browserless": {
@@ -383,7 +385,7 @@
         "category": "devtools",
         "logo": "svgs/browserless.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "budibase": {
@@ -406,7 +408,7 @@
         "category": "automation",
         "logo": "svgs/budibase.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "10000"
     },
     "bugsink": {
@@ -459,7 +461,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-15T23:32:06+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
@@ -503,7 +505,7 @@
         "category": "media",
         "logo": "svgs/calibre-web.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8083"
     },
     "cap-captcha": {
@@ -557,7 +559,7 @@
         "category": "media",
         "logo": "svgs/castopod.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-22T20:39:08+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "celld": {
@@ -576,7 +578,7 @@
         "category": "backend",
         "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-07T18:17:33+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "changedetection": {
@@ -591,7 +593,7 @@
         "category": "monitoring",
         "logo": "svgs/changedetection.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "5000"
     },
     "chatwoot": {
@@ -612,7 +614,7 @@
         "category": "helpdesk",
         "logo": "svgs/chatwoot.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "checkmate": {
@@ -629,7 +631,8 @@
         "logo": "svgs/checkmate.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "52345"
+        "port": "52345",
+        "outdated": true
     },
     "chibisafe": {
         "documentation": "https://chibisafe.app/docs/intro?utm_source=coolify.io",
@@ -788,7 +791,7 @@
         "category": "cms",
         "logo": "svgs/cockpit.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-23T09:53:25+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "code-server": {
@@ -824,7 +827,8 @@
         "logo": "svgs/codimd.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3000"
+        "port": "3000",
+        "outdated": true
     },
     "convex": {
         "documentation": "https://github.com/convex/convex-backend/blob/main/self-hosted/README.md?utm_source=coolify.io",
@@ -897,7 +901,7 @@
         "category": "productivity",
         "logo": "svgs/dashy.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "databasus": {
@@ -930,7 +934,8 @@
         "logo": "svgs/deno-kv.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "4512"
+        "port": "4512",
+        "outdated": true
     },
     "dify": {
         "documentation": "https://docs.dify.ai?utm_source=coolify.io",
@@ -953,7 +958,7 @@
         "category": "ai",
         "logo": "svgs/dify.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "directus-with-postgresql": {
@@ -1055,7 +1060,7 @@
         "category": "productivity",
         "logo": "svgs/docmost.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "documenso": {
@@ -1089,7 +1094,7 @@
         "category": "productivity",
         "logo": "svgs/docuseal.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "docuseal": {
@@ -1118,7 +1123,7 @@
         "category": "cms",
         "logo": "svgs/dokuwiki.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "dolibarr": {
@@ -1302,7 +1307,7 @@
         "category": "media",
         "logo": "svgs/emby.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8096"
     },
     "embystat": {
@@ -1320,7 +1325,8 @@
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "6555"
+        "port": "6555",
+        "outdated": true
     },
     "emqx-enterprise": {
         "documentation": "https://www.emqx.io/docs/en/latest/deploy/install-docker.html?utm_source=coolify.io",
@@ -1448,8 +1454,9 @@
         "category": "backend",
         "logo": "svgs/evolution-api.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-04T21:54:50+01:00",
-        "port": "8080"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "8080",
+        "outdated": true
     },
     "excalidraw": {
         "documentation": "https://docs.excalidraw.com/docs?utm_source=coolify.io",
@@ -1466,7 +1473,8 @@
         "logo": "svgs/excalidraw.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "80"
+        "port": "80",
+        "outdated": true
     },
     "executor": {
         "documentation": "https://executor.sh/docs/hosted/docker?utm_source=coolify.io",
@@ -1512,7 +1520,7 @@
         "category": "productivity",
         "logo": "svgs/fider.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "filebrowser": {
@@ -1530,7 +1538,8 @@
         "logo": "svgs/filebrowser.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "80"
+        "port": "80",
+        "outdated": true
     },
     "fileflows": {
         "documentation": "https://fileflows.com/docs/?utm_source=coolify.io",
@@ -1561,7 +1570,7 @@
         "category": "finance",
         "logo": "svgs/firefly.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "firefox": {
@@ -1611,7 +1620,7 @@
         "category": "backend",
         "logo": "svgs/flipt.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "flowise-with-databases": {
@@ -1637,8 +1646,9 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3001"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "3001",
+        "outdated": true
     },
     "flowise": {
         "documentation": "https://docs.flowiseai.com/?utm_source=coolify.io",
@@ -1663,8 +1673,9 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "3001"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "3001",
+        "outdated": true
     },
     "forgejo-with-mariadb": {
         "documentation": "https://forgejo.org/docs?utm_source=coolify.io",
@@ -1837,7 +1848,7 @@
         "category": "productivity",
         "logo": "svgs/formbricks.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "foundryvtt": {
@@ -1912,7 +1923,7 @@
         "category": "RSS",
         "logo": "svgs/freshrss.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "freshrss": {
@@ -1991,7 +2002,7 @@
         "category": "devtools",
         "logo": "svgs/gitea.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-06-06T00:11:24+02:00"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00"
     },
     "gitea-with-mariadb": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -2042,7 +2053,7 @@
         "category": "git",
         "logo": "svgs/gitea.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00"
     },
     "gitea": {
         "documentation": "https://docs.gitea.com?utm_source=coolify.io",
@@ -2135,7 +2146,7 @@
         "category": "monitoring",
         "logo": "svgs/glances.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "61208"
     },
     "glitchtip": {
@@ -2182,7 +2193,8 @@
         "logo": "svgs/goatcounter.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-01-27T21:23:59+01:00",
-        "port": "8080"
+        "port": "8080",
+        "outdated": true
     },
     "gotenberg": {
         "documentation": "https://gotenberg.dev/docs/getting-started/introduction?utm_source=coolify.io",
@@ -2235,7 +2247,7 @@
     "grafana-with-postgresql": {
         "documentation": "https://grafana.com?utm_source=coolify.io",
         "slogan": "Grafana is the open source analytics & monitoring solution for every database.",
-        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiAnZ3JhZmFuYS9ncmFmYW5hLW9zczoxMy4wLjInCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9HUkFGQU5BXzMwMDAKICAgICAgLSAnR0ZfU0VSVkVSX1JPT1RfVVJMPSR7U0VSVklDRV9VUkxfR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFUlZFUl9ET01BSU49JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFQ1VSSVRZX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HUkFGQU5BfScKICAgICAgLSBHRl9EQVRBQkFTRV9UWVBFPXBvc3RncmVzCiAgICAgIC0gR0ZfREFUQUJBU0VfSE9TVD1wb3N0Z3Jlc3FsCiAgICAgIC0gR0ZfREFUQUJBU0VfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gR0ZfREFUQUJBU0VfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnR0ZfREFUQUJBU0VfTkFNRT0ke1BPU1RHUkVTX0RCOi1ncmFmYW5hfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dyYWZhbmEtZGF0YTovdmFyL2xpYi9ncmFmYW5hJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvYXBpL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogICAgZGVwZW5kc19vbjoKICAgICAgLSBwb3N0Z3Jlc3FsCiAgcG9zdGdyZXNxbDoKICAgIGltYWdlOiAncG9zdGdyZXM6MTYtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAncG9zdGdyZXNxbC1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LWdyYWZhbmF9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiAnZ3JhZmFuYS9ncmFmYW5hOjEzLjMuMScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0dSQUZBTkFfMzAwMAogICAgICAtICdHRl9TRVJWRVJfUk9PVF9VUkw9JHtTRVJWSUNFX1VSTF9HUkFGQU5BfScKICAgICAgLSAnR0ZfU0VSVkVSX0RPTUFJTj0ke1NFUlZJQ0VfRlFETl9HUkFGQU5BfScKICAgICAgLSAnR0ZfU0VDVVJJVFlfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0dSQUZBTkF9JwogICAgICAtIEdGX0RBVEFCQVNFX1RZUEU9cG9zdGdyZXMKICAgICAgLSBHRl9EQVRBQkFTRV9IT1NUPXBvc3RncmVzcWwKICAgICAgLSBHRl9EQVRBQkFTRV9VU0VSPSRTRVJWSUNFX1VTRVJfUE9TVEdSRVMKICAgICAgLSBHRl9EQVRBQkFTRV9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtICdHRl9EQVRBQkFTRV9OQU1FPSR7UE9TVEdSRVNfREI6LWdyYWZhbmF9JwogICAgdm9sdW1lczoKICAgICAgLSAnZ3JhZmFuYS1kYXRhOi92YXIvbGliL2dyYWZhbmEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC9hcGkvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgICBkZXBlbmRzX29uOgogICAgICAtIHBvc3RncmVzcWwKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotZ3JhZmFuYX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "grafana",
             "analytics",
@@ -2251,7 +2263,7 @@
     "grafana": {
         "documentation": "https://grafana.com?utm_source=coolify.io",
         "slogan": "Grafana is the open source analytics & monitoring solution for every database.",
-        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiAnZ3JhZmFuYS9ncmFmYW5hLW9zczoxMy4wLjInCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9HUkFGQU5BXzMwMDAKICAgICAgLSAnR0ZfU0VSVkVSX1JPT1RfVVJMPSR7U0VSVklDRV9VUkxfR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFUlZFUl9ET01BSU49JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFQ1VSSVRZX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HUkFGQU5BfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dyYWZhbmEtZGF0YTovdmFyL2xpYi9ncmFmYW5hJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvYXBpL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiAnZ3JhZmFuYS9ncmFmYW5hOjEzLjMuMScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0dSQUZBTkFfMzAwMAogICAgICAtICdHRl9TRVJWRVJfUk9PVF9VUkw9JHtTRVJWSUNFX1VSTF9HUkFGQU5BfScKICAgICAgLSAnR0ZfU0VSVkVSX0RPTUFJTj0ke1NFUlZJQ0VfRlFETl9HUkFGQU5BfScKICAgICAgLSAnR0ZfU0VDVVJJVFlfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0dSQUZBTkF9JwogICAgdm9sdW1lczoKICAgICAgLSAnZ3JhZmFuYS1kYXRhOi92YXIvbGliL2dyYWZhbmEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC9hcGkvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "grafana",
             "analytics",
@@ -2292,7 +2304,7 @@
         "category": null,
         "logo": "svgs/grimmory.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-04-03T18:59:26+05:30",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "grist": {
@@ -2309,7 +2321,7 @@
         "category": "productivity",
         "logo": "svgs/grist.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-02-16T15:13:50+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8484"
     },
     "grocy": {
@@ -2342,7 +2354,7 @@
         "category": "automation",
         "logo": "svgs/hatchet.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-15T23:30:10+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "healthchecks": {
@@ -2377,7 +2389,7 @@
         "category": "productivity",
         "logo": "svgs/heimdall.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "hermes-agent-with-webui": {
@@ -2437,7 +2449,7 @@
         "category": "productivity",
         "logo": "svgs/heyform.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "9157"
     },
     "hi-events": {
@@ -2594,7 +2606,7 @@
         "category": "media",
         "logo": "svgs/immich.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "2283"
     },
     "infisical": {
@@ -2686,7 +2698,8 @@
         "logo": "svgs/it-tools.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "80"
+        "port": "80",
+        "outdated": true
     },
     "jean": {
         "documentation": "https://github.com/coollabsio/jean/blob/main/docs/headless-server.md?utm_source=coolify.io",
@@ -2754,7 +2767,7 @@
         "category": "productivity",
         "logo": "svgs/jitsi.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-04-24T09:40:01+05:30",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8000"
     },
     "joomla-with-mariadb": {
@@ -2800,7 +2813,7 @@
         "category": "devtools",
         "logo": "svgs/jupyter.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8888"
     },
     "karakeep": {
@@ -2817,7 +2830,7 @@
         "category": "productivity",
         "logo": "svgs/karakeep.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T16:19:39+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "keycloak-with-postgres": {
@@ -2911,7 +2924,7 @@
         "category": "backend",
         "logo": "svgs/kuzzle.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "7512"
     },
     "labelstudio": {
@@ -2937,7 +2950,7 @@
         "category": "ai",
         "logo": "svgs/labelstudio.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "langflow": {
@@ -3041,7 +3054,7 @@
         "category": "productivity",
         "logo": "svgs/libreoffice.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "librespeed": {
@@ -3055,7 +3068,7 @@
         "category": "devtools",
         "logo": "svgs/librespeed.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "82"
     },
     "libretranslate": {
@@ -3069,7 +3082,7 @@
         "category": "ai",
         "logo": "svgs/libretranslate.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "5000"
     },
     "limesurvey": {
@@ -3100,7 +3113,8 @@
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "9090"
+        "port": "9090",
+        "outdated": true
     },
     "linkding": {
         "documentation": "https://linkding.link/?utm_source=coolify.io",
@@ -3114,7 +3128,8 @@
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "9090"
+        "port": "9090",
+        "outdated": true
     },
     "linkwarden": {
         "documentation": "https://docs.linkwarden.app/self-hosting/setup?utm_source=coolify.io",
@@ -3130,7 +3145,7 @@
         "category": "productivity",
         "logo": "svgs/linkwarden.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "listmonk": {
@@ -3177,15 +3192,17 @@
         "port": "4000"
     },
     "lobe-chat": {
-        "documentation": "https://github.com/lobehub/lobe-chat?tab=readme-ov-file#b-deploying-with-docker?utm_source=coolify.io",
-        "slogan": "An open-source, modern-design AI chat framework.",
-        "compose": "c2VydmljZXM6CiAgbG9iZS1jaGF0OgogICAgaW1hZ2U6ICdsb2JlaHViL2xvYmUtY2hhdDoxLjE0My4zJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfTE9CRUNIQVRfMzIxMAogICAgICAtICdPUEVOQUlfQVBJX0tFWT0ke09QRU5BSV9BUElfS0VZfScKICAgICAgLSAnT1BFTkFJX1BST1hZX1VSTD0ke09QRU5BSV9CQVNFX1VSTDotaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MX0nCiAgICAgIC0gJ0FDQ0VTU19DT0RFPSR7U0VSVklDRV9QQVNTV09SRF9BQ0NFU1NDT0RFfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tIGh0dHA6Ly9sb2NhbGhvc3Q6MzIxMC8gfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "documentation": "https://lobehub.com/docs/self-hosting/platform/docker-compose?utm_source=coolify.io",
+        "slogan": "LobeHub (formerly Lobe Chat) is an open-source AI chat and agent workspace for many model providers.",
+        "compose": "c2VydmljZXM6CiAgbG9iZS1jaGF0OgogICAgaW1hZ2U6ICdsb2JlaHViL2xvYmVodWI6Mi4zLjMnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9MT0JFQ0hBVF8zMjEwCiAgICAgIC0gJ0FQUF9VUkw9JHtTRVJWSUNFX1VSTF9MT0JFQ0hBVH0nCiAgICAgIC0gJ0lOVEVSTkFMX0FQUF9VUkw9aHR0cDovL2xvY2FsaG9zdDozMjEwJwogICAgICAtICdLRVlfVkFVTFRTX1NFQ1JFVD0ke1NFUlZJQ0VfUkVBTEJBU0U2NF8zMl9LRVlWQVVMVFN9JwogICAgICAtICdBVVRIX1NFQ1JFVD0ke1NFUlZJQ0VfUkVBTEJBU0U2NF8zMl9BVVRIfScKICAgICAgLSAnREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly9wb3N0Z3Jlczoke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9QHBvc3RncmVzcWw6NTQzMi8ke1BPU1RHUkVTX0RCOi1sb2JlY2hhdH0nCiAgICAgIC0gJ1JFRElTX1VSTD1yZWRpczovL3JlZGlzOjYzNzknCiAgICAgIC0gUkVESVNfUFJFRklYPWxvYmVjaGF0CiAgICAgIC0gUkVESVNfVExTPTAKICAgICAgLSAnUzNfRU5EUE9JTlQ9JHtTRVJWSUNFX1VSTF9SVVNURlN9JwogICAgICAtICdTM19JTlRFUk5BTF9FTkRQT0lOVD1odHRwOi8vcnVzdGZzOjkwMDAnCiAgICAgIC0gJ1MzX0JVQ0tFVD0ke1MzX0JVQ0tFVDotbG9iZX0nCiAgICAgIC0gUzNfRU5BQkxFX1BBVEhfU1RZTEU9MQogICAgICAtICdTM19BQ0NFU1NfS0VZPSR7U0VSVklDRV9VU0VSX1JVU1RGU30nCiAgICAgIC0gJ1MzX0FDQ0VTU19LRVlfSUQ9JHtTRVJWSUNFX1VTRVJfUlVTVEZTfScKICAgICAgLSAnUzNfU0VDUkVUX0FDQ0VTU19LRVk9JHtTRVJWSUNFX1BBU1NXT1JEX1JVU1RGU30nCiAgICAgIC0gUzNfU0VUX0FDTD0wCiAgICAgIC0gTExNX1ZJU0lPTl9JTUFHRV9VU0VfQkFTRTY0PTEKICAgICAgLSAnT1BFTkFJX0FQSV9LRVk9JHtPUEVOQUlfQVBJX0tFWX0nCiAgICAgIC0gJ09QRU5BSV9QUk9YWV9VUkw9JHtPUEVOQUlfQkFTRV9VUkw6LWh0dHBzOi8vYXBpLm9wZW5haS5jb20vdjF9JwogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXNxbDoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgICByZWRpczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgICBydXN0ZnM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgcnVzdGZzLWluaXQ6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2NvbXBsZXRlZF9zdWNjZXNzZnVsbHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tIGh0dHA6Ly9sb2NhbGhvc3Q6MzIxMC9zaWduaW4gPiAvZGV2L251bGwgfHwgZXhpdCAxJwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQogICAgICBzdGFydF9wZXJpb2Q6IDMwcwogIHBvc3RncmVzcWw6CiAgICBpbWFnZTogJ3BhcmFkZWRiL3BhcmFkZWRiOjAuMjYuNy1wZzE3JwogICAgY29tbWFuZDoKICAgICAgLSBwb3N0Z3JlcwogICAgICAtICctYycKICAgICAgLSAnc2hhcmVkX3ByZWxvYWRfbGlicmFyaWVzPXBnX3NlYXJjaCxwZ19jcm9uLHBnX3N0YXRfc3RhdGVtZW50cycKICAgIGVudmlyb25tZW50OgogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1sb2JlY2hhdH0nCiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICB2b2x1bWVzOgogICAgICAtICdsb2JlLXBvc3RncmVzcWwtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgcG9zdGdyZXMgLWggMTI3LjAuMC4xJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKICAgICAgc3RhcnRfcGVyaW9kOiA2MHMKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6OC4xMC4zLWFscGluZScKICAgIGNvbW1hbmQ6ICdyZWRpcy1zZXJ2ZXIgLS1zYXZlIDYwIDEwMDAgLS1hcHBlbmRvbmx5IHllcycKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2xvYmUtcmVkaXMtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSByZWRpcy1jbGkKICAgICAgICAtIHBpbmcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDNzCiAgICAgIHJldHJpZXM6IDEwCiAgcnVzdGZzOgogICAgaW1hZ2U6ICdydXN0ZnMvcnVzdGZzOjEuMC42JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfUlVTVEZTXzkwMDAKICAgICAgLSAnUlVTVEZTX0FDQ0VTU19LRVk9JHtTRVJWSUNFX1VTRVJfUlVTVEZTfScKICAgICAgLSAnUlVTVEZTX1NFQ1JFVF9LRVk9JHtTRVJWSUNFX1BBU1NXT1JEX1JVU1RGU30nCiAgICAgIC0gUlVTVEZTX0NPTlNPTEVfRU5BQkxFPWZhbHNlCiAgICB2b2x1bWVzOgogICAgICAtICdsb2JlLXJ1c3Rmcy1kYXRhOi9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICd3Z2V0IC1xTy0gaHR0cDovL2xvY2FsaG9zdDo5MDAwL2hlYWx0aCA+IC9kZXYvbnVsbCAyPiYxIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDNzCiAgICAgIHJldHJpZXM6IDMwCiAgcnVzdGZzLWluaXQ6CiAgICBpbWFnZTogJ3J1c3Rmcy9yYzp2MC4xLjM3JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1JVU1RGU19BQ0NFU1NfS0VZPSR7U0VSVklDRV9VU0VSX1JVU1RGU30nCiAgICAgIC0gJ1JVU1RGU19TRUNSRVRfS0VZPSR7U0VSVklDRV9QQVNTV09SRF9SVVNURlN9JwogICAgICAtICdTM19CVUNLRVQ9JHtTM19CVUNLRVQ6LWxvYmV9JwogICAgZGVwZW5kc19vbjoKICAgICAgcnVzdGZzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBlbnRyeXBvaW50OiAvYmluL3NoCiAgICBjb21tYW5kOgogICAgICAtICctYycKICAgICAgLSAic2V0IC1lXG5yYyBhbGlhcyBzZXQgcnVzdGZzIGh0dHA6Ly9ydXN0ZnM6OTAwMCBcIiQkUlVTVEZTX0FDQ0VTU19LRVlcIiBcIiQkUlVTVEZTX1NFQ1JFVF9LRVlcIlxucmMgbWIgXCJydXN0ZnMvJCRTM19CVUNLRVRcIiAtLWlnbm9yZS1leGlzdGluZ1xucmMgYW5vbnltb3VzIHNldCBkb3dubG9hZCBcInJ1c3Rmcy8kJFMzX0JVQ0tFVFwiXG5wcmludGYgJyVzJyAnPENPUlNDb25maWd1cmF0aW9uPjxDT1JTUnVsZT48QWxsb3dlZE9yaWdpbj4qPC9BbGxvd2VkT3JpZ2luPjxBbGxvd2VkTWV0aG9kPkdFVDwvQWxsb3dlZE1ldGhvZD48QWxsb3dlZE1ldGhvZD5QVVQ8L0FsbG93ZWRNZXRob2Q+PEFsbG93ZWRNZXRob2Q+SEVBRDwvQWxsb3dlZE1ldGhvZD48QWxsb3dlZEhlYWRlcj4qPC9BbGxvd2VkSGVhZGVyPjxFeHBvc2VIZWFkZXI+RVRhZzwvRXhwb3NlSGVhZGVyPjxNYXhBZ2VTZWNvbmRzPjM2MDA8L01heEFnZVNlY29uZHM+PC9DT1JTUnVsZT48L0NPUlNDb25maWd1cmF0aW9uPicgfCByYyBidWNrZXQgY29ycyBzZXQgXCJydXN0ZnMvJCRTM19CVUNLRVRcIiAtIgogICAgcmVzdGFydDogJ25vJwogICAgZXhjbHVkZV9mcm9tX2hjOiB0cnVlCg==",
         "tags": [
             "ai",
             "chat",
             "openai",
             "llm",
-            "chatbot"
+            "chatbot",
+            "agent",
+            "lobehub"
         ],
         "category": "ai",
         "logo": "svgs/lobe-chat.png",
@@ -3209,7 +3226,7 @@
         "category": "auth",
         "logo": "svgs/logto_dark.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3001"
     },
     "lowcoder": {
@@ -3278,7 +3295,8 @@
         "logo": "svgs/martin.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T16:19:39+01:00",
-        "port": "3000"
+        "port": "3000",
+        "outdated": true
     },
     "matrix-synapse-with-postgresql": {
         "documentation": "https://element-hq.github.io/synapse/latest/welcome_and_overview.html?utm_source=coolify.io",
@@ -3298,7 +3316,7 @@
         "category": "messaging",
         "logo": "svgs/matrix.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-08T22:11:03+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8008"
     },
     "matrix-synapse-with-sqlite": {
@@ -3319,7 +3337,7 @@
         "category": "messaging",
         "logo": "svgs/matrix.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-08T22:11:03+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8008"
     },
     "mattermost": {
@@ -3334,7 +3352,7 @@
         "category": "messaging",
         "logo": "svgs/mattermost.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8065",
         "amd_only": true
     },
@@ -3384,7 +3402,7 @@
         "category": "search",
         "logo": "svgs/meilisearch.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "7700"
     },
     "memos": {
@@ -3435,7 +3453,8 @@
         "logo": "svgs/metamcp.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-10-19T18:04:06+02:00",
-        "port": "12008"
+        "port": "12008",
+        "outdated": true
     },
     "metube": {
         "documentation": "https://github.com/alexta69/metube?utm_source=coolify.io",
@@ -3467,7 +3486,8 @@
         "logo": "svgs/mindsdb.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "47334"
+        "port": "47334",
+        "outdated": true
     },
     "minecraft": {
         "documentation": "https://github.com/itzg/docker-minecraft-server?utm_source=coolify.io",
@@ -3479,7 +3499,7 @@
         "category": "games",
         "logo": "svgs/minecraft.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-04-01T15:06:17-05:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "25565"
     },
     "miniflux": {
@@ -3496,7 +3516,7 @@
         "category": "RSS",
         "logo": "svgs/miniflux.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "mixpost": {
@@ -3514,7 +3534,7 @@
         "category": "analytics",
         "logo": "svgs/mixpost.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "mosquitto": {
@@ -3621,7 +3641,8 @@
         "logo": "svgs/neon.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "80, 2112"
+        "port": "80, 2112",
+        "outdated": true
     },
     "netbird-client": {
         "documentation": "https://docs.netbird.io/how-to/examples#net-bird-client-in-docker?utm_source=coolify.io",
@@ -3653,7 +3674,7 @@
         "category": "api",
         "logo": "svgs/newapi.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "newt-pangolin": {
@@ -3684,8 +3705,9 @@
         "category": "media",
         "logo": "coolify-logo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3000"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "3000",
+        "outdated": true
     },
     "nextcloud-with-mariadb": {
         "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
@@ -3701,7 +3723,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "nextcloud-with-mysql": {
@@ -3735,7 +3757,7 @@
         "category": "storage",
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "nextcloud": {
@@ -3772,7 +3794,8 @@
         "logo": "svgs/nexus.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "8081"
+        "port": "8081",
+        "outdated": true
     },
     "nexus": {
         "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
@@ -3810,7 +3833,8 @@
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3000"
+        "port": "3000",
+        "outdated": true
     },
     "nitropage": {
         "documentation": "https://nitropage.org?utm_source=coolify.io",
@@ -3829,7 +3853,8 @@
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3000"
+        "port": "3000",
+        "outdated": true
     },
     "nocobase": {
         "documentation": "https://docs.nocobase.com/?utm_source=coolify.io",
@@ -3878,7 +3903,7 @@
         "category": "messaging",
         "logo": "svgs/nodebb.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "4567"
     },
     "ntfy": {
@@ -3969,7 +3994,7 @@
         "category": "ai",
         "logo": "svgs/ollama.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00"
     },
     "once-campfire": {
         "documentation": "https://github.com/basecamp/once-campfire?utm_source=coolify.io",
@@ -3987,7 +4012,7 @@
         "category": "messaging",
         "logo": "svgs/once-campfire.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-09-14T09:16:02+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "onedev": {
@@ -4042,7 +4067,7 @@
         "category": "email",
         "logo": "svgs/openarchiver.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "open-webui": {
@@ -4059,7 +4084,7 @@
         "category": "ai",
         "logo": "svgs/openwebui.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "openclaw": {
@@ -4120,7 +4145,8 @@
         "logo": "svgs/openpanel.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
-        "port": "3000"
+        "port": "3000",
+        "outdated": true
     },
     "openwa-with-postgresql-and-redis": {
         "documentation": "https://github.com/rmyndharis/OpenWA?utm_source=coolify.io",
@@ -4219,15 +4245,18 @@
         "port": "80"
     },
     "overseerr": {
-        "documentation": "https://docs.overseerr.dev/getting-started/installation#docker?utm_source=coolify.io",
-        "slogan": "Overseerr is a request management and media discovery tool built to work with your existing Plex ecosystem.",
-        "compose": "c2VydmljZXM6CiAgb3ZlcnNlZXJyOgogICAgaW1hZ2U6ICdzY3R4L292ZXJzZWVycjoxLjM1LjAnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9PVkVSU0VFUlJfNTA1NQogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnb3ZlcnNlZXJyLWNvbmZpZzovYXBwL2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLS10cmllcycKICAgICAgICAtICcxJwogICAgICAgIC0gJy0tbm8tdmVyYm9zZScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUwNTUvYXBpL3YxL3N0YXR1cycKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "documentation": "https://docs.seerr.dev/getting-started/docker?utm_source=coolify.io",
+        "slogan": "Seerr (formerly Overseerr) is a request management and media discovery tool for Jellyfin, Plex, and Emby.",
+        "compose": "c2VydmljZXM6CiAgb3ZlcnNlZXJyOgogICAgaW1hZ2U6ICdnaGNyLmlvL3NlZXJyLXRlYW0vc2VlcnI6djMuNS4yJwogICAgaW5pdDogdHJ1ZQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfT1ZFUlNFRVJSXzUwNTUKICAgICAgLSAnTE9HX0xFVkVMPSR7TE9HX0xFVkVMOi1pbmZvfScKICAgICAgLSAnVFo9JHtUWjotQW1lcmljYS9Ub3JvbnRvfScKICAgICAgLSBQT1JUPTUwNTUKICAgIHZvbHVtZXM6CiAgICAgIC0gJ292ZXJzZWVyci1jb25maWc6L2FwcC9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3dnZXQgLS1uby12ZXJib3NlIC0tdHJpZXM9MSAtLXNwaWRlciBodHRwOi8vbG9jYWxob3N0OjUwNTUvYXBpL3YxL3NldHRpbmdzL3B1YmxpYyB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTUKICAgICAgc3RhcnRfcGVyaW9kOiAyMHMK",
         "tags": [
             "media",
             "request",
             "plex",
+            "jellyfin",
+            "emby",
             "sonarr",
-            "radarr"
+            "radarr",
+            "seerr"
         ],
         "category": "media",
         "logo": "svgs/overseerr.svg",
@@ -4269,7 +4298,7 @@
         "category": "productivity",
         "logo": "svgs/paperless.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8000"
     },
     "passbolt": {
@@ -4300,7 +4329,7 @@
         "category": "finance",
         "logo": "svgs/paymenter.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "80"
     },
     "peertube": {
@@ -4382,8 +4411,9 @@
         "category": "devtools",
         "logo": "svgs/pgbackweb.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "8085"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "8085",
+        "outdated": true
     },
     "phpmyadmin": {
         "documentation": "https://phpmyadmin.net?utm_source=coolify.io",
@@ -4573,7 +4603,7 @@
         "category": "analytics",
         "logo": "svgs/postiz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "5000"
     },
     "prefect": {
@@ -4607,7 +4637,7 @@
         "category": "security",
         "logo": "svgs/privatebin.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-22T20:26:09+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "prowlarr": {
@@ -4730,7 +4760,7 @@
         "category": "messaging",
         "logo": "svgs/rabbitmq.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-10-15T22:51:15+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "15672"
     },
     "radarr": {
@@ -4745,7 +4775,7 @@
         "category": "media",
         "logo": "svgs/radarr.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "7878"
     },
     "rallly": {
@@ -4812,7 +4842,8 @@
         "logo": "svgs/redisinsight.png",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-11-10T15:25:33+05:30",
-        "port": "5540"
+        "port": "5540",
+        "outdated": true
     },
     "redlib": {
         "documentation": "https://github.com/redlib-org/redlib?utm_source=coolify.io",
@@ -4894,7 +4925,7 @@
         "category": "analytics",
         "logo": "svgs/rybbit.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3002"
     },
     "ryot": {
@@ -4913,7 +4944,7 @@
         "category": "productivity",
         "logo": "svgs/ryot.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8000"
     },
     "satisfactory": {
@@ -4967,7 +4998,7 @@
         "category": "search",
         "logo": "svgs/searxng.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "seaweedfs": {
@@ -5000,7 +5031,8 @@
         "logo": "svgs/sequin.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "7376"
+        "port": "7376",
+        "outdated": true
     },
     "sessy": {
         "documentation": "https://github.com/marckohlbrugge/sessy/blob/main/docs/docker-deployment.md?utm_source=coolify.io",
@@ -5120,8 +5152,9 @@
         "category": "productivity",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "5231"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "5231",
+        "outdated": true
     },
     "snipe-it": {
         "documentation": "https://snipe-it.readme.io/docs/introduction?utm_source=coolify.io",
@@ -5168,7 +5201,8 @@
         "logo": "svgs/soketi.jpeg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "6001"
+        "port": "6001",
+        "outdated": true
     },
     "sonarr": {
         "documentation": "https://hub.docker.com/r/linuxserver/sonarr?utm_source=coolify.io",
@@ -5182,7 +5216,7 @@
         "category": "media",
         "logo": "svgs/sonarr.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8989"
     },
     "spacebot": {
@@ -5202,8 +5236,9 @@
         "category": "ai",
         "logo": "svgs/spacebot.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-02-18T11:20:32+01:00",
-        "port": "19898"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "19898",
+        "outdated": true
     },
     "sparkyfitness": {
         "documentation": "https://codewithcj.github.io/SparkyFitness/?utm_source=coolify.io",
@@ -5264,7 +5299,8 @@
         "logo": "svgs/statusnook.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "8000"
+        "port": "8000",
+        "outdated": true
     },
     "stirling-pdf": {
         "documentation": "https://github.com/Stirling-Tools/Stirling-PDF?utm_source=coolify.io",
@@ -5295,7 +5331,7 @@
         "category": "backend",
         "logo": "svgs/strapi.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "1337"
     },
     "supabase": {
@@ -5329,7 +5365,8 @@
         "logo": "svgs/superset.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "8088"
+        "port": "8088",
+        "outdated": true
     },
     "supertokens-with-mysql": {
         "documentation": "https://supertokens.com/docs/guides?utm_source=coolify.io",
@@ -5351,8 +5388,9 @@
         "category": "auth",
         "logo": "svgs/supertokens.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "3567"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "3567",
+        "outdated": true
     },
     "supertokens-with-postgresql": {
         "documentation": "https://supertokens.com/docs/guides?utm_source=coolify.io",
@@ -5374,7 +5412,7 @@
         "category": "auth",
         "logo": "svgs/supertokens.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3567"
     },
     "sure": {
@@ -5457,7 +5495,7 @@
         "category": "productivity",
         "logo": "svgs/teable.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "termix": {
@@ -5505,7 +5543,7 @@
         "category": "productivity",
         "logo": "svgs/tolgee.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "traccar": {
@@ -5623,7 +5661,7 @@
         "category": "search",
         "logo": "svgs/typesense.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8108"
     },
     "umami": {
@@ -5695,7 +5733,7 @@
         "category": "ai",
         "logo": "svgs/unstructured.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8000"
     },
     "uptime-kuma-with-mariadb": {
@@ -5833,7 +5871,7 @@
         "category": "productivity",
         "logo": "svgs/vikunja.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3456"
     },
     "vikunja": {
@@ -5869,7 +5907,7 @@
         "category": "analytics",
         "logo": "svgs/wakapi.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "weaviate": {
@@ -5888,7 +5926,7 @@
         "category": "ai",
         "logo": "svgs/weaviate.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "web-check": {
@@ -5903,7 +5941,7 @@
         "category": "monitoring",
         "logo": "svgs/web-check.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "3000"
     },
     "weblate": {
@@ -5922,7 +5960,7 @@
         "category": "productivity",
         "logo": "svgs/weblate.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8080"
     },
     "whoogle": {
@@ -5936,8 +5974,9 @@
         "category": "search",
         "logo": "svgs/whoogle.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
-        "port": "5000"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "5000",
+        "outdated": true
     },
     "wikijs": {
         "documentation": "https://docs.js.wiki?utm_source=coolify.io",
@@ -5968,7 +6007,7 @@
         "category": "automation",
         "logo": "svgs/windmill.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "8000"
     },
     "wings": {
@@ -6001,7 +6040,7 @@
         "category": "vpn",
         "logo": "svgs/wireguard.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-05T15:54:25+01:00",
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
         "port": "51821"
     },
     "wordpress-with-mariadb": {
@@ -6074,8 +6113,9 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "8000"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "8000",
+        "outdated": true
     },
     "yamtrack": {
         "documentation": "https://github.com/FuzzyGrim/Yamtrack/wiki?utm_source=coolify.io",
@@ -6097,8 +6137,9 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
-        "port": "8000"
+        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "port": "8000",
+        "outdated": true
     },
     "zero": {
         "documentation": "https://zero.rocicorp.dev/docs/deployment?utm_source=coolify.io",

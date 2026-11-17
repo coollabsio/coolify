@@ -4,6 +4,7 @@
 # tags: postgres, sync, data
 # logo: svgs/sequin.svg
 # port: 7376
+# outdated: true
 
 services:
   sequin:

@@ -4,6 +4,7 @@
 # tags: repository, manager, open source, docker, docker, registry, container
 # logo: svgs/nexus.png
 # port: 8081
+# outdated: true
 
 services:
   nexus:
