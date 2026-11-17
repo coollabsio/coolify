@@ -2546,6 +2546,10 @@ $siteAddress {
 
     public function sendUnreachableNotification()
     {
+        if ($this->team->getEnabledChannels('server_unreachable') === []) {
+            return;
+        }
+
         NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
