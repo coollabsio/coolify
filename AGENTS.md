@@ -193,6 +193,7 @@ Before you rate a vulnerability or write an advisory, find the security boundary
   - One team -> another team.
   - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
   - Token -> more than its abilities allow.
+- Do not report the items in "Intended behavior (not a vulnerability)" in `SECURITY.md` (for example, MCP that works while REST API access is disabled). Add a new item there when a report is closed as intended behavior.
 - Rate with the real role that the attack needs, not the role that the reporter claims. Read the policy or gate that protects the path. Admin needed means `PR:H`. Use `S:C` only when the impact reaches another team, the Coolify instance, or a server that the attacker does not manage.
 - If a path is reachable by a member only because of a different missing authorization check, report that check as the main issue, with high severity. Rate each injection behind it by the role it needs when the check works.
 - Always fix low-severity findings (escape shell arguments, validate input, confine paths) when you find them. Do not dismiss them because the attacker is an admin.
