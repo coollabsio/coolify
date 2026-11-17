@@ -1245,7 +1245,8 @@ class Application extends BaseModel
 
     /**
      * Another application of the team that builds and pushes an image with the same Docker image name.
-     * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
+     * Both push the same tags (the commit SHA, `latest`, `pr-<id>-<commit>`), so one application can run the image of the other.
+     * The Docker image tag does not keep them apart: it is pushed in addition, and rollbacks read the commit SHA tag.
      */
     public function otherApplicationBuildingSameImage(): ?Application
     {
@@ -1264,7 +1265,10 @@ class Application extends BaseModel
 
     public function sharedImageNameMessage(Application $otherApplication): string
     {
-        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. Both push the same image tags, so one application can run the image of the other. Set a different Docker image name for each application in the General settings.";
+        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. "
+            .'Coolify tags each build with the commit SHA (latest for a Dockerfile set in Coolify, pr-<id>-<commit> for previews) and pushes the Docker image tag only in addition. '
+            .'A different Docker image tag does not keep the images apart, so one application can run the image of the other. '
+            ."Set a different Docker image name for each application in the General settings, for example {$this->docker_registry_image_name}-staging.";
     }
 
     public function serviceType()
