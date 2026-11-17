@@ -762,9 +762,43 @@ class Github extends Controller
         $github_app->client_secret = $client_secret;
         $github_app->webhook_secret = $webhook_secret;
         $github_app->private_key_id = $private_key->id;
+        $ownerMismatch = $this->syncGithubAppOwner($github_app, (array) data_get($data, 'owner'));
         $github_app->save();
 
-        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        $redirect = redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+
+        return $ownerMismatch ? $redirect->with('error', $ownerMismatch) : $redirect;
+    }
+
+    /**
+     * GitHub registers the App on the account that it shows in its form, not always on the organization
+     * of the manifest URL (for example, when the user cannot manage GitHub Apps of that organization).
+     * Store the real owner, so that the install, permission, and runner settings point to it.
+     *
+     * @param  array{login?: string, type?: string}  $owner
+     * @return string|null The warning for the user when the owner is not the requested organization
+     */
+    private function syncGithubAppOwner(GithubApp $github_app, array $owner): ?string
+    {
+        $login = data_get($owner, 'login');
+        if (blank($login)) {
+            return null;
+        }
+
+        $requested = normalizeGithubOrganization($github_app->organization);
+        $isOrganization = data_get($owner, 'type') === 'Organization';
+        $github_app->organization = $isOrganization ? $login : null;
+
+        if (blank($requested) || ($isOrganization && strcasecmp($requested, $login) === 0)) {
+            return null;
+        }
+
+        [$login, $requested] = [e($login), e($requested)];
+        $account = data_get($owner, 'type') === 'User' ? "personal account {$login}" : "account {$login}";
+
+        return "GitHub registered this GitHub App on your {$account}, not on the organization {$requested}. "
+            ."It can only be installed on {$login}. Make sure that your GitHub user is an owner or a GitHub App manager of {$requested}, "
+            .'then delete this GitHub App on GitHub and in Coolify, and create it again.';
     }
 
     public function install(Request $request)

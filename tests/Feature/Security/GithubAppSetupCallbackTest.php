@@ -50,7 +50,7 @@ function authenticateGithubSetupCallbackTest(object $test): void
     session(['currentTeam' => $test->team]);
 }
 
-function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com'): void
+function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com', ?array $owner = null): void
 {
     $key = openssl_pkey_new([
         'private_key_bits' => 2048,
@@ -67,6 +67,7 @@ function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com')
             'client_secret' => 'new-client-secret',
             'pem' => $privateKey,
             'webhook_secret' => 'new-webhook-secret',
+            'owner' => $owner,
         ]),
     ]);
 }
@@ -181,6 +182,35 @@ it('configures an unbound github app with a valid one-time manifest state', func
         ->and($this->githubApp->client_id)->toBe('new-client-id')
         ->and($this->githubApp->webhook_secret)->toBe('new-webhook-secret')
         ->and($this->githubApp->private_key_id)->not->toBeNull();
+});
+
+it('warns and clears the organization when github registers the app on the personal account', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill(['organization' => 'acme-org'])->save();
+    fakeGithubManifestConversion(owner: ['login' => 'octocat', 'type' => 'User']);
+    cacheGithubAppSetupState('valid-state', 'manifest', $this->githubApp);
+
+    $this->get('/webhooks/source/github/redirect?state=valid-state&code=real-code')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $message) => str_contains($message, 'personal account octocat')
+            && str_contains($message, 'acme-org'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->organization)->toBeNull()
+        ->and($this->githubApp->app_id)->toBe(987654);
+});
+
+it('keeps the organization that owns the registered github app', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill(['organization' => 'ACME-ORG'])->save();
+    fakeGithubManifestConversion(owner: ['login' => 'acme-org', 'type' => 'Organization']);
+    cacheGithubAppSetupState('valid-state', 'manifest', $this->githubApp);
+
+    $this->get('/webhooks/source/github/redirect?state=valid-state&code=real-code')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionMissing('error');
+
+    expect($this->githubApp->refresh()->organization)->toBe('acme-org');
 });
 
 it('converts ghe dot com app manifests through the data residency api host', function () {
