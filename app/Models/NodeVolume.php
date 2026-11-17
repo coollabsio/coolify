@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Collection;
 
 /**
  * A named Podman volume of a cluster application. It lives on exactly one Node: `node_id`
@@ -93,7 +93,7 @@ class NodeVolume extends BaseModel
             return $this->mountingWorkloads()->withoutGlobalScopes()->get();
         }
 
-        return collect([NodeWorkload::query()->withoutGlobalScopes()->find($this->node_workload_id)])->filter()->values();
+        return NodeWorkload::query()->withoutGlobalScopes()->whereKey($this->node_workload_id)->get();
     }
 
     /**
