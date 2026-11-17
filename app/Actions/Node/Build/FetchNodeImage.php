@@ -66,7 +66,7 @@ class FetchNodeImage
     /**
      * Returns the copy: the source Node, the seconds it took, the uncompressed size of the image, and
      * the bytes that the source sent (the layers that the target did not have). Null when nothing had
-     * to be copied: the image is not local, or the target has it.
+     * to be copied: the image is not local, or a container of it is on the target.
      *
      * @return array{source: Node, seconds: float, size_bytes: int, bytes_sent: int}|null
      *
@@ -79,9 +79,6 @@ class FetchNodeImage
             return null;
         }
         $build = $this->build($revision);
-        if ($build?->node_id === $target->id) {
-            return null;
-        }
         $revisionIds = NodeWorkloadRevision::query()
             ->where('node_workload_id', $revision->node_workload_id)
             ->where('image', $image)
@@ -95,8 +92,9 @@ class FetchNodeImage
         }
         $deadline ??= now()->addSeconds(self::MAX_SECONDS);
         $sources = $this->sources($target, $revisionIds, $build);
-        if ($sources->isEmpty() && $ranOnTarget) {
-            // The target ran the image before and may still have it; the deploy shows the error of Podman otherwise.
+        if ($sources->isEmpty() && ($ranOnTarget || $build?->node_id === $target->id)) {
+            // The target built or ran the image and no other server has it: it may still have it. The
+            // deploy shows the error of Podman otherwise.
             return null;
         }
         if ($target->supportsCapability(NodeImages::FETCH_CAPABILITY) !== true || blank($target->wireguard_ip)) {
