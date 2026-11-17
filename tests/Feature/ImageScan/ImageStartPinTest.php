@@ -105,6 +105,12 @@ describe('pins', function () {
 
         expect(ImageStartPin::for($pins, ['docker.io/library/nginx:1.27']))->toBe(['docker.io/library/nginx:1.27' => ['ref' => 'nginx:1.27', 'pull' => 'p1']]);
     });
+
+    it('keeps no tag pin for an image that the start pins by digest', function () {
+        $pins = ['docker.io/library/redis:7' => ['ref' => 'redis:7', 'pull' => 'p1'], 'docker.io/library/redis:latest' => ['ref' => 'redis', 'pull' => 'p2']];
+
+        expect(ImageStartPin::for($pins, ['redis:7@'.START_PIN_DIGEST, 'redis@'.START_PIN_DIGEST]))->toBe([]);
+    });
 });
 
 describe('standalone database start', function () {

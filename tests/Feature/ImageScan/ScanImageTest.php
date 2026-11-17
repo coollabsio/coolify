@@ -258,6 +258,18 @@ it('names the resource and the image in the error of an image reference that is 
     Process::assertNothingRan();
 });
 
+it('scans an image that is pinned by tag and digest by its digest', function () {
+    scanImageTestFake();
+    $ref = 'postgres:15.0-alpine@'.SCAN_TEST_REPO_DIGEST;
+
+    $scan = ScanImage::run($this->server, $this->application, $ref);
+
+    expect($scan->status)->toBe(ImageScanStatus::Completed)
+        ->and($scan->error_code)->toBeNull()
+        ->and($scan->image_ref)->toBe($ref);
+    Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), "docker image inspect --format '{{.Id}}' 'postgres@".SCAN_TEST_REPO_DIGEST."'"));
+});
+
 it('keeps the progress of another run of the resource and records no busy lock for it', function () {
     scanImageTestFake();
     $progress = ['run_id' => 'otherrun123456', 'stage' => 'sbom', 'started_at' => now()->toIso8601String()];
