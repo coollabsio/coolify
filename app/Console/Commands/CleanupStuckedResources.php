@@ -66,7 +66,9 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stucked helper containers: {$e->getMessage()}\n";
         }
         try {
-            $servers = Server::onlyTrashed()->lazyById();
+            // A newer deleted server can still wait for its queued DeleteServer job, which knows whether to remove the containers.
+            // A queued job can wait behind long jobs and then run until the worker timeout (up to about 24 hours).
+            $servers = Server::onlyTrashed()->where('deleted_at', '<', now()->subHours(24))->lazyById();
             foreach ($servers as $server) {
                 echo "Force deleting stuck server: {$server->name}\n";
                 // Deletes its resources from Coolify first. The containers stay, because the choice made at the delete is not known.

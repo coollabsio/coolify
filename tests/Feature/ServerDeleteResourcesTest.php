@@ -125,10 +125,21 @@ it('passes the choice to keep the resources on the server from the API', functio
 
 it('deletes the resources of a stuck deleted server from Coolify before the server', function () {
     softDeleteServer($this->server);
+    $this->travel(25)->hours();
 
     $this->artisan('cleanup:stucked-resources');
 
     expect($this->commands->filter(fn (string $command) => str_contains($command, $this->service->uuid)))->toBeEmpty()
         ->and(Service::withTrashed()->find($this->service->id))->toBeNull()
         ->and(Server::withTrashed()->find($this->server->id))->toBeNull();
+});
+
+it('leaves a recently deleted server to its queued delete job, which knows whether to remove the containers', function () {
+    softDeleteServer($this->server);
+    $this->travel(23)->hours();
+
+    $this->artisan('cleanup:stucked-resources');
+
+    expect(Service::find($this->service->id))->not->toBeNull()
+        ->and(Server::onlyTrashed()->find($this->server->id))->not->toBeNull();
 });
