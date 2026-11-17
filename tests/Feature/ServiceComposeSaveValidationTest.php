@@ -1,17 +1,25 @@
 <?php
 
+use App\Jobs\ServerStorageSaveJob;
 use App\Livewire\Project\Service\EditCompose;
 use App\Livewire\Project\Service\StackForm;
+use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Symfony\Component\Yaml\Yaml;
 
@@ -164,16 +172,78 @@ test('the API does not create a service with a Compose file that Docker Compose 
     $token = serviceComposeApiToken($this->owner);
     $environment = $this->service->environment;
 
+    config(['queue.default' => 'sync']);
+    $queuedJobs = [];
+    Queue::before(function (JobProcessing $event) use (&$queuedJobs) {
+        $queuedJobs[] = $event->job->resolveName();
+    });
+    $existing = [
+        'applications' => ServiceApplication::query()->count(),
+        'databases' => ServiceDatabase::query()->count(),
+        'variables' => EnvironmentVariable::query()->count(),
+        'files' => LocalFileVolume::query()->count(),
+        'volumes' => LocalPersistentVolume::query()->count(),
+    ];
+    $rejected = <<<'YAML'
+        services:
+          app:
+            imag: nginx:alpine
+            environment:
+              - REJECTED_VARIABLE=value
+            volumes:
+              - app-data:/data
+              - type: bind
+                source: ./config/app.conf
+                target: /etc/app.conf
+                content: rejected
+          db:
+            image: postgres:16
+        YAML;
+
     $this->withToken($token)->postJson('/api/v1/services', [
         'project_uuid' => $environment->project->uuid,
         'environment_uuid' => $environment->uuid,
         'server_uuid' => $this->server->uuid,
-        'docker_compose_raw' => base64_encode("services:\n  app:\n    imag: nginx:alpine\n"),
+        'docker_compose_raw' => base64_encode($rejected),
     ])->assertUnprocessable()
         ->assertJsonPath('errors.docker_compose_raw', fn (string $error) => str_contains($error, 'services.app.imag false schema'));
 
-    expect(Service::query()->count())->toBe(1);
+    expect(Service::withTrashed()->count())->toBe(1)
+        ->and(ServiceApplication::query()->count())->toBe($existing['applications'])
+        ->and(ServiceDatabase::query()->count())->toBe($existing['databases'])
+        ->and(EnvironmentVariable::query()->count())->toBe($existing['variables'])
+        ->and(EnvironmentVariable::query()->where('key', 'REJECTED_VARIABLE')->exists())->toBeFalse()
+        ->and(LocalFileVolume::query()->count())->toBe($existing['files'])
+        ->and(LocalPersistentVolume::query()->count())->toBe($existing['volumes']);
+    expect($queuedJobs)->not->toContain(ServerStorageSaveJob::class);
 });
+
+test('the API does not keep a created service whose urls name an unknown container', function (array $payload) {
+    $token = serviceComposeApiToken($this->owner);
+    $environment = $this->service->environment;
+    $existing = [
+        'applications' => ServiceApplication::query()->count(),
+        'variables' => EnvironmentVariable::query()->count(),
+        'volumes' => LocalPersistentVolume::query()->count(),
+    ];
+
+    $this->withToken($token)->postJson('/api/v1/services', [
+        'project_uuid' => $environment->project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'server_uuid' => $this->server->uuid,
+        'urls' => [['name' => 'missing', 'url' => 'https://missing.example.com']],
+        ...$payload,
+    ])->assertUnprocessable()
+        ->assertJsonPath('errors.0', "Service container with 'missing' not found.");
+
+    expect(Service::withTrashed()->count())->toBe(1)
+        ->and(ServiceApplication::query()->count())->toBe($existing['applications'])
+        ->and(EnvironmentVariable::query()->count())->toBe($existing['variables'])
+        ->and(LocalPersistentVolume::query()->count())->toBe($existing['volumes']);
+})->with([
+    'custom Compose file' => [['docker_compose_raw' => base64_encode("services:\n  app:\n    image: nginx:alpine\n    environment:\n      - SOME_VARIABLE=value\n    volumes:\n      - app-data:/data\n")]],
+    'one-click service' => [['type' => 'uptime-kuma']],
+]);
 
 /**
  * A token for API requests. The session login of beforeEach() is removed, or Sanctum uses it instead of the token.

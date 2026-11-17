@@ -52,7 +52,7 @@ class GetService extends Tool
         $service->makeVisible($visibleSensitiveKeys);
 
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($service->toArray(), $visibleSensitiveKeys),
+            redactLockedApiResourceValues($service, $this->scrubSensitive($service->toArray(), $visibleSensitiveKeys)),
             $this->actionsForService($uuid, $service->status ?? null),
         ), ['resource_uuid' => $uuid]);
     }

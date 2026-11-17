@@ -2721,6 +2721,32 @@ test('get_service returns the compose files to a read:sensitive or root token of
     'root' => [['root']],
 ]);
 
+test('get_service hides locked shared variable values in the generated compose', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'LOCKED_TEAM_SECRET',
+        'value' => 'locked-team-secret-value',
+        'type' => 'team',
+        'team_id' => $this->team->id,
+        'is_shown_once' => true,
+    ]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      FOO: '{{team.LOCKED_TEAM_SECRET}}'\n",
+        'docker_compose' => "services:\n  app:\n    image: nginx\n    environment:\n      FOO: locked-team-secret-value\n",
+    ]);
+
+    $response = mcpReadCallWithAbilities(['read', 'read:sensitive'], 'get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['docker_compose'])->toContain('FOO: <locked>')
+        ->and($data['docker_compose_raw'])->toContain('{{team.LOCKED_TEAM_SECRET}}')
+        ->and(json_encode($data))->not->toContain('locked-team-secret-value');
+});
+
 test('get_service hides the compose files from a token without read:sensitive', function () {
     $service = createComposeServiceForMcp();
 
