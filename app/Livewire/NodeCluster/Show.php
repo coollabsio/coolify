@@ -7,15 +7,13 @@ use App\Actions\Node\Build\InspectNodeRegistry;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchLatestSentinelRelease;
+use App\Actions\Node\ManageNodeClusterNetwork;
 use App\Actions\Node\ManageNodeClusterSettings;
 use App\Actions\Node\RemoveNodeFromCluster;
-use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpgradeSentinel;
 use App\Enums\NodeWorkloadState;
-use App\Jobs\ReconcileNodeClusterNetworkJob;
-use App\Jobs\UpgradeClusterSentinelJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
@@ -361,20 +359,19 @@ class Show extends Component
     public function reconcileNetwork(): void
     {
         $this->authorize('update', $this->cluster);
+        try {
+            $queued = ManageNodeClusterNetwork::make()->reconcile($this->cluster, auth()->user());
+        } catch (RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->cluster->refresh();
-        if ($this->cluster->network_status === 'reconciling') {
+        if (! $queued) {
             $this->dispatch('info', 'Cluster network reconciliation is already running.');
 
             return;
         }
-        if (! $this->cluster->nodes()->exists()) {
-            $this->dispatch('error', 'Assign at least one server before network activation.');
-
-            return;
-        }
-
-        $this->cluster->update(['network_status' => 'reconciling']);
-        ReconcileNodeClusterNetworkJob::dispatch($this->cluster->id, auth()->id());
         $this->dispatch('success', 'Cluster network reconciliation queued.');
     }
 
@@ -382,13 +379,13 @@ class Show extends Component
     {
         $this->authorize('update', $this->cluster);
         try {
-            RepairNodeClusterNetwork::run($this->cluster);
+            ManageNodeClusterNetwork::make()->repair($this->cluster, auth()->user());
         } catch (LockTimeoutException|RuntimeException $exception) {
             $this->dispatch('error', $exception->getMessage());
 
             return;
         }
-        $this->cluster->update(['network_status' => 'pending']);
+        $this->cluster->refresh();
         $this->dispatch('success', 'Cluster network state restored over SSH. Reconcile the network to verify current state.');
     }
 
@@ -396,25 +393,18 @@ class Show extends Component
     public function upgradeClusterSentinel(): void
     {
         $this->authorize('update', $this->cluster);
-        $release = FetchLatestSentinelRelease::run();
-        $nodes = UpgradeSentinel::clusterNodesToUpgrade($this->cluster, $release);
-        foreach ($nodes as $node) {
-            $this->authorize('manageSentinel', $node);
+        try {
+            $nodes = ManageNodeClusterNetwork::make()->upgradeSentinel($this->cluster, auth()->user());
+        } catch (RuntimeException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
         }
         if ($nodes->isEmpty()) {
             $this->dispatch('info', 'Sentinel is up to date on every server of this cluster.');
 
             return;
         }
-        $key = UpgradeSentinel::clusterUpgradeCacheKey($this->cluster->id);
-        if (in_array(data_get(Cache::get($key), 'status'), ['queued', 'running'], true)) {
-            $this->dispatch('error', 'A Sentinel upgrade is already running in this cluster.');
-
-            return;
-        }
-
-        Cache::put($key, UpgradeSentinel::newClusterRun('queued', $release['version'], $nodes), now()->addDay());
-        UpgradeClusterSentinelJob::dispatch($this->cluster->id, auth()->id());
         $this->dispatch('success', 'Sentinel upgrade queued. Servers are upgraded one at a time.');
     }
 

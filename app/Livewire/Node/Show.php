@@ -6,6 +6,7 @@ use App\Actions\Node\CleanupNodeImages;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\CreateMoveOperation;
+use App\Actions\Node\DeleteNode;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\FetchLatestSentinelRelease;
@@ -36,6 +37,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\ValidServerIp;
 use App\Support\CpuArchitecture;
+use DomainException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -429,22 +431,13 @@ class Show extends Component
         }
 
         try {
-            $deleted = DB::transaction(function (): bool {
-                $node = Node::query()->whereKey($this->node->id)->lockForUpdate()->firstOrFail();
-                if ($node->node_cluster_id !== null || $node->workloads()->exists()) {
-                    return false;
-                }
-
-                return (bool) $node->delete();
-            });
-        } catch (\Throwable $e) {
-            handleError($e, $this);
+            DeleteNode::run($this->node, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
 
             return true;
-        }
-
-        if (! $deleted) {
-            $this->dispatch('error', 'Remove this server from its cluster and move or delete its applications before deleting it.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
 
             return true;
         }
