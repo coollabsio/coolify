@@ -101,15 +101,15 @@ test('dump-all mysql and mariadb commands use valid shell parameter expansions',
 
     $command = $builder->buildRestoreCommand(importResource($class), '/tmp/dump.sql.gz', true);
 
-    $rootPassword = '${'.$prefix.'_ROOT_PASSWORD}';
+    $rootLogin = '-u root ${root_password:+"-p$root_password"}';
     $database = '${'.$prefix.'_DATABASE:-default}';
 
     expect($command)
         ->toContain($binary)
         ->toStartWith("backup='/tmp/dump.sql.gz'\n")
-        ->toContain('-p'.$rootPassword)
+        ->toContain('root_password=${'.$prefix.'_ROOT_PASSWORD:-}')
         ->toContain('CREATE DATABASE IF NOT EXISTS \`'.$database.'\`')
-        ->and(substr_count($command, $rootPassword))->toBe(6)
+        ->and(substr_count($command, $rootLogin))->toBe(7)
         ->and(substr_count($command, $database))->toBe(2)
         ->and($command)->not->toContain('${{');
 })->with([

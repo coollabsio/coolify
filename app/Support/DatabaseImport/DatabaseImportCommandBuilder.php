@@ -377,7 +377,17 @@ stream | {$binary} \$client_safety -u \${$prefix}_USER -p\${$prefix}_PASSWORD \$
 SH;
         }
 
-        $root = "{$binary} -u root -p\${{$prefix}_ROOT_PASSWORD}";
+        // linuxserver.io images keep root@localhost without a password next to root@% with
+        // the root password, so root without a password is used when only that login works.
+        $rootLogin = '-u root ${root_password:+"-p$root_password"}';
+        $root = "{$binary} {$rootLogin}";
+        $selectRootLogin = <<<SH
+root_password=\${{$prefix}_ROOT_PASSWORD:-}
+if ! {$root} -N -e 'SELECT 1' >/dev/null 2>&1 && {$binary} -u root -N -e 'SELECT 1' >/dev/null 2>&1; then
+  root_password=
+fi
+
+SH;
         $database = "\${{$prefix}_DATABASE:-default}";
 
         if ($restoreMysqlUsers) {
@@ -389,11 +399,11 @@ SH;
             $source = '{ stream | awk '.escapeshellarg(self::MYSQL_SYSTEM_DATABASE_FILTER)." || echo 'Coolify could not filter the system databases of the backup;'; }";
         }
 
-        return $preflight.$clientSafety.<<<SH
+        return $preflight.$clientSafety.$selectRootLogin.<<<SH
 for pid in \$({$root} -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do {$root} -e "KILL \$pid" 2>/dev/null || true; done
 {$root} -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | {$root} || exit 1
 {$root} -e "CREATE DATABASE IF NOT EXISTS \\`{$database}\\`;" || exit 1
-{$source} | {$binary} \$client_safety -u root -p\${{$prefix}_ROOT_PASSWORD} {$database}
+{$source} | {$binary} \$client_safety {$rootLogin} {$database}
 SH;
     }
 
