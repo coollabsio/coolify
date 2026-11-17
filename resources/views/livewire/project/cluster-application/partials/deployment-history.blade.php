@@ -99,7 +99,7 @@
                                                         'A new revision with the image of this deployment ('.$deployment['revision'].') deploys on every server of the application.',
                                                         'Environment variables, secrets, the start command, resource limits, volumes, and the health check keep their current values.',
                                                         'Volume data is not rolled back.',
-                                                        'When the cluster registry no longer has the image, Coolify builds the same commit again before it deploys.',
+                                                        'When no server keeps the image anymore, Coolify builds the same commit again before it deploys.',
                                                     ]"
                                                     :confirmWithText="false" :confirmWithPassword="false"
                                                     step2ButtonText="Roll back">
@@ -113,12 +113,21 @@
                                         @endcan
                                     @endif
                                 </span>
+                            @elseif (filled($deployment['image']))
+                                {{-- A build that failed before it read the commit has no revision yet. --}}
+                                <span class="block truncate text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white"
+                                    title="{{ $deployment['imageTitle'] }}">{{ $deployment['image'] }}</span>
                             @else
                                 <span class="text-neutral-400 dark:text-fg-faint">-</span>
                             @endif
                             @if ($embedded)
                                 <span class="mt-0.5 hidden truncate text-xs text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white 2xl:block">
-                                    {{ $deployment['source'] }} · <span class="tabular-nums">{{ $deployment['duration'] }}</span> · {{ $deployment['node'] ?? '-' }}
+                                    {{ implode(' · ', array_filter([
+                                        $deployment['source'],
+                                        $deployment['statusType'] === 'error' ? $deployment['status'] : null,
+                                        $deployment['duration'] !== '-' ? $deployment['duration'] : null,
+                                        $deployment['node'],
+                                    ])) }}
                                 </span>
                             @endif
                         </span>

@@ -718,7 +718,7 @@
                             <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->nodes_count }} available {{ Str::plural('server', $cluster->nodes_count) }}</span>
                         </span>
                         <x-beta-badge class="shrink-0" />
-                        <x-status-badge status="running" text="Cluster" />
+                        <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
                     </button>
                     @if (str_starts_with((string) $type, 'one-click-service-') && $cluster->nodes_count > 1)
                         <button type="button" wire:click="setClusterSpread('{{ $cluster->uuid }}')"
@@ -730,7 +730,7 @@
                                 <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">Spread across the cluster</span>
                                 <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Each service runs on the least loaded server of {{ $cluster->name }}. Services that share a volume stay on one server.</span>
                             </span>
-                            <x-status-badge status="running" text="Cluster" />
+                            <x-status-badge :status="$cluster->networkStatusLabel()" :type="$cluster->networkStatusBadgeType()" />
                         </button>
                     @endif
                     @foreach($cluster->nodes as $node)
@@ -743,7 +743,7 @@
                                 <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</span>
                                 <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Deploy to this server in {{ $cluster->name }}</span>
                             </span>
-                            <x-status-badge status="running" text="Cluster server" />
+                            <x-status-badge :status="$node->is_reachable ? 'Ready' : 'Unreachable'" :type="$node->is_reachable ? 'success' : 'warning'" />
                         </button>
                     @endforeach
                 @endforeach
@@ -757,7 +757,7 @@
                             <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $server->name }}</span>
                             <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $server->description ?: $server->ip }}</span>
                         </span>
-                        <x-status-badge status="running" text="Docker server" />
+                        <x-status-badge type="success" status="Running" />
                     </button>
                 @endforeach
             </div>

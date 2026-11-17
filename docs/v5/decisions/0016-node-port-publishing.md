@@ -82,8 +82,9 @@ services. These points differ from the decision above or add to it:
   Node of the cluster, 53, 80, 443, `node_clusters.wireguard_port`, the
   Corrosion gossip port 8787 and API port 8080
   (`ReconcileNodeClusterNetwork::CORROSION_*`, the values that Sentinel writes
-  to the Corrosion configuration), and the registry port 5443
-  (`NodeRegistry::PORT`). A reserved port is refused for TCP and for UDP.
+  to the Corrosion configuration). The registry port 5443
+  (`NodeRegistry::PORT`) was reserved until decision 0030 removed the built-in
+  registry. A reserved port is refused for TCP and for UDP.
 - **Source CIDRs.** An address without a prefix becomes `/32`. A CIDR with host
   bits becomes its network (`10.0.0.5/24` is `10.0.0.0/24`). At most 64. IPv4
   only.

@@ -85,7 +85,8 @@ the backup schedule of a database.
 10. **Cluster settings.** `PATCH /clusters/{uuid}` changes the fields of the
     General and Advanced tabs: name, description, CIDR, WireGuard interface and
     port, the deployment pressure policy, the image storage (repository and
-    registry credential), and the server of the built-in registry. The roles of
+    registry credential). (History: the server of the built-in registry was
+    a field until decision 0030 removed `registry_server_uuid`.) The roles of
     a Node stay on `PATCH /nodes/{uuid}/roles`. The firewall rules have their
     own calls. Each write needs a team admin (`NodeClusterPolicy::update`). A
     registry credential must be of the team of the cluster and of the registry

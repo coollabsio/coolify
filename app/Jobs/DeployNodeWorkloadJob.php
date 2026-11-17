@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Node\ApplyNodeClusterNetworkRevision;
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\DispatchWorkloadLifecycle;
@@ -39,8 +40,8 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
     public int $tries = 1;
 
-    /** The Flux deploy request (620 s), the health wait, and the network revision of published ports. */
-    public int $timeout = 1020 + ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
+    /** The image copy from a peer, the Flux deploy request (620 s), the health wait, and the network revision of published ports. */
+    public int $timeout = FetchNodeImage::MAX_SECONDS + 1020 + ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
 
     /** @param  Carbon|null  $waitUntil  A move that runs the job inline ends the health wait at its own deadline. */
     public function __construct(public int $operationId, public ?Carbon $waitUntil = null) {}
@@ -51,6 +52,11 @@ class DeployNodeWorkloadJob implements ShouldQueue
         if ($operation->status->isFinal()) {
             return;
         }
+        $fetched = $this->fetchImage($operation);
+        if ($fetched === null) {
+            return;
+        }
+        $operation->refresh();
 
         if (SyncNodeWorkloadSet::converges($operation->node, $operation->workload)) {
             $this->converge($operation);
@@ -82,7 +88,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
                 return;
             }
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
-            $result = DispatchWorkloadDeployment::run($operation);
+            $result = [...$fetched, ...DispatchWorkloadDeployment::run($operation)];
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
             $verification = $this->verifyUntilHealthy($operation);
             $result['verification'] = $verification;
@@ -104,6 +110,36 @@ class DeployNodeWorkloadJob implements ShouldQueue
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000).$this->discardNew($operation));
         }
+    }
+
+    /**
+     * Copies a local image that the Node does not have from a peer Node first (decision 0030), before
+     * Sentinel gets the revision. Returns the result to keep, or null when the copy failed the operation.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fetchImage(NodeOperation $operation): ?array
+    {
+        $deadline = now()->addSeconds(FetchNodeImage::MAX_SECONDS);
+        if ($this->waitUntil !== null && $this->waitUntil->lt($deadline)) {
+            $deadline = $this->waitUntil;
+        }
+        try {
+            $source = FetchNodeImage::run($operation->node, $operation->revision, $deadline);
+        } catch (Throwable $exception) {
+            if ($operation->refresh()->status->canTransitionTo(NodeOperationStatus::FAILED)) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+            }
+
+            return null;
+        }
+        if ($source === null) {
+            return [];
+        }
+        $fetched = ['fetched_image' => $source->name];
+        $operation->update(['result' => [...($operation->refresh()->result ?? []), ...$fetched]]);
+
+        return $fetched;
     }
 
     /**

@@ -40,11 +40,11 @@
             'group' => 'Network',
         ],
         [
-            'label' => 'Danger',
+            'label' => 'Danger Zone',
             'route' => 'node-cluster.delete',
             'active' => $activeMenu === 'danger',
-            'icon' => 'shield-alert',
-            'group' => 'Danger zone',
+            'icon' => 'danger',
+            'group' => 'Danger Zone',
             'visible' => auth()->user()?->can('delete', $cluster),
         ],
     ])

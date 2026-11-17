@@ -3,11 +3,11 @@
 namespace App\Actions\Node;
 
 use App\Models\NodeBuild;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\SafeWebhookUrl;
 use App\Support\CpuArchitecture;
+use App\Support\NodeImages;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -67,7 +67,7 @@ class ReadImageArchitectures
     public function handle(string $image, ?array $login = null): ?array
     {
         $image = CreateClusterDockerImageWorkload::qualifiedImage(trim($image));
-        if (NodeRegistry::isLocalImage($image) || str_starts_with($image, NodeRegistry::HOST.'/')) {
+        if (NodeImages::isLocalImage($image)) {
             return self::builtArchitectures($image);
         }
         [$this->registry, $this->repository, $reference] = self::parse($image);

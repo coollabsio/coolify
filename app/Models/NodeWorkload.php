@@ -11,6 +11,7 @@ use App\Enums\NodeWorkloadDesiredState;
 use App\Enums\NodeWorkloadSourceType;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\HealthCheckCommand;
+use App\Support\NodeImages;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
@@ -380,12 +381,12 @@ class NodeWorkload extends BaseModel
     public function buildCapabilities(): array
     {
         return array_values(array_filter([
-            NodeRegistry::BUILD_CAPABILITY,
-            $this->usesPrivateGitSource() ? NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY : null,
-            $this->environment_variables()->where('is_buildtime', true)->exists() ? NodeRegistry::BUILD_VARIABLES_CAPABILITY : null,
-            $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeRegistry::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
-            filled($this->build_target) ? NodeRegistry::BUILD_TARGET_CAPABILITY : null,
-            $this->source_type === NodeWorkloadSourceType::STATIC ? NodeRegistry::STATIC_BUILD_CAPABILITY : null,
+            NodeImages::BUILD_CAPABILITY,
+            $this->usesPrivateGitSource() ? NodeImages::PRIVATE_GIT_BUILD_CAPABILITY : null,
+            $this->environment_variables()->where('is_buildtime', true)->exists() ? NodeImages::BUILD_VARIABLES_CAPABILITY : null,
+            $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeImages::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
+            filled($this->build_target) ? NodeImages::BUILD_TARGET_CAPABILITY : null,
+            $this->source_type === NodeWorkloadSourceType::STATIC ? NodeImages::STATIC_BUILD_CAPABILITY : null,
         ]));
     }
 

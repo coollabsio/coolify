@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\ClusterApplication;
 
 use App\Actions\Node\Build\CancelNodeBuild;
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\CreateNodeVolume;
 use App\Actions\Node\DeleteNodeVolumeCopy;
@@ -43,6 +44,7 @@ use App\Models\RegistryCredential;
 use App\Services\DockerImageParser;
 use App\Support\CpuArchitecture;
 use App\Support\DomainUrlParts;
+use App\Support\NodeImages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
@@ -51,6 +53,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Throwable;
 
 class Show extends Component
 {
@@ -250,7 +253,7 @@ class Show extends Component
 
                 return;
             }
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
             $this->loadData();
 
@@ -281,7 +284,7 @@ class Show extends Component
         $revision = $this->workload->revisions()->where('uuid', $revisionUuid)->firstOrFail();
         try {
             $rollback = RollbackNodeWorkload::run($this->workload, $revision, auth()->user());
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
             $this->loadData();
 
@@ -300,10 +303,11 @@ class Show extends Component
         redirectRoute($this, 'project.cluster-application.deployment.show', [...$parameters, 'deployment_uuid' => $rollback['operation']->uuid]);
     }
 
-    public function cancelBuild(): void
+    /** Cancels a build of this application. The deployment page passes the build of the selected deployment. */
+    public function cancelBuild(?string $buildUuid = null): void
     {
         $this->authorize('deploy', $this->workload);
-        $build = $this->workload->builds()->where('uuid', $this->buildUuid)->firstOrFail();
+        $build = $this->workload->builds()->where('uuid', $buildUuid ?? $this->buildUuid)->firstOrFail();
         CancelNodeBuild::run($build);
         $this->dispatch('success', 'Build cancelled.');
     }
@@ -544,7 +548,7 @@ class Show extends Component
             $this->authorize('update', $this->workload);
             RemoveNodePublishedPort::run($this->workload->publishedPorts()->where('uuid', $portUuid)->firstOrFail(), auth()->user());
             $this->dispatch('success', 'Port removed. The servers of the cluster close it without a redeploy.');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
     }
@@ -581,7 +585,7 @@ class Show extends Component
             $this->dispatch('success', $outcome === 'deleted'
                 ? 'Volume removed.'
                 : 'Volume removed from the configuration. Redeploy the application to unmount it. Its data stays until you delete it.');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
     }
@@ -592,7 +596,7 @@ class Show extends Component
             $this->authorize('update', $this->workload);
             DeleteNodeVolumeData::run($this->findVolume($volumeUuid));
             $this->dispatch('success', 'Volume data deleted.');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
     }
@@ -612,7 +616,7 @@ class Show extends Component
                 ->firstOrFail();
             DeleteNodeVolumeCopy::run($copy);
             $this->dispatch('success', 'Retained copy deleted.');
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
     }
@@ -746,7 +750,7 @@ class Show extends Component
                 : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.')));
         } catch (ValidationException $exception) {
             throw $exception;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
         $this->loadData();
@@ -778,7 +782,24 @@ class Show extends Component
             'moveRecovery' => $this->moveRecovery($sources->firstWhere('uuid', $this->moveSource), $targets->firstWhere('uuid', $this->moveTarget) ?? $targets->first()),
             // The services that share stack volumes with this one move with it (decision 0024).
             'moveGroup' => $this->workload->volumeGroup()->slice(1)->pluck('stack_service')->filter()->values()->all(),
+            'moveImage' => $this->moveImage($sources->firstWhere('uuid', $this->moveSource) ?? $sources->first(), $targets->firstWhere('uuid', $this->moveTarget) ?? $targets->first()),
         ];
+    }
+
+    /**
+     * What a move does with a local image: the target copies it from the source server (decision
+     * 0030), or the reason why it cannot. Null when the image is in a registry.
+     *
+     * @return array{error: ?string}|null
+     */
+    private function moveImage(?Node $source, ?Node $target): ?array
+    {
+        $revision = $this->workload->revisions()->latest('id')->first();
+        if ($source === null || $target === null || $revision === null || ! NodeImages::isLocalImage($revision->image)) {
+            return null;
+        }
+
+        return ['error' => FetchNodeImage::moveBlockedReason($source, $target, $revision->image, NotifyNodeReachability::isOffline($source))];
     }
 
     /**
@@ -941,7 +962,7 @@ class Show extends Component
             if ($failures !== []) {
                 $this->dispatch('error', 'Failed to '.$action->value.' the application on every server.', implode('<br>', array_map('e', $failures)));
             }
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             handleError($exception, $this);
         }
         $this->loadData();
@@ -1113,7 +1134,7 @@ class Show extends Component
      * image, or a build that has deployed nothing (yet). On the build page of a build
      * that deployed, the view follows its deployment.
      *
-     * @return array{uuid: string, status: string, statusType: string, isActive: bool, duration: ?string, build: ?array<string, mixed>, deployNote: ?string, lines: list<array{timestamp: string, line: string, stderr: bool}>}
+     * @return array{uuid: string, status: string, statusType: string, isActive: bool, duration: ?string, build: ?array<string, mixed>, deployStarted: bool, deployOpen: bool, deployNote: ?string, lines: list<array{timestamp: string, line: string, stderr: bool}>}
      */
     private function selectedDeployment(): array
     {
@@ -1137,11 +1158,12 @@ class Show extends Component
         return [
             'uuid' => $operation?->uuid ?? $build->uuid,
             'build' => $build ? [
+                'uuid' => $build->uuid,
                 'status' => $build->status->deploymentLabel(),
                 'statusType' => $build->status->badgeType(),
                 'isActive' => ! $build->status->isFinal(),
-                // Open while it is the interesting part: the build page, or a build that deployed nothing.
-                'open' => $this->section === 'build' || $operation === null,
+                // Only the current step is open: the build until its deploy starts.
+                'open' => $operation === null,
                 'duration' => $build->started_at && $build->finished_at ? calculateDuration($build->started_at, $build->finished_at) : null,
                 'lines' => $this->buildLogLines($build),
             ] : null,
@@ -1154,10 +1176,13 @@ class Show extends Component
                 $operation->status->isActive() => calculateDuration($operation->created_at, now()),
                 default => null,
             },
+            // Without an operation the deploy never started: its step shows no status, only the note.
+            'deployStarted' => $operation !== null,
+            'deployOpen' => $operation !== null || $build === null,
             'deployNote' => $operation ? null : match ($build->status) {
                 NodeBuildStatus::QUEUED, NodeBuildStatus::RUNNING => 'The deploy starts when the build succeeds.',
-                NodeBuildStatus::FAILED => 'Nothing was deployed because the build failed.',
-                NodeBuildStatus::CANCELLED => 'Nothing was deployed because the build was cancelled.',
+                NodeBuildStatus::FAILED => 'The deploy did not start because the build failed.',
+                NodeBuildStatus::CANCELLED => 'The deploy did not start because the build was cancelled.',
                 NodeBuildStatus::SUCCEEDED => 'Nothing was deployed. The application has no server.',
             },
             'lines' => $operation ? $this->deploymentLogLines($operation) : [],
@@ -1224,6 +1249,10 @@ class Show extends Component
         if ($pullPolicy) {
             $add($operation->created_at, $pullPolicy === 'newer' ? 'Sentinel pulls the image when a newer version is available.' : 'Sentinel pulls the image only when it is missing.');
         }
+        if (filled(data_get($operation->result, 'fetched_image'))) {
+            // The copy from a peer runs before the command goes to Sentinel (decision 0030).
+            $add($operation->dispatched_at ?? $operation->updated_at, 'The image was copied from server '.data_get($operation->result, 'fetched_image').'.');
+        }
         if ($operation->dispatched_at) {
             $attempt = $operation->attempt_count > 1 ? " (attempt {$operation->attempt_count})" : '';
             $add($operation->dispatched_at, "Command sent to Sentinel on {$nodeName}{$attempt}.");
@@ -1267,13 +1296,22 @@ class Show extends Component
                     : 'The volumes were switched to the target server.');
             }
         }
-        // The status events of Sentinel when it converges the workload (decision 0026).
+        // The status events of Sentinel when it converges the workload (decision 0026). Without a
+        // health check, Sentinel only waits until the container keeps running for the settle time.
+        $hasHealthCheck = filled(data_get($operation->revision?->configuration, 'health_check'));
         foreach ((array) data_get($operation->result, 'sentinel_events', []) as $event) {
             $text = trim((string) data_get($event, 'reason'));
+            if (! $hasHealthCheck) {
+                $text = str_replace(
+                    ['waits until it is healthy.', 'waits until the new container is healthy.'],
+                    ['waits until it keeps running. No health check is set.', 'waits until the new container keeps running. No health check is set.'],
+                    $text,
+                );
+            }
             $add(
                 data_get($event, 'at') ?? $operation->updated_at,
                 'Sentinel: '.match ((string) data_get($event, 'status')) {
-                    'healthy' => 'the container is healthy.',
+                    'healthy' => $hasHealthCheck ? 'the container is healthy.' : 'the container is running.',
                     'failed' => 'the revision failed.',
                     'stopped' => 'the container is stopped.',
                     'removed' => 'the containers are removed.',

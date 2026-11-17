@@ -353,7 +353,7 @@ two items were open in **Not decided here**. They are decided as follows.
   | --- | --- | --- |
   | `dozzle` | Works | The event stream lists the containers of the Node. |
   | `portainer` | Works | Through the local Docker endpoint, `_ping`, `version`, `info`, `containers/json`, `images/json`, `volumes`, `networks`, `system/df`, and `containers/<id>/json`, `stats`, `logs`, and `top` return 200. |
-  | `diun` | Works | It finds the 14 images of the Node. It cannot read the images of the cluster registry, of a private registry, and of local builds (`localhost/...`). That is registry access, not the socket. |
+  | `diun` | Works | It finds the 14 images of the Node. It cannot read the images of the cluster registry (removed by decision 0030), of a private registry, and of local builds (`localhost/...`). That is registry access, not the socket. |
   | `homepage` | Works, with a change | The template does not mount the socket (the line is a comment). With `- /var/run/docker.sock:/var/run/docker.sock:ro` and `my-docker: socket: /var/run/docker.sock`, `/api/docker/statuses` and `/api/docker/stats` return the container. |
   | `glances` | Not available | `privileged` and `pid: host`. Without them, `/api/4/containers` returns the containers with their stats. |
   | `beszel` | Not available | `network_mode: host` of `beszel-agent`. Without it, the hub reaches the agent through the shared volume `beszel_socket`, the system is `up`, and the hub stores the containers and their stats. |

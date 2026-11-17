@@ -7,6 +7,7 @@ use App\Actions\Node\QueueNodeNetworkConvergence;
 use App\Actions\Node\RecordNodeWorkloadStatus;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Actions\Sentinel\ResolveFluxTrustBundle;
+use App\Actions\Sentinel\RotateFluxCertificateAuthority;
 use App\Http\Controllers\Controller;
 use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\RefreshNodeContainersJob;
@@ -172,6 +173,7 @@ class FluxConnectionEventController extends Controller
         if (! FluxCaRotation::query()->exists()) {
             return;
         }
+        rescue(fn () => RotateFluxCertificateAuthority::make()->finishCancelWhenAcknowledged(), report: false);
         rescue(function () use ($node, $version): void {
             if ($version < ResolveFluxTrustBundle::run()['version']) {
                 DistributeFluxTrustBundleJob::dispatch($node->id);

@@ -41,9 +41,9 @@ architecture open. Emulation with QEMU is slow.
   later read that works removes the warning, and it ends after 7 days.
 - A build records the architecture of its builder Node in
   `node_builds.architecture`. The migration sets this column for earlier
-  builds from their builder Node. A built image (`registry.cluster…@digest`
-  or `localhost/…`) has the architecture of the build with the same digest
-  or tag. Revisions do not change, so the configuration hash and rollbacks
+  builds from their builder Node. A built image (`localhost/<workload>:<build>`,
+  or `<repository>@digest` in an external registry) has the architecture of
+  the build with the same tag or digest. Revisions do not change, so the configuration hash and rollbacks
   stay the same.
 - `ReadImageArchitectures` reads the architectures of other images from the
   registry manifest, with the Docker Registry v2 API over HTTPS:

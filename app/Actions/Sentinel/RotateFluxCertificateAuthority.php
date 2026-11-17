@@ -30,7 +30,8 @@ use Throwable;
  *    force), retire the old CA.
  *
  * Before the switch, cancel publishes bundle N+2 (old CA only) and discards
- * the new CA; advance from cancelling then finishes the cancel. Every step
+ * the new CA; the cancel finishes by itself when every usable Node acknowledged
+ * that bundle (advance from cancelling also finishes it, with force). Every step
  * re-reads the durable state, so a failed or interrupted step can be retried.
  */
 class RotateFluxCertificateAuthority
@@ -109,8 +110,29 @@ class RotateFluxCertificateAuthority
             return $rotation;
         });
         DistributeFluxTrustBundleJob::dispatch();
+        $this->finishCancelWhenAcknowledged();
 
-        return $rotation;
+        return $rotation->refresh();
+    }
+
+    /**
+     * Closes a cancel once every usable Node trusts only the old CA again. Nothing is left to
+     * decide at that point, so the admin does not need to click Finish cancel. Runs after each
+     * bundle acknowledgement; while another step holds the lock, the next acknowledgement retries.
+     */
+    public function finishCancelWhenAcknowledged(): void
+    {
+        $rotation = $this->current();
+        if ($rotation?->status !== FluxCaRotation::STATUS_CANCELLING || $this->blockingNodes($rotation)->isNotEmpty()) {
+            return;
+        }
+
+        rescue(fn () => $this->locked(function (): void {
+            $rotation = $this->current();
+            if ($rotation?->status === FluxCaRotation::STATUS_CANCELLING && $this->blockingNodes($rotation)->isEmpty()) {
+                $this->finish($rotation, false);
+            }
+        }), report: false);
     }
 
     /**

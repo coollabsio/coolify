@@ -5,11 +5,13 @@ namespace App\Livewire\Node;
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
 use App\Actions\Node\InspectNodeHost;
+use App\Actions\Node\ManageNodeClusterSettings;
 use App\Actions\Node\ValidateNodeCallback;
 use App\Jobs\OnboardNodeJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\PrivateKey;
+use App\Models\RegistryCredential;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use DomainException;
@@ -46,6 +48,12 @@ class Onboarding extends Component
     public string $clusterUuid = '';
 
     public string $clusterName = '';
+
+    public string $imageStorage = 'local';
+
+    public string $imageRepository = '';
+
+    public string $imageRegistryCredentialUuid = '';
 
     #[Locked]
     #[Url(as: 'server', except: '')]
@@ -201,14 +209,54 @@ class Onboarding extends Component
         }
     }
 
+    /**
+     * Saves where the cluster stores its images. The last step of the onboarding asks once, when the
+     * cluster gets its second server. Builds do not wait for it: they stay on the servers by default.
+     */
+    public function saveImageStorage(): void
+    {
+        $cluster = $this->onboardingNode()->cluster;
+        abort_if($cluster === null, 422, 'This server has no cluster.');
+        $this->authorize('update', $cluster);
+        $this->resetErrorBag();
+        $fields = ['image_storage' => 'imageStorage', 'image_repository' => 'imageRepository', 'image_registry_credential_uuid' => 'imageRegistryCredentialUuid'];
+        try {
+            ManageNodeClusterSettings::make()->updateImageStorage($cluster, $this->imageStorage, $this->imageRepository, $this->imageRegistryCredentialUuid, auth()->user());
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $key => $messages) {
+                $this->addError($fields[$key] ?? $key, $messages[0]);
+            }
+
+            return;
+        }
+        $this->dispatch('success', 'Image storage saved.');
+    }
+
     public function render(): View
     {
         $privateKeys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->orderBy('name')->get(['id', 'name']);
         $clusters = NodeCluster::query()->where('team_id', currentTeam()->id)->orderBy('name')->get();
         $node = $this->nodeUuid ? Node::query()->where('team_id', currentTeam()->id)->where('uuid', $this->nodeUuid)->first() : null;
         $onboarding = data_get($node?->metadata, 'onboarding', []);
+        $cluster = $node?->cluster;
+        $needsImageStorageChoice = data_get($onboarding, 'status') === 'ready'
+            && $cluster !== null
+            && $cluster->needsImageStorageChoice()
+            && auth()->user()->can('update', $cluster);
+        $registryCredentialOptions = $needsImageStorageChoice ? RegistryCredential::query()
+            ->where('team_id', $cluster->team_id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (RegistryCredential $credential): array => [
+                'value' => $credential->uuid,
+                'label' => $credential->name,
+                'description' => $credential->registry.' · '.$credential->username,
+            ])
+            ->prepend(['value' => '', 'label' => 'None', 'description' => 'A registry without a login'])
+            ->values()
+            ->all() : [];
 
-        return view('livewire.node.onboarding', compact('privateKeys', 'clusters', 'node', 'onboarding'));
+        return view('livewire.node.onboarding', compact('privateKeys', 'clusters', 'node', 'onboarding', 'needsImageStorageChoice', 'registryCredentialOptions'));
     }
 
     private function onboardingNode(): Node

@@ -117,6 +117,32 @@
                     </details>
                 @endif
             </x-application.settings-section>
+            @if ($needsImageStorageChoice)
+                <form wire:submit="saveImageStorage" class="mt-6">
+                    <x-application.settings-section title="Where the cluster stores images"
+                        helper="{{ $node->cluster->name }} has more than one server now. By default, builds stay on the servers, and each server copies an image from the server that has it.">
+                        <x-slot:badges><x-status-badge status="New option" type="neutral" /></x-slot:badges>
+                        <x-slot:actions>
+                            <a href="{{ route('node-cluster.advanced', ['cluster_uuid' => $node->cluster->uuid]) }}#node-cluster-image-storage-section" {{ wireNavigate() }} class="button">Choose later</a>
+                            <x-forms.button type="submit" isHighlighted wire:target="saveImageStorage">Save</x-forms.button>
+                        </x-slot:actions>
+                        <div class="flex flex-col gap-4">
+                            <x-forms.listbox id="imageStorage" label="Storage" required
+                                :options="[
+                                    ['value' => 'local', 'label' => 'On the servers (recommended)', 'description' => 'No setup. Each server copies an image from the server that has it, and only the missing layers move. An image is not available while the only server that has it is offline.'],
+                                    ['value' => 'external', 'label' => 'External registry', 'description' => 'A registry of your team, for example GHCR, Docker Hub, or Harbor. It stays available when a server is offline.'],
+                                ]" />
+                            <div x-cloak x-show="$wire.imageStorage === 'external'" class="grid gap-4 lg:grid-cols-2">
+                                <x-forms.input id="imageRepository" label="Repository" placeholder="ghcr.io/your-org/coolify-builds"
+                                    helper="One repository for every application of the cluster. Each build gets the tag &lt;application&gt;-&lt;build&gt;." />
+                                <x-forms.listbox id="imageRegistryCredentialUuid" label="Registry credential" :options="$registryCredentialOptions"
+                                    helper="The login that pushes and pulls. It needs write access to the repository. Add one in Keys & Tokens, Registry Credentials." />
+                            </div>
+                            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">With an external registry, deploy each Git application again, so that its image is in the registry.</p>
+                        </div>
+                    </x-application.settings-section>
+                </form>
+            @endif
         </div>
     @endif
 </div>

@@ -2,9 +2,7 @@
 
 namespace App\Actions\Node;
 
-use App\Actions\Node\Build\EnsureNodeRegistry;
 use App\Enums\AccessLevel;
-use App\Enums\NodeWorkloadSourceType;
 use App\Exceptions\NodePlacementDeniedException;
 use App\Jobs\DeleteNodeWorkloadJob;
 use App\Models\Node;
@@ -88,7 +86,7 @@ class SyncNodeStackCompose
         }
         (new NodeStack(['compose_parsed' => $yaml]))->deployOrder();
         $actor = $userIsActor && $requestedBy !== null ? $requestedBy : $this->actor($stack, $requestedBy);
-        $registryIsNew = ! $cluster->registry()->exists();
+        $buildsAreNew = ! $cluster->runsBuilds();
 
         $portsChanged = false;
         $summary = DB::transaction(function () use ($stack, $cluster, $compose, $yaml, $composeDirectory, $commitSha, $actor, $requestedBy, &$portsChanged): array {
@@ -153,12 +151,6 @@ class SyncNodeStackCompose
             foreach ($nodes as $node) {
                 EnsureNodeWorkloadDnsNames::run($node);
             }
-            $builds = collect($diff->added)->contains(fn (array $service): bool => $service['build'] !== null)
-                || collect($diff->changed)->contains(fn (NodeStackServiceChange $change): bool => ($change->attributes['source_type'] ?? null) === NodeWorkloadSourceType::DOCKERFILE);
-            if ($builds) {
-                EnsureNodeRegistry::run($cluster);
-            }
-
             $summary = [
                 'commit_sha' => $commitSha,
                 'synced_at' => now()->toIso8601String(),
@@ -181,8 +173,8 @@ class SyncNodeStackCompose
         });
 
         $this->deleteRemovedServices($stack, $requestedBy);
-        // The next network revision starts zot and BuildKit on the Nodes, and opens and closes the published ports.
-        if (($registryIsNew && $cluster->registry()->exists()) || $portsChanged) {
+        // The next network revision starts BuildKit on the builder Nodes, and opens and closes the published ports.
+        if (($buildsAreNew && $cluster->runsBuilds()) || $portsChanged) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
 

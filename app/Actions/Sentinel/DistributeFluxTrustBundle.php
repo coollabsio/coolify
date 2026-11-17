@@ -121,6 +121,7 @@ class DistributeFluxTrustBundle
             'flux_trust_bundle_acknowledged_at' => now(),
             'flux_trust_bundle_error' => null,
         ])->saveQuietly();
+        RotateFluxCertificateAuthority::make()->finishCancelWhenAcknowledged();
     }
 
     /**

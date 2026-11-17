@@ -48,7 +48,6 @@ class NodeOperation extends BaseModel
         'network.wireguard.inspect.v1' => 'Inspect private network',
         'network.wireguard.key.ensure.v1' => 'Prepare private network key',
         'network.wireguard.reconcile.v1' => 'Configure private network',
-        'registry.reconcile.v1' => 'Configure the image registry',
         'sentinel.upgrade.v1' => 'Upgrade Sentinel',
         'system.info.v1' => 'Refresh server details',
         'system.ping.v1' => 'Ping Sentinel',

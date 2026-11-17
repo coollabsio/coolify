@@ -22,8 +22,8 @@ because its image did not fit. A manual cleanup freed 2.6 GB of images and
 
 Other storage already has limits:
 
-- The cluster registry keeps `keep_tags` tags of each repository (decision
-  0006).
+- The cluster registry kept `keep_tags` tags of each repository (decision
+  0006). Decision 0030 removed it.
 - A local build (`image.load.v1`) keeps `keep_tags` tags of its repository.
 - BuildKit garbage collection limits the build cache (decision 0006, "Storage
   limits on builder Nodes").
@@ -41,17 +41,19 @@ a kept number of rollback images, and options for volumes and networks.
     finished;
   - dangling images.
 
-  It does not touch volumes, networks, the build cache, or the registry data.
+  It does not touch volumes, networks, or the build cache.
   It returns the freed bytes and the removed image references.
 - **Keep list.** Coolify sends:
   - the images of the deployed revision and of the last 2 earlier revisions of
     each workload on the Node (the v4 default of kept rollback images);
-  - the pinned infrastructure images: builder, BuildKit, zot, ingress, and the
+  - on a build Node, also the last 3 successful local builds of each
+    workload;
+  - the pinned infrastructure images: builder, BuildKit, ingress, and the
     current `sentinel-host`.
 
-  A rollback to an older revision pulls its image again from the cluster
-  registry, or fails with the current message when the registry no longer
-  has it (decision 0017).
+  A rollback to an older revision fetches its local image from a Node that
+  keeps it (decision 0030), pulls it from its external registry by digest, or
+  builds the same commit again (decision 0017).
 - **When.** Like v4 for servers: a daily run, and a run when the disk use of
   the Node goes above a threshold (default 80%). The Node page has
   **Clean up now** and the settings. Each run is a Node operation with its
@@ -63,28 +65,30 @@ a kept number of rollback images, and options for volumes and networks.
 
 Built on 2026-11-16. The code changed these points of the proposal:
 
-- **Infrastructure images.** BuildKit and zot are pinned in Sentinel
-  (`BUILDKIT_IMAGE`, `ZOT_IMAGE`), not in Coolify, so Sentinel keeps them
-  itself. The ingress is the Caddy binary of `coolify-ingress.service`, not a
+- **Infrastructure images.** BuildKit is pinned in Sentinel
+  (`BUILDKIT_IMAGE`), not in Coolify, so Sentinel keeps it itself. (History:
+  zot was pinned as `ZOT_IMAGE` until decision 0030 removed it.) The ingress is the Caddy binary of `coolify-ingress.service`, not a
   container, so it has no image to keep. Sentinel also keeps the newest
   `sentinel-host` image when Coolify does not send one. Coolify sends the
   pinned builder image and the `sentinel-host` image of the last upgrade of the
   Node (else `constants.sentinel.host_image`).
 - **Keep list.** For each workload that runs or ran on the Node, Coolify keeps
   the revision of the last successful deploy or move on that Node, the 2
-  revisions before it, and the newest revision. Images that a container uses,
-  in any state, always stay.
+  revisions before it, and the newest revision. A build Node also keeps the
+  last 3 successful local builds of each workload, so that other Nodes can
+  fetch them (decision 0030). Images that a container uses, in any state,
+  always stay.
 - **Build containers.** Coolify sends the `coolify-build-<uuid>` names of the
   active builds of the Node. Sentinel removes every other `coolify-build-*`
   container that does not run.
 - **Local builds.** A build without a registry (`image.load.v1`) has no copy in
-  a registry. A rollback to such a revision that the cleanup removed needs a
-  new build.
-- **Rollback.** A rollback checked only the cluster registry, and built the
-  revision again when the registry did not have its image, also when the Node
-  still had it. Now a rollback deploys the image without the registry when
-  every server of the application ran it and the cleanup keeps it there. The
-  deploy uses the pull policy `missing`, so Podman starts the local image.
+  a registry. A rollback to such a revision fetches the image from a Node that
+  keeps it (decision 0030). When the cleanup removed it on every Node, the
+  rollback needs a new build.
+- **Rollback.** A rollback deploys a local image when a Node still keeps it,
+  and the deploy fetches it from that Node. The deploy uses the pull policy
+  `missing`, so Podman starts the local image. (History: before decision 0030,
+  a rollback checked the cluster registry first.)
 - **No forced removal.** Sentinel never uses `--force`. An image that a
   container starts to use during the cleanup is skipped and listed in the
   result.

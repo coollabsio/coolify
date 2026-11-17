@@ -137,12 +137,12 @@
                             </div>
                             <div class="service-domain-dns flex min-w-0 items-center justify-center">
                                 @if ($route['scheme'] === 'http')
-                                    <span class="text-[12px] text-neutral-500 dark:text-fg-dim" title="Served over HTTP only, without a certificate">HTTP only</span>
+                                    <span class="cursor-help text-[12px] text-neutral-500 dark:text-fg-dim" tabindex="0" data-tooltip="Served over HTTP only, without a certificate">HTTP only</span>
                                 @elseif ($ingressTls)
                                     <x-cluster-applications.https-badge :certificate="$certificate" />
                                 @else
-                                    <span class="text-[12px] text-neutral-500 dark:text-fg-dim"
-                                        title="HTTPS needs the latest Sentinel on every server of the cluster and an ACME directory on this instance.">Unavailable</span>
+                                    <span class="cursor-help text-[12px] text-neutral-500 dark:text-fg-dim" tabindex="0" data-tooltip-wrap
+                                        data-tooltip="HTTPS needs the latest Sentinel on every server of the cluster and an ACME directory on this instance.">Unavailable</span>
                                 @endif
                             </div>
                             <div class="service-domain-actions flex items-center justify-end gap-1">

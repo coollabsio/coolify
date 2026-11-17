@@ -38,13 +38,67 @@
 <x-application.settings-section id="node-sentinel-connection-section" title="Sentinel"
     helper="Sentinel runs on the server as a systemd service and keeps a secure control connection to Coolify.">
     <x-slot:actions>
-        @can('manageSentinel', $node)
-            <x-forms.button wire:click="testFluxConnection">Test connection</x-forms.button>
-        @endcan
-        <x-forms.button type="button" wire:click="refreshFluxConnection" title="Read the connection state again">
-            <x-reicon name="refresh" class="size-3.5" />
-            Refresh status
-        </x-forms.button>
+        <x-table.dropdown panel-class="w-64!" role="menu">
+            <x-slot:trigger>
+                <button type="button" id="node-sentinel-actions" class="button gap-1.5" aria-haspopup="menu"
+                    :aria-expanded="open">
+                    <x-loading-on-button wire:loading
+                        wire:target="refreshFluxConnection,testFluxConnection,upgradeSentinel,restartSentinel,installSentinel" />
+                    Actions
+                    @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
+                        <span class="size-1.5 rounded-full bg-warning" title="Upgrade available"></span>
+                    @endif
+                    <x-reicon name="chevron-down" class="size-3 transition-transform" ::class="open && 'rotate-180'" />
+                </button>
+            </x-slot:trigger>
+            <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                wire:click="refreshFluxConnection" x-on:click="close()">
+                <x-reicon name="refresh" class="size-3.5 shrink-0 opacity-70" />
+                Refresh status
+            </button>
+            @can('manageSentinel', $node)
+                <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                    wire:click="testFluxConnection" x-on:click="close()">
+                    <x-reicon name="link" class="size-3.5 shrink-0 opacity-70" />
+                    Test connection
+                </button>
+                <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]" role="separator"></div>
+                @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
+                    <x-modal-confirmation title="Upgrade Sentinel?" submitAction="upgradeSentinel" buttonFullWidth :actions="[
+                        'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
+                        'The control connection drops briefly while Sentinel restarts.',
+                        'If Sentinel does not reconnect within ' . $sentinelReconnectTimeout . ', the previous version is restored over SSH.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel">
+                        <x-slot:content>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                x-on:click="close()">
+                                <x-reicon name="server-update" class="size-3.5 shrink-0 opacity-70" />
+                                Upgrade to {{ $latestSentinelVersion }}
+                            </button>
+                        </x-slot:content>
+                    </x-modal-confirmation>
+                @endif
+                <x-modal-confirmation title="Restart Sentinel?" submitAction="restartSentinel" buttonFullWidth
+                    :actions="['Sentinel restarts on this server.']" :confirmWithText="false"
+                    :confirmWithPassword="false" warningMessage="The control connection drops briefly."
+                    step2ButtonText="Restart Sentinel">
+                    <x-slot:content>
+                        <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                            x-on:click="close()">
+                            <x-reicon name="restart" class="size-3.5 shrink-0 opacity-70" />
+                            Restart Sentinel
+                        </button>
+                    </x-slot:content>
+                </x-modal-confirmation>
+                @if (! $isConnected || $sentinelVersion === null)
+                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                        wire:click="installSentinel" x-on:click="close()" title="Install Sentinel again over SSH to repair it">
+                        <x-reicon name="bandage" class="size-3.5 shrink-0 opacity-70" />
+                        Reinstall
+                    </button>
+                @endif
+            @endcan
+        </x-table.dropdown>
     </x-slot:actions>
 
     <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @elseif ($fluxConnectionPolls > 0) wire:poll.3s="pollFluxConnection" @endif class="flex flex-col gap-5">
@@ -81,26 +135,6 @@
         </dl>
 
         @can('manageSentinel', $node)
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
-                <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                    Upgrades and updates install Sentinel over SSH and restart the service. If Sentinel does not reconnect within {{ $sentinelReconnectTimeout }} after an upgrade, the previous version is restored over SSH.
-                </p>
-                <div class="flex flex-wrap items-center gap-2">
-                    @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
-                        <x-modal-confirmation title="Upgrade Sentinel?" buttonTitle="Upgrade Sentinel"
-                            submitAction="upgradeSentinel" :actions="[
-                                'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
-                                'The control connection drops briefly while Sentinel restarts.',
-                                'If Sentinel does not reconnect within ' . $sentinelReconnectTimeout . ', the previous version is restored over SSH.',
-                            ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
-                    @endif
-                    <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>
-                    <x-modal-confirmation title="Restart Sentinel?" buttonTitle="Restart" submitAction="restartSentinel"
-                        :actions="['Sentinel restarts on this server.']" :confirmWithText="false"
-                        :confirmWithPassword="false" warningMessage="The control connection drops briefly."
-                        step2ButtonText="Restart Sentinel" />
-                </div>
-            </div>
             @if ($sentinelUpgrade !== null)
                 <div class="flex flex-wrap items-center gap-2 text-[12px] text-neutral-600 dark:text-fg-dim">
                     <span>Last upgrade to {{ data_get($sentinelUpgrade, 'version') ?? 'unknown' }}</span>
@@ -119,15 +153,6 @@
         helper="Use these actions when the server is not ready or Sentinel cannot connect.">
         <div class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">
             <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
-                <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-black dark:text-fg">Validate server</p>
-                    <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                        Check Podman and the host requirements, then update the server status.
-                    </p>
-                </div>
-                <x-forms.button wire:click="validateNode">Validate server</x-forms.button>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div class="min-w-0">
                     <p class="text-[13px] font-medium text-black dark:text-fg">Repair trust</p>
                     <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
@@ -159,11 +184,33 @@
                         <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
                             Instance admins only. Renews the instance-wide Flux TLS certificate used by every cluster server and restarts Flux.
                         </p>
+                        @php $fluxCertificateValidUntil = $this->fluxCertificateValidUntil; @endphp
+                        <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                            @if ($fluxCertificateValidUntil !== null)
+                                Expires <span class="font-medium text-neutral-700 dark:text-fg" title="{{ $fluxCertificateValidUntil->toIso8601String() }}">{{ $fluxCertificateValidUntil->toFormattedDateString() }}</span>
+                                ({{ $fluxCertificateValidUntil->diffForHumans() }}).
+                            @else
+                                No active certificate.
+                            @endif
+                            Coolify renews it automatically {{ config('constants.flux.renew_before_days') }} days before it expires.
+                        </p>
                     </div>
-                    <x-forms.button wire:click="renewFluxCertificate">Renew certificate</x-forms.button>
+                    <x-modal-confirmation title="Renew Flux certificate?" buttonTitle="Renew certificate"
+                        submitAction="renewFluxCertificate" :actions="[
+                            'Coolify issues a new Flux TLS certificate from the current certificate authority.',
+                            'Flux restarts, and every cluster server of this instance reconnects.',
+                            'If Flux does not serve the new certificate, the previous certificate is restored.',
+                        ]" :confirmWithText="false" :confirmWithPassword="false"
+                        warningMessage="Cluster servers of all teams lose the control connection briefly."
+                        step2ButtonText="Renew certificate" />
                 </div>
             @endif
-            <dl class="grid gap-3 pt-4 text-[12px] sm:grid-cols-2">
+            <details class="group pt-4">
+                <summary class="flex cursor-pointer list-none items-center gap-1.5 text-[12px] font-medium text-neutral-600 dark:text-fg-dim [&::-webkit-details-marker]:hidden">
+                    <x-reicon name="chevron-down" class="size-3 -rotate-90 transition-transform group-open:rotate-0" />
+                    Connection details
+                </summary>
+            <dl class="mt-3 grid gap-3 text-[12px] sm:grid-cols-2">
                 <div class="min-w-0">
                     <dt class="text-neutral-500 dark:text-fg-faint">Coolify endpoint</dt>
                     <dd class="mt-0.5 break-all font-mono text-[11px] text-neutral-700 dark:text-fg-dim">
@@ -180,7 +227,7 @@
                     <dt class="text-neutral-500 dark:text-fg-faint">Trust bundle</dt>
                     <dd class="mt-0.5 break-all font-mono text-[11px] text-neutral-700 dark:text-fg-dim">
                         {{ $node->flux_trust_bundle_version ?? 'Unknown' }}
-                        @if (isInstanceAdmin())
+                        @if (auth()->user()?->can('update', instanceSettings()))
                             <a href="{{ route('settings.node-trust') }}" {{ wireNavigate() }}
                                 class="ml-1 font-sans underline">CA rotation</a>
                         @endif
@@ -190,6 +237,7 @@
                     @endif
                 </div>
             </dl>
+            </details>
         </div>
     </x-application.settings-section>
 @endcan

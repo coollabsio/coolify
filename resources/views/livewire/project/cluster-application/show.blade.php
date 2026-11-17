@@ -22,9 +22,15 @@
         ];
         // The status can carry the health, like "Running (healthy)".
         $isRunning = str_starts_with($status, 'Running');
+        // The ingress gets certificates in the background after a deploy: poll until each HTTPS domain has one.
+        $certificatePending = $section === 'domains' && ($ingressTls ?? false)
+            && collect($workload->domain_routes ?? [])->contains(fn (array $route): bool => ($route['scheme'] ?? 'https') === 'https'
+                && ! in_array(data_get($domainCertificates ?? [], $route['host'].'.status'), ['failed', 'dns_mismatch'], true)
+                && ! \App\Models\NodeWorkload::servesHttps(($domainCertificates ?? [])[$route['host']] ?? null));
         $pollInterval = match (true) {
             in_array($section, ['deployment', 'build'], true) && $selectedDeployment['isActive'] => '2000ms',
             in_array($section, ['general', 'deployments', 'deployment', 'build'], true) => '10000ms',
+            $certificatePending => '10000ms',
             default => null,
         };
     @endphp
@@ -115,6 +121,13 @@
                                         <p>They all stop for the final copy of the volumes and start on the target server in their depends_on order.</p>
                                     </div>
                                 @endif
+                                @if ($moveImage)
+                                    @if ($moveImage['error'])
+                                        <x-callout type="warning" title="The image cannot move">{{ $moveImage['error'] }}</x-callout>
+                                    @else
+                                        <p class="text-[12px] text-neutral-500 dark:text-fg-dim">The target server copies the image from the source server. Only the missing layers move.</p>
+                                    @endif
+                                @endif
                                 @if ($moveRecovery)
                                     <div class="flex flex-col gap-2 text-[12px] text-neutral-500 dark:text-fg-dim">
                                         <p class="font-medium text-error">Server {{ $moveRecovery['source'] }} is offline.</p>
@@ -142,7 +155,7 @@
                                     </p>
                                 @endif
                                 <div class="flex justify-end">
-                                    <x-forms.button type="submit" isHighlighted wire:target="moveWorkload" :disabled="(bool) ($moveRecovery['error'] ?? false)">
+                                    <x-forms.button type="submit" isHighlighted wire:target="moveWorkload" :disabled="(bool) ($moveRecovery['error'] ?? false) || filled($moveImage['error'] ?? null)">
                                         {{ $moveRecovery ? 'Recover on target server' : 'Move application' }}
                                     </x-forms.button>
                                 </div>

@@ -102,6 +102,16 @@
                         </span>
                     </div>
                     <div class="logs-viewer-end">
+                        {{-- Like the v4 deployment log: the cancel action sits in the toolbar while the build runs. --}}
+                        @if (($selectedDeployment['build']['isActive'] ?? false) && auth()->user()->can('deploy', $workload))
+                            <div class="logs-viewer-deployment-actions">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <x-forms.button isError class="logs-viewer-deployment-btn logs-viewer-cancel-btn"
+                                        wire:click.prevent="cancelBuild({{ \Illuminate\Support\Js::from($selectedDeployment['build']['uuid']) }})"
+                                        wire:confirm="Cancel this build?">Cancel build</x-forms.button>
+                                </div>
+                            </div>
+                        @endif
                         <div class="logs-viewer-search relative">
                             <x-reicon name="search"
                                 class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
@@ -171,7 +181,7 @@
                         No matches found.
                     </div>
                     @if ($build = $selectedDeployment['build'])
-                        <div wire:key="deployment-build-{{ $selectedDeployment['uuid'] }}" x-data="{ open: @js($build['open']) }" class="mb-2 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+                        <div wire:key="deployment-build-{{ $selectedDeployment['uuid'] }}-{{ $build['open'] ? 'open' : 'closed' }}" x-data="{ open: @js($build['open']) }" class="mb-2 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
                             <button type="button" x-on:click="open = !open" :aria-expanded="open"
                                 class="flex w-full items-center gap-2 py-1 text-left font-sans text-xs text-neutral-600 hover:text-black dark:text-fg-dim dark:hover:text-white">
                                 <span class="flex shrink-0 transition-transform" :class="open ? '' : '-rotate-90'"><x-reicon name="chevron-down" class="size-3.5" /></span>
@@ -188,12 +198,6 @@
                                     <span class="ml-auto tabular-nums text-neutral-500 dark:text-fg-faint">{{ $build['duration'] }}</span>
                                 @endif
                             </button>
-                            @if ($build['isActive'])
-                                @can('deploy', $workload)
-                                    <button type="button" wire:click="cancelBuild" wire:confirm="Cancel this build?"
-                                        class="mb-1 font-sans text-xs font-medium text-red-500 underline underline-offset-2 hover:text-red-400">Cancel build</button>
-                                @endcan
-                            @endif
                             <div x-show="open" class="flex min-w-0 flex-col">
                                 @forelse ($build['lines'] as $line)
                                     <div wire:key="deployment-build-log-{{ $loop->index }}"
@@ -208,12 +212,14 @@
                             </div>
                         </div>
                     @endif
-                    <div wire:key="deployment-deploy-{{ $selectedDeployment['uuid'] }}" x-data="{ open: true }">
+                    {{-- The key changes with the current step, so the step that becomes active opens and the finished one closes. --}}
+                    <div wire:key="deployment-deploy-{{ $selectedDeployment['uuid'] }}-{{ $selectedDeployment['deployOpen'] ? 'open' : 'closed' }}" x-data="{ open: @js($selectedDeployment['deployOpen']) }">
                     @if ($selectedDeployment['build'])
                         <button type="button" x-on:click="open = !open" :aria-expanded="open"
                             class="flex w-full items-center gap-2 py-1 text-left font-sans text-xs text-neutral-600 hover:text-black dark:text-fg-dim dark:hover:text-white">
                             <span class="flex shrink-0 transition-transform" :class="open ? '' : '-rotate-90'"><x-reicon name="chevron-down" class="size-3.5" /></span>
                             <span class="font-medium text-neutral-950 dark:text-fg">Deploy</span>
+                            @if ($selectedDeployment['deployStarted'] ?? true)
                             <span @class([
                                 'size-2 shrink-0 rounded-full',
                                 'bg-emerald-500' => $selectedDeployment['statusType'] === 'success',
@@ -222,6 +228,7 @@
                                 'bg-neutral-400 dark:bg-neutral-500' => ! in_array($selectedDeployment['statusType'], ['success', 'warning', 'error'], true),
                             ])></span>
                             <span>{{ $selectedDeployment['status'] }}</span>
+                            @endif
                             @if ($selectedDeployment['duration'])
                                 <span class="ml-auto tabular-nums text-neutral-500 dark:text-fg-faint">{{ $selectedDeployment['duration'] }}</span>
                             @endif

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Node;
 
+use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Jobs\CleanupNodeImagesJob;
 use App\Models\Node;
@@ -11,6 +12,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\NodeWorkloadSetEntry;
 use App\Models\User;
+use App\Support\NodeImages;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -21,8 +23,8 @@ use Throwable;
 
 /**
  * Removes the images on a Node that no container uses, except the images of the last revisions of
- * its workloads and the pinned infrastructure images (decision 0027). Sentinel keeps the BuildKit and
- * zot images itself. Each run is a Node operation with the result of Sentinel. A run waits while a
+ * its workloads, the recent builds of a build Node, and the pinned infrastructure images (decision
+ * 0027). Sentinel keeps the BuildKit image itself. Each run is a Node operation with the result of Sentinel. A run waits while a
  * build or a deploy runs on the Node.
  */
 class CleanupNodeImages
@@ -115,7 +117,9 @@ class CleanupNodeImages
 
     /**
      * The images that the cleanup keeps: for each workload that has or had a placement on the Node,
-     * the revision that runs there, the 2 revisions before it, and the newest revision; then the pinned
+     * the revision that runs there, the 2 revisions before it, and the newest revision. On a build Node,
+     * the local images of the last 3 builds of each workload, also when no workload runs there: other
+     * Nodes copy them from there for a deploy, a move, or a rollback (decision 0030). Then the pinned
      * builder image and the Sentinel host image of the last install. Sentinel with
      * `workload.reconcile.v1` keeps the images of its desired set itself (decision 0026), so the
      * revision of a set entry is not in the list; its earlier revisions stay for a rollback.
@@ -155,6 +159,15 @@ class CleanupNodeImages
                     ->pluck('image'));
             }
         }
+
+        $builds = NodeBuild::query()
+            ->where('node_id', $node->id)
+            ->where('status', NodeBuildStatus::SUCCEEDED)
+            ->where('image', 'like', NodeImages::LOCAL_PREFIX.'%')
+            ->latest('id')
+            ->get(['id', 'node_workload_id', 'image']);
+        $keep = $keep->merge($builds->groupBy('node_workload_id')
+            ->flatMap(fn ($workloadBuilds) => $workloadBuilds->take(self::KEPT_EARLIER_REVISIONS + 1)->pluck('image')));
 
         $keep->push(config('constants.node.builder_image'));
         $keep->push(self::sentinelHostImage($node));

@@ -22,10 +22,11 @@
             List view
         </a>
     @else
-        {{-- Only the view that is not current shows, as an icon: the button switches to that view.
+        {{-- Only the views that are not current show, as icons: a button switches to its view.
              The fixed-width slot keeps its width before Alpine starts, so the toolbar does not jump. --}}
         @unless ($singleList || count($views) === 0)
-            <span class="flex w-7.5 shrink-0">
+            {{-- One 1.875rem (w-7.5) button for each view that is not current. --}}
+            <span class="flex shrink-0" style="width: {{ (count($views) - 1) * 1.875 }}rem">
             @foreach ($views as $mode => [$label, $icon])
                 <button type="button" x-on:click="setViewMode(@js($mode))" x-show="viewMode !== @js($mode)" x-cloak
                     class="{{ $canvasItem }} {{ $idle }} w-7.5 justify-center px-0!"

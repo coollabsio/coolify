@@ -5,14 +5,14 @@ namespace App\Models;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeImageStorage;
+use App\Enums\NodeWorkloadSourceType;
+use App\Support\NodeImages;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
@@ -62,15 +62,6 @@ class NodeCluster extends BaseModel
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
-    /** The image registry of this cluster (decision 0006). */
-    public function registry(): HasOne
-    {
-        return $this->hasOne(NodeRegistry::class);
-    }
-
-    /** How long the registry Node may be unreachable before the registry moves automatically. */
-    public const REGISTRY_MOVE_AFTER_MINUTES = 10;
-
     /** The login for the external image storage. */
     public function imageRegistryCredential(): BelongsTo
     {
@@ -78,25 +69,54 @@ class NodeCluster extends BaseModel
     }
 
     /**
-     * Where the builds of this cluster go. The choice of the user, but a cluster with one Node
-     * keeps them in the Podman store of that Node unless the user chose an external registry:
-     * no other Node can need them. Null when a cluster with more Nodes has no choice yet, or
-     * when the only Node runs an older Sentinel that cannot keep a build local.
+     * Where the builds of this cluster go. The choice of the user when it is the external registry.
+     * Otherwise the Podman store of the build Node (decision 0030), when every Node can load a build
+     * and, with more Nodes, serve and copy local images between them. Null when a Node runs an
+     * older Sentinel: then a build fails with imageStorageError().
      */
     public function imageStorage(): ?NodeImageStorage
     {
         if ($this->image_storage === NodeImageStorage::EXTERNAL) {
             return NodeImageStorage::EXTERNAL;
         }
-        $nodes = $this->nodes()->limit(2)->get();
-        if ($nodes->count() === 1 && $nodes->first()->supportsCapability(NodeRegistry::LOAD_CAPABILITY) === true) {
-            return NodeImageStorage::LOCAL;
-        }
 
-        return $this->image_storage;
+        return $this->localImageStorageError() === null ? NodeImageStorage::LOCAL : null;
     }
 
-    /** Whether the user must choose the image storage before the next build. */
+    /** Why the builds of the cluster cannot stay on its servers, or null when they can. */
+    public function localImageStorageError(): ?string
+    {
+        $nodes = $this->nodes()->orderBy('name')->get();
+        $required = $nodes->count() > 1
+            ? [NodeImages::LOAD_CAPABILITY, NodeImages::SERVE_CAPABILITY, NodeImages::FETCH_CAPABILITY]
+            : [NodeImages::LOAD_CAPABILITY];
+        $old = $nodes->filter(fn (Node $node): bool => collect($required)->contains(fn (string $capability): bool => $node->supportsCapability($capability) !== true));
+        if ($old->isEmpty()) {
+            return null;
+        }
+
+        return 'Sentinel on '.$old->pluck('name')->implode(', ').' cannot keep builds on the servers of the cluster. Upgrade Sentinel there, or select an external registry in the Advanced settings of the cluster (Image storage).';
+    }
+
+    /**
+     * Whether the cluster builds images (decision 0006): a workload on its Nodes builds from source,
+     * or a build ran on one of them. Then its builder Nodes run BuildKit.
+     */
+    public function runsBuilds(): bool
+    {
+        $nodeIds = $this->nodes()->pluck('id');
+        if ($nodeIds->isEmpty()) {
+            return false;
+        }
+        $buildTypes = collect(NodeWorkloadSourceType::cases())->filter(fn (NodeWorkloadSourceType $type): bool => $type->builds())->map(fn (NodeWorkloadSourceType $type): string => $type->value)->values()->all();
+
+        return NodeBuild::query()->whereIn('node_id', $nodeIds)->exists()
+            || NodeWorkload::query()->withoutGlobalScopes()->whereIn('source_type', $buildTypes)
+                ->whereHas('nodes', fn ($nodes) => $nodes->whereIn('nodes.id', $nodeIds))
+                ->exists();
+    }
+
+    /** Whether the user should choose the image storage: the cluster has more servers and no choice yet. Builds do not wait for it. */
     public function needsImageStorageChoice(): bool
     {
         return $this->image_storage === null && $this->nodes()->count() > 1;
@@ -110,70 +130,13 @@ class NodeCluster extends BaseModel
      */
     public function imageStorageLogin(string $image): ?array
     {
-        if ($this->image_registry_credential_id === null || NodeRegistry::isLocalImage($image) || str_starts_with($image, NodeRegistry::HOST.'/')) {
+        if ($this->image_registry_credential_id === null || NodeImages::isLocalImage($image)) {
             return null;
         }
         $credential = RegistryCredential::query()->where('team_id', $this->team_id)->find($this->image_registry_credential_id)
             ?? throw new RuntimeException("The registry credential of the image storage of the cluster {$this->name} is not available anymore. Select another one in the Advanced settings of the cluster.");
 
         return $credential->matchesImage($image) ? ['username' => $credential->username, 'password' => $credential->password] : null;
-    }
-
-    /**
-     * The Node that should run the registry. A selected Node is kept, also while it is offline.
-     * Otherwise the registry stays on its current Node; it moves to the first available Node by
-     * ID only after the current Node was unreachable for REGISTRY_MOVE_AFTER_MINUTES, because a
-     * move starts an empty registry. It does not move back when the old Node returns.
-     */
-    public function desiredRegistryNode(): ?Node
-    {
-        $registry = $this->registry;
-        if ($registry === null || $this->imageStorage() !== NodeImageStorage::BUILT_IN) {
-            return null;
-        }
-        if ($registry->selected_node_id !== null) {
-            return $registry->selectedNode;
-        }
-        $available = fn (Node $node): bool => $node->canReceiveNetworkCommands()
-            && $node->supportsCapability(NodeRegistry::CAPABILITY) === true;
-        $current = $registry->node;
-        $awayKey = "node-registry:{$registry->id}:unreachable-since";
-        if ($current !== null && $current->node_cluster_id === $this->id) {
-            if ($available($current)) {
-                Cache::forget($awayKey);
-
-                return $current;
-            }
-            $since = Cache::get($awayKey);
-            if (! is_string($since)) {
-                Cache::put($awayKey, $since = now()->toIso8601String(), now()->addDay());
-            }
-            if (Carbon::parse($since)->isAfter(now()->subMinutes(self::REGISTRY_MOVE_AFTER_MINUTES))) {
-                return $current;
-            }
-        }
-        Cache::forget($awayKey);
-
-        return $this->nodes()->orderBy('id')->get()->first($available);
-    }
-
-    /**
-     * Records the desired registry Node. Returns whether it changed; the caller then applies a
-     * network revision, so the previous Node stops zot and every Node opens the new address.
-     */
-    public function syncRegistryNode(): bool
-    {
-        $registry = $this->registry;
-        if ($registry === null) {
-            return false;
-        }
-        $nodeId = $this->desiredRegistryNode()?->id;
-        if ($registry->node_id === $nodeId) {
-            return false;
-        }
-        $registry->update(['node_id' => $nodeId]);
-
-        return true;
     }
 
     public function nodes(): HasMany
@@ -214,6 +177,16 @@ class NodeCluster extends BaseModel
     public function hasNetworkStatus(): bool
     {
         return $this->relationLoaded('nodes') ? $this->nodes->isNotEmpty() : $this->nodes()->exists();
+    }
+
+    /**
+     * Whether the SSH network repair can help: the network is degraded or failed, or a server that
+     * applied the network does not reach Flux. A healthy cluster does not need it.
+     */
+    public function needsNetworkRepair(): bool
+    {
+        return in_array($this->network_status, ['degraded', 'error', 'failed'], true)
+            || $this->nodes()->whereNotNull('network_applied_revision')->where('is_reachable', false)->exists();
     }
 
     public function networkStatusLabel(): string
@@ -342,12 +315,11 @@ class NodeCluster extends BaseModel
             (int) $this->wireguard_port => 'the WireGuard network of the cluster',
             ReconcileNodeClusterNetwork::CORROSION_GOSSIP_PORT => 'Corrosion service discovery',
             ReconcileNodeClusterNetwork::CORROSION_API_PORT => 'the Corrosion API',
-            NodeRegistry::PORT => 'the cluster registry',
             8888 => 'the Sentinel API',
         ];
-        // Sentinel moves volumes with rsync on these ports of the WireGuard address.
+        // Sentinel moves volumes with rsync and copies images between Nodes on these ports of the WireGuard address.
         foreach (range(7800, 7899) as $port) {
-            $reserved[$port] = 'volume moves between servers';
+            $reserved[$port] = 'volume moves and image copies between servers';
         }
         foreach ($this->nodes()->orderBy('id')->get(['id', 'name', 'port']) as $node) {
             $reserved[(int) $node->port] ??= "SSH on server {$node->name}";

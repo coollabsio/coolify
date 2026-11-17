@@ -37,9 +37,24 @@
         'finish_cancel' => ['The cancelled rotation is closed.'],
         default => [],
     };
+    $pending = collect($nodes)->where('acknowledged', false)->count();
+    $serverWord = $blocking === 1 ? 'server has' : 'servers have';
+    // What the admin must do now, so the buttons do not need to be guessed.
+    [$guideTitle, $guideText, $guideType] = match (true) {
+        ! $inProgress => [null, null, null],
+        $nextStep === 'switch' && $blocking === 0 => ['Step 1 of 3: Ready to switch', 'Every cluster server trusts the old and the new CA. Click Switch to new CA to move Flux to the new certificate.', 'success'],
+        $nextStep === 'switch' => ['Step 1 of 3: Waiting for servers', "{$blocking} cluster {$serverWord} not acknowledged the trust bundle yet. Wait, click Retry delivery, or run Repair trust on the server. Force the switch only if you accept that the server loses its connection.", 'warning'],
+        $nextStep === 'retire' => ['Step 2 of 3: Remove the old CA from servers', 'Flux uses the new certificate now. Click Start retirement to send the cluster servers a trust bundle with the new CA only.', 'info'],
+        $nextStep === 'complete' && $blocking === 0 => ['Step 3 of 3: Ready to finish', 'Every cluster server trusts only the new CA. Click Retire old CA to erase the old CA and finish the rotation.', 'success'],
+        $nextStep === 'complete' => ['Step 3 of 3: Waiting for servers', "{$blocking} cluster {$serverWord} not acknowledged the new trust bundle yet. Wait, click Retry delivery, or run Repair trust on the server.", 'warning'],
+        $nextStep === 'finish_cancel' && $blocking === 0 => ['Ready to finish the cancel', 'Every cluster server trusts only the old CA again. Click Finish cancel to close the rotation.', 'success'],
+        $nextStep === 'finish_cancel' => ['Cancelling: waiting for servers', "{$blocking} cluster {$serverWord} not acknowledged the old trust bundle yet. Wait, click Retry delivery, or run Repair trust on the server.", 'warning'],
+        default => [null, null, null],
+    };
 @endphp
 
-<div>
+{{-- Servers acknowledge the bundle in the background, so poll while a rotation runs. --}}
+<div @if ($inProgress) wire:poll.5s="refreshStatus" @endif>
     <x-slot:title>
         Cluster Trust | Coolify
     </x-slot>
@@ -48,13 +63,6 @@
         <div class="application-settings-form flex min-w-0 flex-col gap-6">
             <x-application.settings-section title="Flux certificate authority"
                 helper="Sentinel on every cluster server verifies Flux with this instance-wide CA. Rotation first sends a bundle with the old and new CA over the secure Flux connection, then switches the Flux certificate, then removes the old CA.">
-                <x-slot:actions>
-                    <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshStatus"
-                        title="Refresh rotation state">
-                        <x-reicon name="refresh" class="size-3.5" />
-                    </x-forms.button>
-                </x-slot:actions>
-
                 <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                         <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Rotation</dt>
@@ -87,7 +95,13 @@
                     </p>
                 @endif
 
-                <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                @if ($guideTitle !== null)
+                    <x-callout :type="$guideType" :title="$guideTitle" class="mt-4">{{ $guideText }}</x-callout>
+                @endif
+
+                {{-- The confirmation modals use wire:ignore, so a new key per state makes Livewire replace the buttons. --}}
+                <div wire:key="flux-trust-actions-{{ $rotationStatus ?? 'none' }}-{{ $nextStep ?? 'none' }}-{{ $blocking > 0 ? 'blocked' : 'ready' }}-{{ $pending > 0 ? 'pending' : 'delivered' }}"
+                    class="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                     @if (! $inProgress)
                         <x-modal-confirmation title="Start Flux CA rotation?" buttonTitle="Start rotation"
                             submitAction="startRotation" :actions="[
@@ -98,7 +112,7 @@
                     @else
                         @if ($nextStepLabel !== null && ($blocking === 0 || $nextStep === 'retire'))
                             <x-modal-confirmation :title="$nextStepLabel . '?'" :buttonTitle="$nextStepLabel"
-                                submitAction="continueRotation" :actions="$nextStepActions" :confirmWithText="false"
+                                submitAction="continueRotation" isHighlightedButton :actions="$nextStepActions" :confirmWithText="false"
                                 :confirmWithPassword="false" :step2ButtonText="$nextStepLabel" />
                         @elseif ($nextStepLabel !== null)
                             <x-modal-confirmation :title="'Force: ' . $nextStepLabel . '?'"
@@ -107,7 +121,9 @@
                                 :warningMessage="$blocking . ' usable cluster server(s) have not acknowledged the trust bundle. They may lose their Flux connection and need Repair trust over SSH.'"
                                 :confirmWithText="false" :confirmWithPassword="false" :step2ButtonText="'Force: ' . $nextStepLabel" />
                         @endif
-                        <x-forms.button type="button" wire:click="retryDistribution">Retry delivery</x-forms.button>
+                        @if ($pending > 0)
+                            <x-forms.button type="button" wire:click="retryDistribution">Retry delivery</x-forms.button>
+                        @endif
                         @if ($rotationStatus === 'distributing')
                             <x-modal-confirmation title="Cancel Flux CA rotation?" buttonTitle="Cancel rotation"
                                 isErrorButton submitAction="cancelRotation" :actions="[

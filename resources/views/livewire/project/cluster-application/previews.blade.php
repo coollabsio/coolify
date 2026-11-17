@@ -99,6 +99,9 @@
     </x-application.settings-section>
 
     <form wire:submit="saveUrlTemplate" class="application-settings-form flex flex-col">
+        @if ($canUpdate)
+            <x-unsaved-bar action="saveUrlTemplate" targets="previewUrlTemplate" />
+        @endif
         <x-application.settings-section id="preview-template-section" title="Preview URL template"
             helper="Define how Coolify generates domains for pull request deployments.">
             @if ($canUpdate)
@@ -106,7 +109,6 @@
                     <x-forms.button type="button" wire:click="resetUrlTemplate">
                         Reset template
                     </x-forms.button>
-                    <x-forms.button type="submit">Save</x-forms.button>
                 </x-slot:actions>
             @endif
 

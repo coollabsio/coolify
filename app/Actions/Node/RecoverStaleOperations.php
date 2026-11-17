@@ -40,7 +40,6 @@ class RecoverStaleOperations
         'network.firewall.reconcile.v1',
         'discovery.corrosion.reconcile.v1',
         'ingress.reconcile.v1',
-        'registry.reconcile.v1',
         'builder.reconcile.v1',
     ];
 

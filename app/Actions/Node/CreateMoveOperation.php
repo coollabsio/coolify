@@ -2,9 +2,9 @@
 
 namespace App\Actions\Node;
 
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Models\Node;
 use App\Models\NodeOperation;
-use App\Models\NodeRegistry;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -59,12 +59,16 @@ class CreateMoveOperation
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
                 ->firstOrFail();
-            if (NodeRegistry::isLocalImage($revision->image)) {
-                throw new RuntimeException('The image of this application is only on '.$source->name.'. Deploy the application again, so that it is stored in the cluster registry, then move it.');
-            }
             // The services that share stack volumes with this one move with it (decision 0024).
             $group = self::group($workload, $source, $revision);
             foreach ($group as $member) {
+                // The target deployment copies a local image from the source (decision 0030). A restore
+                // on the same server keeps it.
+                $reason = FetchNodeImage::moveBlockedReason($source, $target, $member['revision']->image, $recovery);
+                if ($reason !== null) {
+                    $name = $group->count() > 1 ? "The service {$member['workload']->stack_service}" : 'This application';
+                    throw new RuntimeException("{$name} cannot move. {$reason}");
+                }
                 if ($member['revision']->mountsContainerSocket()) {
                     // The move deploys the socket on the target server.
                     NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $workload->team_id, $group->count() > 1 ? "The service {$member['workload']->stack_service}" : 'This application');
@@ -132,9 +136,6 @@ class CreateMoveOperation
             $memberRevision = $member->revisions()->latest('id')->first();
             if ($memberRevision === null) {
                 throw new RuntimeException("Deploy the service {$member->stack_service} first. It shares a volume with {$workload->stack_service}, so it moves with it.");
-            }
-            if (NodeRegistry::isLocalImage($memberRevision->image)) {
-                throw new RuntimeException("The image of the service {$member->stack_service} is only on {$source->name}. Deploy it again, then move.");
             }
 
             return ['workload' => $member, 'revision' => $memberRevision];

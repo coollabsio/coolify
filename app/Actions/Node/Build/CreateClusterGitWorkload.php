@@ -22,9 +22,8 @@ use RuntimeException;
 /**
  * Creates a cluster application that Coolify builds from a Git repository:
  * a public one, or a private one through a GitHub App or a deploy key of the
- * project team (decision 0011). It has no revision until the first build succeeds. The first
- * Git application of a cluster creates its registry; the next network
- * revision starts zot and BuildKit on the Nodes.
+ * project team (decision 0011). It has no revision until the first build succeeds. After the
+ * first Git application of a cluster, the next network revision starts BuildKit on the builder Nodes.
  */
 class CreateClusterGitWorkload
 {
@@ -58,7 +57,7 @@ class CreateClusterGitWorkload
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        $registryIsNew = ! $cluster->registry()->exists();
+        $buildsAreNew = ! $cluster->runsBuilds();
         $workload = DB::transaction(function () use ($project, $environment, $cluster, $sourceType, $repository, $branch, $targetNode, $name, $baseDirectory, $dockerfileLocation, $githubApp, $privateKey, $publishDirectory, $requestedBy): NodeWorkload {
             // A build runs on a builder of the architecture of the Node (decision 0020).
             $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures(), $requestedBy);
@@ -79,11 +78,10 @@ class CreateClusterGitWorkload
             ]);
             $workload->nodes()->attach($node);
             EnsureNodeWorkloadDnsNames::run($node);
-            EnsureNodeRegistry::run($cluster);
 
             return $workload->refresh();
         });
-        if ($registryIsNew) {
+        if ($buildsAreNew) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
 

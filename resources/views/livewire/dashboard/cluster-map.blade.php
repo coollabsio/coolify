@@ -100,7 +100,7 @@
                         {{-- Cluster frames with their server cards and application rows. --}}
                         <template x-for="cluster in data.clusters" x-bind:key="cluster.uuid">
                             <section data-map-cluster
-                                class="absolute rounded-xl border border-neutral-200 bg-white/70 dark:border-white/[0.1] dark:bg-white/[0.03]"
+                                class="absolute rounded-2xl border border-neutral-200 bg-[color-mix(in_oklab,var(--color-neutral-50),white_50%)] dark:bg-[color-mix(in_oklab,var(--color-app),var(--color-panel)_35%)] dark:border-white/[0.07]"
                                 x-bind:style="frameStyle(frame(`cluster:${cluster.uuid}`))">
                                 <div class="flex h-[52px] min-w-0 items-center justify-between gap-2 px-4">
                                     <div class="flex min-w-0 items-center gap-2.5">
@@ -122,7 +122,7 @@
                                     class="px-4 text-[12px] text-neutral-500 dark:text-fg-dim">No servers in this cluster yet.</p>
 
                                 <template x-if="layout.internet[cluster.uuid]">
-                                    <div class="absolute flex items-center justify-center gap-1.5 rounded-xl border border-neutral-300 bg-white text-[12px] font-medium text-neutral-700 shadow-sm dark:border-white/[0.14] dark:bg-neutral-900 dark:text-fg"
+                                    <div class="absolute flex items-center justify-center gap-1.5 rounded-xl border border-neutral-300 bg-white text-[12px] font-medium text-neutral-700 shadow-sm dark:border-white/[0.14] dark:bg-raised dark:text-fg"
                                         x-bind:style="relativeStyle(layout.internet[cluster.uuid], frame(`cluster:${cluster.uuid}`))">
                                         <x-reicon name="globe" class="size-3.5" />
                                         Internet
@@ -131,7 +131,7 @@
 
                                 <template x-for="server in cluster.servers" x-bind:key="server.uuid">
                                     <article data-map-server
-                                        class="absolute rounded-xl border bg-white shadow-sm transition-[border-color,box-shadow] dark:bg-neutral-900"
+                                        class="absolute rounded-xl border bg-white shadow-sm transition-[border-color,box-shadow] dark:bg-raised"
                                         x-bind:class="isServerHighlighted(cluster.uuid, server.uuid)
                                             ? 'border-coollabs ring-2 ring-coollabs/20 dark:border-warning dark:ring-warning/20'
                                             : 'border-neutral-200 dark:border-white/[0.1]'"
@@ -182,7 +182,7 @@
                         {{-- Docker servers, compact. --}}
                         <template x-if="data.dockerServers.length > 0">
                             <section data-map-docker
-                                class="absolute rounded-xl border border-dashed border-neutral-300 bg-white/50 dark:border-white/[0.12] dark:bg-white/[0.02]"
+                                class="absolute rounded-2xl border border-dashed border-neutral-300 bg-[color-mix(in_oklab,var(--color-neutral-50),white_50%)] dark:bg-[color-mix(in_oklab,var(--color-app),var(--color-panel)_35%)] dark:border-white/[0.12]"
                                 x-bind:style="frameStyle(frame('docker'))">
                                 <div class="flex h-[52px] min-w-0 items-center justify-between gap-2 px-4">
                                     <div class="flex min-w-0 items-center gap-2.5">
@@ -196,7 +196,7 @@
                                 </div>
                                 <template x-for="server in data.dockerServers" x-bind:key="server.uuid">
                                     <a x-bind:href="server.href" {{ wireNavigate() }} data-map-docker-server
-                                        class="absolute flex min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 shadow-sm transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.1] dark:bg-neutral-900 dark:hover:border-white/[0.18]"
+                                        class="absolute flex min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 shadow-sm transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.1] dark:bg-raised dark:hover:border-white/[0.18]"
                                         x-bind:style="relativeStyle(layout.dockerServers[server.uuid] ?? { x: 0, y: 0, width: 0, height: 0 }, frame('docker'))"
                                         x-bind:title="`${server.name}: ${server.status}`">
                                         <span class="size-1.5 shrink-0 rounded-full" x-bind:class="{{ $dot('server.statusType') }}"></span>

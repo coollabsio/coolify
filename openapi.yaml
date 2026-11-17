@@ -5904,7 +5904,7 @@ paths:
       tags:
         - 'Cluster Applications'
       summary: 'Roll Back'
-      description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When the cluster registry no longer has the image, Coolify builds the same commit again and deploys the result.'
+      description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.'
       operationId: rollback-cluster-application
       parameters:
         -
@@ -9463,7 +9463,7 @@ paths:
       tags:
         - Clusters
       summary: Update
-      description: 'Change the settings of a cluster, like the cluster pages: the name and the network (General), the deployment pressure policy and the image storage (Advanced), and the server of the built-in registry. Send only the fields to change. Coolify saves the groups in this order and stops at the first error: general, pressure policy, image storage, registry server. Needs a team admin. The network fields cannot change on an active cluster, and the CIDR cannot change while the cluster has servers.'
+      description: 'Change the settings of a cluster, like the cluster pages: the name and the network (General), and the deployment pressure policy and the image storage (Advanced). Send only the fields to change. Coolify saves the groups in this order and stops at the first error: general, pressure policy, image storage. Needs a team admin. The network fields cannot change on an active cluster, and the CIDR cannot change while the cluster has servers.'
       operationId: update-cluster-by-uuid
       parameters:
         -
@@ -9502,16 +9502,14 @@ paths:
                   description: '1 to 60.'
                   type: integer
                 image_storage:
+                  description: '`local`: builds stay on the servers, and each server copies an image from a server that has it. `external`: a registry of the team.'
                   type: string
-                  enum: [external, built_in]
+                  enum: [local, external]
                 image_repository:
                   description: 'For `external`: a repository without a tag, for example ghcr.io/acme/coolify-builds.'
                   type: [string, 'null']
                 image_registry_credential_uuid:
                   description: 'For `external`: a registry credential of the team for the registry of the repository.'
-                  type: [string, 'null']
-                registry_server_uuid:
-                  description: 'The server of the cluster that runs the built-in registry. Null selects the first available server.'
                   type: [string, 'null']
               type: object
       responses:
@@ -24092,11 +24090,6 @@ components:
             - string
             - 'null'
         image_registry_credential_uuid:
-          type:
-            - string
-            - 'null'
-        registry_server_uuid:
-          description: 'The server that the user selected for the built-in registry. Null is the first available server.'
           type:
             - string
             - 'null'

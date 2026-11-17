@@ -7,9 +7,9 @@ use App\Actions\Node\NotifyNodeDeployment;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\NodeBuild;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
+use App\Support\NodeImages;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -30,7 +30,7 @@ class PublishBuiltRevision
             // A local build has no registry digest; its tag is unique to the build. A pushed build
             // is pulled by digest from its repository.
             $workload->createRevision(
-                NodeRegistry::isLocalImage($build->image) ? $build->image : preg_replace('/:[^:\/]+$/', '', $build->image).'@'.$digest,
+                NodeImages::isLocalImage($build->image) ? $build->image : preg_replace('/:[^:\/]+$/', '', $build->image).'@'.$digest,
                 // A preview follows the configuration of its parent at each build (decision 0025).
                 $workload->isPreview() ? $workload->firstRevisionConfiguration() : ($current?->configuration ?? $workload->firstRevisionConfiguration()),
                 $current?->environment ?? [],

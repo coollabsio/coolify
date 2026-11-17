@@ -7,7 +7,6 @@ use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\RegistryCredential;
 use App\Models\User;
@@ -22,12 +21,11 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
-use RuntimeException;
 
 /**
  * The settings of a cluster, for the cluster pages and the API (decision 0029): the name and the
- * network, the deployment pressure policy, the image storage, the registry server, and the
- * firewall rules. Only a team admin may change them (`update` on the cluster). The errors use the
+ * network, the deployment pressure policy, the image storage, and the firewall rules. Only a
+ * team admin may change them (`update` on the cluster). The errors use the
  * snake_case field names.
  */
 class ManageNodeClusterSettings
@@ -86,9 +84,9 @@ class ManageNodeClusterSettings
     }
 
     /**
-     * Saves where the builds of the cluster are stored. A change turns the built-in registry on or
-     * off; images in the previous storage are not copied. The registry credential must be of the
-     * team of the cluster and of the registry of the repository.
+     * Saves where the builds of the cluster are stored: on its servers (decision 0030) or in an
+     * external registry. Images in the previous storage are not copied. The registry credential
+     * must be of the team of the cluster and of the registry of the repository.
      *
      * @return bool True when the storage changed from an earlier choice.
      *
@@ -103,9 +101,9 @@ class ManageNodeClusterSettings
             'image_repository' => $repository,
             'image_registry_credential_uuid' => $credentialUuid,
         ], [
-            'image_storage' => ['required', Rule::in([NodeImageStorage::EXTERNAL->value, NodeImageStorage::BUILT_IN->value])],
+            'image_storage' => ['required', Rule::in([NodeImageStorage::EXTERNAL->value, NodeImageStorage::LOCAL->value])],
             'image_repository' => $external
-                ? [...ValidationPatterns::dockerImageNameRules(required: true), 'not_regex:/@/', 'not_regex:/:[^\/]*$/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//']
+                ? [...ValidationPatterns::dockerImageNameRules(required: true), 'not_regex:/@/', 'not_regex:/:[^\/]*$/', 'not_regex:/^localhost\//']
                 : ['nullable'],
             'image_registry_credential_uuid' => ['nullable', 'string'],
         ], [
@@ -132,32 +130,8 @@ class ManageNodeClusterSettings
             'image_repository' => $repository,
             'image_registry_credential_id' => $credential?->id,
         ]);
-        if ($cluster->refresh()->syncRegistryNode()) {
-            QueueNodeClusterNetworkRevision::run($cluster, $user);
-        }
 
         return $previous !== null && $previous !== $cluster->image_storage;
-    }
-
-    /**
-     * Selects the server that runs the image registry, or null for the first available server.
-     *
-     * @throws RuntimeException When the cluster has no registry yet.
-     */
-    public function setRegistryNode(NodeCluster $cluster, ?Node $node, User $user): void
-    {
-        Gate::forUser($user)->authorize('update', $cluster);
-        $registry = $cluster->registry;
-        if ($registry === null) {
-            throw new RuntimeException('The cluster has no image registry yet. It is created with the first Git application.');
-        }
-        if ($node !== null && ($node->team_id !== $cluster->team_id || $node->node_cluster_id !== $cluster->id)) {
-            throw ValidationException::withMessages(['server' => 'Select a server of this cluster.']);
-        }
-        $registry->update(['selected_node_id' => $node?->id]);
-        if ($cluster->refresh()->syncRegistryNode()) {
-            QueueNodeClusterNetworkRevision::run($cluster, $user);
-        }
     }
 
     /**

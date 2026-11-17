@@ -30,5 +30,5 @@
     };
 @endphp
 
-<span title="{{ $title }}"
+<span role="img" aria-label="{{ $label }}" data-tooltip="{{ trim($title) }}" data-tooltip-wrap tabindex="0"
     {{ $attributes->class(['shrink-0 cursor-help rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1', $classes]) }}>{{ $label }}</span>

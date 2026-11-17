@@ -7,9 +7,9 @@
 ## Context
 
 v4 passes build-time variables as Docker build args. A build arg can stay in
-the image history and metadata. Cluster applications push their images to the
-cluster registry (decision 0006) and, later, to external registries, so a leaked
-value persists there. Decisions 0006 and 0008 leave build-time secrets open.
+the image history and metadata. Cluster applications keep their images in the
+Podman store of their Nodes or push them to an external registry (decisions
+0006 and 0030), so a leaked value persists there. Decisions 0006 and 0008 leave build-time secrets open.
 
 ## Decision
 

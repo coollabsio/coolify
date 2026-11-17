@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\ReadGitComposeFile;
 use App\Actions\Node\Build\StartNodeBuild;
@@ -69,7 +70,8 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         }
         $sourceTypes = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stackId)->pluck('source_type');
         $builds = $sourceTypes->filter(fn (NodeWorkloadSourceType $type): bool => $type->builds())->count();
-        $buildSeconds = $builds * (int) config('constants.node.build_timeout_minutes') * 60;
+        // A built service can deploy on another server than its build: the copy of its image comes first.
+        $buildSeconds = $builds * ((int) config('constants.node.build_timeout_minutes') * 60 + FetchNodeImage::MAX_SECONDS);
         $this->timeout = min(max($this->timeout, $sourceTypes->count() * self::SERVICE_WAIT_SECONDS + $buildSeconds + 120), self::MAX_TIMEOUT);
     }
 

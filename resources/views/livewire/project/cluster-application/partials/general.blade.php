@@ -127,7 +127,7 @@
         @endif
         @if ($workload->buildsFromSource())
             <x-application.settings-subsection title="Image registry"
-                helper="Each build is stored in the cluster registry. Set an image to also push each build there.">
+                helper="Each build is stored in the image storage of the cluster. Set an image to also push each build there.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input id="dockerRegistryImageName" label="Image" placeholder="ghcr.io/your-org/your-app"
                         canGate="update" :canResource="$workload"

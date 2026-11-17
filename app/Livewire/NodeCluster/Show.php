@@ -3,7 +3,6 @@
 namespace App\Livewire\NodeCluster;
 
 use App\Actions\Node\AssignNodeToCluster;
-use App\Actions\Node\Build\InspectNodeRegistry;
 use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchLatestSentinelRelease;
@@ -13,6 +12,7 @@ use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\SetNodeBuilder;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpgradeSentinel;
+use App\Enums\NodeImageStorage;
 use App\Enums\NodeWorkloadState;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -49,9 +49,6 @@ class Show extends Component
 
     public NodeCluster $cluster;
 
-    /** @var array<string, mixed>|null The image registry report; loaded after the page renders. */
-    public ?array $registryReport = null;
-
     #[Locked]
     public string $section = 'general';
 
@@ -76,7 +73,7 @@ class Show extends Component
 
     public int $resourceStaleAfterMinutes = 5;
 
-    /** `external`, `built_in`, or empty while the user has not chosen. */
+    /** `local` or `external`. */
     public string $imageStorage = '';
 
     public string $imageRepository = '';
@@ -211,41 +208,7 @@ class Show extends Component
         $this->dispatch('success', $enabled ? "Builds turned on for {$node->name}." : "Builds turned off for {$node->name}.");
     }
 
-    /** Loads the image registry report from the Nodes. The Image registry section calls it on load. */
-    public function loadRegistryReport(): void
-    {
-        $this->authorize('view', $this->cluster);
-        if ($this->cluster->registry === null) {
-            return;
-        }
-        $this->registryReport = InspectNodeRegistry::run($this->cluster);
-    }
-
-    /** Selects the Node that runs the image registry, or clears the selection for automatic. */
-    public function setRegistryNode(string $nodeUuid = ''): void
-    {
-        $this->authorize('update', $this->cluster);
-        $node = $nodeUuid === '' ? null : Node::query()
-            ->where('team_id', $this->cluster->team_id)
-            ->where('node_cluster_id', $this->cluster->id)
-            ->where('uuid', $nodeUuid)
-            ->firstOrFail();
-        try {
-            ManageNodeClusterSettings::make()->setRegistryNode($this->cluster, $node, auth()->user());
-        } catch (RuntimeException $exception) {
-            $this->dispatch('error', $exception->getMessage());
-
-            return;
-        }
-        $this->dispatch('success', $node === null
-            ? 'The registry runs on the first available server.'
-            : 'The registry moves to the selected server. Images stored on the previous server are rebuilt on the next deploy.');
-    }
-
-    /**
-     * Saves where the builds of this cluster are stored. A change turns the built-in registry on
-     * or off; images in the previous storage are not copied.
-     */
+    /** Saves where the builds of this cluster are stored. Images in the previous storage are not copied. */
     public function saveImageStorage(): void
     {
         $this->authorize('update', $this->cluster);
@@ -412,7 +375,6 @@ class Show extends Component
     {
         return view('livewire.node-cluster.show', [
             'nodesNeedAttention' => $this->cluster->hasNodesNeedingAttention(),
-            'needsImageStorageChoice' => $this->cluster->needsImageStorageChoice(),
             ...match ($this->section) {
                 'general' => $this->generalData(),
                 'resources' => $this->resourcesData(),
@@ -579,6 +541,7 @@ class Show extends Component
                 ->prepend(['value' => '', 'label' => 'None', 'description' => 'A registry without a login'])
                 ->values()
                 ->all(),
+            'networkNeedsRepair' => $this->cluster->needsNetworkRepair(),
             'operations' => NodeOperation::query()
                 ->with('node')
                 ->whereHas('node', fn ($query) => $query->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id))
@@ -622,7 +585,8 @@ class Show extends Component
         $this->memoryPressureThreshold = $this->cluster->memory_pressure_threshold;
         $this->diskPressureThreshold = $this->cluster->disk_pressure_threshold;
         $this->resourceStaleAfterMinutes = $this->cluster->resource_stale_after_minutes;
-        $this->imageStorage = (string) $this->cluster->image_storage?->value;
+        // Builds stay on the servers until the user selects an external registry (decision 0030).
+        $this->imageStorage = $this->cluster->image_storage?->value ?? NodeImageStorage::LOCAL->value;
         $this->imageRepository = (string) $this->cluster->image_repository;
         $this->imageRegistryCredentialUuid = (string) $this->cluster->imageRegistryCredential?->uuid;
     }

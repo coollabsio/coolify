@@ -3,7 +3,6 @@
 namespace App\Actions\Node;
 
 use App\Actions\Node\Build\CreateClusterGitWorkload;
-use App\Actions\Node\Build\EnsureNodeRegistry;
 use App\Enums\AccessLevel;
 use App\Enums\NodeRole;
 use App\Enums\NodeWorkloadDesiredState;
@@ -36,7 +35,7 @@ use RuntimeException;
  *
  * A Compose file from Git (step 2) keeps its source on the stack. A service with `build:` is a
  * Dockerfile application of the same repository: it has no revision until its first build, and
- * the first one of a cluster creates the registry, as for a Git application.
+ * the first one of a cluster starts BuildKit, as for a Git application.
  *
  * With `$spread`, the services spread across the servers of the cluster: each placement unit (the
  * services that share a volume, decision 0024, or one service) goes to the least loaded server
@@ -84,7 +83,7 @@ class CreateClusterStack
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }
         $name = filled($name) ? trim($name) : ($template ?? ($git !== null ? CreateClusterGitWorkload::defaultName($git->repository) : 'stack'));
-        $registryIsNew = ! $cluster->registry()->exists();
+        $buildsAreNew = ! $cluster->runsBuilds();
         $architectures = $spread ? null : self::architectures($cluster, $yaml);
 
         $stack = DB::transaction(function () use ($project, $environment, $cluster, $compose, $yaml, $requestedBy, $targetNode, $name, $template, $git, $composeDirectory, $architectures, $spread): NodeStack {
@@ -131,14 +130,11 @@ class CreateClusterStack
             foreach (collect($placements)->unique('id') as $placed) {
                 EnsureNodeWorkloadDnsNames::run($placed);
             }
-            if (in_array(true, array_map(fn (array $service): bool => $service['build'] !== null, $services), true)) {
-                EnsureNodeRegistry::run($cluster);
-            }
 
             return $stack->refresh();
         });
-        // The next network revision starts zot and BuildKit on the Nodes.
-        if ($registryIsNew && $cluster->registry()->exists()) {
+        // The next network revision starts BuildKit on the builder Nodes.
+        if ($buildsAreNew && $cluster->runsBuilds()) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
 

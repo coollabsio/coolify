@@ -292,7 +292,7 @@ class ClustersController extends Controller
 
     #[OA\Patch(
         summary: 'Update',
-        description: 'Change the settings of a cluster, like the cluster pages: the name and the network (General), the deployment pressure policy and the image storage (Advanced), and the server of the built-in registry. Send only the fields to change. Coolify saves the groups in this order and stops at the first error: general, pressure policy, image storage, registry server. Needs a team admin. The network fields cannot change on an active cluster, and the CIDR cannot change while the cluster has servers.',
+        description: 'Change the settings of a cluster, like the cluster pages: the name and the network (General), and the deployment pressure policy and the image storage (Advanced). Send only the fields to change. Coolify saves the groups in this order and stops at the first error: general, pressure policy, image storage. Needs a team admin. The network fields cannot change on an active cluster, and the CIDR cannot change while the cluster has servers.',
         path: '/clusters/{uuid}',
         operationId: 'update-cluster-by-uuid',
         security: [['bearerAuth' => []]],
@@ -308,10 +308,9 @@ class ClustersController extends Controller
             new OA\Property(property: 'memory_pressure_threshold', type: 'integer', description: 'Percent, 1 to 100.'),
             new OA\Property(property: 'disk_pressure_threshold', type: 'integer', description: 'Percent, 1 to 100.'),
             new OA\Property(property: 'resource_stale_after_minutes', type: 'integer', description: '1 to 60.'),
-            new OA\Property(property: 'image_storage', type: 'string', enum: ['external', 'built_in']),
+            new OA\Property(property: 'image_storage', type: 'string', enum: ['local', 'external'], description: '`local`: builds stay on the servers, and each server copies an image from a server that has it. `external`: a registry of the team.'),
             new OA\Property(property: 'image_repository', type: 'string', nullable: true, description: 'For `external`: a repository without a tag, for example ghcr.io/acme/coolify-builds.'),
             new OA\Property(property: 'image_registry_credential_uuid', type: 'string', nullable: true, description: 'For `external`: a registry credential of the team for the registry of the repository.'),
-            new OA\Property(property: 'registry_server_uuid', type: 'string', nullable: true, description: 'The server of the cluster that runs the built-in registry. Null selects the first available server.'),
         ])),
         responses: [
             new OA\Response(response: 200, description: 'The cluster.', content: new OA\JsonContent(ref: '#/components/schemas/Cluster')),
@@ -342,7 +341,6 @@ class ClustersController extends Controller
             'image_storage' => 'sometimes|string',
             'image_repository' => 'sometimes|nullable|string',
             'image_registry_credential_uuid' => 'sometimes|nullable|string',
-            'registry_server_uuid' => 'sometimes|nullable|string',
         ]);
         if ($invalid !== null) {
             return $invalid;
@@ -379,14 +377,6 @@ class ClustersController extends Controller
                     $request->has('image_registry_credential_uuid') ? $request->input('image_registry_credential_uuid') : $cluster->imageRegistryCredential?->uuid,
                     $user,
                 );
-            }
-            if ($request->has('registry_server_uuid')) {
-                $node = null;
-                if (filled($request->input('registry_server_uuid'))) {
-                    $node = $cluster->nodes()->where('team_id', $cluster->team_id)->where('uuid', (string) $request->input('registry_server_uuid'))->first()
-                        ?? throw ValidationException::withMessages(['registry_server_uuid' => 'Select a server of this cluster.']);
-                }
-                $settings->setRegistryNode($cluster, $node, $user);
             }
             auditLog('api.cluster.updated', ['team_id' => $cluster->team_id, 'cluster_uuid' => $cluster->uuid, 'fields' => array_keys($request->all())]);
 
@@ -826,7 +816,6 @@ class ClustersController extends Controller
             'image_storage' => $cluster->image_storage,
             'image_repository' => $cluster->image_repository,
             'image_registry_credential_uuid' => $cluster->imageRegistryCredential?->uuid,
-            'registry_server_uuid' => $cluster->registry?->selectedNode?->uuid,
             'generated_domain_base' => $cluster->generatedDomainBase(),
             'servers' => $cluster->nodes->sortBy('id')->map(fn (Node $node): array => [
                 'uuid' => $node->uuid,

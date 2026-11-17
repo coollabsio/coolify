@@ -1,8 +1,8 @@
 @php
-    $rows = collect($hostnames)->map(function (array $row) use ($addresses): array {
+    // Generated sslip.io domains resolve by themselves, so they have no DNS records to manage.
+    $rows = collect($hostnames)->reject(fn (array $row): bool => str_ends_with($row['hostname'], '.sslip.io'))->map(function (array $row) use ($addresses): array {
         $automatic = count($row['zones']) === 1 && $row['zones'][0]['automatic'];
         [$status, $type] = match (true) {
-            str_ends_with($row['hostname'], '.sslip.io') => ['Generated domain', 'neutral'],
             $row['zones'] === [] => ['Manual', 'neutral'],
             filled($row['problem']) => ['Failed', 'error'],
             $addresses !== [] && $row['missing'] === [] => ['Managed', 'success'],
@@ -12,8 +12,10 @@
         };
 
         return [...$row, 'status' => $status, 'type' => $type, 'automatic' => $automatic];
-    });
+    })->values();
     $isPending = $rows->contains('status', 'Pending');
+    // Only a domain that a connected DNS provider manages needs a public address.
+    $needsAddress = $rows->contains(fn (array $row): bool => $row['zones'] !== []);
 @endphp
 
 <div>
@@ -23,10 +25,12 @@
             @if ($isPending)
                 <div class="hidden" wire:poll.5s aria-hidden="true"></div>
             @endif
-            @if ($addresses === [])
+            @if ($addresses === [] && $needsAddress)
                 <div class="px-4 pt-4">
                     <x-callout type="warning" title="No public ingress address">
-                        No ingress server of the cluster has a public address, so Coolify cannot create DNS records.
+                        No ingress server of the cluster has a public IP address, so Coolify cannot create DNS records.
+                        Coolify does not publish private addresses. Turn on ingress on a server with a public IP address
+                        on the cluster's Servers tab.
                     </x-callout>
                 </div>
             @endif
@@ -44,7 +48,7 @@
                     <tbody class="divide-y divide-neutral-200 dark:divide-white/10">
                         @foreach ($rows as $row)
                             <tr wire:key="cluster-application-dns-record-{{ $row['hostname'] }}" class="align-top text-[13px] text-black dark:text-fg">
-                                <td class="px-4 py-3" style="overflow-wrap: anywhere; white-space: normal">{{ $row['hostname'] }}</td>
+                                <td class="px-4 py-3"><span class="block truncate" title="{{ $row['hostname'] }}">{{ $row['hostname'] }}</span></td>
                                 <td class="px-4 py-3" style="overflow-wrap: anywhere; white-space: normal">
                                     @forelse ($row['zones'] as $zone)
                                         <div>{{ $zone['credential'] }} · {{ $zone['zone'] }}</div>
@@ -73,6 +77,11 @@
                                     <x-status-badge :status="$row['status']" :type="$row['type']" :pulse="$row['status'] === 'Pending'" />
                                     @if (filled($row['problem']))
                                         <div class="pt-1 text-[12px] break-words whitespace-normal text-red-600 dark:text-red-400">{{ $row['problem'] }}</div>
+                                    @endif
+                                    @if ($row['status'] === 'Manual')
+                                        <div class="pt-1 text-[12px] whitespace-normal text-neutral-500 dark:text-fg-dim">
+                                            Create the records at your DNS provider{{ $addresses !== [] ? ': an A or AAAA record to '.implode(', ', $addresses).'.' : '.' }}
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-right">

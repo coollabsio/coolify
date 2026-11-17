@@ -349,7 +349,6 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'image_storage', type: 'string', nullable: true),
                 new OA\Property(property: 'image_repository', type: 'string', nullable: true),
                 new OA\Property(property: 'image_registry_credential_uuid', type: 'string', nullable: true),
-                new OA\Property(property: 'registry_server_uuid', type: 'string', nullable: true, description: 'The server that the user selected for the built-in registry. Null is the first available server.'),
                 new OA\Property(property: 'generated_domain_base', type: 'string', nullable: true),
                 new OA\Property(property: 'servers', type: 'array', items: new OA\Items(type: 'object', properties: [new OA\Property(property: 'uuid', type: 'string'), new OA\Property(property: 'name', type: 'string'), new OA\Property(property: 'role', type: 'string'), new OA\Property(property: 'is_ingress', type: 'boolean'), new OA\Property(property: 'is_builder', type: 'boolean'), new OA\Property(property: 'is_usable', type: 'boolean')])),
                 new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),

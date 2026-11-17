@@ -1,4 +1,4 @@
-<section data-testid="server-index-clusters" class="w-full">
+<section data-testid="server-index-clusters" class="w-full" @if ($clusters->contains('network_status', 'reconciling')) wire:poll.5s @endif>
     <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <x-section-heading class="mb-0!" title="Clusters" subtitle="Cluster servers share a private, encrypted network and run cluster applications." />
         <div class="flex w-fit shrink-0 flex-wrap items-center gap-2">

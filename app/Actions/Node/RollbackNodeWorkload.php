@@ -2,7 +2,6 @@
 
 namespace App\Actions\Node;
 
-use App\Actions\Node\Build\RunImageBuild;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
@@ -10,22 +9,22 @@ use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeOperation;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use App\Support\NodeImages;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
-use Throwable;
 
 /**
  * Rolls a cluster application back to the image of an earlier revision (decision 0017). The
  * rollback adds a new latest revision with that image and the current settings, environment
  * variables, and secrets of the workload, and deploys it like Deploy does, so rolling deploys
- * apply. When the cluster registry no longer has the image, the build of that image runs again
- * from the same commit, and its job deploys the result.
+ * apply. A local image (decision 0030) is copied from a Node that still keeps it. When no Node
+ * keeps it, the build of that image runs again from the same commit, and its job deploys the result.
+ * An image in a registry is pulled by digest.
  */
 class RollbackNodeWorkload
 {
@@ -58,7 +57,7 @@ class RollbackNodeWorkload
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $current);
         }
 
-        if (! $this->keptOnEveryNode($workload, $nodes, $revision->image) && $this->registryHasImage($workload, $nodes->first(), $revision->image) === false) {
+        if (NodeImages::isLocalImage($revision->image) && ! $this->keptOnEveryNode($workload, $nodes, $revision->image) && ! $this->keptOnAnyNode($workload, $nodes->first(), $revision->image)) {
             return ['operation' => null, 'build' => StartNodeBuild::run($workload, $user, rebuildOf: $this->buildOf($workload, $revision))];
         }
 
@@ -104,54 +103,45 @@ class RollbackNodeWorkload
     /** The successful build that made the image of the revision, with a source that can be built again. */
     private function buildOf(NodeWorkload $workload, NodeWorkloadRevision $revision): NodeBuild
     {
-        $digest = Str::after($revision->image, '@');
         $build = $workload->builds()
             ->where('status', NodeBuildStatus::SUCCEEDED)
-            ->where('image_digest', $digest)
+            ->when(
+                NodeImages::isLocalImage($revision->image),
+                fn ($builds) => $builds->where('image', $revision->image),
+                fn ($builds) => $builds->where('image_digest', Str::after($revision->image, '@')),
+            )
             ->latest('id')
             ->first();
         if ($build === null || ($build->source_type->usesGit() && blank($build->commit_sha))) {
-            throw new RuntimeException('The image of this revision is no longer in the cluster registry, and Coolify cannot build it again because it does not know the commit that it was built from.');
+            throw new RuntimeException('No server keeps the image of this revision anymore, and Coolify cannot build it again because it does not know the commit that it was built from.');
         }
 
         return $build;
     }
 
     /**
-     * Whether the cluster registry still has the image. Null when the image is not in the cluster
-     * registry or the registry cannot tell; then the deploy pulls it and fails with the pull error.
+     * Whether an online Node of the cluster keeps the local image, so that the other Nodes can copy
+     * it (decision 0030): the build Node or a Node that ran it, when the image cleanup keeps it there.
      */
-    private function registryHasImage(NodeWorkload $workload, Node $node, string $image): ?bool
+    private function keptOnAnyNode(NodeWorkload $workload, Node $node, string $image): bool
     {
-        if (! str_starts_with($image, NodeRegistry::HOST.'/'.$workload->uuid.'@sha256:')) {
-            return null;
-        }
-        $registry = $node->cluster?->registry;
-        // A cluster without a registry Node (one Node left, or a registry that moved away) has no pushed image.
-        if ($registry?->node === null) {
-            return false;
-        }
-        if (! $registry->node->canReceiveNetworkCommands() || $registry->node->supportsCapability(NodeRegistry::INSPECT_CAPABILITY) !== true) {
-            return null;
-        }
-        try {
-            $result = RunImageBuild::flux('registry.inspect', ['server_id' => $registry->node->uuid, 'command_id' => (string) Str::uuid()], 60);
-        } catch (Throwable) {
-            return null;
-        }
-        if (! data_get($result, 'registry_running') || ! data_get($result, 'healthy')) {
-            return null;
-        }
-        $digest = Str::after($image, '@');
-        $found = collect((array) data_get($result, 'repositories', []))
-            ->where('name', $workload->uuid)
-            ->flatMap(fn ($repository): array => (array) data_get($repository, 'tags', []))
-            ->contains(fn ($tag): bool => data_get($tag, 'digest') === $digest);
+        $nodeIds = $workload->builds()->where('status', NodeBuildStatus::SUCCEEDED)->where('image', $image)->pluck('node_id')
+            ->merge(NodeOperation::query()
+                ->where('node_workload_id', $workload->id)
+                ->whereIn('command_type', ['workload.deploy.v1', 'workload.move.v1'])
+                ->where('status', NodeOperationStatus::SUCCEEDED)
+                ->whereHas('revision', fn ($revision) => $revision->where('image', $image))
+                ->pluck('node_id'))
+            ->filter()
+            ->unique();
 
-        if ($found) {
-            return true;
-        }
-
-        return data_get($result, 'repositories_truncated') ? null : false;
+        return Node::query()
+            ->whereKey($nodeIds->all())
+            ->where('team_id', $workload->team_id)
+            ->where('node_cluster_id', $node->node_cluster_id)
+            ->get()
+            ->contains(fn (Node $source): bool => $source->canReceiveNetworkCommands()
+                && $source->supportsCapability(NodeImages::SERVE_CAPABILITY) === true
+                && in_array($image, CleanupNodeImages::keepList($source), true));
     }
 }

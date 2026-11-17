@@ -4,9 +4,11 @@
      closes the menu, also when the item opens a modal. --}}
 @props([
     'label' => 'Actions',
+    // Wider menus for items with a description line.
+    'panelClass' => 'w-44!',
 ])
 
-<x-table.dropdown panel-class="w-44!" role="menu">
+<x-table.dropdown :panel-class="$panelClass" role="menu">
     <x-slot:trigger>
         <button type="button" class="icon-button" title="{{ $label }}" aria-label="{{ $label }}"
             aria-haspopup="menu" :aria-expanded="open">

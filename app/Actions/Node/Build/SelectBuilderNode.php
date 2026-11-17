@@ -5,9 +5,9 @@ namespace App\Actions\Node\Build;
 use App\Exceptions\NodePlacementDeniedException;
 use App\Models\Node;
 use App\Models\NodeBuild;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -37,12 +37,13 @@ class SelectBuilderNode
         }
         $capabilities = $workload->buildCapabilities();
         $architecture = self::targetArchitecture($workload);
-        $candidates = Node::query()
+        $clusterNodes = Node::query()
             ->whereIn('node_cluster_id', $clusterIds)
             ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')])
             ->orderBy('active_builds_count')
             ->orderBy('id')
-            ->get()
+            ->get();
+        $candidates = $clusterNodes
             ->filter(fn (Node $node): bool => $node->canBuild()
                 && $node->canReceiveNetworkCommands()
                 && collect($capabilities)->every(fn (string $capability): bool => $node->supportsCapability($capability) === true)
@@ -62,15 +63,38 @@ class SelectBuilderNode
         // One build at a time on each builder Node; the job waits for a free one.
         $node = $candidates->first(fn (Node $node): bool => $node->active_builds_count === 0);
         if ($node === null) {
-            $features = array_diff($capabilities, [NodeRegistry::BUILD_CAPABILITY]);
-            throw new RuntimeException($candidates->isEmpty()
-                ? ($features !== []
-                    ? 'No server in this cluster can build this application. Turn on the builder role on a server, and upgrade Sentinel to a version that supports '.implode(', ', $features).'.'
-                    : 'No server in this cluster can build images. Turn on the builder role on a server, and upgrade Sentinel if needed.')
-                : NodeBuild::BUILDERS_BUSY);
+            throw new RuntimeException($candidates->isEmpty() ? self::noBuilderReason($clusterNodes, $capabilities) : NodeBuild::BUILDERS_BUSY);
         }
 
         return $node;
+    }
+
+    /**
+     * Why no server can build: the first check that every builder fails, with the names of the servers.
+     *
+     * @param  Collection<int, Node>  $nodes
+     * @param  list<string>  $capabilities
+     */
+    private static function noBuilderReason(Collection $nodes, array $capabilities): string
+    {
+        $names = fn ($nodes): string => $nodes->pluck('name')->implode(', ');
+        $builders = $nodes->filter(fn (Node $node): bool => $node->canBuild());
+        if ($builders->isEmpty()) {
+            return 'No server in this cluster has the builder role. Turn on builds for a server on the Servers tab of the cluster.';
+        }
+        $connected = $builders->filter(fn (Node $node): bool => $node->canReceiveNetworkCommands());
+        if ($connected->isEmpty()) {
+            return "The builder servers are not connected to Coolify: {$names($builders)}.";
+        }
+        $missing = collect($capabilities)->reject(fn (string $capability): bool => $connected->contains(fn (Node $node): bool => $node->supportsCapability($capability) === true));
+        $capable = $connected->filter(fn (Node $node): bool => collect($capabilities)->every(fn (string $capability): bool => $node->supportsCapability($capability) === true));
+        if ($capable->isEmpty()) {
+            $features = $missing->isNotEmpty() ? $missing : collect($capabilities);
+
+            return "The Sentinel on the builder servers is too old for this build: {$names($connected)}. Upgrade Sentinel to a version that supports {$features->implode(', ')}.";
+        }
+
+        return "The builder of these servers is not running yet: {$names($capable)}. It starts with the next network sync of the cluster.";
     }
 
     /** Refuses a build of the user before it is queued when the user may not place resources on a builder Node of the cluster. */

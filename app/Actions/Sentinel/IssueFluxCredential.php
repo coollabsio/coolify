@@ -73,6 +73,8 @@ class IssueFluxCredential
             'image.build.v1',
             'image.build.private_git.v1',
             'image.load.v1',
+            'image.serve.v1',
+            'image.fetch.v1',
             'image.prune.v1',
             'image.build.external_push.v1',
             'image.build.external_image.v1',
@@ -82,8 +84,6 @@ class IssueFluxCredential
             'image.build.static.v1',
             'workload.registry_auth.v1',
             'builder.reconcile.v1',
-            'registry.reconcile.v1',
-            'registry.inspect.v1',
             'workload.exec.v1',
             'workload.terminal.v1',
         ], $capabilities));

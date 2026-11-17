@@ -567,7 +567,7 @@ class ClusterApplicationsController extends Controller
 
     #[OA\Post(
         summary: 'Roll Back',
-        description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When the cluster registry no longer has the image, Coolify builds the same commit again and deploys the result.',
+        description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.',
         path: '/cluster-applications/{uuid}/rollback',
         operationId: 'rollback-cluster-application',
         security: [
@@ -649,7 +649,7 @@ class ClusterApplicationsController extends Controller
 
         return response()->json([
             'message' => $buildUuid !== null
-                ? "The image is no longer in the cluster registry. Application {$workload->name} builds it again and then deploys."
+                ? "No server keeps the image anymore. Application {$workload->name} builds it again and then deploys."
                 : "Application {$workload->name} rollback queued.",
             'deployment_uuid' => $deploymentUuid,
             'build_uuid' => $buildUuid,

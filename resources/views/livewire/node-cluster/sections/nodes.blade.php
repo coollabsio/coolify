@@ -1,9 +1,10 @@
 @php
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $canCreateNode = auth()->user()->can('create', App\Models\Node::class);
-    $nodeGridClasses = 'grid min-w-[820px] grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_16rem] items-center gap-3 px-4';
+    $nodeGridClasses = 'grid min-w-[640px] grid-cols-[minmax(0,1fr)_7rem_7rem_12rem_2.5rem] items-center gap-3 px-4';
     $sentinelUpgradeRunning = in_array(data_get($sentinelUpgradeRun, 'status'), ['queued', 'running'], true);
     $canUpgradeSentinel = $canUpdateCluster && $sentinelUpgradeNodes->isNotEmpty() && ! $sentinelUpgradeRunning;
+    $clusterRunsBuilds = $cluster->runsBuilds();
 @endphp
 
 <x-application.settings-section id="node-cluster-nodes-section" title="Servers"
@@ -167,10 +168,7 @@
                             'pending' => 'warning',
                             default => 'neutral',
                         }" />
-                        @if ($cluster->registry?->node_id === $node->id)
-                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint">Image registry</p>
-                        @endif
-                        @if ($cluster->registry !== null && $node->canBuild())
+                        @if ($clusterRunsBuilds && $node->canBuild())
                             <p class="mt-1 truncate text-[11px] {{ data_get($node->metadata, 'build_error') ? 'text-red-500' : 'text-neutral-500 dark:text-fg-faint' }}"
                                 title="{{ data_get($node->metadata, 'build_error') }}">
                                 {{ data_get($node->metadata, 'build_error') ? 'Builder error' : (data_get($node->metadata, 'builder_running') ? 'Builder' : 'Builder pending') }}
@@ -182,18 +180,26 @@
                             </p>
                         @endif
                     </div>
-                    <div class="flex justify-end gap-2">
+                    <div class="flex justify-end">
                         @if ($canUpdateCluster)
-                            <x-forms.button wire:click="setIngress('{{ $node->uuid }}', {{ $node->is_ingress ? 'false' : 'true' }})"
-                                wire:loading.attr="disabled" wire:target="setIngress"
-                                title="{{ $node->is_ingress ? 'Stop serving public traffic on this server.' : 'Serve public traffic for cluster applications on ports 80 and 443 of this server.' }}">
-                                {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
-                            </x-forms.button>
-                            <x-forms.button wire:click="setBuilder('{{ $node->uuid }}', {{ $node->is_builder ? 'false' : 'true' }})"
-                                wire:loading.attr="disabled" wire:target="setBuilder"
-                                title="{{ $node->is_builder ? 'Stop building images on this server and remove its build cache.' : 'Build images of Git applications on this server.' }}">
-                                {{ $node->is_builder ? 'Turn off builds' : 'Turn on builds' }}
-                            </x-forms.button>
+                            <x-table.row-actions label="Server actions" panel-class="w-72!">
+                                <x-table.row-action class="items-start! gap-2.5! py-2!"
+                                    wire:click="setIngress('{{ $node->uuid }}', {{ $node->is_ingress ? 'false' : 'true' }})">
+                                    <x-reicon name="globe" class="mt-0.5 size-3.5 shrink-0 opacity-70" />
+                                    <span class="flex min-w-0 flex-col text-left">
+                                        <span>{{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}</span>
+                                        <span class="whitespace-normal text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">{{ $node->is_ingress ? 'Stop serving public traffic on this server.' : 'Serve public traffic for cluster applications on ports 80 and 443 of this server.' }}</span>
+                                    </span>
+                                </x-table.row-action>
+                                <x-table.row-action class="items-start! gap-2.5! py-2!"
+                                    wire:click="setBuilder('{{ $node->uuid }}', {{ $node->is_builder ? 'false' : 'true' }})">
+                                    <x-reicon name="layers" class="mt-0.5 size-3.5 shrink-0 opacity-70" />
+                                    <span class="flex min-w-0 flex-col text-left">
+                                        <span>{{ $node->is_builder ? 'Turn off builds' : 'Turn on builds' }}</span>
+                                        <span class="whitespace-normal text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">{{ $node->is_builder ? 'Stop building images on this server and remove its build cache.' : 'Build images of Git applications on this server.' }}</span>
+                                    </span>
+                                </x-table.row-action>
+                            </x-table.row-actions>
                         @endif
                     </div>
                 </div>

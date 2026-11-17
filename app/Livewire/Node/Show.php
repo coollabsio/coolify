@@ -28,6 +28,7 @@ use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
 use App\Jobs\UpgradeNodeSentinelJob;
+use App\Models\FluxCertificate;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
@@ -37,6 +38,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Rules\ValidServerIp;
 use App\Support\CpuArchitecture;
+use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
@@ -45,6 +47,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -435,11 +438,19 @@ class Show extends Component
         return $this->deleteServer($password, force: true);
     }
 
+    /** The expiry of the instance-wide Flux certificate. The view reads it only for instance admins. */
+    #[Computed]
+    public function fluxCertificateValidUntil(): ?CarbonImmutable
+    {
+        return FluxCertificate::query()->where('state', 'active')->value('valid_until');
+    }
+
     public function renewFluxCertificate(): void
     {
         $this->runAction(function (): void {
             $this->authorize('update', instanceSettings());
             RenewFluxCertificate::run(null, true);
+            unset($this->fluxCertificateValidUntil);
         }, 'Flux TLS certificate renewed.');
     }
 

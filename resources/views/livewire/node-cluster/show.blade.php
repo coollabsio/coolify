@@ -5,11 +5,12 @@
         'nodes' => 'Servers',
         'firewall' => 'Firewall',
         'advanced' => 'Advanced',
-        'danger' => 'Danger',
+        'danger' => 'Danger Zone',
     ];
 @endphp
 
-<div>
+{{-- A network sync runs in a queued job, so poll on every tab until it ends. --}}
+<div @if ($cluster->network_status === 'reconciling') wire:poll.5s @endif>
     <x-slot:title>{{ str($cluster->name)->limit(24) }} > {{ $sectionTitles[$section] ?? 'General' }} | Cluster | Coolify</x-slot>
 
     <x-node-cluster.navbar :cluster="$cluster" />
@@ -19,12 +20,6 @@
         <x-node-cluster.sidebar :cluster="$cluster" :activeMenu="$section" :nodesNeedAttention="$nodesNeedAttention" />
 
         <div class="application-settings-form flex w-full min-w-0 flex-col gap-6">
-            @if ($needsImageStorageChoice)
-                <x-callout type="warning" title="Choose where this cluster stores images">
-                    The cluster has more than one server, so each build must go to a registry that every server can pull from. Builds fail until you choose.
-                    <a class="underline" href="{{ route('node-cluster.advanced', ['cluster_uuid' => $cluster->uuid]) }}#node-cluster-image-storage-section" wire:navigate>Choose the image storage</a>
-                </x-callout>
-            @endif
             @include('livewire.node-cluster.sections.'.$section)
         </div>
     </div>

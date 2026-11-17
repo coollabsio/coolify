@@ -53,7 +53,7 @@ Node cluster data plane
   - Corrosion replication over WireGuard: endpoints, routes, certificates
   - private workload DNS on each Node WireGuard address
   - Caddy on ingress Nodes, ports 80 and 443
-  - builder Nodes and one cluster image registry
+  - builder Nodes; local images move between Nodes on request
 ```
 
 Flux does not make product decisions. Coolify selects and authorizes the server
@@ -423,9 +423,11 @@ Cluster applications:
   ([decision 0008](../decisions/0008-node-workload-secrets.md));
 - private image pulls and pushes to an external registry with team registry
   credentials (`RegistryCredential`);
-- builds on builder Nodes into the cluster registry, with the Dockerfile,
-  Railpack, and Static build packs
+- builds on builder Nodes into the Podman store of the build Node or into an
+  external registry, with the Dockerfile, Railpack, and Static build packs
   ([decision 0006](../decisions/0006-node-image-builds.md));
+- copies of local images from a peer Node before a deploy, without a registry
+  ([decision 0030](../decisions/0030-node-peer-image-fetch.md));
 - public and private Git repositories, push webhooks, and the deploy API
   ([decision 0011](../decisions/0011-node-git-sources.md));
 - volumes pinned to one Node, and moves with volumes

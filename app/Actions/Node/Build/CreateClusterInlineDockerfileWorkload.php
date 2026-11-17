@@ -21,7 +21,7 @@ use RuntimeException;
  * Creates a cluster application from a Dockerfile that the user pasted, the v4
  * "Dockerfile" resource. Coolify builds it with an empty context, so it has no
  * Git repository. Like a Git application, it has no revision until the first
- * build succeeds, and the first built application of a cluster creates its registry.
+ * build succeeds, and the first built application of a cluster starts BuildKit.
  */
 class CreateClusterInlineDockerfileWorkload
 {
@@ -53,7 +53,7 @@ class CreateClusterInlineDockerfileWorkload
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        $registryIsNew = ! $cluster->registry()->exists();
+        $buildsAreNew = ! $cluster->runsBuilds();
         $workload = DB::transaction(function () use ($project, $environment, $cluster, $dockerfile, $targetNode, $name, $requestedBy): NodeWorkload {
             // A build runs on a builder of the architecture of the Node (decision 0020).
             $node = CreateClusterDockerImageWorkload::placementNode($cluster, $targetNode, $cluster->builderArchitectures(), $requestedBy);
@@ -68,11 +68,10 @@ class CreateClusterInlineDockerfileWorkload
             ]);
             $workload->nodes()->attach($node);
             EnsureNodeWorkloadDnsNames::run($node);
-            EnsureNodeRegistry::run($cluster);
 
             return $workload->refresh();
         });
-        if ($registryIsNew) {
+        if ($buildsAreNew) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
 

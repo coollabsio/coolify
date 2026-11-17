@@ -5,7 +5,6 @@ namespace App\Actions\Node;
 use App\Actions\Node\Build\CreateClusterGitWorkload;
 use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
 use App\Enums\NodeWorkloadSourceType;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\RegistryCredential;
 use App\Models\User;
@@ -95,11 +94,11 @@ class UpdateNodeWorkloadSettings
             'dockerfile_location' => self::PATH_RULES,
             'publish_directory' => self::PATH_RULES,
             'start_command' => ['nullable', 'string', 'max:16384'],
-            'docker_registry_image_name' => [...ValidationPatterns::dockerImageNameRules(), 'not_regex:/@/', 'not_regex:/^(localhost|'.preg_quote(NodeRegistry::HOST, '/').')\//'],
+            'docker_registry_image_name' => [...ValidationPatterns::dockerImageNameRules(), 'not_regex:/@/', 'not_regex:/^localhost\//'],
             'docker_registry_image_tag' => ['nullable', 'string', 'max:128', 'regex:'.ValidationPatterns::DOCKER_IMAGE_LITERAL_TAG_PATTERN],
         ], [
             'docker_registry_image_name.regex' => 'Enter an image repository without a tag, for example ghcr.io/acme/api.',
-            'docker_registry_image_name.not_regex' => 'Enter an image repository outside the cluster registry, without a digest.',
+            'docker_registry_image_name.not_regex' => 'Enter an image repository in a registry, without a digest.',
         ])->validate();
         $errors = new MessageBag;
         $command = self::parseStartCommand((string) ($input['start_command'] ?? ''), $errors);

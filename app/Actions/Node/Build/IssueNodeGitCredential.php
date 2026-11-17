@@ -3,9 +3,9 @@
 namespace App\Actions\Node\Build;
 
 use App\Models\GithubApp;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
+use App\Support\NodeImages;
 use Illuminate\Database\Eloquent\Builder;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -15,7 +15,7 @@ use RuntimeException;
  * the `image.build` request: a new GitHub App installation token (valid for
  * one hour), or the deploy key. Empty for a public repository. It checks
  * again that the source belongs to the team of the workload. Do not store
- * the result. Builder Nodes need {@see NodeRegistry::PRIVATE_GIT_BUILD_CAPABILITY}.
+ * the result. Builder Nodes need {@see NodeImages::PRIVATE_GIT_BUILD_CAPABILITY}.
  */
 class IssueNodeGitCredential
 {

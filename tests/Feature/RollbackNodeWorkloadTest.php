@@ -11,16 +11,15 @@ use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeOperation;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\NodeImages;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -69,43 +68,31 @@ function rollbackPage(object $test): array
     ];
 }
 
-/** Turns the workload into a Git application whose revisions are cluster registry images with a registry Node. */
+/** Turns the workload into a Git application whose revisions are local images (decision 0030). */
 function rollbackGitWorkload(object $test, ?string $commit = 'c0ffee1'): void
 {
     $test->workload->update(['source_type' => NodeWorkloadSourceType::DOCKERFILE, 'git_repository' => 'https://github.com/acme/app', 'git_branch' => 'main']);
-    $test->old->update(['image' => NodeRegistry::HOST.'/'.$test->workload->uuid.'@sha256:'.str_repeat('a', 64)]);
-    $test->current->update(['image' => NodeRegistry::HOST.'/'.$test->workload->uuid.'@sha256:'.str_repeat('b', 64)]);
+    $test->old->update(['image' => NodeImages::LOCAL_PREFIX.$test->workload->uuid.':old-build']);
+    $test->current->update(['image' => NodeImages::LOCAL_PREFIX.$test->workload->uuid.':current-build']);
     $test->workload->builds()->create([
         'source_type' => NodeWorkloadSourceType::DOCKERFILE,
         'git_repository' => 'https://github.com/acme/old-app',
         'git_branch' => 'release',
         'commit_sha' => $commit,
         'dockerfile_location' => '/docker/Dockerfile',
+        'image' => $test->old->image,
         'image_digest' => 'sha256:'.str_repeat('a', 64),
         'node_workload_revision_id' => $test->old->id,
         'status' => NodeBuildStatus::SUCCEEDED,
     ]);
-    NodeRegistry::query()->create([
-        'node_cluster_id' => $test->cluster->id,
-        'node_id' => $test->node->id,
-        'ca_certificate_pem' => 'ca',
-        'ca_private_key_pem' => 'key',
-        'push_password' => 'push',
-        'pull_password' => 'pull',
-        'htpasswd' => 'users',
-    ]);
-    $test->node->update(['sentinel_capabilities' => ['workload.deploy.v1', NodeRegistry::INSPECT_CAPABILITY]]);
+    $test->node->update(['sentinel_capabilities' => ['workload.deploy.v1', NodeImages::SERVE_CAPABILITY, NodeImages::FETCH_CAPABILITY]]);
     Cache::put($test->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String()]);
 }
 
-/** @param  list<string>  $digests */
-function fakeRegistryDigests(object $test, array $digests): void
+/** Records that the server ran the old revision, so that the image cleanup keeps its image there. */
+function rollbackKeptOnServer(object $test): void
 {
-    Http::fake(['flux:7080/v1/commands/registry.inspect' => Http::response([
-        'registry_running' => true,
-        'healthy' => true,
-        'repositories' => [['name' => $test->workload->uuid, 'tags' => array_map(fn (string $digest): array => ['tag' => 'build', 'digest' => $digest], $digests)]],
-    ])]);
+    NodeOperation::factory()->create(['node_id' => $test->node->id, 'node_workload_id' => $test->workload->id, 'node_workload_revision_id' => $test->old->id, 'status' => NodeOperationStatus::SUCCEEDED]);
 }
 
 it('rolls back to the image of an earlier revision with the current settings and environment', function () {
@@ -172,9 +159,9 @@ it('rejects a revision of another workload', function () {
     Queue::assertNothingPushed();
 });
 
-it('deploys a cluster registry image that the registry still has', function () {
+it('deploys a local image that a server still keeps', function () {
     rollbackGitWorkload($this);
-    fakeRegistryDigests($this, ['sha256:'.str_repeat('a', 64), 'sha256:'.str_repeat('b', 64)]);
+    rollbackKeptOnServer($this);
 
     Livewire::test(Show::class, rollbackPage($this))->call('rollback', $this->old->uuid)->assertRedirectContains('/deployments/');
 
@@ -183,9 +170,8 @@ it('deploys a cluster registry image that the registry still has', function () {
     Queue::assertPushed(DeployNodeWorkloadJob::class);
 });
 
-it('builds the same commit again when the registry no longer has the image', function () {
+it('builds the same commit again when no server keeps the local image', function () {
     rollbackGitWorkload($this);
-    fakeRegistryDigests($this, ['sha256:'.str_repeat('b', 64)]);
 
     Livewire::test(Show::class, rollbackPage($this))->call('rollback', $this->old->uuid)->assertRedirectContains('/builds/');
 
@@ -204,11 +190,10 @@ it('builds the same commit again when the registry no longer has the image', fun
 
 it('fails with a clear error when the image is gone and the commit is unknown', function () {
     rollbackGitWorkload($this, commit: null);
-    fakeRegistryDigests($this, []);
 
     Livewire::test(Show::class, rollbackPage($this))
         ->call('rollback', $this->old->uuid)
-        ->assertDispatched('error', 'The image of this revision is no longer in the cluster registry, and Coolify cannot build it again because it does not know the commit that it was built from.')
+        ->assertDispatched('error', 'No server keeps the image of this revision anymore, and Coolify cannot build it again because it does not know the commit that it was built from.')
         ->assertNoRedirect();
 
     expect($this->workload->builds()->count())->toBe(1)

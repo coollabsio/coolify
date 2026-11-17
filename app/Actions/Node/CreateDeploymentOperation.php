@@ -6,12 +6,12 @@ use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadDesiredState;
 use App\Models\Node;
 use App\Models\NodeOperation;
-use App\Models\NodeRegistry;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
 use App\Support\CpuArchitecture;
+use App\Support\NodeImages;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -40,7 +40,7 @@ class CreateDeploymentOperation
             throw new RuntimeException("{$mismatch} Coolify does not emulate another CPU architecture.");
         }
         // A local build exists only in the Podman store of this Node; there is nothing to pull.
-        if (NodeRegistry::isLocalImage($revision->image)) {
+        if (NodeImages::isLocalImage($revision->image)) {
             $pullPolicy = 'missing';
         }
 

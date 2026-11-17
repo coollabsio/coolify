@@ -1,4 +1,4 @@
-# Decision 0006: Build images on builder Nodes and store them in a cluster registry
+# Decision 0006: Build images on builder Nodes
 
 **Status: Accepted**
 
@@ -15,7 +15,8 @@ and the registry flow. This decision covers these items.
 These facts from the current system limit the design:
 
 - Each Node pulls its own image with `podman run --pull`. A built image must be
-  in a registry that every Node can reach.
+  in a registry that every Node can reach. (Decision 0030 changed this: a Node
+  now fetches a local image from a peer Node.)
 - Sentinel runs one command at a time. The Flux internal API is synchronous,
   with a 10-minute maximum for deploys. A build cannot be one long command.
 - The reconciler, Node moves, and operation recovery deploy the latest revision
@@ -40,11 +41,15 @@ nginx template) are copied into v5 classes.
    `image.build.v1` capability, and with the fewest active builds.
 3. Sentinel starts a one-shot build container with Podman. It clones the
    commit, runs `railpack prepare` for Railpack sources, and builds with
-   BuildKit on the same Node. It pushes the image to the cluster registry and
-   writes the digest from the `buildctl --metadata-file` output.
-4. When the build succeeds, Coolify creates a `NodeWorkloadRevision` with
-   `image = registry.cluster.coolify.internal:5443/<workload>@sha256:<digest>`. Then
-   the existing `CreateDeploymentOperation` flow deploys it.
+   BuildKit on the same Node. With the `LOCAL` image storage, it loads the
+   image into the Podman store of that Node (`image.load.v1`). With the
+   `EXTERNAL` image storage, it pushes the image to the registry of the team
+   and writes the digest from the `buildctl --metadata-file` output.
+4. When the build succeeds, Coolify creates a `NodeWorkloadRevision`. Its
+   `image` is `localhost/<workload>:<build>` for a local image, or
+   `<repository>@sha256:<digest>` for the tag `<repository>:<workload>-<build>`
+   in the external registry. Then the existing `CreateDeploymentOperation`
+   flow deploys it.
 
 ### Builder Nodes
 
@@ -85,91 +90,58 @@ nginx template) are copied into v5 classes.
 - Restart adoption: Podman keeps the build container when Sentinel restarts.
   Coolify finds a build again by its label. A build container that has no
   Coolify build record is removed.
-- `builder.reconcile` and `registry.reconcile` are idempotent and converge
-  `buildkitd`, zot, and their configuration.
+- `builder.reconcile` is idempotent and converges `buildkitd` and its
+  configuration. It has only `enabled` and `max_used_space_bytes`. (History:
+  `registry.reconcile` converged zot until decision 0030 removed it.)
 
 ### Image storage
 
-- Each cluster has an image storage: where its builds go, so that every Node
-  can pull them. The user chooses it in the Image storage section of the
-  cluster (`node_clusters.image_storage`):
-  - External registry (recommended): one repository of the team, for example
+- Each cluster has an image storage: where its builds go
+  (`node_clusters.image_storage`, decision 0030):
+  - On the servers (`LOCAL`, the default): each build stays in the Podman
+    store of its build Node as `localhost/<workload>:<build>`. Other Nodes
+    fetch it from a peer Node (decision 0030).
+  - External registry (`EXTERNAL`): one repository of the team, for example
     `ghcr.io/acme/coolify-builds`, with an optional team registry credential
     that can push and pull. Each build is the tag `<workload>-<build>`. One
     repository works with registries that limit the number of private
     repositories. The revision pulls `<repository>@<digest>` with the same
     credential. Coolify does not delete old tags; the registry owns
     retention. Needs `image.build.external_image.v1`: `image.build` accepts
-    an `image` outside the cluster registry, with `image_username` and
-    `image_password` for its push.
-  - Built-in registry: zot on one Node (below).
-- A cluster with one Node needs no choice. Its builds stay on that Node (below),
+    an `image` from the team, with `image_username` and `image_password` for
+    its push.
+- A cluster with one Node needs no choice. Its builds stay on that Node,
   unless the user selected an external registry.
-- When a cluster gets its second Node and has no choice yet, the cluster page
-  asks for one, and builds fail with "Choose where the cluster stores its
-  images" until the user chooses. A cluster that ran zot before this choice
-  existed keeps the built-in registry.
+- The onboarding of the second server shows the choice one time. Builds do
+  not fail while no choice is made (decision 0030).
 - A change of the storage does not copy images. The next deploy of each Git
   application builds into the new storage.
 
-### Cluster registry
+### Cluster registry (removed by decision 0030)
 
-- One zot registry for each cluster, on one Node. By default this is the first
-  active Node by ID. The registry stays on its Node while that Node is
-  reachable. Coolify moves it only after the Node was unreachable for 10
-  minutes, and does not move it back when the Node returns. A user can select
-  a Node instead. Coolify does not move a selected Node; builds fail until the
-  Node is back or the user clears the selection.
-- A move starts an empty registry on the new Node. The next deploy of each
-  application rebuilds its image. The previous Node stops zot but keeps its
-  image volume, so a role that returns finds its images again.
-- A cluster with one Node runs no zot, when its Sentinel has
-  `image.load.v1`. The build exports a docker archive in place of a push, and
-  `image.load.v1` loads it into the Podman store of that Node as
-  `localhost/<workload>:<build>`. Sentinel keeps the newest `keep_tags` local
-  tags of each application. Only one Node exists, so no other Node needs the
-  image. When a second Node joins, the user chooses the image storage. With
-  the built-in registry, the next network reconcile starts zot. The next build
-  of each application pushes again. Until then, Coolify
-  refuses to move an application with a local image, because the target Node
-  cannot pull it. When one Node remains, zot stops and keeps its volume.
-- The Image registry section of the cluster shows the registry health, the
-  disk use of the registry and the build cache on each Node, and the images
-  of each application (`registry.inspect.v1`, read only).
-- The name is `registry.cluster.coolify.internal:5443`. The registry Node
-  publishes an endpoint row in the `cluster` namespace while zot runs, and
-  Sentinel discovery DNS answers it like a Node name. zot listens on the mesh
-  IP of that Node. The cluster firewall drops traffic from and to the cluster
-  range in both the `input` and the `output` chain, also from a Node to
-  itself. Coolify must add a rule to port 5443 for every Node, the registry
-  Node included. Workload subnets cannot reach it.
-- TLS: a separate registry CA for each cluster, signed by Coolify. The server
-  certificate has only the DNS name `registry.cluster.coolify.internal`, is
-  valid for
-  90 days, and Coolify renews it. Nodes trust the CA through
-  `/etc/containers/certs.d/<host:port>/ca.crt` and the BuildKit registry
-  configuration. The Flux CA is not used: Sentinel accepts any Flux CA
-  certificate whose name matches the Flux URL host, and the registry key is on
-  a worker Node.
-- Auth: zot htpasswd with a push user for builders and a pull user for all
-  Nodes. Anonymous access is denied. `workload.deploy` passes the pull
-  credential to Podman with `--authfile` for images in the cluster registry.
-- Storage: `dedupe`, `gc`, and a retention policy that keeps the last 10 pushed
-  tags of each workload (decision 0017; it was 5) and removes untagged manifests. Coolify deletes a
-  workload's repository when the workload is deleted.
+History: until decision 0030, a cluster with two or more Nodes could run one
+zot registry on one of its Nodes (`BUILT_IN`), at
+`registry.cluster.coolify.internal:5443`, with its own CA, htpasswd users for
+push and pull, and a retention of the last 10 tags of each workload. Coolify
+moved it to another Node after 10 minutes offline, and the move lost its
+images. Decision 0030 removed zot, `registry.reconcile.v1`,
+`registry.inspect.v1`, the `node_registries` table, port 5443, and the
+registry section of the cluster page. Nodes now fetch local images from each
+other.
 
 ### Storage limits on builder Nodes
 
 - BuildKit garbage collection uses `reservedSpace`, `maxUsedSpace`, and
   `minFreeSpace` in `buildkitd.toml`. The default `maxUsedSpace` is 20% of the
   disk.
-- The Node page shows the disk use of the build cache and the registry.
+- The Node page shows the disk use of the build cache.
 
 ## Evidence
 
 On 2026-11-02, a test on a development worker Node (Ubuntu 24.04.5, Podman
 4.9.3, AppArmor on, `apparmor_restrict_unprivileged_userns=1`, 2 vCPU, 3 GiB)
-used BuildKit v0.34.1, Railpack v0.43.0, and zot v2.1.23:
+used BuildKit v0.34.1, Railpack v0.43.0, and zot v2.1.23. The zot rows are
+historical: decision 0030 removed zot.
 
 | Check | Result |
 | --- | --- |
@@ -179,10 +151,10 @@ used BuildKit v0.34.1, Railpack v0.43.0, and zot v2.1.23:
 | The same with the default seccomp profile | Fails: the build's `RUN` step exits with code 1 |
 | Rootful BuildKit with `--privileged` | Passes: Dockerfile build 4 s, Railpack build 36 s cold and 1 s warm |
 | `railpack prepare` + BuildKit `gateway.v0` with `railpack-frontend` | Passes (Node.js sample) |
-| zot with TLS (DNS SAN only) and htpasswd; anonymous request | Passes; anonymous gets `401` |
-| Podman pull with `certs.d` CA and auth file, then run the image | Passes; the app answers |
-| Pull user tries to push | Denied |
-| Storage after the run | BuildKit cache 2.64 GB (mostly the Railpack toolchain); zot data 172 MB for 3 tags; the warm rebuild added no data |
+| (Historical) zot with TLS (DNS SAN only) and htpasswd; anonymous request | Passes; anonymous gets `401` |
+| (Historical) Podman pull from zot with `certs.d` CA and auth file, then run the image | Passes; the app answers |
+| (Historical) zot pull user tries to push | Denied |
+| Storage after the run | BuildKit cache 2.64 GB (mostly the Railpack toolchain); zot data 172 MB for 3 tags (historical); the warm rebuild added no data |
 
 ## Consequences
 
@@ -190,15 +162,16 @@ used BuildKit v0.34.1, Railpack v0.43.0, and zot v2.1.23:
 - Builds of different workloads of one team share the BuildKit cache of a Node.
   Clusters belong to one team, and only users who can update a workload can
   start a build, so this matches the threat model.
-- The registry Node is a single point for new builds and pulls. Running
-  containers continue when it is offline.
+- A local image is only on the Nodes that built, run, or keep it. When all of
+  them are offline, a Git application must be built again (decision 0030).
 - Every builder Node uses disk for the build cache. The limit and the Node page
   make this visible.
 
 ## Before release
 
-For now, cluster applications use the cluster registry (zot) for built images,
-and pull other images only from public registries. These items must be done
+When this decision was written, cluster applications used the cluster
+registry (zot, removed by decision 0030) for built images, and pulled other
+images only from public registries. These items must be done
 before v5 ships:
 
 - [x] **Private registry pulls.** v4 runs `docker login` on each server over SSH
@@ -208,7 +181,7 @@ before v5 ships:
   passes to Podman as a temporary `--authfile` and never journals. The v4
   logins cannot be imported, because they exist only on each v4 server.
 - [x] **Push built images to an external registry** (the v4 "Docker registry
-  image name" setting), as an extra target next to the cluster registry.
+  image name" setting). This is now the `EXTERNAL` image storage.
 - [ ] **Release Sentinel and Flux** with the build and registry commands. The
   latest Sentinel release does not have them, and **Upgrade Sentinel** installs
   that release. Add the `coolify-builder` image to the Sentinel `release.yaml`
@@ -249,9 +222,9 @@ container crash-looped on a missing `server.js`).
 
 - Private repositories, webhooks, preview builds, and build-time secrets (see
   decisions 0011 and 0012).
-- Registry replication to a second Node, and peers that serve their Podman
-  store.
+- A second copy of each local image on another Node. (Peers that serve
+  their Podman store are decided in decision 0030.)
 - Builds for a different CPU architecture (see decision 0020).
-- The registry port and the exact `buildkitd.toml` defaults.
+- The exact `buildkitd.toml` defaults.
 - Whether the sandboxed rootless mode needs both `systempaths=unconfined` and
   `/dev/fuse`. The test passed with both and did not check each one alone.

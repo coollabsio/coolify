@@ -47,7 +47,8 @@
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
     // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
     $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
-    // Show a loading state on the trigger button while the submit action runs (needs Livewire updates, so not with wire:ignore).
+    // Show a loading state on the trigger button while the submit action runs. With wire:ignore, Livewire
+    // cannot update the trigger, so the Alpine `submitting` flag shows the spinner instead.
     $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
@@ -170,7 +171,7 @@
         @endif
     @else
         @if ($content)
-            <div @click="modalOpen=true">
+            <div @class(['w-full min-w-0' => $buttonFullWidth]) @click="modalOpen=true">
                 {{ $content }}
             </div>
         @else
@@ -186,31 +187,49 @@
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button class="w-full" isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button isError @click="modalOpen=true" wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target="{{ $triggerWireTarget }}">
+                    <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target="{{ $triggerWireTarget }}" x-bind:disabled="submitting">
+                        @if ($triggerWireTarget === '')
+                            <x-loading-on-button x-show="submitting" x-cloak />
+                        @endif
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Node\ApplyNodeClusterNetworkRevision;
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
@@ -27,6 +28,7 @@ use App\Models\NodeVolumeCopy;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
+use App\Support\NodeImages;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -94,10 +96,13 @@ class MoveNodeWorkloadJob implements ShouldQueue
     public function __construct(public int $operationId)
     {
         // A stateful move touches its operation while it copies, so the stale operation limit does not apply.
-        $operation = NodeOperation::query()->with('workload')->find($operationId);
+        $operation = NodeOperation::query()->with(['workload', 'revision'])->find($operationId);
         $workloadIds = $operation === null ? [] : array_filter([$operation->node_workload_id, ...$operation->groupWorkloadIds()]);
         if ($workloadIds !== [] && NodeWorkload::query()->withoutGlobalScopes()->whereKey($workloadIds)->get()->contains(fn (NodeWorkload $workload): bool => $workload->hasVolumesWithData())) {
             $this->timeout = self::STATEFUL_TIMEOUT;
+        } elseif ($operation !== null && NodeImages::isLocalImage($operation->revision?->image)) {
+            // The target deployment copies the local image from a peer first (decision 0030).
+            $this->timeout += FetchNodeImage::MAX_SECONDS;
         }
     }
 
@@ -179,6 +184,10 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 }
                 $deploymentOperation = $this->waitForDeployment($deployment['operation'], $deadline);
                 $deployments[$workload->id] = $deploymentOperation;
+                if ($workload->id === $operation->workload->id && filled(data_get($deploymentOperation->result, 'fetched_image'))) {
+                    // The deployment copied the local image from a peer (decision 0030); the move log shows it.
+                    self::checkpoint($operation, ['fetched_image' => data_get($deploymentOperation->result, 'fetched_image')]);
+                }
                 if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
                     $verification = data_get($deploymentOperation->result, 'verification', []);
                     $targetStarted = data_get($verification, 'state') === 'running' || data_get($verification, 'state') === 'exited';

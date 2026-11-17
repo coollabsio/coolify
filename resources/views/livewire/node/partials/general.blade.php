@@ -22,6 +22,11 @@
     helper="Connection details and host information that Sentinel reports.">
     <x-slot:actions>
         @can('manageSentinel', $node)
+            <x-forms.button type="button" wire:click="validateNode" :isHighlighted="! $node->is_usable"
+                title="Check Podman and the host requirements, then update the server status">
+                <x-reicon :name="$node->is_usable ? 'refresh' : 'alert-circle'" class="size-3.5" />
+                {{ $node->is_usable ? 'Revalidate connection' : 'Validate connection' }}
+            </x-forms.button>
             <x-forms.button type="button" wire:click="refreshInformation"
                 title="Refresh server information">
                 <x-reicon name="refresh" class="size-3.5" />
@@ -93,7 +98,7 @@
 </x-application.settings-section>
 
 <form wire:submit="saveConnection" class="application-settings-form">
-<x-unsaved-bar action="saveConnection" />
+<x-unsaved-bar action="saveConnection" targets="connection" />
 <x-application.settings-section id="node-connection-section" title="Connection"
     helper="How Coolify identifies and connects to this server.">
     <div class="grid gap-4 sm:grid-cols-2">
@@ -123,14 +128,14 @@
 </form>
 
 <form wire:submit="saveImageCleanup" class="application-settings-form">
+<x-unsaved-bar action="saveImageCleanup" targets="imageCleanup" />
 <x-application.settings-section id="node-image-cleanup-section" title="Image cleanup"
-    helper="Removes the images that no container uses. The deployed revision and the 2 revisions before it of each application, and the builder, BuildKit, registry, and Sentinel images stay. Volumes, networks, and the build cache stay.">
+    helper="Removes the images that no container uses. The deployed revision and the 2 revisions before it of each application, the last 3 builds of each application on a builder server, and the builder, BuildKit, and Sentinel images stay. Volumes, networks, and the build cache stay.">
     <x-slot:actions>
         @can('update', $node)
             <x-forms.button type="button" wire:click="cleanupImages" title="Clean up images now">
                 Clean up now
             </x-forms.button>
-            <x-forms.button type="submit">Save</x-forms.button>
         @endcan
     </x-slot:actions>
     <div class="grid gap-4 sm:grid-cols-2">

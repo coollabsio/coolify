@@ -9,8 +9,8 @@ use App\Enums\NodeWorkloadSourceType;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeBuildLogLine;
-use App\Models\NodeRegistry;
 use App\Services\Security\SensitiveDataRedactor;
+use App\Support\NodeImages;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
@@ -24,8 +24,8 @@ use Throwable;
  * Sentinel only starts the container (`image.build.v1`). The state comes from
  * `container.list` and the output from `container.logs`. The last line of a
  * successful build carries the image digest. The image storage of the cluster
- * decides the target: an external registry, the built-in registry, or, in a
- * cluster with one Node, its Podman store, where Sentinel loads the build.
+ * decides the target: an external registry, or the Podman store of the build
+ * Node, where Sentinel loads the build. Other Nodes copy it from there (decision 0030).
  */
 class RunImageBuild
 {
@@ -34,6 +34,9 @@ class RunImageBuild
     private const POLL_SECONDS = 3;
 
     private const RESULT_PREFIX = 'COOLIFY_BUILD_RESULT ';
+
+    /** The local builds of a workload that `image.load` keeps on the build Node. */
+    private const LOCAL_KEEP_TAGS = 10;
 
     /**
      * @param  array{source_type: string, dockerfile_path?: string, dockerfile_content?: string}  $source
@@ -53,15 +56,14 @@ class RunImageBuild
         $variables = $build->workload->buildVariables();
         $cluster = $node->cluster;
         $storage = $cluster?->imageStorage()
-            ?? throw new RuntimeException('Choose where the cluster stores its images: open the cluster, then Advanced, Image storage.');
+            ?? throw new RuntimeException((string) $cluster?->localImageStorageError() ?: 'The server is not in a cluster.');
         $image = match ($storage) {
             NodeImageStorage::EXTERNAL => "{$cluster->image_repository}:{$build->workload->uuid}-{$build->uuid}",
-            NodeImageStorage::BUILT_IN => NodeRegistry::HOST."/{$build->workload->uuid}:{$build->uuid}",
-            NodeImageStorage::LOCAL => NodeRegistry::LOCAL_PREFIX."{$build->workload->uuid}:{$build->uuid}",
+            NodeImageStorage::LOCAL => NodeImages::LOCAL_PREFIX."{$build->workload->uuid}:{$build->uuid}",
         };
         $imageLogin = null;
         if ($storage === NodeImageStorage::EXTERNAL) {
-            $node->ensureReportedCapability(NodeRegistry::EXTERNAL_IMAGE_CAPABILITY);
+            $node->ensureReportedCapability(NodeImages::EXTERNAL_IMAGE_CAPABILITY);
             $imageLogin = $cluster->imageStorageLogin($image);
         }
         $secrets = array_values(array_filter([...array_values($credential), $push['push_password'] ?? null, $imageLogin['password'] ?? null, ...array_values($variables['secrets'])], fn (?string $value): bool => filled($value)));
@@ -142,7 +144,7 @@ class RunImageBuild
                 'command_id' => (string) Str::uuid(),
                 'build_id' => $build->uuid,
                 'image' => $build->image,
-                'keep_tags' => $node->cluster->registry?->keep_tags ?? 10,
+                'keep_tags' => self::LOCAL_KEEP_TAGS,
             ], 660);
         }
 
