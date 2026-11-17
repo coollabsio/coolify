@@ -187,6 +187,9 @@ class EnvironmentVariable extends BaseModel
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
             }
+            if ($environmentVariable->isDirty('value')) {
+                ValidationPatterns::rejectNulByteInEnvironmentVariableValue($environmentVariable->value);
+            }
             $environmentVariable->authorizeAddedSharedVariableReferences();
             $environmentVariable->updateIsShared();
         });
@@ -719,7 +722,7 @@ class EnvironmentVariable extends BaseModel
      */
     private static function sharedVariableReferences(?string $value): array
     {
-        preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $value, $matches, PREG_SET_ORDER);
+        preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, (string) $value, $matches, PREG_SET_ORDER);
 
         return array_map(fn (array $match): array => ['type' => $match[1], 'key' => $match[2]], $matches);
     }
@@ -831,24 +834,19 @@ class EnvironmentVariable extends BaseModel
             return $environment_variable;
         }
         $environment_variable = self::withoutEdgeLineBreaks($environment_variable);
-        $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
-        if ($sharedEnvsFound->isEmpty()) {
-            return $environment_variable;
-        }
-        foreach ($sharedEnvsFound as $sharedEnv) {
-            $type = str($sharedEnv)->trim()->match('/(.*?)\./');
-            if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+        preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, $environment_variable, $references, PREG_SET_ORDER);
+        foreach ($references as [$reference, $type, $variable]) {
+            if (! in_array($type, SHARED_VARIABLE_TYPES, true)) {
                 continue;
             }
-            $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
             $id = null;
-            if ($type->value() === 'environment') {
+            if ($type === 'environment') {
                 $id = $resource->environment->id;
-            } elseif ($type->value() === 'project') {
+            } elseif ($type === 'project') {
                 $id = $resource->environment->project->id;
-            } elseif ($type->value() === 'team') {
+            } elseif ($type === 'team') {
                 $id = $resource->team()->id;
-            } elseif ($type->value() === 'server') {
+            } elseif ($type === 'server') {
                 if ($serverOverride) {
                     $id = $serverOverride->id;
                 } elseif (isset($resource->server) && $resource->server) {
@@ -861,8 +859,8 @@ class EnvironmentVariable extends BaseModel
                 continue;
             }
             $found = $sharedVariables !== null
-                ? $sharedVariables->first(fn (SharedEnvironmentVariable $shared): bool => $shared->type === $type->value()
-                    && $shared->key === $variable->value()
+                ? $sharedVariables->first(fn (SharedEnvironmentVariable $shared): bool => $shared->type === $type
+                    && $shared->key === $variable
                     && (int) $shared->{"{$type}_id"} === (int) $id)
                 : SharedEnvironmentVariable::where('type', $type)
                     ->where('key', $variable)
@@ -870,11 +868,11 @@ class EnvironmentVariable extends BaseModel
                     ->where("{$type}_id", $id)
                     ->first();
             if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once) && ($canReveal === null || $canReveal($found))) {
-                $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
+                $environment_variable = str_replace($reference, $found->value, $environment_variable);
             }
         }
 
-        return str($environment_variable)->value();
+        return $environment_variable;
     }
 
     private function get_environment_variables(?string $environment_variable = null): ?string

@@ -162,3 +162,8 @@ const NEEDS_TO_DISABLE_STRIPPREFIX = [
     'rybbit' => ['rybbit_backend'],
 ];
 const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];
+/**
+ * The only parser of shared variable references ({{team.KEY}}). Every place that reads references uses it,
+ * so that all of them find the same references in a value.
+ */
+const SHARED_VARIABLE_REFERENCE_PATTERN = '/{{\s*(\w+)\.([^}\s]+)\s*}}/';

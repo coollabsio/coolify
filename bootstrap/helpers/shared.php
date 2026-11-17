@@ -5985,24 +5985,19 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
         return $value;
     }
     $value = trim($value);
-    $sharedEnvsFound = str($value)->matchAll('/{{(.*?)}}/');
-    if ($sharedEnvsFound->isEmpty()) {
-        return $value;
-    }
-    foreach ($sharedEnvsFound as $sharedEnv) {
-        $type = str($sharedEnv)->trim()->match('/(.*?)\./');
-        if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, $value, $references, PREG_SET_ORDER);
+    foreach ($references as [$reference, $type, $variable]) {
+        if (! in_array($type, SHARED_VARIABLE_TYPES, true)) {
             continue;
         }
-        $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
         $id = null;
-        if ($type->value() === 'environment') {
+        if ($type === 'environment') {
             $id = $resource->environment->id;
-        } elseif ($type->value() === 'project') {
+        } elseif ($type === 'project') {
             $id = $resource->environment->project->id;
-        } elseif ($type->value() === 'team') {
+        } elseif ($type === 'team') {
             $id = $resource->team()->id;
-        } elseif ($type->value() === 'server') {
+        } elseif ($type === 'server') {
             $id = data_get($resource, 'destination.server_id');
         }
         if (is_null($id)) {
@@ -6014,11 +6009,11 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             ->where("{$type}_id", $id)
             ->first();
         if ($found) {
-            $value = str($value)->replace("{{{$sharedEnv}}}", $found->value);
+            $value = str_replace($reference, $found->value, $value);
         }
     }
 
-    return str($value)->value();
+    return $value;
 }
 
 /**
@@ -6044,7 +6039,7 @@ function redactLockedValuesInGeneratedCompose(string|array|Collection|null $comp
 
     $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
 
-    preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
     $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], SHARED_VARIABLE_TYPES, true));
     $teamId = $resource->team()?->id;
     if ($references->isNotEmpty() && $teamId !== null) {
