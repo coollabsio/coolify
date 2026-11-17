@@ -37,9 +37,29 @@
 
     <x-application.settings-section title="Executions"
         helper="Review backup runs across every schedule of this database." flush>
-        @if ($executions->total() > 10)
+        @php
+            $canDeleteExecutions = auth()->user()?->can('delete', $database) ?? false;
+        @endphp
+        @if ($executions->total() > 10 || ($canDeleteExecutions && $executions->isNotEmpty()))
             <x-slot:actions>
-                <x-page-size-select model="perPage" livewire />
+                @if ($canDeleteExecutions && $executions->isNotEmpty())
+                    <x-forms.button wire:click="cleanupFailed">Clean failed backups</x-forms.button>
+                    <x-modal-confirmation title="Cleanup Deleted Backup Entries?" isErrorButton
+                        submitAction="cleanupDeleted()" :actions="[
+                            'Permanently delete execution records already removed from local storage.',
+                            'Actual backup files are not changed.',
+                        ]"
+                        confirmationText="cleanup deleted backups"
+                        confirmationLabel="Type cleanup deleted backups to confirm."
+                        shortConfirmationLabel="Confirmation">
+                        <x-slot:trigger>
+                            <x-forms.button isError>Clean deleted entries</x-forms.button>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
+                @endif
+                @if ($executions->total() > 10)
+                    <x-page-size-select model="perPage" livewire />
+                @endif
             </x-slot:actions>
         @endif
         @if ($executions->isEmpty())
@@ -87,7 +107,7 @@
                                 </span>
                             </span>
                             <span>{{ $execution['size'] ? formatBytes($execution['size']) : '-' }}</span>
-                            <span class="flex justify-end">
+                            <span class="flex items-center justify-end gap-1" x-on:click.stop x-on:keydown.enter.stop>
                                 @can('manageBackups', $database)
                                     @if ($execution['download_url'] && $s3Downloads)
                                         <button type="button" wire:click.stop="downloadExecution('{{ $execution['uuid'] }}')"
@@ -102,6 +122,23 @@
                                         </a>
                                     @endif
                                 @endcan
+                                @if ($canDeleteExecutions)
+                                    <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
+                                        submitAction="deleteExecution('{{ $execution['uuid'] }}')"
+                                        :checkboxes="$execution['has_live_s3_copies'] ? [['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from every S3 storage']] : []"
+                                        :actions="[$execution['local_storage_deleted'] || blank($execution['filename']) ? 'This backup execution record will be deleted.' : 'This backup will be permanently deleted from local storage.']"
+                                        confirmationText="{{ $execution['filename'] ?: $execution['uuid'] }}"
+                                        confirmationLabel="Enter the backup filename to confirm."
+                                        shortConfirmationLabel="Backup Filename">
+                                        <x-slot:trigger>
+                                            <button type="button"
+                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                title="Delete backup" aria-label="Delete backup">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </button>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                @endif
                             </span>
                         </div>
                     @endforeach

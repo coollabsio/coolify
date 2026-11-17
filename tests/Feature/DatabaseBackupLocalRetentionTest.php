@@ -80,7 +80,10 @@ function fakeLocalRetentionServer(?string $failWhen = null): Collection
 }
 
 it('keeps the configured number of local backups for each database of a schedule', function () {
-    $backup = localRetentionBackup(['database_backup_retention_amount_locally' => 2]);
+    $backup = localRetentionBackup([
+        'databases_to_backup' => 'app,auth,billing',
+        'database_backup_retention_amount_locally' => 2,
+    ]);
     foreach (['app', 'auth', 'billing'] as $database) {
         foreach ([1, 2, 3] as $day) {
             localRetentionExecution($backup, "{$database}-{$day}", $database, $day * 24);
@@ -95,7 +98,10 @@ it('keeps the configured number of local backups for each database of a schedule
 });
 
 it('keeps the newest backup of each database when the storage limit is reached', function () {
-    $backup = localRetentionBackup(['database_backup_retention_max_storage_locally' => 1]);
+    $backup = localRetentionBackup([
+        'databases_to_backup' => 'app,auth',
+        'database_backup_retention_max_storage_locally' => 1,
+    ]);
     $gigabyte = 1024 ** 3;
     localRetentionExecution($backup, 'app-new', 'app', 1, $gigabyte);
     localRetentionExecution($backup, 'auth-new', 'auth', 1, $gigabyte);
@@ -107,6 +113,36 @@ it('keeps the newest backup of each database when the storage limit is reached',
 
     expect($backup->executions()->pluck('uuid')->sort()->values()->all())
         ->toBe(['app-new', 'app-old', 'auth-new']);
+});
+
+it('expires the backups of a database that the schedule no longer backs up', function (array $retention, array $kept) {
+    $backup = localRetentionBackup(['databases_to_backup' => 'app', ...$retention]);
+    $gigabyte = 1024 ** 3;
+    localRetentionExecution($backup, 'app-new', 'app', 1, $gigabyte);
+    localRetentionExecution($backup, 'app-old', 'app', 48, $gigabyte);
+    localRetentionExecution($backup, 'removed-new', 'removed', 24 * 10, $gigabyte);
+    localRetentionExecution($backup, 'removed-old', 'removed', 24 * 11, $gigabyte);
+    fakeLocalRetentionServer();
+
+    removeOldBackups($backup);
+
+    expect($backup->executions()->pluck('uuid')->sort()->values()->all())->toBe($kept);
+})->with([
+    'backups to keep' => [['database_backup_retention_amount_locally' => 2], ['app-new', 'app-old']],
+    'days to keep' => [['database_backup_retention_days_locally' => 5], ['app-new', 'app-old']],
+    'maximum storage' => [['database_backup_retention_max_storage_locally' => 1], ['app-new', 'app-old']],
+]);
+
+it('treats the dump of all databases as the database of the schedule', function () {
+    $backup = localRetentionBackup(['dump_all' => true, 'database_backup_retention_amount_locally' => 1]);
+    localRetentionExecution($backup, 'all-new', 'all', 1);
+    localRetentionExecution($backup, 'all-old', 'all', 24);
+    localRetentionExecution($backup, 'single', 'postgres', 48);
+    fakeLocalRetentionServer();
+
+    removeOldBackups($backup);
+
+    expect($backup->executions()->pluck('uuid')->all())->toBe(['all-new']);
 });
 
 it('keeps the executions of local files that the server failed to delete', function () {

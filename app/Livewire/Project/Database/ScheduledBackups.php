@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Jobs\DatabaseBackupJob;
+use App\Livewire\Concerns\ManagesDatabaseBackup;
 use App\Models\ScheduledDatabaseBackup;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
@@ -13,6 +13,7 @@ class ScheduledBackups extends Component
 {
     use AuthorizesRequests;
     use ListensToTeamChannel;
+    use ManagesDatabaseBackup;
 
     public $database;
 
@@ -60,16 +61,12 @@ class ScheduledBackups extends Component
 
     public function backupNow(string $backupUuid): void
     {
-        try {
-            $this->authorize('manageBackups', $this->database);
-            $backup = $this->database->scheduledBackups()->where('uuid', $backupUuid)->firstOrFail();
-            if (! str($this->database->status)->startsWith('running')) {
-                $this->dispatch('error', 'The database must be running to start a backup.');
+        $this->authorize('manageBackups', $this->database);
+        $backup = $this->database->scheduledBackups()->where('uuid', $backupUuid)->first();
+        abort_unless($backup, 404);
 
-                return;
-            }
-            DatabaseBackupJob::dispatch($backup);
-            $this->dispatch('success', 'Backup queued.');
+        try {
+            $this->queueDatabaseBackup($backup);
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -117,7 +114,13 @@ class ScheduledBackups extends Component
 
     public function render(): View
     {
-        $this->database->loadMissing(['scheduledBackups.s3', 'scheduledBackups.s3Storages']);
+        $this->database->load([
+            'scheduledBackups' => fn ($query) => $query->withCount('executions')->with([
+                's3',
+                's3Storages',
+                'latest_log' => fn ($query) => $query->limit(1),
+            ]),
+        ]);
 
         return view('livewire.project.database.scheduled-backups');
     }

@@ -411,22 +411,27 @@ function removeOldBackups($backup): void
 
 /**
  * Successful executions that fall outside the retention settings, newest execution first. The amount and the days
- * apply to each database of the schedule. The storage limit applies to all databases together and keeps the newest
- * backup of each database.
+ * apply to each database that the schedule still backs up. The storage limit applies to all databases together and
+ * keeps the newest backup of each of these databases. The backups of a database that the schedule no longer backs up
+ * count against the whole schedule, so they expire as new backups come in.
  *
  * @param  Collection<int, ScheduledDatabaseBackupExecution>  $executions  Sorted newest first.
+ * @param  array<int, string>|null  $activeDatabaseNames  The databases that the schedule backs up; null for all of them.
  * @return Collection<int, ScheduledDatabaseBackupExecution>
  */
-function backupExecutionsOutsideRetention(Collection $executions, ?int $retentionAmount, ?int $retentionDays, int|float|null $maxStorageGB): Collection
+function backupExecutionsOutsideRetention(Collection $executions, ?int $retentionAmount, ?int $retentionDays, int|float|null $maxStorageGB, ?array $activeDatabaseNames = null): Collection
 {
     if ($executions->isEmpty()) {
         return collect();
     }
 
     $backupsToDelete = collect();
+    $isActive = fn (string $databaseName): bool => $activeDatabaseNames === null || in_array($databaseName, $activeDatabaseNames, true);
     $executionsByDatabase = $executions->groupBy(fn (ScheduledDatabaseBackupExecution $execution) => (string) $execution->database_name);
+    $activeExecutionsByDatabase = $executionsByDatabase->filter(fn (Collection $databaseExecutions, $databaseName) => $isActive((string) $databaseName));
+    $inactiveExecutions = $executions->reject(fn (ScheduledDatabaseBackupExecution $execution) => $isActive((string) $execution->database_name));
 
-    foreach ($executionsByDatabase as $databaseExecutions) {
+    foreach ($activeExecutionsByDatabase as $databaseExecutions) {
         if ($retentionAmount > 0) {
             $backupsToDelete = $backupsToDelete->merge($databaseExecutions->skip($retentionAmount));
         }
@@ -439,9 +444,22 @@ function backupExecutionsOutsideRetention(Collection $executions, ?int $retentio
         }
     }
 
+    if ($retentionAmount > 0) {
+        $backupsToDelete = $backupsToDelete->merge(
+            $executions->skip($retentionAmount)->reject(fn ($execution) => $isActive((string) $execution->database_name))
+        );
+    }
+
+    if ($retentionDays > 0) {
+        $oldestAllowedDate = $executions->first()->created_at->clone()->utc()->subDays($retentionDays);
+        $backupsToDelete = $backupsToDelete->merge(
+            $inactiveExecutions->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate)
+        );
+    }
+
     if ($maxStorageGB > 0) {
         $maxStorageBytes = $maxStorageGB * pow(1024, 3);
-        $newestIds = $executionsByDatabase->map(fn (Collection $databaseExecutions) => $databaseExecutions->first()->id);
+        $newestIds = $activeExecutionsByDatabase->map(fn (Collection $databaseExecutions) => $databaseExecutions->first()->id);
         $totalSize = 0;
 
         foreach ($executions->reject(fn ($execution) => $newestIds->contains($execution->id)) as $backupExecution) {
@@ -477,6 +495,7 @@ function deleteOldBackupsLocally($backup): Collection
         $backup->database_backup_retention_amount_locally,
         $backup->database_backup_retention_days_locally,
         $backup->database_backup_retention_max_storage_locally,
+        $backup->activeDatabaseNames(),
     );
 
     if ($backupsToDelete->isEmpty()) {
@@ -529,6 +548,7 @@ function deleteOldBackupsFromS3($backup): Collection
         ->get();
 
     $deletedReplicas = $liveReplicas->filter(fn (DatabaseBackupS3Replica $replica) => ! $replica->s3);
+    $activeDatabaseNames = $backup->activeDatabaseNames();
 
     foreach ($liveReplicas->filter(fn (DatabaseBackupS3Replica $replica) => $replica->s3)->groupBy('s3_storage_id') as $replicas) {
         $successfulBackups = $backup->executions()
@@ -542,6 +562,7 @@ function deleteOldBackupsFromS3($backup): Collection
             $backup->database_backup_retention_amount_s3,
             $backup->database_backup_retention_days_s3,
             $backup->database_backup_retention_max_storage_s3,
+            $activeDatabaseNames,
         );
 
         $filesToDelete = $backupsToDelete

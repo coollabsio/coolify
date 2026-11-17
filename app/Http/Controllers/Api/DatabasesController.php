@@ -3013,7 +3013,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup configuration',
-        description: 'Deletes a backup configuration and all its executions.',
+        description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}',
         operationId: 'delete-backup-configuration-by-uuid',
         security: [
@@ -3100,12 +3100,13 @@ class DatabasesController extends Controller
             DB::beginTransaction();
             // Get all executions for this backup configuration
             $executions = $backup->executions()->get();
+            $server = $database->destination?->server;
+            $deleteLocalFiles = $server?->isFunctional() ?? false;
 
-            // Delete all execution files (locally and optionally from S3)
+            // Delete all execution files (locally when the server is reachable, and optionally from S3)
             foreach ($executions as $execution) {
-                if ($execution->filename) {
-                    deleteBackupsLocally($execution->filename, $database->destination->server, throwError: true);
-
+                if ($deleteLocalFiles && $execution->filename && ! $execution->local_storage_deleted) {
+                    deleteBackupsLocally($execution->filename, $server, throwError: true);
                 }
 
                 if ($deleteS3) {
@@ -3139,7 +3140,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup execution',
-        description: 'Deletes a specific backup execution.',
+        description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}',
         operationId: 'delete-backup-execution-by-uuid',
         security: [
@@ -3239,9 +3240,10 @@ class DatabasesController extends Controller
         $deleteS3 = $request->boolean('delete_s3', false);
 
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $database->destination->server, throwError: true);
-
+            // An unreachable server keeps the local file, as when the UI skips the local delete.
+            $server = $database->destination?->server;
+            if ($execution->filename && ! $execution->local_storage_deleted && ($server?->isFunctional() ?? false)) {
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
             if ($deleteS3) {
