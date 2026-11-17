@@ -5508,7 +5508,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup configuration'
-      description: 'Deletes a backup configuration and all its executions.'
+      description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.'
       operationId: delete-backup-configuration-by-uuid
       parameters:
         -
@@ -6605,7 +6605,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup execution'
-      description: 'Deletes a specific backup execution.'
+      description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.'
       operationId: delete-backup-execution-by-uuid
       parameters:
         -
@@ -13438,6 +13438,14 @@ paths:
                   type: string
                   nullable: true
                   description: 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'
+                public_ipv4:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
+                public_ipv6:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
                 server_timezone:
                   type: string
                   description: 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'
@@ -15192,7 +15200,7 @@ paths:
       tags:
         - Services
       summary: Start
-      description: 'Start service.'
+      description: 'Start service. Pulls the latest images first.'
       operationId: start-service-by-uuid
       parameters:
         -
@@ -18995,6 +19003,14 @@ components:
           type: string
           nullable: true
           description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
+        public_ipv4:
+          type: string
+          nullable: true
+          description: 'Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP.'
+        public_ipv6:
+          type: string
+          nullable: true
+          description: 'Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP.'
         is_reachable:
           type: boolean
         ssh_host_key:
