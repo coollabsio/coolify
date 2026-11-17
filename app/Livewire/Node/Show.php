@@ -425,26 +425,13 @@ class Show extends Component
 
     public function deleteNode(mixed $password = null): bool|string
     {
-        $this->authorize('delete', $this->node);
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return 'The provided password is incorrect.';
-        }
+        return $this->deleteServer($password, force: false);
+    }
 
-        try {
-            DeleteNode::run($this->node, auth()->user());
-        } catch (DomainException $exception) {
-            $this->dispatch('error', $exception->getMessage());
-
-            return true;
-        } catch (\Throwable $e) {
-            handleError($e, $this);
-
-            return true;
-        }
-
-        $this->redirectRoute('server.index', navigate: true);
-
-        return true;
+    /** Deletes a Node that still holds volume data, for a server that is gone for good. */
+    public function forceDeleteNode(mixed $password = null): bool|string
+    {
+        return $this->deleteServer($password, force: true);
     }
 
     public function renewFluxCertificate(): void
@@ -468,6 +455,7 @@ class Show extends Component
             'workloads' => $this->workloadsViewData(),
             'containers' => ['orphanVolumes' => $this->orphanVolumes()],
             'general' => ['lastImageCleanup' => $this->node->operations()->where('command_type', CleanupNodeImages::COMMAND_TYPE)->latest('id')->first()],
+            'danger' => ['volumeData' => DeleteNode::dataOn($this->node)],
             default => [],
         });
     }
@@ -603,6 +591,30 @@ class Show extends Component
                 default => null,
             },
         ];
+    }
+
+    private function deleteServer(mixed $password, bool $force): bool|string
+    {
+        $this->authorize('delete', $this->node);
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
+        try {
+            DeleteNode::run($this->node, auth()->user(), $force);
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return true;
+        }
+
+        $this->redirectRoute('server.index', navigate: true);
+
+        return true;
     }
 
     private function resolveSection(?string $section): string

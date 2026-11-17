@@ -733,15 +733,22 @@ class ClustersController extends Controller
 
     #[OA\Delete(
         summary: 'Delete Node',
-        description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. Needs a team admin.',
+        description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. A server that still holds volumes or volume copies is deleted only with `force=true`, for a server that is gone for good: Coolify cannot remove that data after the delete. Needs a team admin.',
         path: '/nodes/{uuid}',
         operationId: 'delete-node-by-uuid',
         security: [['bearerAuth' => []]],
         tags: ['Clusters'],
-        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the Node.', required: true, schema: new OA\Schema(type: 'string'))],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the Node.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'force', in: 'query', description: 'Delete also when the server holds volumes or volume copies. The data stays on the server. The default is false.', required: false, schema: new OA\Schema(type: 'boolean', default: false)),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'The Node is deleted.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'message', type: 'string')])),
-            new OA\Response(response: 400, description: 'The Node is in a cluster or runs applications.'),
+            new OA\Response(response: 400, description: 'The Node is in a cluster or runs applications, or it holds volume data and `force` is not set.', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'volumes', type: 'integer', description: 'Only for volume data.'),
+                new OA\Property(property: 'volume_copies', type: 'integer', description: 'Only for volume data.'),
+            ])),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
@@ -755,9 +762,14 @@ class ClustersController extends Controller
         }
         $this->authorize('delete', $node);
 
-        return $this->runClusterAction(function () use ($request, $node): JsonResponse {
-            DeleteNode::run($node, $request->user());
-            auditLog('api.node.deleted', ['team_id' => $node->team_id, 'node_uuid' => $node->uuid, 'node_name' => $node->name]);
+        $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
+        ['volumes' => $volumes, 'copies' => $copies] = DeleteNode::dataOn($node);
+        if (! $force && $node->node_cluster_id === null && ! $node->workloads()->exists() && $volumes + $copies > 0) {
+            return response()->json(['message' => DeleteNode::dataError($volumes, $copies), 'volumes' => $volumes, 'volume_copies' => $copies], 400);
+        }
+
+        return $this->runClusterAction(function () use ($request, $node, $force): JsonResponse {
+            DeleteNode::run($node, $request->user(), $force, 'api');
 
             return response()->json(['message' => 'Node deleted.']);
         });

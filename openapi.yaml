@@ -9588,7 +9588,7 @@ paths:
       tags:
         - Clusters
       summary: 'Delete Node'
-      description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. Needs a team admin.'
+      description: 'Delete a server (Node) from Coolify, like the Danger zone of the Node page. The server must be in no cluster and run no applications. Coolify runs no command on the server: Sentinel and the data stay on it. A server that still holds volumes or volume copies is deleted only with `force=true`, for a server that is gone for good: Coolify cannot remove that data after the delete. Needs a team admin.'
       operationId: delete-node-by-uuid
       parameters:
         -
@@ -9598,6 +9598,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: force
+          in: query
+          description: 'Delete also when the server holds volumes or volume copies. The data stays on the server. The default is false.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'The Node is deleted.'
@@ -9608,7 +9616,15 @@ paths:
                   message: { type: string }
                 type: object
         '400':
-          description: 'The Node is in a cluster or runs applications.'
+          description: 'The Node is in a cluster or runs applications, or it holds volume data and `force` is not set.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  volumes: { description: 'Only for volume data.', type: integer }
+                  volume_copies: { description: 'Only for volume data.', type: integer }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '403':

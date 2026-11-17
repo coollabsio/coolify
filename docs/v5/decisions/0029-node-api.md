@@ -100,8 +100,13 @@ the backup schedule of a database.
 12. **Node delete and the recovery actions of a cluster.** `DELETE /nodes/{uuid}`
     calls `DeleteNode`, the action of the Node page: the Node must be in no
     cluster and run no applications, else the API answers 400 with the message
-    of the page. The delete removes only the record. Coolify runs no command on
-    the server, so Sentinel and the data stay on it. A Node has no server
+    of the page. A Node that still holds volumes or volume copies is refused
+    with the counts, also on the page. `force=true` (on the page, a second
+    confirmation) deletes it for a server that is gone for good, and writes a
+    `node.force_deleted` warning with the counts to the audit log. The delete
+    removes only the record. Coolify runs no command on the server, so Sentinel
+    and the data stay on it, and Coolify cannot remove that data after the
+    delete. A Node has no server
     transfer, so the rule of `Server::isTransferredAway()` does not apply.
     `POST /clusters/{uuid}/network/reconcile`, `.../network/repair`, and
     `.../sentinel/upgrade` call `ManageNodeClusterNetwork`, the action of the
