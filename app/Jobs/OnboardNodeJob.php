@@ -10,10 +10,13 @@ use App\Actions\Node\ValidateNode;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Sleep;
 use RuntimeException;
 use Throwable;
 
@@ -24,6 +27,9 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
     public int $tries = 1;
 
     public int $timeout = 1200;
+
+    /** How long the onboarding waits for another network run of the cluster. */
+    private const NETWORK_LOCK_WAIT_SECONDS = 300;
 
     public int $uniqueFor = 1500;
 
@@ -55,7 +61,7 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
 
             $this->step($node, 'networking', 'Configuring the cluster network');
             $cluster = $node->fresh('cluster')->cluster ?? throw new RuntimeException('The server does not belong to a cluster.');
-            ReconcileNodeClusterNetwork::run($cluster, $user);
+            $this->reconcileNetwork($cluster, $user);
 
             $this->step($node, 'verifying', 'Running final checks');
             PingFluxConnection::run($node);
@@ -89,6 +95,27 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
                     throw new RuntimeException('The server did not connect to Coolify.');
                 }
                 sleep(1);
+            }
+        }
+    }
+
+    /**
+     * Another onboarding or a scheduled run can hold the network lock of the cluster, for example when
+     * two servers are added one after the other. Waits for it, then applies the network with this server.
+     */
+    private function reconcileNetwork(NodeCluster $cluster, User $user): void
+    {
+        $deadline = now()->addSeconds(self::NETWORK_LOCK_WAIT_SECONDS);
+        while (true) {
+            try {
+                ReconcileNodeClusterNetwork::run($cluster, $user);
+
+                return;
+            } catch (LockTimeoutException $exception) {
+                if (now()->gte($deadline)) {
+                    throw new RuntimeException('Another network change of this cluster did not finish in time. Retry the installation in a few minutes.', previous: $exception);
+                }
+                Sleep::for(5)->seconds();
             }
         }
     }
