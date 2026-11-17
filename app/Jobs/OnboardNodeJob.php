@@ -7,6 +7,7 @@ use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeHost;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\ValidateNode;
+use App\Actions\Sentinel\FetchFluxNodeInformation;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Models\Node;
 use App\Models\User;
@@ -58,6 +59,8 @@ class OnboardNodeJob implements ShouldBeUnique, ShouldQueue
 
             $this->step($node, 'verifying', 'Running final checks');
             PingFluxConnection::run($node);
+            // Without this, the server page shows Unknown details until the next scheduled refresh.
+            rescue(fn () => FetchFluxNodeInformation::run($node->fresh()), report: false);
 
             $this->step($node, 'ready', 'Server ready', 'ready');
         } catch (Throwable $exception) {
