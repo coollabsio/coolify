@@ -118,6 +118,29 @@ class Previews extends Component
         }
     }
 
+    /**
+     * Asks GitHub whether the branch of the pull request is in the repository of the application, because the
+     * browser sends only the number. A pull request from a fork, or one that Coolify cannot check, is not.
+     */
+    private function isPullRequestFromRepository(int $pullRequestId): bool
+    {
+        if (! $this->application->isGithubAppSource()) {
+            return false;
+        }
+        try {
+            ['data' => $pullRequest] = githubApi(
+                source: $this->application->source,
+                endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/pulls/{$pullRequestId}",
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        $headRepositoryId = data_get($pullRequest, 'head.repo.id');
+        $baseRepositoryId = data_get($pullRequest, 'base.repo.id');
+
+        return is_int($headRepositoryId) && $headRepositoryId === $baseRepositoryId;
+    }
+
     public function save_preview($preview_id)
     {
         try {
@@ -157,6 +180,7 @@ class Previews extends Component
                         'docker_compose_domains' => $this->application->docker_compose_domains,
                     ]);
                     $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
+                    $found->recordSameRepository($this->isPullRequestFromRepository($pull_request_id));
                 }
                 $found->generate_preview_fqdn_compose(keepExistingDomains: ! $found->wasRecentlyCreated);
                 $this->application->refresh();

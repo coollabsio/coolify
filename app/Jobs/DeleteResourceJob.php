@@ -13,6 +13,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\LocalFileVolume;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
@@ -373,6 +374,27 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\Throwable $e) {
             // Log the error but don't fail the job
             \Log::warning('Error stopping preview containers for application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
+        }
+
+        try {
+            if ($pull_request_id !== 0) {
+                // Older versions wrote the Compose file of a preview to the folder of the application.
+                $legacyComposeFile = $application->workdir().'/'.addPreviewDeploymentSuffix('docker-compose', $pull_request_id).'.yaml';
+                $previewFileMounts = $application->fileStorages
+                    ->reject(fn (LocalFileVolume $storage) => $storage->is_host_file)
+                    ->map(fn (LocalFileVolume $storage) => $storage->forPullRequest($pull_request_id))
+                    ->filter(fn (LocalFileVolume $storage) => $storage->isForPullRequest())
+                    ->map(fn (LocalFileVolume $storage) => $storage->resolvedFsPath($application->workdir())->value())
+                    ->filter(fn (string $path) => str_starts_with($path, $application->workdir().'/'))
+                    ->map(fn (string $path) => 'rm -rf '.escapeshellarg($path));
+                instant_remote_process([
+                    'rm -rf '.escapeshellarg($application->deploymentWorkdir($pull_request_id)),
+                    'rm -f '.escapeshellarg($legacyComposeFile),
+                    ...$previewFileMounts->values()->all(),
+                ], $server, false);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Error removing the preview folder of application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
         }
 
         // Finally, force delete to trigger resource cleanup

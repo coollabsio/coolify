@@ -586,6 +586,11 @@ class LocalFileVolume extends BaseModel
         return str(addPreviewDeploymentSuffix($path, $this->previewPullRequestId));
     }
 
+    public function isForPullRequest(): bool
+    {
+        return $this->previewPullRequestId !== 0;
+    }
+
     /**
      * A copy that uses the path of the preview of a pull request, as the Compose parser mounts it
      * (`<path>-pr-<id>` unless the PR suffix is off for this storage). The row keeps the path of

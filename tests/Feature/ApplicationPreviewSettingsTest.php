@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -14,6 +15,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -230,3 +232,41 @@ it('deploys a docker image preview with its stored tag when no tag is passed', f
 
     expect(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 7)->value('docker_registry_image_tag'))->toBe('pr-7');
 });
+
+it('asks GitHub whether a pull request added from the list is a branch of the repository', function (int $headRepositoryId, bool $isSameRepository) {
+    Queue::fake();
+    $githubApp = GithubApp::create([
+        'name' => 'Public GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+        'team_id' => $this->team->id,
+    ]);
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'git_repository' => 'example/repo',
+        'source_id' => $githubApp->id,
+        'source_type' => GithubApp::class,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    Http::fake([
+        'https://api.github.com/repos/example/repo/pulls/7' => Http::response([
+            'number' => 7,
+            'head' => ['repo' => ['id' => $headRepositoryId]],
+            'base' => ['repo' => ['id' => 100]],
+        ]),
+    ]);
+
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ])
+        ->call('add', 7, 'https://github.com/example/repo/pull/7');
+
+    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 7)->value('is_same_repository'))->toBe($isSameRepository);
+})->with([
+    'branch of the repository' => [100, true],
+    'fork' => [200, false],
+]);

@@ -233,6 +233,11 @@ class Bitbucket extends Controller
                                 $pr_app->generate_preview_fqdn();
                             }
                         }
+                        ($found ?? $pr_app)->recordSameRepository($this->isPreviewFromSameRepository(
+                            data_get($payload, 'pullrequest.source.repository.uuid'),
+                            data_get($payload, 'pullrequest.destination.repository.uuid'),
+                        ));
+
                         $result = queue_application_deployment(
                             application: $application,
                             pull_request_id: $pull_request_id,

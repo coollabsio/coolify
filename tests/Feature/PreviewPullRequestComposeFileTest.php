@@ -52,7 +52,7 @@ beforeEach(function () {
  * @param  array<int, array{0: string, 1: string}>  $logEntries
  * @param  array<int, string>  $commands
  */
-function pullRequestComposeJob(Application $application, ?string $checkoutOutput, array &$logEntries, array &$commands = []): ApplicationDeploymentJob
+function pullRequestComposeJob(Application $application, ?string $checkoutOutput, array &$logEntries, array &$commands = [], ?ApplicationPreview $preview = null): ApplicationDeploymentJob
 {
     $queue = Mockery::mock(ApplicationDeploymentQueue::class);
     $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout', bool $hidden = false) use (&$logEntries) {
@@ -69,6 +69,7 @@ function pullRequestComposeJob(Application $application, ?string $checkoutOutput
         'application' => $application,
         'application_deployment_queue' => $queue,
         'pull_request_id' => 42,
+        'preview' => $preview,
         'deployment_uuid' => 'deployment-uuid',
         'basedir' => '/artifacts/deployment-uuid',
         'workdir' => '/artifacts/deployment-uuid',
@@ -79,6 +80,23 @@ function pullRequestComposeJob(Application $application, ?string $checkoutOutput
     }
 
     return $job;
+}
+
+/**
+ * A preview of pull request #42. Only the webhooks and the pull request list know that its branch is in the repository itself.
+ */
+function pullRequestComposePreview(Application $application, bool $isSameRepository = true): ApplicationPreview
+{
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/coollabsio/compose-app/pull/42',
+    ]);
+    if ($isSameRepository) {
+        $preview->forceFill(['is_same_repository' => true])->save();
+    }
+
+    return $preview->fresh();
 }
 
 function loadComposeForDeployment(ApplicationDeploymentJob $job): void
@@ -93,12 +111,8 @@ test('a preview deploys the Compose file of its pull request and keeps the file 
     Process::fake();
     $logEntries = [];
     $commands = [];
-    $job = pullRequestComposeJob($this->application, $pullRequestCompose."\n", $logEntries, $commands);
-    $preview = ApplicationPreview::create([
-        'application_id' => $this->application->id,
-        'pull_request_id' => 42,
-        'pull_request_html_url' => 'https://github.com/coollabsio/compose-app/pull/42',
-    ]);
+    $preview = pullRequestComposePreview($this->application);
+    $job = pullRequestComposeJob($this->application, $pullRequestCompose."\n", $logEntries, $commands, $preview);
 
     loadComposeForDeployment($job);
     $parsed = $this->application->parse(pull_request_id: 42, preview_id: $preview->id);
@@ -112,9 +126,33 @@ test('a preview deploys the Compose file of its pull request and keeps the file 
         ->and(collect($logEntries)->pluck(0))->toContain('Using the Docker Compose file at /docker-compose.yml of pull request #42.');
 });
 
+test('a preview parse with the Compose file of its pull request does not change the variables and file storages of the application', function () {
+    Queue::fake();
+    Process::fake();
+    $volume = fn (string $content): string => "    volumes:\n      - type: bind\n        source: ./app.conf\n        target: /etc/app.conf\n        content: {$content}\n";
+    $this->application->update(['docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    environment:\n      EXISTING: \${EXISTING}\n".$volume('from-base')]);
+    $this->application->parse();
+    $variablesBefore = $this->application->environment_variables()->orderBy('key')->get()->map->only(['key', 'value', 'is_required', 'is_preview'])->all();
+    $fileStoragesBefore = $this->application->fileStorages()->get(['fs_path', 'mount_path', 'content', 'is_directory'])->toArray();
+    $pullRequestCompose = "services:\n  web:\n    image: nginx:1.27\n    environment:\n      EXISTING: \${EXISTING:?}\n      NEW_DEFAULT: \${NEW_DEFAULT:-from-pr}\n      NEW_PLAIN: \${NEW_PLAIN}\n".$volume('from-pr')
+        ."      - type: bind\n        source: ./extra.conf\n        target: /etc/extra.conf\n        content: from-pr\n";
+    $preview = pullRequestComposePreview($this->application);
+    $logEntries = [];
+    $application = $this->application->fresh();
+
+    loadComposeForDeployment(pullRequestComposeJob($application, $pullRequestCompose, $logEntries, preview: $preview));
+    $parsed = $application->parse(pull_request_id: 42, preview_id: $preview->id);
+
+    expect(data_get($parsed, 'services.web.image'))->toBe('nginx:1.27')
+        ->and(data_get($parsed, 'services.web.environment.NEW_DEFAULT'))->toBe('${NEW_DEFAULT:-from-pr}')
+        ->and(collect(data_get($parsed, 'services.web.volumes'))->pluck('target')->all())->toContain('/etc/app.conf', '/etc/extra.conf')
+        ->and($this->application->environment_variables()->orderBy('key')->get()->map->only(['key', 'value', 'is_required', 'is_preview'])->all())->toBe($variablesBefore)
+        ->and($this->application->fileStorages()->get(['fs_path', 'mount_path', 'content', 'is_directory'])->toArray())->toBe($fileStoragesBefore);
+});
+
 test('a preview stops when the Compose file of its pull request cannot be used', function (string $checkoutOutput, string $reason) {
     $logEntries = [];
-    $job = pullRequestComposeJob($this->application, $checkoutOutput, $logEntries);
+    $job = pullRequestComposeJob($this->application, $checkoutOutput, $logEntries, preview: pullRequestComposePreview($this->application));
 
     expect(fn () => loadComposeForDeployment($job))
         ->toThrow(DeploymentException::class, "Deployment stopped: the Docker Compose file at /docker-compose.yml (pull request #42) {$reason}");
@@ -130,20 +168,23 @@ test('a preview stops when the Compose file of its pull request cannot be used',
     'not safe' => ["services:\n  'web;touch /tmp/pwned':\n    image: nginx\n", 'is not safe to use, so Coolify did not load it.'],
 ]);
 
-test('a preview uses the Compose file of the base branch when it can come from a fork or uses raw Compose', function (array $settings, string $reason) {
+test('a preview uses the Compose file of the base branch when it can come from a fork or uses raw Compose', function (array $settings, bool $isSameRepository, string $reason) {
     $this->application->settings->update($settings);
+    $preview = pullRequestComposePreview($this->application, $isSameRepository);
     Process::fake(fn ($process) => Process::result(output: str_contains(implode(' ', (array) remoteProcessScript($process)), 'git cat-file blob') ? "services:\n  base:\n    image: nginx\n" : ''));
     $logEntries = [];
     $commands = [];
 
-    loadComposeForDeployment(pullRequestComposeJob($this->application, "services:\n  from-pr:\n    image: nginx\n", $logEntries, $commands));
+    loadComposeForDeployment(pullRequestComposeJob($this->application, "services:\n  from-pr:\n    image: nginx\n", $logEntries, $commands, $preview));
 
     expect($commands)->toBe([])
         ->and($this->application->fresh()->docker_compose_raw)->toBe("services:\n  base:\n    image: nginx")
         ->and(collect($logEntries)->pluck(0))->toContain("This preview uses the Docker Compose file of the main branch, because {$reason}.");
 })->with([
-    'public PR deployments' => [['is_pr_deployments_public_enabled' => true], 'public PR deployments are on, and a pull request from a fork could add host mounts to it'],
-    'raw Compose deployment' => [['is_raw_compose_deployment_enabled' => true], 'raw Compose deployments are on'],
+    'public PR deployments' => [['is_pr_deployments_public_enabled' => true], true, 'public PR deployments are on, and a pull request from a fork could add host mounts to it'],
+    'raw Compose deployment' => [['is_raw_compose_deployment_enabled' => true], true, 'raw Compose deployments are on'],
+    // A preview added by hand or through the API can be a pull request from a fork.
+    'pull request that is not known to come from the repository' => [[], false, 'Coolify does not know that the branch of the pull request is in this repository. A pull request from a fork could add host mounts to it'],
 ]);
 
 test('the checkout read prints only regular files inside the repository', function () {

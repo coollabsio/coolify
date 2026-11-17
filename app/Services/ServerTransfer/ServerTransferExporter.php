@@ -1796,6 +1796,7 @@ class ServerTransferExporter
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
                 'keeps_production_values' => $preview->keeps_production_values,
+                'is_same_repository' => $preview->is_same_repository,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

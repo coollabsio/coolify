@@ -206,6 +206,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $build_pack = null;
 
+    /**
+     * Copies one file or folder of the checkout of a preview ($2, inside $1) to its mount path ($3). An empty
+     * folder that Docker created at the path of a file is replaced; a path of another type is left alone.
+     */
+    private const PREVIEW_REPOSITORY_FILE_COPY_SCRIPT = 'base=$1; src=$2; dest=$3; '
+        .'[ -e "$src" ] && [ ! -L "$src" ] || exit 0; '
+        .'real=$(readlink -f "$src") && root=$(readlink -f "$base") || exit 0; '
+        .'case "$real" in "$root"/*) ;; *) exit 0 ;; esac; '
+        .'if [ -L "$dest" ]; then rm -f "$dest"; fi; '
+        .'if [ -d "$src" ]; then '
+        .'if [ -e "$dest" ] && [ ! -d "$dest" ]; then exit 0; fi; '
+        .'mkdir -p "$dest" && cp -a "$src/." "$dest/"; '
+        .'else '
+        .'if [ -d "$dest" ]; then rmdir "$dest" 2>/dev/null || exit 0; fi; '
+        .'mkdir -p "${dest%/*}" && cp -f "$src" "$dest"; '
+        .'fi';
+
     private string $configuration_dir;
 
     private string $build_image_name;
@@ -357,7 +374,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validatePathField($baseDir, 'base_directory');
         }
         $this->workdir = "{$this->basedir}".rtrim($baseDir, '/');
-        $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
+        $this->configuration_dir = $this->application->deploymentWorkdir($this->pull_request_id);
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
@@ -900,7 +917,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateShellSafeCommand($this->application->docker_compose_custom_start_command, 'docker_compose_custom_start_command');
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
             if (! str($this->docker_compose_custom_start_command)->contains('--project-directory')) {
-                $projectDir = $this->preserveRepository ? $this->application->workdir() : $this->workdir;
+                $projectDir = $this->preserveRepository ? $this->configuration_dir : $this->workdir;
                 $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory '.$projectDir)->value();
             }
         }
@@ -1269,7 +1286,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->write_deployment_configurations();
             $this->server = $this->mainServer;
-            $workdir = $this->application->workdir();
+            $workdir = $this->configuration_dir;
             $command = serverDockerConfigPrefix($this->server)."{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->composeProjectName()} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
@@ -1349,7 +1366,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->write_missing_content_files();
         $this->remove_containers_with_removed_volumes();
 
-        $server_workdir = $this->application->workdir();
+        $server_workdir = $this->configuration_dir;
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 // Auto-inject -f (compose file) and --env-file flags using helper function
@@ -1606,6 +1623,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->rolling_update();
     }
 
+    /**
+     * A preview mounts its file storages at their `-pr-<id>` paths, outside of its own folder. Like `docker cp` puts
+     * the files of the repository at the paths of the application, this copies them from the checkout of the
+     * pull request in the folder of the preview to these paths. A source that is a symbolic link, or that resolves
+     * outside of the folder of the preview, is not copied, so the code of a pull request cannot mount host files.
+     */
+    private function copyRepositoryFilesToPreviewMounts(): void
+    {
+        if ($this->pull_request_id === 0) {
+            return;
+        }
+        $applicationWorkdir = $this->application->workdir();
+        foreach ($this->application->fileStorages as $fileStorage) {
+            $storage = $fileStorage->forPullRequest($this->previewFileStoragePullRequestId());
+            $applicationPath = $fileStorage->resolvedFsPath($applicationWorkdir)->value();
+            if ($fileStorage->is_host_file || ! $storage->isForPullRequest() || ! str_starts_with($applicationPath, $applicationWorkdir.'/')) {
+                continue;
+            }
+            $source = $this->configuration_dir.substr($applicationPath, strlen($applicationWorkdir));
+            $this->execute_remote_command([
+                'sh -c '.escapeshellarg(self::PREVIEW_REPOSITORY_FILE_COPY_SCRIPT).' sh '.escapeshellarg($this->configuration_dir).' '.escapeshellarg($source).' '.escapeshellarg($storage->resolvedFsPath($applicationWorkdir)->value()),
+                'hidden' => true,
+            ]);
+        }
+    }
+
     private function write_deployment_configurations()
     {
         if ($this->preserveRepository) {
@@ -1621,6 +1664,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
                     ],
                 );
+                $this->copyRepositoryFilesToPreviewMounts();
             }
             foreach ($this->application->fileStorages as $fileStorage) {
                 if (! $fileStorage->is_host_file && ! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
@@ -1638,9 +1682,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
 
             $mainDir = $this->configuration_dir;
-            if ($this->application->settings->is_raw_compose_deployment_enabled) {
-                $mainDir = $this->application->workdir();
-            }
             if ($this->pull_request_id === 0) {
                 $composeFileName = "$mainDir/docker-compose.yaml";
             } else {
@@ -2063,9 +2104,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         if ($this->pull_request_id !== 0) {
-            $reason = $this->application->settings->is_raw_compose_deployment_enabled
-                ? 'raw Compose deployments are on'
-                : 'public PR deployments are on, and a pull request from a fork could add host mounts to it';
+            $reason = match (true) {
+                (bool) $this->application->settings->is_raw_compose_deployment_enabled => 'raw Compose deployments are on',
+                (bool) $this->application->settings->is_pr_deployments_public_enabled => 'public PR deployments are on, and a pull request from a fork could add host mounts to it',
+                default => 'Coolify does not know that the branch of the pull request is in this repository. A pull request from a fork could add host mounts to it',
+            };
             $this->application_deployment_queue->addLogEntry("This preview uses the Docker Compose file of the {$this->application->git_branch} branch, because {$reason}.");
         }
 
@@ -2078,13 +2121,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Without public PR deployments, only branches of the repository deploy as previews, so the Compose file
-     * of the pull request is as trusted as the file of the base branch. A fork could add host mounts or
-     * privileged services, so public previews use the file of the base branch.
+     * The branch of a pull request in the repository itself is as trusted as the base branch, so its Compose
+     * file can deploy. A fork could add host mounts or privileged services. Only the webhooks and the pull
+     * request list know where the branch is (ApplicationPreview::$is_same_repository); a preview added by
+     * hand or through the API, and every public preview, use the file of the base branch.
      */
     private function usesPullRequestComposeFile(): bool
     {
         return $this->pull_request_id !== 0
+            && $this->preview?->is_same_repository === true
             && ! $this->application->settings->is_pr_deployments_public_enabled
             && ! $this->application->settings->is_raw_compose_deployment_enabled;
     }
@@ -2092,7 +2137,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * Reads the Compose file from the checkout of the pull request. The file is used only by this deployment:
      * it is set on the model of the job and marked as unchanged, so a save keeps the file of the base branch,
-     * and the parser does not write the Compose fields of the application for a preview.
+     * and the parser does not write the Compose fields, variables, or file storages of the application.
      *
      * @throws DeploymentException
      */
@@ -2126,6 +2171,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->application->docker_compose_raw = $compose;
         $this->application->syncOriginalAttribute('docker_compose_raw');
+        $this->application->usesPullRequestComposeFile = true;
         $this->application_deployment_queue->addLogEntry("Using the Docker Compose file at {$displayPath} of pull request #{$this->pull_request_id}.");
     }
 
@@ -4243,12 +4289,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * With a preserved repository, a bind source that is a file or a directory in the repository decides the type
      * of its storage. It runs after the Compose parse, so it also sees the storages that the first deployment creates.
      */
+    /**
+     * A file storage that is a directory in the checkout becomes a directory storage, and the other way around.
+     * A preview checks out the code of its pull request, so it changes only its own copy on the server and never
+     * saves the row of the application. A preview without its own path shares the production files and skips this.
+     */
     private function syncPreservedStorageTypesWithRepository(): void
     {
         if (! $this->preserveRepository) {
             return;
         }
+        $isPreview = $this->pull_request_id !== 0;
         foreach ($this->application->fileStorages()->get() as $fileStorage) {
+            $storage = $fileStorage->forPullRequest($this->previewFileStoragePullRequestId());
+            if ($isPreview && ! $storage->isForPullRequest()) {
+                continue;
+            }
             $path = $fileStorage->fs_path;
             $saveName = 'file_stat_'.$fileStorage->id;
             $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
@@ -4256,22 +4312,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
             );
-            if ($this->saved_outputs->has($saveName)) {
-                $fileStat = $this->trimmedSavedOutput($saveName);
-                if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
-                    $fileStorage->is_directory = true;
-                    $fileStorage->content = null;
-                    $fileStorage->save();
-                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
-                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
-                } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
-                    $fileStorage->is_directory = false;
-                    $fileStorage->is_based_on_git = true;
-                    $fileStorage->save();
-                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->deleteStorageOnServer($this->mainServer);
-                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
-                }
+            if (! $this->saved_outputs->has($saveName)) {
+                continue;
             }
+            $fileStat = $this->trimmedSavedOutput($saveName)->value();
+            if ($fileStat === 'directory' && ! $storage->is_directory) {
+                $storage->is_directory = true;
+                $storage->content = null;
+            } elseif ($fileStat === 'regular file' && $storage->is_directory) {
+                $storage->is_directory = false;
+                $storage->is_based_on_git = true;
+            } else {
+                continue;
+            }
+            if (! $isPreview) {
+                $storage->save();
+            }
+            $storage->deleteStorageOnServer($this->mainServer);
+            $storage->saveStorageOnServer($this->mainServer);
         }
     }
 

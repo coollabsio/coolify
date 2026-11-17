@@ -46,7 +46,19 @@ class ApplicationPreview extends BaseModel
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
         'keeps_production_values' => 'boolean',
+        'is_same_repository' => 'boolean',
     ];
+
+    /**
+     * Records whether the branch of the pull request is in the repository of the application. Only then
+     * does the preview deploy the Compose file of its pull request (ApplicationDeploymentJob::usesPullRequestComposeFile()).
+     */
+    public function recordSameRepository(bool $isSameRepository): void
+    {
+        if ($this->is_same_repository !== $isSameRepository) {
+            $this->forceFill(['is_same_repository' => $isSameRepository])->save();
+        }
+    }
 
     protected static function booted(): void
     {

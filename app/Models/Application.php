@@ -151,6 +151,12 @@ class Application extends BaseModel
 
     private static $parserVersion = '5';
 
+    /**
+     * Set by a preview deployment that uses the Compose file of its pull request (not saved). The parser then
+     * reads the variables and file storages of the application, but does not add or change them.
+     */
+    public bool $usesPullRequestComposeFile = false;
+
     protected $attributes = [
         'max_restart_count' => 0,
     ];
@@ -1675,6 +1681,15 @@ class Application extends BaseModel
     public function workdir()
     {
         return application_configuration_dir()."/{$this->uuid}";
+    }
+
+    /**
+     * The folder on the server of one deployment: the application folder, or the own folder of a preview. A preview
+     * keeps its checkout, Compose file and .env there, so it never replaces the files of the application.
+     */
+    public function deploymentWorkdir(int $pullRequestId = 0): string
+    {
+        return addPreviewDeploymentSuffix($this->workdir(), $pullRequestId);
     }
 
     public function isLogDrainEnabled()

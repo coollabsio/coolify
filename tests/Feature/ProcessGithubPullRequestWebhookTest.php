@@ -481,7 +481,7 @@ it('deploys an opened GitHub pull request preview by fork status, not by author 
     $job->handle();
 
     if ($deploys) {
-        expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue()
+        expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('is_same_repository'))->toBe(! $isForkPullRequest)
             ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('status'))->not->toBe(ApplicationDeploymentStatus::SKIPPED->value);
     } else {
         expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request comes from a fork and public PR deployments are disabled.');

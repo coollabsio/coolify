@@ -2393,6 +2393,7 @@ class ServerTransferImporter
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
                 'keeps_production_values' => (bool) data_get($previewPayload, 'keeps_production_values', false),
+                'is_same_repository' => (bool) data_get($previewPayload, 'is_same_repository', false),
             ];
 
             if ($preview) {
