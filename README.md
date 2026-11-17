@@ -7,11 +7,13 @@
 
 ## What is Coolify?
 
-Coolify is an open-source, self-hostable platform for deploying **any application, database, or service** on your own servers.
+Coolify is an open-source, self-hostable platform for deploying **any application, database, or service** on your own servers. It is an alternative to Heroku, Netlify, and Vercel.
 
-It gives you the experience of a managed cloud platform while running on infrastructure you control. This could be a VPS, a bare-metal server, a Raspberry Pi, or even an old laptop running Linux.
+It gives you the experience of a managed cloud platform while running on infrastructure you control. This could be a VPS, a bare-metal server, a Raspberry Pi, or even an old laptop running Linux. You only need an SSH connection.
 
-Coolify is fully free and open source, as described in our [philosophy](https://coolify.io/philosophy), with an optional managed service, Coolify Cloud. **Nothing is locked behind a paywall.**
+Your configurations stay on your servers. If you stop using Coolify, your running resources continue to work and remain manageable.
+
+Coolify is fully free and open source, as described in our [philosophy](https://coolify.io/philosophy), with an optional managed service, [Coolify Cloud](https://app.coolify.io). **Nothing is locked behind a paywall.**
 
 <br />
 
@@ -81,18 +83,27 @@ Coolify is fully free and open source, as described in our [philosophy](https://
 
 | Area | Highlights |
 | :--- | :--- |
-| **Deploy** | Any stack via Railpack, Dockerfile or Compose, with auto-deploy, PR previews, rolling updates & rollbacks |
+| **Deploy** | Any stack from GitHub, GitLab, Bitbucket, Gitea or a Docker image, via Railpack, Dockerfile or Compose, with auto-deploy, PR previews, webhooks, rolling updates & rollbacks |
 | **Databases & services** | Deploy Postgres, MongoDB, Redis & more, plus 360+ one-click services |
 | **Networking** | Reverse proxy with automatic HTTPS, custom domains & isolated Docker networks |
 | **Servers** | Manage unlimited servers over SSH, or provision new ones from hosting providers |
 | **Monitor** | Real-time metrics, logs, web terminal & health checks |
-| **Security & teams** | Scheduled backups, secrets, teams, plus a REST API, CLI & MCP server |
+| **Operations** | Scheduled backups & tasks, environment variables & secrets, notifications |
+| **Teams & integrations** | Teams with access control, plus a REST API, CLI & MCP server |
 
 This is just a highlight — there's much more.
 
 <br />
 
 ## Get started
+
+Install Coolify on a supported server with one command:
+
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+
+Read the [installation guide](https://coolify.io/docs/start-with-self-hosted) for requirements. You can also review the [installation script](./scripts/install.sh) before you run it.
 
 - [Choose your path](https://coolify.io/docs/choose-your-path) — self-host or use Coolify Cloud
 - [Start with self-hosted](https://coolify.io/docs/start-with-self-hosted)
@@ -110,6 +121,8 @@ This is just a highlight — there's much more.
 - [Discord community](https://coollabs.io/discord)
 - [Discussions](https://github.com/coollabsio/coolify/discussions)
 - [Support](https://coolify.io/docs/support)
+- [Contribution guide](./CONTRIBUTING.md)
+- [Code of conduct](./CODE_OF_CONDUCT.md)
 
 <br />
 
@@ -234,5 +247,5 @@ Thank you for your support!
 ## Star History
 
 <p align="center">
-  <img alt="chart" src="https://shieldcn.dev/chart/github/stars/coollabsio/coolify.svg?theme=violet&amp;font=geist&amp;icon=coolify" />
+  <a href="https://star-history.com/#coollabsio/coolify&Date"><img alt="Star history chart" src="https://shieldcn.dev/chart/github/stars/coollabsio/coolify.svg?theme=violet&amp;font=geist&amp;icon=coolify" /></a>
 </p>
