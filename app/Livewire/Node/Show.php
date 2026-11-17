@@ -386,6 +386,20 @@ class Show extends Component
             $operation = CreateMoveOperation::run($this->node, $target, $revision, auth()->user());
             MoveNodeWorkloadJob::dispatch($operation->id);
             $this->dispatch('close-modal');
+            // Like the Move of the application page: open the log of the move.
+            $workload = $operation->workload;
+            $project = $workload?->project()->value('uuid');
+            $environment = $workload?->environment()->value('uuid');
+            if ($project !== null && $environment !== null) {
+                redirectRoute($this, 'project.cluster-application.deployment.show', [
+                    'project_uuid' => $project,
+                    'environment_uuid' => $environment,
+                    'workload_uuid' => $workload->uuid,
+                    'deployment_uuid' => $operation->uuid,
+                ]);
+
+                return;
+            }
             $this->dispatch('success', data_get($operation->result, 'stateful') || $operation->workload?->hasVolumesWithData()
                 ? 'Workload move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
                 : 'Workload move queued. The source stays active until the target is ready.');

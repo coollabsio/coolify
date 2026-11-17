@@ -733,8 +733,7 @@ class Show extends Component
                 'moveTarget' => ['required', 'string'],
             ]);
             try {
-                ['operation' => $operation, 'source' => $source, 'target' => $target, 'recovery' => $recovery, 'has_volumes' => $hasVolumes, 'group' => $group]
-                    = MoveNodeWorkload::run($this->workload, $this->moveSource, $this->moveTarget, auth()->user(), $this->moveRecoveryConfirmed);
+                ['operation' => $operation] = MoveNodeWorkload::run($this->workload, $this->moveSource, $this->moveTarget, auth()->user(), $this->moveRecoveryConfirmed);
             } catch (ValidationException $exception) {
                 $this->addError('moveRecoveryConfirmed', collect($exception->errors())->flatten()->first());
 
@@ -743,11 +742,15 @@ class Show extends Component
             $this->moveTarget = '';
             $this->moveRecoveryConfirmed = false;
             $this->dispatch('close-modal');
-            $this->dispatch('success', ($group->isEmpty() ? '' : 'The services '.$group->implode(', ').' move too, because they share a volume. ').($recovery
-                ? 'Recovery move queued. The application starts on '.$target->name.($hasVolumes ? ' with the volumes from their latest backups' : '').'. Its old container on '.$source->name.' is removed when that server comes back.'
-                : (data_get($operation->result, 'stateful') || $hasVolumes
-                ? 'Move queued. Coolify copies the volumes first; the application is stopped only for the final copy.'
-                : 'Move queued. The application keeps running on '.$source->name.' until it is ready on '.$target->name.'.')));
+            // Like a deploy: open the log of the move.
+            redirectRoute($this, 'project.cluster-application.deployment.show', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'workload_uuid' => $this->workload->uuid,
+                'deployment_uuid' => $operation->uuid,
+            ]);
+
+            return;
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
