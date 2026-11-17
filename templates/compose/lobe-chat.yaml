@@ -1,22 +1,110 @@
-# documentation: https://github.com/lobehub/lobe-chat?tab=readme-ov-file#b-deploying-with-docker
-# slogan: An open-source, modern-design AI chat framework.
+# documentation: https://lobehub.com/docs/self-hosting/platform/docker-compose
+# slogan: LobeHub (formerly Lobe Chat) is an open-source AI chat and agent workspace for many model providers.
 # category: ai
-# tags: ai, chat, openai, llm, chatbot
+# tags: ai, chat, openai, llm, chatbot, agent, lobehub
 # logo: svgs/lobe-chat.png
 # port: 3210
 
 services:
   lobe-chat:
-    image: "lobehub/lobe-chat:1.143.3"
+    image: lobehub/lobehub:2.3.3
     environment:
       - SERVICE_URL_LOBECHAT_3210
+      - APP_URL=${SERVICE_URL_LOBECHAT}
+      - INTERNAL_APP_URL=http://localhost:3210
+      - KEY_VAULTS_SECRET=${SERVICE_REALBASE64_32_KEYVAULTS}
+      - AUTH_SECRET=${SERVICE_REALBASE64_32_AUTH}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-lobechat}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PREFIX=lobechat
+      - REDIS_TLS=0
+      - S3_ENDPOINT=${SERVICE_URL_RUSTFS}
+      - S3_INTERNAL_ENDPOINT=http://rustfs:9000
+      - S3_BUCKET=${S3_BUCKET:-lobe}
+      - S3_ENABLE_PATH_STYLE=1
+      - S3_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - S3_ACCESS_KEY_ID=${SERVICE_USER_RUSTFS}
+      - S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - S3_SET_ACL=0
+      - LLM_VISION_IMAGE_USE_BASE64=1
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_PROXY_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - ACCESS_CODE=${SERVICE_PASSWORD_ACCESSCODE}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD-SHELL
-        - "wget -qO- http://localhost:3210/ || exit 1"
+        - "wget -qO- http://localhost:3210/signin > /dev/null || exit 1"
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  postgresql:
+    image: paradedb/paradedb:0.26.7-pg17
+    command: ["postgres", "-c", "shared_preload_libraries=pg_search,pg_cron,pg_stat_statements"]
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-lobechat}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - lobe-postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
       interval: 5s
-      timeout: 20s
+      timeout: 5s
       retries: 10
+      start_period: 60s
+
+  redis:
+    image: redis:8.10.3-alpine
+    command: redis-server --save 60 1000 --appendonly yes
+    volumes:
+      - lobe-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    environment:
+      - SERVICE_URL_RUSTFS_9000
+      - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - RUSTFS_CONSOLE_ENABLE=false
+    volumes:
+      - lobe-rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/health > /dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rustfs-init:
+    image: rustfs/rc:v0.1.37
+    environment:
+      - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - S3_BUCKET=${S3_BUCKET:-lobe}
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        rc alias set rustfs http://rustfs:9000 "$$RUSTFS_ACCESS_KEY" "$$RUSTFS_SECRET_KEY"
+        rc mb "rustfs/$$S3_BUCKET" --ignore-existing
+        rc anonymous set download "rustfs/$$S3_BUCKET"
+        printf '%s' '<CORSConfiguration><CORSRule><AllowedOrigin>*</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' | rc bucket cors set "rustfs/$$S3_BUCKET" -
+    restart: "no"
+    exclude_from_hc: true
