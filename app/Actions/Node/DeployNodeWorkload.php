@@ -8,6 +8,7 @@ use App\Models\NodeBuild;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -34,8 +35,9 @@ class DeployNodeWorkload
         }
         $revision = PrepareNodeWorkloadRevision::run($workload);
         $operation = null;
+        $notificationGroup = (string) Str::uuid();
         foreach ($workload->nodes()->orderBy('nodes.id')->get() as $node) {
-            $deployment = CreateDeploymentOperation::run($node, $revision, $user, 'newer');
+            $deployment = CreateDeploymentOperation::run($node, $revision, $user, 'newer', notificationGroup: $notificationGroup);
             if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
                 $operation ??= $deployment['operation'];

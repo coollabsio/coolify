@@ -64,9 +64,10 @@ class RollbackNodeWorkload
 
         $rollback = PrepareNodeWorkloadRevision::run($workload, $revision->image);
         $operation = null;
+        $notificationGroup = (string) Str::uuid();
         foreach ($nodes as $node) {
             // The image is pinned by digest, or is the tag that the earlier revision ran; a pull of a newer tag would not roll back.
-            $deployment = CreateDeploymentOperation::run($node, $rollback, $user, 'missing');
+            $deployment = CreateDeploymentOperation::run($node, $rollback, $user, 'missing', notificationGroup: $notificationGroup);
             if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
                 $operation ??= $deployment['operation'];

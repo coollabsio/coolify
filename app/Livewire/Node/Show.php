@@ -42,6 +42,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
@@ -247,7 +248,7 @@ class Show extends Component
             if ($revision->workload->revisions()->latest('id')->value('id') === $revision->id) {
                 $revision = PrepareNodeWorkloadRevision::run($revision->workload);
             }
-            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
+            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer', notificationGroup: (string) Str::uuid());
             $operation = $deployment['operation'];
             if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($operation->id);

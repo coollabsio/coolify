@@ -24,9 +24,10 @@ class CreateDeploymentOperation
 
     /**
      * @param  'missing'|'newer'  $pullPolicy  Use `newer` for user redeploys so mutable tags get the latest image.
+     * @param  string|null  $notificationGroup  The same value for the deployment on each server of one deploy, which then sends one deploy notification (NotifyNodeDeployment). Null sends none.
      * @return array{operation: NodeOperation, created: bool}
      */
-    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing', bool $partOfMove = false): array
+    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing', bool $partOfMove = false, ?string $notificationGroup = null): array
     {
         $node->ensureCapability('workload.deploy.v1');
         if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
@@ -42,7 +43,7 @@ class CreateDeploymentOperation
             $pullPolicy = 'missing';
         }
 
-        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove): array {
+        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove, $notificationGroup): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -132,6 +133,9 @@ class CreateDeploymentOperation
                 ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash, 'pull_policy' => $pullPolicy],
                 $requestedBy,
             );
+            if ($notificationGroup !== null) {
+                $operation->update(['notification_group' => $notificationGroup]);
+            }
 
             return ['operation' => $operation, 'created' => true];
         });

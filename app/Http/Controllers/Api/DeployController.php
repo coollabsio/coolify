@@ -26,6 +26,7 @@ use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use Throwable;
 
@@ -678,8 +679,9 @@ class DeployController extends Controller
             } else {
                 $revision = PrepareNodeWorkloadRevision::run($workload);
                 $operationUuid = null;
+                $notificationGroup = (string) Str::uuid();
                 foreach ($nodes as $node) {
-                    $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer');
+                    $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer', notificationGroup: $notificationGroup);
                     if ($deployment['created']) {
                         DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
                         $operationUuid ??= $deployment['operation']->uuid;

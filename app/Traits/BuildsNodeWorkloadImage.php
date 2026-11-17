@@ -8,6 +8,7 @@ use App\Actions\Node\Build\ResolveGitCommit;
 use App\Actions\Node\Build\RunImageBuild;
 use App\Actions\Node\Build\SelectBuilderNode;
 use App\Actions\Node\Build\StartWaitingNodeBuild;
+use App\Actions\Node\NotifyNodeDeployment;
 use App\Enums\NodeBuildStatus;
 use App\Models\NodeBuild;
 use Illuminate\Support\Carbon;
@@ -98,12 +99,15 @@ trait BuildsNodeWorkloadImage
         }
     }
 
-    /** A cancelled build keeps its status. */
+    /** A cancelled build keeps its status. Only the change to failed sends the notification, so a retry does not send it again. */
     private function markFailed(NodeBuild $build, string $message): void
     {
-        NodeBuild::query()
+        $changed = NodeBuild::query()
             ->whereKey($build->id)
             ->whereIn('status', NodeBuildStatus::activeValues())
             ->update(['status' => NodeBuildStatus::FAILED, 'finished_at' => now(), 'error' => mb_substr($message, 0, 2000)]);
+        if ($changed > 0) {
+            NotifyNodeDeployment::forFailedBuild($build);
+        }
     }
 }

@@ -6,6 +6,7 @@ use App\Contracts\ThrottledNotification;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\BaseModel;
+use App\Models\NodeWorkload;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
 /**
- * A resource (application, preview, service part, or database) stopped without a stop from Coolify.
+ * A resource (application, preview, service part, database, or cluster application) stopped without a stop from Coolify.
  */
 class StatusChanged extends CustomEmailNotification implements ThrottledNotification
 {
@@ -40,16 +41,28 @@ class StatusChanged extends CustomEmailNotification implements ThrottledNotifica
         $environment = data_get($resource, 'environment')
             ?? data_get($resource, 'application.environment')
             ?? data_get($resource, 'service.environment');
-        $this->resource_name = $resource instanceof ApplicationPreview
-            ? data_get($resource, 'application.name').' PR #'.$resource->pull_request_id
-            : (string) data_get($resource, 'name');
+        $this->resource_name = match (true) {
+            $resource instanceof ApplicationPreview => data_get($resource, 'application.name').' PR #'.$resource->pull_request_id,
+            $resource instanceof NodeWorkload && $resource->isPreview() => data_get($resource, 'previewOf.name').' PR #'.$resource->pull_request_id,
+            default => (string) data_get($resource, 'name'),
+        };
         $this->project_name = data_get($environment, 'project.name');
         $this->project_uuid = data_get($environment, 'project.uuid');
         $this->environment_uuid = data_get($environment, 'uuid');
         $this->environment_name = data_get($environment, 'name');
-        $this->fqdn = data_get($resource, 'fqdn', null);
+        $route = $resource instanceof NodeWorkload ? ($resource->domain_routes[0] ?? null) : null;
+        $this->fqdn = $route !== null ? "{$route['scheme']}://{$route['host']}".($route['path'] ?? '') : data_get($resource, 'fqdn', null);
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
+        }
+        if ($resource instanceof NodeWorkload) {
+            $this->resource_url = base_url().route('project.cluster-application.show', [
+                'project_uuid' => $this->project_uuid,
+                'environment_uuid' => $this->environment_uuid,
+                'workload_uuid' => $resource->uuid,
+            ], false);
+
+            return;
         }
         [$type, $uuid] = match (true) {
             $resource instanceof Application => ['application', $resource->uuid],

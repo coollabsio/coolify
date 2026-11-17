@@ -49,6 +49,10 @@ class TransitionOperation
             }
 
             $operation->update($attributes);
+            if ($status->isFinal() && $operation->notification_group !== null) {
+                // After the commit, so the check of the other servers of the deploy sees this end status.
+                DB::afterCommit(fn () => NotifyNodeDeployment::forOperation($operation->fresh()));
+            }
 
             return $operation->refresh();
         });

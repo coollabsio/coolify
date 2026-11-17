@@ -6,6 +6,7 @@ use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\ReadGitComposeFile;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\NotifyNodeDeployment;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\SyncNodeStackCompose;
 use App\Enums\NodeBuildStatus;
@@ -89,7 +90,7 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             return;
         }
         $requestedBy = $this->requestedById === null ? null : User::query()->find($this->requestedById);
-        $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null]);
+        $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null, 'deploy_notified_at' => null]);
 
         try {
             $deadline = now()->addSeconds($this->timeout - 60);
@@ -124,6 +125,7 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         } catch (Throwable $exception) {
             $stack->update(['deploy_status' => 'failed', 'deploy_error' => mb_substr($exception->getMessage(), 0, 2000)]);
         }
+        NotifyNodeDeployment::forStack($stack);
     }
 
     /**
@@ -232,5 +234,9 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             'deploy_status' => 'failed',
             'deploy_error' => mb_substr('The stack deployment worker stopped: '.($exception?->getMessage() ?? ''), 0, 2000),
         ]);
+        $stack = NodeStack::query()->withoutGlobalScopes()->find($this->stackId);
+        if ($stack !== null) {
+            NotifyNodeDeployment::forStack($stack);
+        }
     }
 }

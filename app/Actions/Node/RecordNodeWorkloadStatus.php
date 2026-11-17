@@ -4,6 +4,7 @@ namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Jobs\NotifyNodeWorkloadStoppedJob;
 use App\Jobs\RefreshNodeContainersJob;
 use App\Models\Node;
 use App\Models\NodeOperation;
@@ -19,7 +20,8 @@ use Throwable;
  * Records a status of a workload that Sentinel converges (decision 0026). A status of the revision
  * of a user operation (deploy, rollback, stop, start, removal) updates that operation and its log.
  * A change that Sentinel made alone, such as a start after a crash or a reboot, adds an event to
- * the deployment history instead.
+ * the deployment history instead. Sentinel that cannot start a container again sends the
+ * "resource stopped" notification of v4.
  */
 class RecordNodeWorkloadStatus
 {
@@ -56,7 +58,7 @@ class RecordNodeWorkloadStatus
         if ($operation !== null) {
             $this->updateOperation($operation, $value, $reason, $status, $observedAt);
         } elseif ($fromEvent && ($status['autonomous'] ?? false) && filled($status['event_id'] ?? null)) {
-            NodeWorkloadEvent::query()->firstOrCreate(['event_id' => (string) $status['event_id']], [
+            $event = NodeWorkloadEvent::query()->firstOrCreate(['event_id' => (string) $status['event_id']], [
                 'node_id' => $node->id,
                 'node_workload_id' => $workload->id,
                 'node_workload_revision_id' => $workload->revisions()->where('uuid', $revisionId)->value('id'),
@@ -64,6 +66,10 @@ class RecordNodeWorkloadStatus
                 'reason' => $reason === '' ? null : $reason,
                 'observed_at' => $observedAt,
             ]);
+            // Sentinel could not start the container again by itself: like a v4 resource that stopped.
+            if ($value === 'failed' && $event->wasRecentlyCreated) {
+                NotifyNodeWorkloadStoppedJob::dispatch($node->id, $workload->id);
+            }
         }
         if (in_array($value, ['healthy', 'failed', 'stopped', 'removed'], true)) {
             RefreshNodeContainersJob::dispatch($node->id);

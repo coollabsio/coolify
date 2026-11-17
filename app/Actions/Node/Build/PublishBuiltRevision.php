@@ -3,6 +3,7 @@
 namespace App\Actions\Node\Build;
 
 use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\NotifyNodeDeployment;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\NodeBuild;
@@ -47,7 +48,7 @@ class PublishBuiltRevision
             return $revision;
         }
         foreach ($build->workload->nodes()->get() as $node) {
-            $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing');
+            $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing', notificationGroup: NotifyNodeDeployment::buildGroup($build));
             if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
             }
