@@ -66,6 +66,37 @@ the backup schedule of a database.
    repository at each deploy. A stack from a template gets a new Compose file
    through `PATCH /cluster-stacks/{uuid}`, with the same three-way rule as a Git
    sync (decision 0023).
+9. **Volumes, volume backups, and scheduled tasks.** The three resource paths
+   (`/cluster-applications`, `/cluster-databases`, `/cluster-stacks`) have the
+   same calls. A stack call names the service (`service` in the query or the
+   body). Without `service`, the volume list and the volume delete of a stack
+   work on the volumes of the stack (decision 0024). The calls use the actions
+   of the storage pages (`CreateNodeVolume`, `UpdateNodeVolume`,
+   `RemoveNodeVolume`, `DeleteNodeVolumeData`, `ManageNodeVolumeBackups`), so
+   the rules of decisions 0007 and 0009 apply: a volume is a Podman volume with
+   an absolute container path (no host bind mount), a backup goes to one S3
+   storage of the team, and a restore stops the workload, replaces the data,
+   and starts the workload again. A rename keeps the data, because the Podman
+   name of a volume is its UUID. The scheduled task calls are the v4 calls with
+   the v4 fields. `command` and the output of a run (`message`) show only when
+   the user can view sensitive values of the resource. An enabled task, a
+   backup that stops the workload, a backup run, and a restore need the
+   `deploy` ability.
+10. **Cluster settings.** `PATCH /clusters/{uuid}` changes the fields of the
+    General and Advanced tabs: name, description, CIDR, WireGuard interface and
+    port, the deployment pressure policy, the image storage (repository and
+    registry credential), and the server of the built-in registry. The roles of
+    a Node stay on `PATCH /nodes/{uuid}/roles`. The firewall rules have their
+    own calls. Each write needs a team admin (`NodeClusterPolicy::update`). A
+    registry credential must be of the team of the cluster and of the registry
+    of the repository. No response shows a credential value, only its UUID.
+11. **Create and delete of clusters.** `POST /clusters` and
+    `DELETE /clusters/{uuid}` call `CreateNodeCluster` and `DeleteNodeCluster`.
+    `POST /clusters/{uuid}/servers` and `DELETE /clusters/{uuid}/servers/{uuid}`
+    call `AssignNodeToCluster` and `RemoveNodeFromCluster` for a server that
+    already is a Node of the team. They need a team admin. The UI asks for the
+    password before it deletes a cluster. The API does not, as for the other
+    deletes of v4, because the token is the proof.
 
 ## Endpoints
 
@@ -83,8 +114,16 @@ the backup schedule of a database.
 - **Cluster stacks.** List, show, create (`/template`, `/git`), update the
   Compose file, delete, deploy, start, stop, restart, environment variables, and
   services.
-- **Clusters and Nodes.** List and show. For admins: set the ingress and builder
-  roles of a Node, start an image cleanup, and upgrade Sentinel.
+- **Volumes (each resource path).** List, create, update (name, mount path),
+  delete (`delete_data=true` also deletes the data), and the volume backups:
+  list, create, change, and delete a schedule, run now, list the runs, and
+  restore a run.
+- **Scheduled tasks (each resource path).** List, create, update, delete,
+  execute now, and list the runs with their output.
+- **Clusters and Nodes.** List and show. For admins: create, change the
+  settings, and delete a cluster, add a server to a cluster and remove it, list,
+  add, and delete the firewall rules, set the ingress and builder roles of a
+  Node, start an image cleanup, and upgrade Sentinel.
 
 ## Consequences
 
@@ -93,9 +132,17 @@ the backup schedule of a database.
 - The OpenAPI files (`openapi.json`, `openapi.yaml`) list the new endpoints.
 - An MCP tool or a CLI command for cluster resources can use these endpoints.
 
-## Not decided here
+## Not in the API
 
-- Volumes and volume backups of cluster applications in the API.
-- Scheduled tasks, the terminal, and exec through the API.
-- The cluster settings (network, firewall rules, image storage) in the API.
-- Create and delete of clusters and Nodes through the API.
+- **Terminal and exec.** A terminal session is interactive. v4 has no exec
+  call in its API, so the cluster API has none. A scheduled task with
+  `execute` runs one command in the container of a workload.
+- **Create and delete of a Node.** A new Node needs the onboarding steps of the
+  UI: an SSH key, an SSH check, and the install of Sentinel with the answers of
+  the user. No shared action does these steps without the UI. The delete of a
+  Node is logic of the Node page, not a shared action.
+- **Network repair, network reconcile, and the Sentinel upgrade of a cluster.**
+  These are recovery buttons of the cluster page. Their logic is in the page,
+  not in a shared action.
+- **The delete of one backup run.** The page asks for the password, and the
+  delete of the files in S3 is logic of the page.
