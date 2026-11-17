@@ -17,12 +17,7 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * The column stays text: encrypted passwords are longer than 255 characters, so Postgres would refuse the change back to varchar(255).
      */
-    public function down(): void
-    {
-        Schema::table('applications', function (Blueprint $table) {
-            $table->string('http_basic_auth_password')->nullable()->default(null)->change();
-        });
-    }
+    public function down(): void {}
 };
