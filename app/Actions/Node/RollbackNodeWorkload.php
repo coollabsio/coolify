@@ -65,13 +65,17 @@ class RollbackNodeWorkload
         $rollback = PrepareNodeWorkloadRevision::run($workload, $revision->image);
         $operation = null;
         $notificationGroup = (string) Str::uuid();
-        foreach ($nodes as $node) {
-            // The image is pinned by digest, or is the tag that the earlier revision ran; a pull of a newer tag would not roll back.
-            $deployment = CreateDeploymentOperation::run($node, $rollback, $user, 'missing', notificationGroup: $notificationGroup);
-            if ($deployment['created']) {
-                DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
-                $operation ??= $deployment['operation'];
+        try {
+            foreach ($nodes as $node) {
+                // The image is pinned by digest, or is the tag that the earlier revision ran; a pull of a newer tag would not roll back.
+                $deployment = CreateDeploymentOperation::run($node, $rollback, $user, 'missing', notificationGroup: $notificationGroup, notificationGroupSize: $nodes->count());
+                if ($deployment['created']) {
+                    DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                    $operation ??= $deployment['operation'];
+                }
             }
+        } finally {
+            NotifyNodeDeployment::finishGroup($notificationGroup);
         }
         if ($operation === null) {
             throw new RuntimeException('This application already has an active operation. The rollback revision deploys when it finishes, or deploy again then.');

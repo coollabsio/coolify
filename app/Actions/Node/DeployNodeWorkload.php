@@ -36,14 +36,19 @@ class DeployNodeWorkload
         $revision = PrepareNodeWorkloadRevision::run($workload);
         $operation = null;
         $notificationGroup = (string) Str::uuid();
-        foreach ($workload->nodes()->orderBy('nodes.id')->get() as $node) {
-            $deployment = CreateDeploymentOperation::run($node, $revision, $user, 'newer', notificationGroup: $notificationGroup);
-            if ($deployment['created']) {
-                DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
-                $operation ??= $deployment['operation'];
-            } elseif (in_array($deployment['operation']->command_type, NodeOperation::DEPLOYMENT_COMMAND_TYPES, true)) {
-                $operation ??= $deployment['operation'];
+        $nodes = $workload->nodes()->orderBy('nodes.id')->get();
+        try {
+            foreach ($nodes as $node) {
+                $deployment = CreateDeploymentOperation::run($node, $revision, $user, 'newer', notificationGroup: $notificationGroup, notificationGroupSize: $nodes->count());
+                if ($deployment['created']) {
+                    DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                    $operation ??= $deployment['operation'];
+                } elseif (in_array($deployment['operation']->command_type, NodeOperation::DEPLOYMENT_COMMAND_TYPES, true)) {
+                    $operation ??= $deployment['operation'];
+                }
             }
+        } finally {
+            NotifyNodeDeployment::finishGroup($notificationGroup);
         }
 
         return ['operation' => $operation, 'build' => null];

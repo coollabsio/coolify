@@ -7,6 +7,7 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Node\Build\StartNodeBuild;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\DeployNodePreview;
+use App\Actions\Node\NotifyNodeDeployment;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
@@ -680,12 +681,16 @@ class DeployController extends Controller
                 $revision = PrepareNodeWorkloadRevision::run($workload);
                 $operationUuid = null;
                 $notificationGroup = (string) Str::uuid();
-                foreach ($nodes as $node) {
-                    $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer', notificationGroup: $notificationGroup);
-                    if ($deployment['created']) {
-                        DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
-                        $operationUuid ??= $deployment['operation']->uuid;
+                try {
+                    foreach ($nodes as $node) {
+                        $deployment = CreateDeploymentOperation::run($node, $revision, auth()->user(), 'newer', notificationGroup: $notificationGroup, notificationGroupSize: $nodes->count());
+                        if ($deployment['created']) {
+                            DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                            $operationUuid ??= $deployment['operation']->uuid;
+                        }
                     }
+                } finally {
+                    NotifyNodeDeployment::finishGroup($notificationGroup);
                 }
                 if ($operationUuid === null) {
                     return ['message' => 'This application already has an active operation.', 'deployment_uuid' => null];

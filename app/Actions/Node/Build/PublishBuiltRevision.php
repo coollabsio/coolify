@@ -47,11 +47,16 @@ class PublishBuiltRevision
         if ($build->skip_deploy) {
             return $revision;
         }
-        foreach ($build->workload->nodes()->get() as $node) {
-            $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing', notificationGroup: NotifyNodeDeployment::buildGroup($build));
-            if ($deployment['created']) {
-                DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+        $nodes = $build->workload->nodes()->get();
+        try {
+            foreach ($nodes as $node) {
+                $deployment = CreateDeploymentOperation::run($node, $revision, $build->requestedBy, 'missing', notificationGroup: NotifyNodeDeployment::buildGroup($build), notificationGroupSize: $nodes->count());
+                if ($deployment['created']) {
+                    DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+                }
             }
+        } finally {
+            NotifyNodeDeployment::finishGroup(NotifyNodeDeployment::buildGroup($build));
         }
 
         return $revision;

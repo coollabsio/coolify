@@ -25,9 +25,10 @@ class CreateDeploymentOperation
     /**
      * @param  'missing'|'newer'  $pullPolicy  Use `newer` for user redeploys so mutable tags get the latest image.
      * @param  string|null  $notificationGroup  The same value for the deployment on each server of one deploy, which then sends one deploy notification (NotifyNodeDeployment). Null sends none.
+     * @param  int  $notificationGroupSize  The number of servers of the deploy. The caller calls NotifyNodeDeployment::finishGroup() after the last server.
      * @return array{operation: NodeOperation, created: bool}
      */
-    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing', bool $partOfMove = false, ?string $notificationGroup = null): array
+    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing', bool $partOfMove = false, ?string $notificationGroup = null, int $notificationGroupSize = 1): array
     {
         $node->ensureCapability('workload.deploy.v1');
         if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
@@ -43,7 +44,7 @@ class CreateDeploymentOperation
             $pullPolicy = 'missing';
         }
 
-        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove, $notificationGroup): array {
+        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove, $notificationGroup, $notificationGroupSize): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -134,7 +135,7 @@ class CreateDeploymentOperation
                 $requestedBy,
             );
             if ($notificationGroup !== null) {
-                $operation->update(['notification_group' => $notificationGroup]);
+                $operation->update(['notification_group' => $notificationGroup, 'notification_group_size' => max(1, $notificationGroupSize)]);
             }
 
             return ['operation' => $operation, 'created' => true];

@@ -31,7 +31,9 @@ class NotifyNodeDeployment
         }
         try {
             $group = NodeOperation::query()->where('notification_group', $operation->notification_group)->orderBy('id')->get();
-            if ($group->contains(fn (NodeOperation $member): bool => ! $member->status->isFinal())) {
+            // A server can end before the operation of the next server exists: wait for the size of the group.
+            if ($group->count() < (int) ($group->min('notification_group_size') ?? 1)
+                || $group->contains(fn (NodeOperation $member): bool => ! $member->status->isFinal() || $member->notified_at !== null)) {
                 return;
             }
             // The worker that sets the marker sends. Another worker that saw the same end status stops here.
@@ -43,6 +45,25 @@ class NotifyNodeDeployment
                 return;
             }
             self::sendForGroup($group);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * Called by the creator of a group after its last server, also after an error. A server that
+     * had an active operation already, or that the error stopped, has no operation in the group:
+     * the size becomes the number of operations that exist, and the group sends when they ended.
+     */
+    public static function finishGroup(string $notificationGroup): void
+    {
+        try {
+            $count = NodeOperation::query()->where('notification_group', $notificationGroup)->count();
+            if ($count === 0) {
+                return;
+            }
+            NodeOperation::query()->where('notification_group', $notificationGroup)->where('notification_group_size', '>', $count)->update(['notification_group_size' => $count]);
+            self::forOperation(NodeOperation::query()->where('notification_group', $notificationGroup)->orderBy('id')->first());
         } catch (Throwable $exception) {
             report($exception);
         }
