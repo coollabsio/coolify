@@ -23,7 +23,15 @@ function get_versions_data(): array
     return Cache::remember('coolify:versions', 3600, function () {
         $versionsPath = storage_path('app/versions.json');
         if (! File::exists($versionsPath)) {
-            return ['coolify' => ['version' => config('constants.coolify.version')]] + json_decode(File::get(base_path('upstream.json')), true);
+            $upstream = json_decode(File::get(base_path('upstream.json')), true);
+
+            return [
+                'coolify' => ['version' => config('constants.coolify.version')],
+                'helper' => current($upstream['helper']),
+                'sentinel' => current($upstream['sentinel']),
+                'sentinel-host' => current($upstream['sentinel-host']),
+                'traefik' => array_map(fn (array $pin) => $pin['version'], $upstream['traefik']),
+            ];
         }
         $channels = json_decode(File::get($versionsPath), true);
         $channel = newest_update_channel($channels);

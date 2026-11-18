@@ -2,7 +2,7 @@
 
 it('reads the Coolify and helper versions of its channel from versions.json in install.sh', function (string $channel, string $version) {
     $root = dirname(__DIR__, 2);
-    $upstream = json_decode(file_get_contents("{$root}/upstream.json"), true);
+    $upstream = ['helper' => ['version' => '1.0.19']];
     $versions = json_encode([
         'stable' => ['coolify' => ['version' => '4.5.1']] + $upstream,
         'preview' => ['coolify' => ['version' => '4.6.0-beta.1']] + $upstream,

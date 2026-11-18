@@ -63,7 +63,7 @@ write_versions() {
 	local versions="$WORK_DIR/cdn/json/coolify/versions.json"
 	[ -f "$versions" ] || echo '{}' > "$versions"
 	jq --indent 4 --arg channel "$channel" --arg version "$VERSION" --slurpfile upstream upstream.json '
-		$upstream[0].traefik as $traefik
+		($upstream[0].traefik | map_values(.version)) as $traefik
 		| .[$channel] += {coolify: {$version}, $traefik}
 		| if $channel == "stable" then .coolify.v4 = {$version} | .traefik = $traefik else . end
 		| {stable, preview, nightly, coolify, traefik} | with_entries(select(.value))

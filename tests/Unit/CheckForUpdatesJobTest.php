@@ -70,6 +70,15 @@ it('keeps the CDN versions of the other components when it keeps the running Coo
     ]);
 });
 
+it('reads the versions of upstream.json until the first update check', function () {
+    $versions = get_versions_data();
+
+    expect($versions['helper']['version'])->toBe(config('constants.coolify.helper_version'))
+        ->and($versions['sentinel']['version'])->toMatch('/^\d+\.\d+\.\d+$/')
+        ->and($versions['sentinel-host']['digest'])->toStartWith('sha256:')
+        ->and($versions['traefik']['v3.7'])->toStartWith('3.7.');
+});
+
 it('keeps the local versions.json when the CDN fetch fails', function () {
     Http::fake(['*' => Http::response('', 500)]);
     File::shouldReceive('replace')->never();
