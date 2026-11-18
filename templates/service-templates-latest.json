@@ -4081,6 +4081,26 @@
         "template_last_updated_at": "2026-02-09T12:35:36+01:00",
         "port": "8080"
     },
+    "opencode": {
+        "documentation": "https://github.com/peakimages/opencode?utm_source=coolify.io",
+        "slogan": "Open source AI coding agent as a server for the OpenCode web UI, desktop app, mobile app and terminal.",
+        "compose": "c2VydmljZXM6CiAgb3BlbmNvZGU6CiAgICBpbWFnZTogJ3BlYWtpbWFnZXMvb3BlbmNvZGU6Mi4zLjEtdjAuMS4wJwogICAgY2FwX2Ryb3A6CiAgICAgIC0gQUxMCiAgICBzZWN1cml0eV9vcHQ6CiAgICAgIC0gJ25vLW5ldy1wcml2aWxlZ2VzOnRydWUnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9PUEVOQ09ERV80MDk2CiAgICAgIC0gJ09QRU5DT0RFX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF82NF9PUEVOQ09ERX0nCiAgICB2b2x1bWVzOgogICAgICAtICdvcGVuY29kZS1kYXRhOi9ob21lL25vbnJvb3QnCg==",
+        "tags": [
+            "opencode",
+            "ai",
+            "agent",
+            "coding",
+            "assistant",
+            "llm",
+            "ide",
+            "development"
+        ],
+        "category": "ai",
+        "logo": "svgs/opencode.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-11-18T11:08:35+01:00",
+        "port": "4096"
+    },
     "openobserve": {
         "documentation": "https://openobserve.ai/docs/?utm_source=coolify.io",
         "slogan": "Cloud-native observability platform for logs, metrics, traces, RUM, errors and session replays \u2014 a 140x cheaper alternative to Elasticsearch, Splunk and Datadog.",
