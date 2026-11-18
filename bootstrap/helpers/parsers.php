@@ -396,6 +396,35 @@ function resolveComposeVolumeSourceVariables(string $source, ?array $variables =
 }
 
 /**
+ * Before v4.7.6, a short-syntax host path such as `${DATA:-./data}` always used the default, also when the resource
+ * set DATA. A storage that Coolify saved with that path keeps it, so its data does not move after the upgrade. The
+ * storage keeps the path of the variable in `variable_fs_path`, and the user switches to it on the storage.
+ *
+ * @return array{0: Stringable, 1: ?string} The host path, and the path of the variable while the saved path is kept
+ */
+function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringable $mainDirectory, ?LocalFileVolume $savedStorage, Application|Service $resource): array
+{
+    if ($volume === null || $savedStorage === null || ! str_contains($volume, '${')) {
+        return [$source, null];
+    }
+    try {
+        $defaultSource = parseDockerVolumeString($volume)['source'];
+    } catch (Exception) {
+        return [$source, null];
+    }
+    if ($defaultSource === null || ! sourceIsLocal($defaultSource)) {
+        return [$source, null];
+    }
+    $defaultSource = resolveComposeBindSource($defaultSource, $mainDirectory, $savedStorage->fs_path);
+    if ($defaultSource->value() === $source->value() || $savedStorage->fs_path !== $defaultSource->value()) {
+        return [$source, null];
+    }
+    $resource->addComposeVolumeWarning("The storage {$savedStorage->mount_path} keeps its saved host path {$defaultSource}. Its variable gives {$source}. To use that path, open the storage and click Use the variable path.");
+
+    return [$defaultSource, $source->value()];
+}
+
+/**
  * The environment variables that Coolify writes to the `.env` file, where Docker Compose reads the variables of the Compose file.
  */
 function composeEnvironmentVariablesQuery(Application|Service $resource, bool $isPreview = false): mixed
@@ -1777,6 +1806,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
                         // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
                         $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
@@ -1797,6 +1827,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 ],
                                 [
                                     'fs_path' => $storedSource,
+                                    'variable_fs_path' => $variableSource,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
@@ -3148,6 +3179,7 @@ function serviceParser(Service $resource): Collection
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
                         if (! composeBindKeepsMissingHostPath($volume)) {
                             LocalFileVolume::updateOrCreate(
@@ -3158,6 +3190,7 @@ function serviceParser(Service $resource): Collection
                                 ],
                                 [
                                     'fs_path' => $source,
+                                    'variable_fs_path' => $variableSource,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,

@@ -102,6 +102,7 @@ class LocalFileVolume extends BaseModel
         'is_host_file',
         'is_based_on_git',
         'is_preview_suffix_enabled',
+        'variable_fs_path',
     ];
 
     public $appends = ['is_binary', 'is_too_large'];
