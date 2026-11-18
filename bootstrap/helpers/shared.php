@@ -1690,12 +1690,26 @@ function resolveHostToIp(string $host): string
 
 function service_templates_cache_key(): string
 {
-    return (string) config('constants.services.cache_key', 'coolify:service-templates-bundle');
+    return config('constants.services.cache_key', 'coolify:service-templates-bundle').':'.service_templates_cdn_url();
 }
 
 function service_templates_path(): string
 {
     return base_path('templates/'.config('constants.services.file_name'));
+}
+
+function service_templates_cdn_url(): ?string
+{
+    $version = config('constants.coolify.version');
+    $url = config('constants.services.official');
+
+    return match (true) {
+        isDev() => null,
+        preg_match('/^\d+\.\d+\.\d+$/', $version) === 1 => $url,
+        preg_match('/^\d+\.\d+\.\d+-(beta|rc)\.\d+$/', $version) === 1 => dirname($url).'/preview/'.basename($url),
+        preg_match('/^\d+\.\d+\.\d+-(alpha\.\d+|(alpha|beta|rc)\.\d+\.\d{8}\.\d+)$/', $version) === 1 => dirname($url).'/nightly/'.basename($url),
+        default => null,
+    };
 }
 
 /**
@@ -1749,12 +1763,12 @@ function get_service_templates_fetched_at(): ?CarbonImmutable
 
 function get_service_templates(bool $force = false): Collection
 {
-    if ($force) {
+    if ($force && service_templates_cdn_url()) {
         try {
             $response = Http::retry(3, 1000, throw: false)
                 ->timeout(60)
                 ->connectTimeout(10)
-                ->get(config('constants.services.official'));
+                ->get(service_templates_cdn_url());
             if ($response->failed()) {
                 return collect([]);
             }
