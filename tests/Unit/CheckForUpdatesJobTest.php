@@ -56,19 +56,46 @@ it('keeps the CDN versions of the other components when it keeps the running Coo
         '*' => Http::response([
             'stable' => [
                 'coolify' => ['version' => '4.0.0'],
-                'traefik' => ['v3.6' => '3.6.2'],
-                'sentinel' => ['version' => '1.0.5'],
+                'traefik' => ['v3.6' => '3.6.999'],
+                'sentinel' => ['version' => '1.999.0'],
             ],
         ], 200),
     ]);
     config(['constants.coolify.version' => '4.0.10']);
 
-    expect(refresh_versions_file())->toMatchArray([
-        'coolify' => ['version' => '4.0.10'],
-        'traefik' => ['v3.6' => '3.6.2'],
-        'sentinel' => ['version' => '1.0.5'],
-    ]);
+    $versions = refresh_versions_file();
+
+    expect($versions['coolify'])->toBe(['version' => '4.0.10'])
+        ->and($versions['traefik']['v3.6'])->toBe('3.6.999')
+        ->and($versions['sentinel'])->toBe(['version' => '1.999.0']);
 });
+
+it('never offers an older version of a component than upstream.json pins', function (string $helper, string $sentinel, string $traefik) {
+    $upstream = json_decode(File::get(base_path('upstream.json')), true);
+    Http::fake([
+        '*' => Http::response([
+            'stable' => [
+                'coolify' => ['version' => '4.0.10'],
+                'helper' => ['version' => $helper],
+                'sentinel' => ['version' => $sentinel],
+                'sentinel-host' => ['version' => $sentinel, 'digest' => 'sha256:cdn'],
+                'traefik' => ['v3.6' => $traefik],
+            ],
+        ], 200),
+    ]);
+    config(['constants.coolify.version' => '4.0.10']);
+
+    $versions = refresh_versions_file();
+
+    expect($versions['helper'])->toBe($upstream['helper']['v1'])
+        ->and($versions['sentinel'])->toBe($upstream['sentinel']['v1'])
+        ->and($versions['sentinel-host'])->toBe($upstream['sentinel-host']['v1'])
+        ->and($versions['traefik']['v3.6'])->toBe($upstream['traefik']['v3.6']['version'])
+        ->and($versions['traefik']['v3.7'])->toBe($upstream['traefik']['v3.7']['version']);
+})->with([
+    'an older version' => ['1.0.0', '1.0.0', '3.6.0'],
+    'a version of another line' => ['2.0.0', '2.0.0', '3.7.999'],
+]);
 
 it('reads the versions of upstream.json until the first update check', function () {
     $versions = get_versions_data();
