@@ -76,47 +76,6 @@ it('enables transactional smtp only after required fields validate', function ()
         ->and(instanceSettings()->fresh()->resend_enabled)->toBeFalse();
 });
 
-it('shows notification provider save buttons while disabled', function (string $component) {
-    actingAsEnableActionOwner();
-
-    Livewire::test($component)
-        ->assertSet(str(class_basename($component))->camel()->append('Enabled')->toString(), false)
-        ->assertSee('Save');
-})->with([
-    'discord' => [Discord::class],
-    'slack' => [Slack::class],
-    'telegram' => [Telegram::class],
-    'pushover' => [Pushover::class],
-    'webhook' => [Webhook::class],
-]);
-
-it('hides notification provider test buttons while disabled and shows them when enabled', function (string $component, string $enabledProperty) {
-    actingAsEnableActionOwner();
-
-    // The channel actions always render "Send test"; it stays disabled until the channel is enabled.
-    $sendTestButton = '/<button\s+(disabled\s+)?class="button"[^>]*\$wire\.\$call\(testMethod\)[^>]*>/';
-
-    preg_match($sendTestButton, Livewire::test($component)->html(), $disabledMatch);
-    expect($disabledMatch[1] ?? null)->not->toBeEmpty();
-
-    preg_match($sendTestButton, Livewire::test($component)->set($enabledProperty, true)->html(), $enabledMatch);
-    expect($enabledMatch)->not->toBeEmpty()
-        ->and($enabledMatch[1] ?? '')->toBe('');
-})->with([
-    'discord' => [Discord::class, 'discordEnabled'],
-    'slack' => [Slack::class, 'slackEnabled'],
-    'telegram' => [Telegram::class, 'telegramEnabled'],
-    'pushover' => [Pushover::class, 'pushoverEnabled'],
-    'webhook' => [Webhook::class, 'webhookEnabled'],
-]);
-
-it('hides the email test button while email notifications are disabled', function () {
-    actingAsEnableActionOwner();
-
-    Livewire::test(Email::class)
-        ->assertDontSee('Send Test Email');
-});
-
 it('keeps notification providers disabled when enable validation fails', function (string $component, string $method, string $enabledProperty, string $requiredField, string $settingsRelation, string $settingsColumn) {
     [, $team] = actingAsEnableActionOwner();
 

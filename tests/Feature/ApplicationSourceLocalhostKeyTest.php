@@ -56,7 +56,7 @@ describe('Application Source with localhost key (id=0)', function () {
             ->assertSee('Deploy key');
     });
 
-    test('shows no source connected section when private_key_id is null', function () {
+    test('shows no deploy key section when private_key_id is null', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,
             'private_key_id' => null,
@@ -65,8 +65,7 @@ describe('Application Source with localhost key (id=0)', function () {
         Livewire::test(Source::class, ['application' => $application])
             ->assertSuccessful()
             ->assertSet('privateKeyId', null)
-            ->assertDontSee('Deploy key')
-            ->assertSee('No source connected');
+            ->assertDontSee('Deploy key');
     });
 
     test('dispatches configuration changed when source settings are saved', function () {

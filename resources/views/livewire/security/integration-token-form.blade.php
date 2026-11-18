@@ -105,18 +105,30 @@
                 <div class="font-medium text-black dark:text-fg">Recommended Doppler token</div>
                 <p>Use a read-only <span class="font-medium">Service Token</span> (dp.st.*). It is pinned to one
                     project and config. Create it in Doppler under Project &gt; Config &gt; Access.</p>
+                <a href="https://dashboard.doppler.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open Doppler dashboard
+                    <x-external-link />
+                </a>
             </div>
         @elseif ($provider === 'infisical')
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Infisical machine identity</div>
                 <p>Create a machine identity with Universal Auth and read access to your project. Paste the client
                     ID above and the client secret in the secret field.</p>
+                <a href="https://app.infisical.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open Infisical Cloud
+                    <x-external-link />
+                </a>
             </div>
         @elseif ($provider === 'vault')
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Vault token</div>
                 <p>Use a token with read access to your KV v2 secrets. Prefer a periodic or long-lived token —
                     deployments fail when the token expires.</p>
+                <a href="https://portal.cloud.hashicorp.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open HCP Vault
+                    <x-external-link />
+                </a>
             </div>
         @endif
 

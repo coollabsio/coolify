@@ -20,7 +20,10 @@
     <x-empty size="sm" title="No path data" description="No requests were recorded for the selected range."
         icon-name="unordered-list" />
 @else
-    <div x-data="trafficTable()">
+    {{-- Keyed so the lazy-load morph inserts fresh nodes instead of reusing the
+         placeholder skeleton; reused nodes keep their old Alpine scope and the
+         pager and sort buttons stop working. --}}
+    <div wire:key="{{ $keyPrefix }}-table" x-data="trafficTable()">
         <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
             @include('livewire.traffic._sort-header', ['column' => 'name', 'label' => 'Path', 'text' => true, 'class' => 'min-w-0 flex-1'])
             <span class="hidden w-16 shrink-0 sm:inline" aria-hidden="true"></span>

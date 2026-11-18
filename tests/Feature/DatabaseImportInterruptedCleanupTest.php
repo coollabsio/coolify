@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Models\User;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
@@ -38,6 +39,9 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
+    $this->user = User::factory()->create();
+    $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    $this->actingAs($this->user);
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
     $this->server = Server::factory()->create([
         'team_id' => $this->team->id,

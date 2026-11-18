@@ -91,6 +91,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
         function () use ($source, $dest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -120,6 +121,7 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
         function () use ($remoteSource, $localDest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpDownloadCommand($server, $remoteSource, $localDest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -161,13 +163,23 @@ function runSshProcess(string $sshCommand, int $timeout, ?string $input = null):
  */
 function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
 {
-    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    instant_remote_process_with_input($server, ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null', $content, $throwError);
+}
+
+/**
+ * Run one command on a server with content on its stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. The command is not passed
+ * through the sudo parser: add `sudo` for non-root servers yourself.
+ */
+function instant_remote_process_with_input(Server $server, string $remoteCommand, string $input, bool $throwError = true): void
+{
     $timeout = (int) config('constants.ssh.command_timeout');
 
     SshRetryHandler::retry(
-        function () use ($server, $remoteCommand, $content, $timeout) {
+        function () use ($server, $remoteCommand, $input, $timeout) {
             $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
-            $process = runSshProcess($sshCommand, $timeout, $content);
+            $process = runSshProcess($sshCommand, $timeout, $input);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             if ($process->exitCode() !== 0) {
                 excludeCertainErrors($process->errorOutput(), $process->exitCode());
@@ -175,8 +187,8 @@ function instant_remote_write_file(Server $server, string $path, string $content
         },
         [
             'server' => $server->ip,
-            'dest' => $path,
-            'function' => 'instant_remote_write_file',
+            'command_preview' => substr($remoteCommand, 0, 100),
+            'function' => 'instant_remote_process_with_input',
         ],
         $throwError
     );
@@ -192,8 +204,9 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = runSshProcess($sshCommand, 30);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server);
+            $process = runSshProcess($sshCommand, 30, SshMultiplexingHelper::sshBatchInput($command_string));
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -228,8 +241,9 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
-            $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server, $disableMultiplexing, (int) $effectiveTimeout);
+            $process = runSshProcess($sshCommand, (int) $effectiveTimeout, SshMultiplexingHelper::sshBatchInput($command_string));
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -262,6 +276,10 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
     }
+    if ($exitCode === 255 && str_contains($errorMessage, 'Host key verification failed')) {
+        $errorMessage = SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE;
+    }
+    $errorMessage = trim(SshMultiplexingHelper::stripHostKeyChangedWarning($errorMessage)) ?: "SSH command failed with exit code: $exitCode";
 
     throw new RuntimeException($errorMessage, $exitCode);
 }

@@ -126,6 +126,22 @@ it('labels the log drain container with the current configuration version', func
         ->toContain(StartLogDrain::CONFIG_VERSION_LABEL.'='.StartLogDrain::CONFIG_VERSION);
 });
 
+it('mounts the user files directory read-only, so that a custom drain can read a credentials file', function () {
+    $this->server->settings->update([
+        'is_logdrain_axiom_enabled' => false,
+        'is_logdrain_custom_enabled' => true,
+        'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stackdriver\n    Match *\n    google_service_credentials /files/gcp.json\n",
+    ]);
+    $scripts = startLogDrainScripts($this->server);
+    $compose = Yaml::parse(generatedLogDrainFile($scripts, 'docker-compose.yml'));
+    $script = $scripts->implode("\n");
+    $filesDirectory = config('constants.coolify.base_config_path').'/log-drains/files';
+
+    expect($compose['services']['coolify-log-drain']['volumes'])->toContain('./files:/files:ro')
+        ->and(strpos($script, "mkdir -p {$filesDirectory}"))->toBeInt()
+        ->toBeLessThan(strpos($script, 'docker-compose.yml up -d'));
+});
+
 it('pulls the new image before it removes the running log drain', function () {
     $script = startLogDrainScripts($this->server)->implode("\n");
 
@@ -164,7 +180,7 @@ it('changes the configuration version when the generated files change', function
     $hashes = collect([
         'newrelic' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1'],
         'axiom' => [],
-        'custom' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => "[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name p\n"],
+        'custom' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name p\n"],
     ])->map(function (array $settings) {
         $this->server->settings->update($settings);
         $scripts = startLogDrainScripts($this->server);
@@ -175,5 +191,5 @@ it('changes the configuration version when the generated files change', function
     });
 
     expect([StartLogDrain::CONFIG_VERSION, hash('sha256', $hashes->implode("\0"))])
-        ->toBe(['1', '11916cd1142514c158a6fbe812ce468e3fe80fc79428cef6ba2654c86aa384ba']);
+        ->toBe(['4', '9d8dab1d13bd0a54ccaf64e3407500f1ba2036e7e85e366034b5ae934389272e']);
 });

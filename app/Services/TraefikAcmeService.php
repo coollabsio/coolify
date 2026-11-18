@@ -54,35 +54,83 @@ class TraefikAcmeService
         return $certificates;
     }
 
-    public function deleteCertificate(string $contents, string $resolver, string $certificateId): string
+    /**
+     * Removes the certificates with the given identifiers from every resolver.
+     *
+     * @param  array<int, string>  $certificateIds
+     */
+    public function deleteCertificates(string $contents, array $certificateIds): string
     {
         $data = $this->decode($contents);
-        $certificates = $data[$resolver]['Certificates'] ?? null;
+        $pending = array_fill_keys($certificateIds, true);
 
-        if (! is_array($certificates)) {
-            throw new RuntimeException('The selected certificate could not be found.');
-        }
-
-        $remaining = [];
-        $deleted = false;
-
-        foreach ($certificates as $certificate) {
-            if (! $deleted && is_array($certificate) && hash_equals($this->certificateId($resolver, $certificate), $certificateId)) {
-                $deleted = true;
-
+        foreach ($data as $resolver => $resolverData) {
+            $certificates = is_string($resolver) && is_array($resolverData) ? ($resolverData['Certificates'] ?? null) : null;
+            if (! is_array($certificates)) {
                 continue;
             }
 
-            $remaining[] = $certificate;
+            $remaining = [];
+            foreach ($certificates as $certificate) {
+                $id = is_array($certificate) ? $this->certificateId($resolver, $certificate) : null;
+                if ($id !== null && isset($pending[$id])) {
+                    unset($pending[$id]);
+
+                    continue;
+                }
+
+                $remaining[] = $certificate;
+            }
+
+            $data[$resolver]['Certificates'] = $remaining;
         }
 
-        if (! $deleted) {
+        if ($certificateIds === [] || $pending !== []) {
             throw new RuntimeException('The selected certificate could not be found.');
         }
 
-        $data[$resolver]['Certificates'] = $remaining;
-
         return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+    }
+
+    /**
+     * Every host name in the text, such as the hosts of Traefik rules, labels, and resource URLs.
+     *
+     * @return array<string, true>
+     */
+    public function hostnames(string $text): array
+    {
+        preg_match_all('/(?<![a-z0-9-])(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?![a-z0-9-])/', strtolower($text), $matches);
+
+        return array_fill_keys($matches[0], true);
+    }
+
+    /**
+     * True when a host in use matches the main domain or an alternative name of the certificate.
+     *
+     * @param  array{main_domain: string, sans: array<int, string>}  $certificate
+     * @param  array<string, true>  $hostnames
+     */
+    public function isInUse(array $certificate, array $hostnames): bool
+    {
+        foreach ([$certificate['main_domain'], ...$certificate['sans']] as $domain) {
+            $domain = strtolower($domain);
+            if (isset($hostnames[$domain])) {
+                return true;
+            }
+
+            // A wildcard certificate covers exactly one label below its domain.
+            if (str_starts_with($domain, '*.')) {
+                $suffix = substr($domain, 1);
+                foreach (array_keys($hostnames) as $hostname) {
+                    $label = str_ends_with($hostname, $suffix) ? substr($hostname, 0, -strlen($suffix)) : '';
+                    if ($label !== '' && ! str_contains($label, '.')) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return array<string, mixed> */

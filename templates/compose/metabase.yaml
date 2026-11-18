@@ -7,7 +7,7 @@
 
 services:
   metabase:
-    image: metabase/metabase:latest
+    image: metabase/metabase:v0.65.4.4
     volumes:
       - /dev/urandom:/dev/random:ro
     environment:

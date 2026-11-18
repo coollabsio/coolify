@@ -40,12 +40,12 @@
         @endif
 
         <div class="max-w-xs">
-            <x-forms.listbox id="healthCheckType" label="Check type" required live :options="[
+            <x-forms.listbox id="healthCheckType" label="Check type" required :options="[
                 ['value' => 'http', 'label' => 'HTTP request'],
                 ['value' => 'cmd', 'label' => 'Container command'],
             ]" :disabled="! $canUpdate" />
         </div>
-        @if ($healthCheckType === 'http')
+        <div x-show="$wire.healthCheckType === 'http'" @if ($healthCheckType !== 'http') x-cloak @endif>
             <x-application.settings-subsection id="healthcheck-request-section" title="HTTP request"
                 helper="Coolify sends this request from inside the container and evaluates the response.">
                 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -69,15 +69,17 @@
                     <x-forms.input canGate="update" :canResource="$resource" id="healthCheckPath"
                         placeholder="/health" label="Path" required />
                     <x-forms.input canGate="update" :canResource="$resource" type="number"
-                        id="healthCheckReturnCode" placeholder="200" label="Expected code" required />
+                        id="healthCheckReturnCode" placeholder="200"
+                        helper="Any 2xx or 3xx response always passes. Set a 4xx or 5xx code (for example 401) to also pass that response." label="Expected code" required />
                 </div>
                 <div class="mt-4">
                     <x-forms.input canGate="update" :canResource="$resource" id="healthCheckResponseText"
                         placeholder="OK" label="Expected response text"
-                        helper="Leave empty when the response body does not need to contain specific text." />
+                        helper="The response body must contain this text. Leave empty to check only the response code. A HEAD response has no body, so HEAD does not check the text." />
                 </div>
             </x-application.settings-subsection>
-        @else
+        </div>
+        <div x-show="$wire.healthCheckType !== 'http'" @if ($healthCheckType === 'http') x-cloak @endif>
             <x-application.settings-subsection id="healthcheck-command-section" title="Container command"
                 helper="The command must exit with code 0 for the container to be considered healthy.">
                 <x-callout type="warning" title="Shell operators are not supported">
@@ -88,23 +90,23 @@
                     <x-forms.input canGate="update" :canResource="$resource" id="healthCheckCommand"
                         label="Command" placeholder="pg_isready -U postgres"
                         helper="Use a single executable command without shell expansion."
-                        :required="$healthCheckType === 'cmd'" />
+                        required x-bind:required="$wire.healthCheckType === 'cmd'" />
                 </div>
             </x-application.settings-subsection>
-        @endif
-    </x-application.settings-section>
-
-    <x-application.settings-section id="healthcheck-timing-section" title="Timing and retries"
-        helper="Control how quickly healthchecks start, repeat, and fail.">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckRetries" placeholder="3" label="Retries" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
         </div>
+
+        <x-application.settings-subsection id="healthcheck-timing-section" title="Timing and retries"
+            helper="Control how quickly healthchecks start, repeat, and fail.">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckRetries" placeholder="3" label="Retries" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
+            </div>
+        </x-application.settings-subsection>
     </x-application.settings-section>
 </form>

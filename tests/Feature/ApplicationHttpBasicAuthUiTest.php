@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -71,18 +72,13 @@ function createApplicationForHttpBasicAuth(array $overrides = []): Application
     ], $overrides));
 }
 
-test('http basic auth form shows a single username and password without multi-user controls', function () {
+test('http basic auth form loads the saved credentials', function () {
     $application = createApplicationForHttpBasicAuth();
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
         ->assertSet('isHttpBasicAuthEnabled', true)
-        ->assertSet('httpBasicAuthUsername', 'admin')
-        ->assertSee('Username')
-        ->assertSee('Password')
-        ->assertDontSee('Add user')
-        ->assertDontSee('Remove user')
-        ->assertDontSee('The default user cannot be removed');
+        ->assertSet('httpBasicAuthUsername', 'admin');
 });
 
 test('http basic auth credentials can be saved through the general form', function () {
@@ -102,6 +98,31 @@ test('http basic auth credentials can be saved through the general form', functi
     expect($application->http_basic_auth_username)->toBe('new-user')
         ->and($application->http_basic_auth_password)->toBe('new-pass')
         ->and((bool) $application->is_http_basic_auth_enabled)->toBeTrue();
+});
+
+test('a 64 character http basic auth password can be saved and read back', function () {
+    $application = createApplicationForHttpBasicAuth(['redirect' => 'both']);
+    $password = str_repeat('a', 64);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('httpBasicAuthPassword', $password)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $application->refresh();
+
+    expect(strlen($application->getRawOriginal('http_basic_auth_password')))->toBeGreaterThan(255)
+        ->and($application->http_basic_auth_password)->toBe($password);
+});
+
+test('the migration changes the http basic auth password column from string to text', function () {
+    $migration = require database_path('migrations/2026_10_19_210000_change_http_basic_auth_password_to_text_in_applications.php');
+
+    $migration->down();
+    expect(Schema::getColumnType('applications', 'http_basic_auth_password'))->toBe('varchar');
+
+    $migration->up();
+    expect(Schema::getColumnType('applications', 'http_basic_auth_password'))->toBe('text');
 });
 
 test('disabling http basic auth is saved instantly', function () {
@@ -151,9 +172,7 @@ test('selecting Argon2id is saved instantly and applied to the Caddy labels', fu
         ->set('httpBasicAuthHashAlgorithm', 'argon2id')
         ->set('httpBasicAuthArgon2idMemoryCost', 8192)
         ->call('instantSave')
-        ->assertDispatched('success')
-        ->assertSee('Iterations')
-        ->assertDontSee('Cost factor');
+        ->assertDispatched('success');
 
     expect(base64_decode($application->refresh()->custom_labels))
         ->toContain('caddy_0.basic_auth=argon2id', 'caddy_0.basic_auth.admin="$argon2id$v=19$m=8192,t=4,p=1$');

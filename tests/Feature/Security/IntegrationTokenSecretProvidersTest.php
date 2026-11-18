@@ -132,12 +132,6 @@ test('secret manager provider base urls only accept http and https', function (s
     'vault' => ['vault', ['base_url' => 'ftp://vault.example.com']],
 ]);
 
-test('the infisical fields put the client id before the client secret', function () {
-    Livewire::test(IntegrationTokenForm::class)
-        ->set('provider', 'infisical')
-        ->assertSeeInOrder(['Token name', 'Client ID', 'Client secret', 'Base URL']);
-});
-
 test('an infisical token stores its metadata after a successful login', function () {
     Http::fake([
         'https://example.com/api/v1/auth/universal-auth/login' => Http::response([

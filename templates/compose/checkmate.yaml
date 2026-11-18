@@ -4,10 +4,11 @@
 # tags: monitoring,server,uptime,healthcheck
 # logo: svgs/checkmate.png
 # port: 52345
+# outdated: true
 
 services:
   checkmate:
-    image: 'ghcr.io/bluewave-labs/checkmate-backend-mono-multiarch:v3.2.0'
+    image: 'ghcr.io/bluewave-labs/checkmate-backend-mono-multiarch:v3.9.2'
     environment:
       - SERVICE_URL_CHECKMATE_52345
       - 'UPTIME_APP_API_BASE_URL=${SERVICE_URL_CHECKMATE}/api/v1'
@@ -27,7 +28,7 @@ services:
       timeout: 5s
       retries: 3
   mongodb:
-    image: 'ghcr.io/bluewave-labs/checkmate-mongo:v3.2.0'
+    image: 'ghcr.io/bluewave-labs/checkmate-mongo:v3.9.2'
     command:
       - mongod
       - '--quiet'

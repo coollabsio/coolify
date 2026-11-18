@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
@@ -10,6 +12,7 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -24,7 +27,7 @@ beforeEach(function () {
     Event::listen('eloquent.retrieved: '.Application::class, fn (Application $application) => $this->retrievedApplicationIds->push($application->id));
 });
 
-function manualLookupApplication(string $gitRepository, string $branch = 'main'): Application
+function manualLookupApplication(string $gitRepository, string $branch = 'main', string $buildPack = 'nixpacks'): Application
 {
     $team = Team::factory()->create();
     $project = Project::factory()->create(['team_id' => $team->id]);
@@ -41,7 +44,7 @@ function manualLookupApplication(string $gitRepository, string $branch = 'main')
         'name' => 'manual-lookup-app',
         'git_repository' => $gitRepository,
         'git_branch' => $branch,
-        'build_pack' => 'nixpacks',
+        'build_pack' => $buildPack,
         'ports_exposes' => '3000',
         'environment_id' => $environment->id,
         'destination_id' => $destination->id,
@@ -124,7 +127,7 @@ test('the candidate query filters by repository before applications are loaded',
 
     DB::enableQueryLog();
     sendManualLookupPush($this, $provider, $application->{"manual_webhook_secret_{$provider}"})->assertOk();
-    $candidateQuery = collect(DB::getQueryLog())->first(fn (array $query): bool => str_contains($query['query'], 'from "applications" where "git_branch" = ?'));
+    $candidateQuery = collect(DB::getQueryLog())->first(fn (array $query): bool => preg_match('/from "applications" where "git_branch" (= \?|in \(\?\))/', $query['query']) === 1);
 
     expect($candidateQuery['query'])->toContain('LOWER(git_repository) LIKE ?')
         ->and($candidateQuery['bindings'])->toContain('%acme/app%')
@@ -158,6 +161,29 @@ test('identically named repositories on different git hosts deploy only the appl
         ->and(manualLookupDeployed($githubApplication))->toBeFalse();
 });
 
+test('applications of one repository deploy only when the delivery branch and secret are theirs', function (string $provider) {
+    $staging = manualLookupApplication('https://gitlab.com/acme/app.git', 'main');
+    $production = manualLookupApplication('https://gitlab.com/acme/app.git', 'production');
+    $productionSecret = $production->{"manual_webhook_secret_{$provider}"};
+
+    // A push to the default branch (what GitLab's "Test" button sends) signed with
+    // the production secret matches only staging, so it deploys nothing.
+    sendManualLookupPush($this, $provider, $productionSecret, branch: 'main')
+        ->assertOk()
+        ->assertExactJson([['status' => 'failed', 'message' => 'No matching application or invalid signature.']]);
+    expect(manualLookupDeployed($staging))->toBeFalse()
+        ->and(manualLookupDeployed($production))->toBeFalse();
+
+    // When both applications track the pushed branch, the other secret does not fail the delivery.
+    $staging->update(['git_branch' => 'production']);
+    $response = sendManualLookupPush($this, $provider, $productionSecret, branch: 'production')->assertOk();
+
+    expect($response->json())->toHaveCount(1)
+        ->and($response->json('0.status'))->toBe('success')
+        ->and(manualLookupDeployed($production))->toBeTrue()
+        ->and(manualLookupDeployed($staging))->toBeFalse();
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
 test('an underscore in the repository name matches only an underscore', function () {
     $application = manualLookupApplication('https://github.com/acme/my_app');
     $wildcardMatch = manualLookupApplication('https://github.com/acme/myXapp');
@@ -190,6 +216,16 @@ test('pushes that must not deploy an application', function (string $case, strin
     'invalid signature' => ['invalid signature', 'No matching application or invalid signature.'],
 ]);
 
+test('a push does not deploy a Docker Compose application with auto deploy disabled', function (string $provider) {
+    $application = manualLookupApplication('https://github.com/acme/app', buildPack: 'dockercompose');
+    $application->settings->update(['is_auto_deploy_enabled' => false]);
+
+    $response = sendManualLookupPush($this, $provider, $application->{"manual_webhook_secret_{$provider}"})->assertOk();
+
+    expect($response->json('0.status'))->toBe('failed')
+        ->and(manualLookupDeployed($application))->toBeFalse();
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
 test('pull request events dispatch only applications of the repository', function (string $action) {
     $application = manualLookupApplication('https://github.com/acme/app');
     $application->settings->update(['is_preview_deployments_enabled' => true]);
@@ -202,3 +238,42 @@ test('pull request events dispatch only applications of the repository', functio
     Queue::assertPushed(ProcessGithubPullRequestWebhook::class, fn (ProcessGithubPullRequestWebhook $job): bool => $job->applicationId === $application->id && $job->action === $action);
     expect($this->retrievedApplicationIds)->not->toContain($unrelated->id);
 })->with(['opened', 'closed']);
+
+test('a closed GitLab merge request loads only applications of the repository', function () {
+    Process::fake();
+    $application = manualLookupApplication('git@gitlab.example.com:acme/app.git', 'feature/parent');
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://gitlab.example.com/acme/app/-/merge_requests/42',
+        'git_type' => 'gitlab',
+    ]);
+    $unrelated = manualLookupApplication('https://gitlab.example.com/other/service');
+    $this->retrievedApplicationIds = collect();
+
+    $payload = json_encode([
+        'object_kind' => 'merge_request',
+        'project' => ['id' => 987654321, 'path_with_namespace' => 'acme/app'],
+        'object_attributes' => [
+            'action' => 'close',
+            'iid' => 42,
+            'url' => 'https://gitlab.example.com/acme/app/-/merge_requests/42',
+            'title' => 'Change',
+            'source_branch' => 'feature/child',
+            'target_branch' => 'main',
+            'source_project_id' => 987654321,
+            'target_project_id' => 987654321,
+            'last_commit' => ['id' => 'abc1234def5678', 'message' => 'Change'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $response = $this->call('POST', '/webhooks/source/gitlab/events/manual', [], [], [], [
+        'HTTP_X-Gitlab-Event' => 'Merge Request Hook',
+        'HTTP_X-Gitlab-Token' => $application->manual_webhook_secret_gitlab,
+        'CONTENT_TYPE' => 'application/json',
+    ], $payload);
+
+    $response->assertOk()->assertJson([['status' => 'success', 'message' => 'Preview deployment closed.']]);
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job): bool => $job->resource->is($preview));
+    expect($this->retrievedApplicationIds)->not->toContain($unrelated->id);
+});

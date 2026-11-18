@@ -58,8 +58,8 @@
                                     <div class="min-w-0 font-medium text-neutral-900 dark:text-fg">
                                         @if ($rowExpandable)
                                             <div class="break-words"
-                                                :class="expandedRows['{{ $changeKey }}'] ? '' : 'truncate'"
-                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($label) : @js((string) str($label)->limit(24))">
+                                                :class="expandedRows[@js($changeKey)] ? '' : 'truncate'"
+                                                x-text="expandedRows[@js($changeKey)] ? @js($label) : @js((string) str($label)->limit(24))">
                                             </div>
                                         @else
                                             {{ $label }}
@@ -69,8 +69,8 @@
                                     <div class="min-w-0 text-red-600 dark:text-red-400">
                                         @if ($expandable)
                                             <div class="break-words"
-                                                :class="expandedRows['{{ $changeKey }}'] ? 'whitespace-pre-wrap' : 'truncate'"
-                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($oldFull) : @js($oldDisplay)">
+                                                :class="expandedRows[@js($changeKey)] ? 'whitespace-pre-wrap' : 'truncate'"
+                                                x-text="expandedRows[@js($changeKey)] ? @js($oldFull) : @js($oldDisplay)">
                                             </div>
                                         @else
                                             <div class="truncate">{{ $oldDisplay }}</div>
@@ -84,8 +84,8 @@
                                     <div class="min-w-0 text-emerald-600 dark:text-emerald-400">
                                         @if ($expandable)
                                             <div class="break-words"
-                                                :class="expandedRows['{{ $changeKey }}'] ? 'whitespace-pre-wrap' : 'truncate'"
-                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($newFull) : @js($newDisplay)">
+                                                :class="expandedRows[@js($changeKey)] ? 'whitespace-pre-wrap' : 'truncate'"
+                                                x-text="expandedRows[@js($changeKey)] ? @js($newFull) : @js($newDisplay)">
                                             </div>
                                         @else
                                             <div class="truncate">{{ $newDisplay }}</div>
@@ -95,15 +95,15 @@
                                     <div class="flex justify-end">
                                         @if ($rowExpandable)
                                             <button type="button"
-                                                x-on:click="expandedRows['{{ $changeKey }}'] = ! expandedRows['{{ $changeKey }}']"
-                                                :aria-expanded="!! expandedRows['{{ $changeKey }}']"
+                                                x-on:click="expandedRows[@js($changeKey)] = ! expandedRows[@js($changeKey)]"
+                                                :aria-expanded="!! expandedRows[@js($changeKey)]"
                                                 title="Toggle full value"
                                                 class="flex size-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                                                 <x-reicon name="eye"
-                                                    x-show="! expandedRows['{{ $changeKey }}']"
+                                                    x-show="! expandedRows[{{ Js::from($changeKey) }}]"
                                                     class="size-3" />
                                                 <x-reicon name="eye-off2"
-                                                    x-show="expandedRows['{{ $changeKey }}']"
+                                                    x-show="expandedRows[{{ Js::from($changeKey) }}]"
                                                     x-cloak class="size-3" />
                                             </button>
                                         @endif

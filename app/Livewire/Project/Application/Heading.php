@@ -8,8 +8,11 @@ use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\SecurityCard;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -129,6 +132,7 @@ class Heading extends Component
      */
     public function stopFailed(array $event): void
     {
+        $event = $this->teamChannelPayload($event);
         if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
             $this->skipRender();
 
@@ -154,6 +158,44 @@ class Heading extends Component
             ->whereIn('status', ['in_progress', 'queued'])
             ->orderByDesc('id')
             ->value('deployment_url');
+    }
+
+    /**
+     * Gate warning for the latest deployment of the application (not a preview) when the image scan
+     * gate blocked it or could not run. Re-evaluated on the heading's existing 10s poll.
+     *
+     * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
+     */
+    #[Computed]
+    public function imageScanGate(): ?array
+    {
+        // The gate never runs without both. Scanning off on the server still shows: the gate reports it.
+        if (! ImageScanPolicyResolver::isAllowedFor($this->application)) {
+            return null;
+        }
+
+        $deployment = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', 0)
+            ->orderByDesc('id')
+            ->first(['id', 'deployment_uuid', 'status', 'scan_gate_result']);
+
+        if (! $deployment || (! $deployment->isImageScanBlocked() && ! $deployment->isImageScanSkipped())) {
+            return null;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+        ];
+
+        return [
+            'result' => $deployment->scan_gate_result,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)['sentence'] ?? null : null,
+            'vulnerabilities_url' => route('project.application.vulnerabilities', $parameters),
+            'deployment_url' => route('project.application.deployment.show', [...$parameters, 'deployment_uuid' => $deployment->deployment_uuid]),
+        ];
     }
 
     public function force_deploy_without_cache()
@@ -182,7 +224,7 @@ class Heading extends Component
 
                 return;
             }
-            if (data_get($this->application, 'settings.is_build_server_enabled') && str($this->application->docker_registry_image_name)->isEmpty()) {
+            if ($this->application->isBuildServerEnabled() && str($this->application->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
 
                 return;

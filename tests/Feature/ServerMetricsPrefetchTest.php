@@ -52,20 +52,20 @@ it('keeps the Sentinel error of one prefetched metric', function () {
         ->and(fn () => $this->server->getMemoryMetrics(5))->toThrow(Exception::class, 'Unauthorized');
 });
 
-it('falls back to one fetch per metric when the batch fails', function () {
+it('does not retry an unavailable server after the batch fails', function () {
     $commands = [];
     Process::fake(function (PendingProcess $process) use (&$commands) {
         $commands[] = remoteProcessScript($process);
 
-        return count($commands) === 1
-            ? Process::result('', 'ssh: connect to host failed', 1)
-            : Process::result('[{"time":2000,"percent":5}]');
+        return Process::result('', 'ssh: connect to host failed', 1);
     });
 
     $this->server->prefetchMetrics(['cpu', 'memory'], 5);
 
-    expect($this->server->getCpuMetrics(5))->toBe([[2000, 5.0]])
-        ->and($commands)->toHaveCount(2);
+    expect($this->server->getCpuMetrics(5))->toBeNull()
+        ->and($this->server->getMemoryMetrics(5))->toBeNull()
+        ->and($this->server->getLoadMetrics(5))->toBeNull()
+        ->and($commands)->toHaveCount(1);
 });
 
 it('quotes the bucketed history URL in a single fetch for a non-root user', function () {
@@ -96,7 +96,7 @@ it('runs the batched metrics script with sudo for a non-root user', function () 
 
     expect($commands)->toHaveCount(1)
         ->and($commands[0])->toContain('sudo docker exec -i coolify-sentinel sh -s')
-        ->and($commands[0])->toContain("\ncurl -s -H @- ")
+        ->and($commands[0])->toContain("\ncurl -sS --connect-timeout 2 --max-time 3 -H @- ")
         ->and($commands[0])->not->toContain('sudo curl')
         ->and($commands[0])->not->toContain('sudo printf');
 });

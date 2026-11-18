@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class OtherController extends Controller
 {
@@ -93,7 +94,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
@@ -149,7 +150,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.enable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to enable the MCP server.'], 403);
@@ -205,7 +206,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the MCP server.'], 403);
@@ -264,10 +265,40 @@ class OtherController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 503,
+                description: 'Database migrations are not finished yet.',
+            ),
         ]
     )]
     public function healthcheck(Request $request)
     {
+        if ($this->hasPendingMigrations()) {
+            return response('Database migrations are running.', 503);
+        }
+
         return response('OK');
+    }
+
+    /**
+     * The web server starts before the migrations finish, so the upgrade page must not reload before they do.
+     */
+    private function hasPendingMigrations(): bool
+    {
+        if (! config('constants.migration.is_migration_enabled')) {
+            return false;
+        }
+
+        try {
+            $migrator = app('migrator');
+            if (! $migrator->repositoryExists()) {
+                return true;
+            }
+            $files = $migrator->getMigrationFiles(array_merge($migrator->paths(), [database_path('migrations')]));
+
+            return array_diff(array_keys($files), $migrator->getRepository()->getRan()) !== [];
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

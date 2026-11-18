@@ -56,7 +56,7 @@
   const listButton = 'flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[12px] transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.06]';
   const smallButton = danger => `button h-6! shrink-0 px-2! text-[11px]! ${danger ? 'button-error' : ''}`;
   const faint = 'text-[12px] text-neutral-400 dark:text-fg-faint';
-  const statusPill = 'inline-flex h-6 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white';
+  const statusPill = 'inline-flex h-6 items-center gap-1.5 text-[13px] text-neutral-700 dark:text-fg';
   const titleLink = '[&[href]]:cursor-pointer [&[href]]:underline-offset-2 [&[href]]:hover:underline';
 </script>
 

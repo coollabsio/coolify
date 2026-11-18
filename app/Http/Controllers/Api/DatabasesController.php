@@ -253,24 +253,14 @@ class DatabasesController extends Controller
                 'mariadb_root_password',
                 ...$database::CONFIGURATION_ATTRIBUTES,
             ]);
+        }
+        if (canReadServerSecretsFromApi()) {
             $this->exposeNestedServerSecrets($database);
         } else {
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        $payload = serializeApiResponse($database);
-
-        // A locked password variable is never shown again, also not inside the connection URLs.
-        if (request()->attributes->get('can_read_sensitive', false) === true
-            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
-            foreach (['internal_db_url', 'external_db_url'] as $key) {
-                if ($payload->has($key)) {
-                    $payload->put($key, null);
-                }
-            }
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($database, serializeApiResponse($database));
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -313,7 +303,7 @@ class DatabasesController extends Controller
 
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
-     * relations for callers with the `read:sensitive` or `root` token ability.
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
      */
     private function exposeNestedServerSecrets(Model $model): void
     {
@@ -375,7 +365,7 @@ class DatabasesController extends Controller
         }
         $projects = Project::where('team_id', $teamId)->get();
         $databases = collect();
-        $databaseRelations = $request->attributes->get('can_read_sensitive', false) === true
+        $databaseRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
@@ -671,8 +661,8 @@ class DatabasesController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable|between:1024,65535',
@@ -688,7 +678,7 @@ class DatabasesController extends Controller
             'redact_all_env_values_in_logs' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'is_log_drain_enabled' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -1256,6 +1246,11 @@ class DatabasesController extends Controller
         if (! isset($backupData['enabled'])) {
             $backupData['enabled'] = true;
         }
+        $backupData['save_s3'] ??= false;
+
+        if ($s3Storages?->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
+        }
 
         $backupConfig = ScheduledDatabaseBackup::create($backupData);
         if ($s3Storages !== null) {
@@ -1509,6 +1504,10 @@ class DatabasesController extends Controller
             }
         }
 
+        if ($storageIds !== null && $backupConfig->newS3StorageIds($storageIds)->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
+        }
+
         $backupConfig->update($backupData);
         if ($storageIds !== null) {
             $backupConfig->syncS3Storages($storageIds->all());
@@ -1742,8 +1741,8 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Redis)',
-        description: 'Create a new Redis database.',
+        summary: 'Create (Redis / Valkey)',
+        description: 'Create a new Redis or Valkey database. Valkey (valkey/valkey:9-alpine) is the default. Set image to a Redis image (for example redis:8) for Redis.',
         path: '/databases/redis',
         operationId: 'create-database-redis',
         security: [
@@ -1769,7 +1768,7 @@ class DatabasesController extends Controller
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
-                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker image of the database. Default: valkey/valkey:9-alpine. For Redis, use a Redis image, for example redis:8.'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
                         'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
@@ -2166,9 +2165,6 @@ class DatabasesController extends Controller
             return invalidTokenResponse();
         }
 
-        // Use a generic authorization for database creation - using PostgreSQL as representative model
-        $this->authorize('create', StandalonePostgresql::class);
-
         if ($request->boolean('instant_deploy')) {
             abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
         }
@@ -2213,10 +2209,13 @@ class DatabasesController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'You need to provide a valid environment_name or environment_uuid.'], 422);
         }
+        // StandalonePostgresql stands for every database type: they share one policy.
+        $this->authorize('create', [StandalonePostgresql::class, $environment]);
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('placeResource', $server);
         if (! $server->canHostResources()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2250,8 +2249,8 @@ class DatabasesController extends Controller
         }
         $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
@@ -2271,7 +2270,7 @@ class DatabasesController extends Controller
             'instant_deploy' => 'boolean',
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2934,6 +2933,7 @@ class DatabasesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_backups', in: 'query', required: false, description: 'Delete the database and storage backups, on the server and on S3.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -2995,7 +2995,8 @@ class DatabasesController extends Controller
             deleteVolumes: $request->boolean('delete_volumes', true),
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
-            dockerCleanup: $request->boolean('docker_cleanup', true)
+            dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteBackups: $request->boolean('delete_backups', false),
         );
 
         auditLog('api.database.deleted', [
@@ -3012,7 +3013,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup configuration',
-        description: 'Deletes a backup configuration and all its executions.',
+        description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}',
         operationId: 'delete-backup-configuration-by-uuid',
         security: [
@@ -3082,7 +3083,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3099,12 +3100,13 @@ class DatabasesController extends Controller
             DB::beginTransaction();
             // Get all executions for this backup configuration
             $executions = $backup->executions()->get();
+            $server = $database->destination?->server;
+            $deleteLocalFiles = $server?->isFunctional() ?? false;
 
-            // Delete all execution files (locally and optionally from S3)
+            // Delete all execution files (locally when the server is reachable, and optionally from S3)
             foreach ($executions as $execution) {
-                if ($execution->filename) {
-                    deleteBackupsLocally($execution->filename, $database->destination->server);
-
+                if ($deleteLocalFiles && $execution->filename && ! $execution->local_storage_deleted) {
+                    deleteBackupsLocally($execution->filename, $server, throwError: true);
                 }
 
                 if ($deleteS3) {
@@ -3138,7 +3140,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup execution',
-        description: 'Deletes a specific backup execution.',
+        description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}',
         operationId: 'delete-backup-execution-by-uuid',
         security: [
@@ -3218,7 +3220,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3238,9 +3240,10 @@ class DatabasesController extends Controller
         $deleteS3 = $request->boolean('delete_s3', false);
 
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $database->destination->server);
-
+            // An unreachable server keeps the local file, as when the UI skips the local delete.
+            $server = $database->destination?->server;
+            if ($execution->filename && ! $execution->local_storage_deleted && ($server?->isFunctional() ?? false)) {
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
             if ($deleteS3) {
@@ -3937,7 +3940,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -4029,14 +4032,19 @@ class DatabasesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the database context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.database.env_updated', [
-            'team_id' => $teamId,
-            'database_uuid' => $database->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.database.env_updated', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }
@@ -4080,7 +4088,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4212,7 +4220,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -5012,7 +5020,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         $storageUuid = $request->route('storage_uuid');
 
@@ -5246,9 +5254,9 @@ class DatabasesController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'destination_uuid' => 'required|string',
-            'name' => 'string|max:255|nullable',
+            'name' => ValidationPatterns::nameRules(required: false),
             'clone_volumes' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -5269,6 +5277,7 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('update', $database);
+        $this->authorize('create', [StandalonePostgresql::class, $database->environment]);
 
         if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
             return $response;
@@ -5280,6 +5289,7 @@ class DatabasesController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         $uuid = new_public_id();
         $name = $request->filled('name')

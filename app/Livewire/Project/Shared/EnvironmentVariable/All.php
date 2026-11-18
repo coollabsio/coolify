@@ -302,7 +302,7 @@ class All extends Component
 
     private function canViewEnvironmentValues(): bool
     {
-        return auth()->user()?->can('manageEnvironment', $this->resource) ?? false;
+        return auth()->user()?->can('viewSensitive', $this->resource) ?? false;
     }
 
     private function nullLockedValues($envs)
@@ -848,8 +848,7 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        // Compose content is visible only to users who can edit the resource.
-        $canViewValues = auth()->user()?->can('update', $this->resource) ?? false;
+        $canViewValues = $this->canViewEnvironmentValues();
 
         return $hardcodedVars->map(fn (array $variable): array => [
             ...$variable,
@@ -1139,7 +1138,9 @@ class All extends Component
     private function handleSingleSubmit($data)
     {
         $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
-        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
+        $found = EnvironmentVariable::query()
+            ->forResourceKey($this->resource->getMorphClass(), $this->resource->id, (bool) ($data['is_preview'] ?? false), $data['key'])
+            ->exists();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
 
@@ -1241,9 +1242,11 @@ class All extends Component
             $comment = is_array($data) ? ($data['comment'] ?? null) : null;
 
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
-            $found = $this->resource->$method()->where('key', $key)->first();
+            // A key can have copies from earlier duplicate saves. Each copy gets the saved value,
+            // so that a deployment uses this value whichever copy it reads last.
+            $copies = $this->resource->$method()->where('key', $key)->get();
 
-            if ($found) {
+            foreach ($copies as $found) {
                 if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     $changed = false;
 
@@ -1268,7 +1271,9 @@ class All extends Component
                         $count++;
                     }
                 }
-            } else {
+            }
+
+            if ($copies->isEmpty()) {
                 $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $value;

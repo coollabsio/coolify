@@ -7,7 +7,7 @@
 
 services:
   obsidian:
-    image: lscr.io/linuxserver/obsidian:latest
+    image: lscr.io/linuxserver/obsidian:1.15.1
     environment:
       - SERVICE_URL_OBSIDIAN_3000
       - PUID=${PUID:-1000}

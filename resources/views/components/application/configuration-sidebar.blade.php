@@ -27,7 +27,7 @@
                 'label' => 'Swarm',
                 'route' => 'project.application.swarm',
                 'active' => $currentRoute === 'project.application.swarm',
-                'visible' => $application->destination->server->isSwarm(),
+                'visible' => $application->destination?->server?->isSwarm(),
             ],
             [
                 'label' => 'Environment Variables',
@@ -49,13 +49,13 @@
                 'route' => 'project.application.command',
                 'active' => $currentRoute === 'project.application.command',
                 'navigate' => false,
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Files',
                 'route' => 'project.application.files',
                 'active' => $currentRoute === 'project.application.files',
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Deployment Logs',
@@ -110,11 +110,17 @@
                 'label' => 'Resource Limits',
                 'route' => 'project.application.resource-limits',
                 'active' => $currentRoute === 'project.application.resource-limits',
+                'visible' => $application->build_pack !== 'dockercompose',
             ],
             [
                 'label' => 'Resource Operations',
                 'route' => 'project.application.resource-operations',
                 'active' => $currentRoute === 'project.application.resource-operations',
+            ],
+            [
+                'label' => 'Maintenance Mode',
+                'route' => 'project.application.maintenance',
+                'active' => $currentRoute === 'project.application.maintenance',
             ],
             [
                 'label' => 'Metrics',
@@ -125,6 +131,12 @@
                 'label' => 'Analytics',
                 'route' => 'project.application.analytics',
                 'active' => $currentRoute === 'project.application.analytics',
+            ],
+            [
+                'label' => 'Security',
+                'route' => 'project.application.vulnerabilities',
+                'active' => $currentRoute === 'project.application.vulnerabilities',
+                'security' => \App\Services\ImageScan\SecurityStatus::stored($application)->status->value,
             ],
             [
                 'label' => 'Tags',
@@ -165,8 +177,10 @@
             'Rollback' => 'time-back',
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
+            'Maintenance Mode' => 'bandage',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
+            'Security' => 'shield-alert',
             'Tags' => 'tags',
             'Danger Zone' => 'danger',
         ];
@@ -174,10 +188,10 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
+            'Operations' => ['Resource Operations', 'Maintenance Mode', 'Resource Limits', 'Rollback', 'Tags'],
             'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
@@ -212,10 +226,6 @@
                     : null,
                 ['id' => 'preview-deployments-section', 'label' => 'Deployments'],
             ])),
-            'project.application.healthcheck' => [
-                ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
-            ],
             'project.application.resource-operations' => [
                 ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
@@ -228,7 +238,7 @@
 
 @php
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $application->name);
 @endphp
 
 {{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.
@@ -266,6 +276,7 @@
                                     @if ($menuItem['label'] === 'Files')
                                         <x-beta-badge class="ml-auto shrink-0" />
                                     @endif
+                                    <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"

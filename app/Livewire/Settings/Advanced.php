@@ -129,6 +129,7 @@ class Advanced extends Component
         $this->avatar_storage_options = [
             ['value' => 'local', 'label' => 'Local storage'],
             ...S3Storage::query()
+                ->s3Only()
                 ->whereTeamId(0)
                 ->where('is_usable', true)
                 ->orderBy('name')
@@ -271,6 +272,7 @@ class Advanced extends Component
 
         $storageId = (int) str($this->avatar_storage)->after('s3:')->value();
         $storage = S3Storage::query()
+            ->s3Only()
             ->whereTeamId(0)
             ->where('is_usable', true)
             ->find($storageId);
@@ -302,6 +304,7 @@ class Advanced extends Component
         }
 
         $storage = S3Storage::query()
+            ->s3Only()
             ->whereTeamId(0)
             ->where('is_usable', true)
             ->find($storageId);

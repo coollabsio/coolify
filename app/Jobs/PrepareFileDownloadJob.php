@@ -47,7 +47,7 @@ class PrepareFileDownloadJob implements ShouldQueue
     public function handle(FileDownloadStorageService $downloads): void
     {
         try {
-            $storage = S3Storage::query()->whereTeamId(0)->where('is_usable', true)->find($this->s3StorageId);
+            $storage = S3Storage::query()->s3Only()->whereTeamId(0)->where('is_usable', true)->find($this->s3StorageId);
             if (! $storage) {
                 throw new \RuntimeException('The file download storage is not available.');
             }

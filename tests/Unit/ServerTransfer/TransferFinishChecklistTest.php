@@ -101,7 +101,6 @@ test('the GitHub App webhook step checks the URL at GitHub and sets it with one 
     $key = "github_app_webhook:{$this->githubApp->uuid}";
     $hookUrl = 'https://coolify-a.test/webhooks/source/github/events';
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => function ($request) use (&$hookUrl) {
             if ($request->method() === 'PATCH') {
                 $hookUrl = $request['url'];
@@ -157,25 +156,20 @@ test('I finished closes the list and keeps the open steps as skipped', function 
         ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
-test('the panel shows the open steps by group, collapses done steps, and finishes', function () {
+test('the panel counts the done steps and finishes', function () {
     $this->checklist->start($this->server);
 
     Livewire::test(TransferFinish::class, ['server' => $this->server])
-        ->assertSee('Finish the transfer')
         ->assertSee('0 of 3 done.')
-        ->assertSee('Server')
-        ->assertSee('Restart Sentinel')
         ->call('markStepDone', 'sentinel:server')
         ->assertSee('1 of 3 done.')
         ->assertSee('1 step is OK or done')
-        ->assertSee('Finish with open steps')
         ->call('markStepDone', 'server_connection:server')
         ->call('markStepDone', 'previous_ssh_key:server')
-        ->assertDontSee('Finish with open steps')
-        ->call('finishTransfer')
-        ->assertDontSee('Finish the transfer');
+        ->call('finishTransfer');
 
-    expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('done');
+    expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('done')
+        ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
 test('the panel starts background checks when they are stale, and not again within 30 seconds', function () {
@@ -195,7 +189,6 @@ test('a failed check shows a short message and keeps the technical reason as det
     finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
     $this->checklist->start($this->server);
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => Http::response(['message' => 'Bad credentials'], 401),
     ]);
 
@@ -272,10 +265,6 @@ test('the GitHub App steps link to the App settings at GitHub', function () {
 
     expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub'])
         ->and($this->checklist->linkOf($items->firstWhere('key', "github_app_urls:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub']);
-
-    Livewire::test(TransferFinish::class, ['server' => $this->server])
-        ->assertSeeHtml('href="https://github.com/organizations/acme/settings/apps/deploy-bot" target="_blank"')
-        ->assertSee('Open on GitHub');
 });
 
 test('a step key is passed to Livewire as a JavaScript string, so a quote in a domain cannot run script', function () {

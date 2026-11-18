@@ -2,24 +2,15 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
+use App\Models\Server;
+use App\Services\Access\AccessResolver;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 
 trait ResolvesTeam
 {
-    /**
-     * Abilities that team members must not exercise (parity with ApiAbility).
-     *
-     * @var array<int, string>
-     */
-    private const MEMBER_DISALLOWED_ABILITIES = [
-        'root',
-        'write',
-        'write:sensitive',
-        'deploy',
-        'read:sensitive',
-    ];
-
     protected function ensureAbility(Request $request, string $ability = 'read', ?string $tool = null): ?Response
     {
         $user = $request->user();
@@ -30,30 +21,20 @@ trait ResolvesTeam
         }
 
         $token = $user->currentAccessToken();
-        if (! $token) {
+        if (! $token || $token->team_id === null) {
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'invalid_token']);
 
             return Response::error('Invalid token.');
         }
 
-        $teamId = $token->team_id;
-        if ($teamId !== null) {
-            // Fresh pivot lookup (avoid stale $user->teams cache after role changes).
-            $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
-            $isAdminOrOwner = in_array($role, ['admin', 'owner'], true);
+        // Same check as api.token.team, for tools that run without the HTTP middleware.
+        if (! EnsureTokenBelongsToCurrentTeamMember::tokenWithinCreatorAccess($user, $token, (int) $token->team_id)) {
+            $this->auditMcpTool($request, $tool, 'denied', [
+                'reason' => 'token_exceeds_access',
+                'required_ability' => $ability,
+            ]);
 
-            if (! $isAdminOrOwner) {
-                $tokenAbilities = $token->abilities ?? [];
-                $disallowed = array_intersect($tokenAbilities, self::MEMBER_DISALLOWED_ABILITIES);
-                if ($disallowed !== [] || in_array($ability, self::MEMBER_DISALLOWED_ABILITIES, true)) {
-                    $this->auditMcpTool($request, $tool, 'denied', [
-                        'reason' => 'member_role',
-                        'required_ability' => $ability,
-                    ]);
-
-                    return Response::error('Missing required team role.');
-                }
-            }
+            return Response::error(EnsureTokenBelongsToCurrentTeamMember::EXCEEDS_ACCESS_MESSAGE);
         }
 
         if ($token->can('root') || $token->can($ability)) {
@@ -105,6 +86,21 @@ trait ResolvesTeam
         }
 
         return (int) $teamId;
+    }
+
+    /**
+     * Servers of the team, or none for a token or member limited to some projects, environments, or resources.
+     *
+     * @return Builder<Server>
+     */
+    protected function visibleServers(Request $request, int $teamId): Builder
+    {
+        $query = Server::whereTeamId($teamId);
+        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     protected function mcpSuccess(Request $request, Response $response, array $context = []): Response

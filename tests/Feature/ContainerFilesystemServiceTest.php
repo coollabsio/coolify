@@ -32,11 +32,15 @@ function fsServer(): Server
     $team = Team::factory()->create();
     $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
 
-    return Server::factory()->create([
+    $server = Server::factory()->create([
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
         'ip' => '203.0.113.10',
     ]);
+    // These tests read the faked ssh commands in order; the host key check would add a key scan.
+    $server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
+
+    return $server;
 }
 
 it('sorts directories before files, then by name case-insensitively', function () {
@@ -461,13 +465,13 @@ it('streams the remote command output to the writer in chunks', function () {
     $server = fsServer();
     $svc = new class($server, 'app-123') extends ContainerFilesystemService
     {
-        public ?string $remoteCommand = null;
+        public string $stdinFile;
 
-        protected function sshCommand(string $command): string
+        protected function sshCommand(): string
         {
-            $this->remoteCommand = $command;
+            $this->stdinFile = tempnam(sys_get_temp_dir(), 'fs-stream-');
 
-            return 'head -c 200000 /dev/zero';
+            return 'cat > '.escapeshellarg($this->stdinFile).'; head -c 200000 /dev/zero';
         }
     };
     $received = '';
@@ -478,7 +482,9 @@ it('streams the remote command output to the writer in chunks', function () {
         $chunks++;
     });
 
-    expect($svc->remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'");
+    $remoteCommand = file_get_contents($svc->stdinFile);
+    unlink($svc->stdinFile);
+    expect($remoteCommand)->toEndWith("docker exec 'app-123' cat -- '/app/a.bin'\n");
     expect(strlen($received))->toBe(200000);
     expect($chunks)->toBeGreaterThan(1);
 });

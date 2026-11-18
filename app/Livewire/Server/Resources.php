@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Server;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -168,6 +169,7 @@ class Resources extends Component
         }
         $this->activeTab = 'unmanaged';
         try {
+            $this->authorize('view', $this->server);
             $this->unmanagedContainers = $this->server->loadUnmanagedContainers()->toArray();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -182,6 +184,7 @@ class Resources extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
+            $this->authorize('view', $this->server);
             if ($this->prefersCanvasView('server_resources')) {
                 return $this->redirectRoute('server.canvas', ['server_uuid' => $this->server->uuid], navigate: true);
             }
@@ -213,13 +216,16 @@ class Resources extends Component
             $this->setPage($page);
         }
 
+        $pageResources = $resources->forPage($page, $this->perPage)->values();
+
         return view('livewire.server.resources', [
             'resources' => new LengthAwarePaginator(
-                $resources->forPage($page, $this->perPage)->values(),
+                $pageResources,
                 $resources->count(),
                 $this->perPage,
                 $page,
             ),
+            'markers' => $this->activeTab === 'managed' ? VulnerabilityMarkers::for($pageResources) : [],
         ]);
     }
 }

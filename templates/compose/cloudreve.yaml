@@ -7,7 +7,7 @@
 
 services:
   cloudreve:
-    image: cloudreve/cloudreve:4.10.1
+    image: cloudreve/cloudreve:4.19.1
     environment:
       - SERVICE_URL_CLOUDREVE_5212
       - CR_CONF_Database.Type=postgres

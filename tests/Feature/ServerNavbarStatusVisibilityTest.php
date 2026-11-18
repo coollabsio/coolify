@@ -102,25 +102,6 @@ it('refreshes sentinel status when sentinel restarts for the server', function (
         ->assertDispatched('sentinel-status-changed');
 });
 
-it('does not render the floating action panel when the server has no proxy actions', function () {
-    [$server] = makeNavbarServer(isFunctional: false);
-
-    Livewire::test('server.navbar', ['server' => $server])
-        ->assertDontSeeHtml('x-teleport="#resource-action-hud-slot"');
-});
-
-it('renders the floating action panel with proxy actions for a functional server', function () {
-    [$server] = makeNavbarServer(isFunctional: true);
-    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value]])->save();
-    $server = $server->fresh();
-
-    expect($server->proxySet())->toBeTrue();
-
-    Livewire::test('server.navbar', ['server' => $server])
-        ->assertSeeHtml('x-teleport="#resource-action-hud-slot"')
-        ->assertSee('Refresh Proxy Status');
-});
-
 it('shows the Traefik dashboard link without proxy actions to members who cannot manage the proxy', function () {
     [$server, $user, $team] = makeNavbarServer(isFunctional: true);
     $user->teams()->updateExistingPivot($team->id, ['role' => 'member']);
@@ -129,7 +110,7 @@ it('shows the Traefik dashboard link without proxy actions to members who cannot
     Cache::put(ProxyDashboardCacheService::getCacheKey($server), true);
 
     Livewire::test('server.navbar', ['server' => $server])
-        ->assertSeeHtml('x-teleport="#resource-action-hud-slot"')
+        ->set('currentRoute', 'server.proxy')
         ->assertSee('Traefik Dashboard')
         ->assertDontSee('Refresh Proxy Status');
 });

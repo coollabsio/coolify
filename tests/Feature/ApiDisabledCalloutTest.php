@@ -83,9 +83,7 @@ it('lets users create API tokens for MCP while the REST API is disabled', functi
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->assertSee('API access is turned off')
-        ->assertSee('Create token')
-        ->set('description', 'MCP client')
+        ->set('form.description', 'MCP client')
         ->call('addNewToken')
         ->assertHasNoErrors();
 

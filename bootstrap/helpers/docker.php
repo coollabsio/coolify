@@ -324,6 +324,21 @@ function getCurrentApplicationContainerStatus(Server $server, Application $appli
     return $containers;
 }
 
+/**
+ * Pick the container the proxy routes to when an application has several, as during a
+ * rolling update: running, ready (healthy or without a healthcheck) over starting or
+ * unhealthy, and the newest among equals, since the older one is about to be stopped.
+ */
+function selectServingContainer(Collection $containers): ?array
+{
+    $running = $containers->filter(fn ($container) => data_get($container, 'State') === 'running');
+    $ready = $running->reject(fn ($container) => str(data_get($container, 'Status'))->contains(['(health: starting)', '(unhealthy)']));
+
+    return ($ready->isEmpty() ? $running : $ready)
+        ->sortByDesc(fn ($container) => strtotime((string) data_get($container, 'CreatedAt')) ?: 0)
+        ->first();
+}
+
 function getCurrentServiceContainerStatus(Server $server, Service $service): Collection
 {
     $containers = collect([]);
@@ -505,6 +520,98 @@ function dockerRemoveCommand(string $container): string
     $command = 'docker rm -f '.escapeShellValue($container);
 
     return dockerCommandIgnoringError($command, 'No such container:');
+}
+
+/**
+ * The `docker run` option that mounts a host file read-only. Unlike `-v`, `--mount` fails when Docker cannot see
+ * the source, so a missing file does not become an empty directory on the host and in the container.
+ */
+function dockerReadOnlyFileMountOption(string $source, string $target): string
+{
+    return '--mount '.escapeshellarg("type=bind,source={$source},target={$target},readonly");
+}
+
+/**
+ * Lists the containers of a Compose project, one JSON object per line, for composeContainersWithRemovedVolumes().
+ */
+function composeProjectMountsCommand(string $projectName): string
+{
+    $format = '{"name":{{json .Name}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"imageVolumes":{{json .Config.Volumes}},"mounts":{{json .Mounts}}}';
+
+    return 'docker ps -aq --filter '.escapeshellarg("label=com.docker.compose.project={$projectName}")
+        .' | xargs -r docker inspect --format '.escapeshellarg($format).' 2>/dev/null || true';
+}
+
+/**
+ * `docker compose up` gives a recreated container the mount of the old container at each path
+ * that the image declares with VOLUME. This also keeps a volume that the user deleted in Coolify,
+ * so its old data comes back (#6875). Returns the containers to remove before `up`.
+ *
+ * Only a volume that Coolify made (its name starts with "{uuid}_") and that has no storage row
+ * anymore counts. A volume that is only removed from the Compose file still has its row, and an
+ * external volume or a bind mount is not Coolify's, so Compose keeps using them as before.
+ *
+ * @param  string  $projectMounts  output of composeProjectMountsCommand()
+ * @param  array<string, mixed>  $composeServices  the services of the Compose file that `up` starts
+ * @param  list<string>  $storageNames  names of the storage rows that the resource still has
+ * @return array<string, string> container name => volume that the user deleted
+ */
+function composeContainersWithRemovedVolumes(string $projectMounts, array $composeServices, string $uuid, array $storageNames): array
+{
+    $normalize = fn (string $path): string => rtrim($path, '/') ?: '/';
+    $containers = [];
+    foreach (preg_split('/\R/', trim($projectMounts)) as $line) {
+        $container = json_decode($line, true);
+        $service = data_get($container, 'service');
+        if (! is_array($container) || ! is_string($service) || ! is_array(data_get($composeServices, $service))) {
+            continue;
+        }
+        $targets = composeServiceVolumeTargets(data_get($composeServices, "{$service}.volumes", []));
+        if ($targets === null) {
+            continue;
+        }
+        $imageVolumes = array_map($normalize, array_keys(data_get($container, 'imageVolumes') ?? []));
+        foreach (data_get($container, 'mounts') ?? [] as $mount) {
+            $name = (string) data_get($mount, 'Name');
+            $path = $normalize((string) data_get($mount, 'Destination'));
+            if (data_get($mount, 'Type') !== 'volume' || ! str_starts_with($name, "{$uuid}_") || in_array($name, $storageNames, true)
+                || ! in_array($path, $imageVolumes, true) || in_array($path, $targets, true)) {
+                continue;
+            }
+            $containers[ltrim((string) data_get($container, 'name'), '/')] = $name;
+        }
+    }
+
+    return $containers;
+}
+
+/**
+ * The container paths of the volumes of a Compose service, or null when a path is not literal
+ * (for example `${DATA_PATH}`).
+ *
+ * @return list<string>|null
+ */
+function composeServiceVolumeTargets(mixed $volumes): ?array
+{
+    $targets = [];
+    foreach (is_array($volumes) ? $volumes : [] as $volume) {
+        if (is_array($volume)) {
+            $target = data_get($volume, 'target');
+        } else {
+            // source:target:mode, where the source can contain colons, for example ${DATA:-/data}.
+            $parts = explode(':', (string) $volume);
+            if (count($parts) > 1 && preg_match('/^[a-zA-Z,]+$/', end($parts))) {
+                array_pop($parts);
+            }
+            $target = end($parts);
+        }
+        if (! is_string($target) || ! str_starts_with($target, '/')) {
+            return null;
+        }
+        $targets[] = rtrim($target, '/') ?: '/';
+    }
+
+    return $targets;
 }
 
 function dockerNetworkRemoveCommand(string $network): string
@@ -854,6 +961,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
+        $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
@@ -963,9 +1071,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {
-        // Not named `gzip`: containers that are not redeployed still declare the old `gzip`
-        // definition, and Traefik drops a middleware with conflicting definitions (#5076).
-        $labels->push('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream');
+        $labels->push('traefik.http.middlewares.'.TRAEFIK_GZIP_MIDDLEWARE.'.compress.excludedcontenttypes='.implode(',', TRAEFIK_GZIP_EXCLUDED_CONTENT_TYPES));
     }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
     // Every container declares the shared middleware, so a permanent variant needs its own name.
@@ -1081,7 +1187,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1109,7 +1215,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1174,7 +1280,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1203,7 +1309,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1926,36 +2032,32 @@ function stripCoolifyCustomFields(array $yamlCompose): array
     return $yamlCompose;
 }
 
-function validateComposeFile(string $compose, int $server_id): string|Throwable
+/**
+ * Check a Compose file with `docker compose config` on the server. The file goes to the command on
+ * stdin, so no temporary file is written and large files are not limited by the argument length.
+ * Relative paths (such as `extends.file`) resolve in $projectDirectory, as in the deployment.
+ *
+ * @throws RuntimeException With the exit code of the check when Docker Compose rejects the file (255: SSH failure)
+ */
+function checkComposeFileOnServer(string $compose, Server $server, ?string $projectDirectory = null): void
 {
-    $uuid = Str::random(18);
-    $server = Server::ownedByCurrentTeam()->find($server_id);
+    $yamlCompose = stripCoolifyCustomFields(parseDockerComposeYaml($compose));
+    $projectDirectoryOption = filled($projectDirectory) ? '--project-directory '.escapeshellarg($projectDirectory).' ' : '';
+    $command = ($server->isNonRoot() ? 'sudo ' : '')."docker compose {$projectDirectoryOption}-f - config --no-interpolate --no-path-resolution -q";
+    instant_remote_process_with_input($server, $command, Yaml::dump($yamlCompose, 10, 2));
+}
+
+/**
+ * @return string 'OK', or the error of checkComposeFileOnServer()
+ */
+function validateComposeFile(string $compose, Server $server, ?string $projectDirectory = null): string
+{
     try {
-        if (! $server) {
-            throw new Exception('Server not found');
-        }
-        $yaml_compose = parseDockerComposeYaml($compose);
-
-        // Remove Coolify's custom fields before Docker validation
-        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
-
-        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
-        instant_remote_process([
-            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "chmod 600 /tmp/{$uuid}.yml",
-            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
-            "rm /tmp/{$uuid}.yml",
-        ], $server);
+        checkComposeFileOnServer($compose, $server, $projectDirectory);
 
         return 'OK';
     } catch (Throwable $e) {
         return $e->getMessage();
-    } finally {
-        if (filled($server)) {
-            instant_remote_process([
-                "rm /tmp/{$uuid}.yml",
-            ], $server, throwError: false);
-        }
     }
 }
 
@@ -2124,7 +2226,7 @@ function generateDockerBuildArgs($variables): Collection
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key' and 'value'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
@@ -2138,11 +2240,6 @@ function generateDockerEnvFlags($variables): string
 
             if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
                 throw new InvalidArgumentException('Invalid environment variable key.');
-            }
-
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
-            if ($isMultiline) {
-                $value = trim($value, "'");
             }
 
             return '-e '.escapeshellarg("{$key}={$value}");

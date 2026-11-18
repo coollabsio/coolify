@@ -25,6 +25,7 @@ class ActiveDeployments extends Component
         'server_name',
         'server_id',
         'status',
+        'scan_gate_result',
         'created_at',
         'finished_at',
     ];
@@ -97,6 +98,8 @@ class ActiveDeployments extends Component
     }
 
     /**
+     * The Application access grant scope also limits the IDs to the applications the current actor can see.
+     *
      * @return Collection<int, string>
      */
     private function teamApplicationIds(): Collection

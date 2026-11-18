@@ -53,13 +53,14 @@ class Index extends Component
             return $this->redirectRoute('shared-variables.team.canvas', navigate: true);
         }
         $this->team = currentTeam();
+        $this->authorize('viewSharedVariables', $this->team);
         $this->getDevView();
     }
 
     public function switch()
     {
         try {
-            $this->authorize('view', $this->team);
+            $this->authorize('viewSharedVariables', $this->team);
             $this->view = $this->view === 'normal' ? 'dev' : 'normal';
             $this->getDevView();
         } catch (\Throwable $e) {

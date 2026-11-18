@@ -786,9 +786,9 @@ class SentinelTrafficClient
         $commands = $this->server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $this->server) : [$command];
 
         try {
-            return Process::timeout(self::REMOTE_TIMEOUT)->start(
-                SshMultiplexingHelper::generateSshCommand($this->server, implode("\n", $commands), commandTimeout: self::REMOTE_TIMEOUT)
-            );
+            return Process::timeout(self::REMOTE_TIMEOUT)
+                ->input(SshMultiplexingHelper::sshBatchInput(implode("\n", $commands)))
+                ->start(SshMultiplexingHelper::generateSshBatchCommand($this->server, commandTimeout: self::REMOTE_TIMEOUT));
         } catch (\Throwable $e) {
             Cache::put($this->unavailableKey(), true, self::UNAVAILABLE_TTL);
 

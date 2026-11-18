@@ -146,6 +146,9 @@ class OauthLoginService
                 if ($user?->oauthIdentities()->exists()) {
                     throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
+                if ($user) {
+                    $this->claimInvitationAccount($user);
+                }
 
                 $linksExistingUser = $user !== null;
                 if (! $user) {
@@ -269,6 +272,9 @@ class OauthLoginService
                 if ($user?->oauthIdentities()->exists()) {
                     throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
+                if ($user) {
+                    $this->claimInvitationAccount($user);
+                }
 
                 $linksExistingUser = $user !== null;
                 if (! $user) {
@@ -310,6 +316,30 @@ class OauthLoginService
         ]);
 
         return $user;
+    }
+
+    /**
+     * An account that an invitation created links its first identity only while
+     * nobody has used it, and its temporary password is removed. A used account
+     * links after a password reset through email or `user:allow-sso-link`.
+     */
+    private function claimInvitationAccount(User $user): void
+    {
+        if (! $user->created_by_invitation) {
+            return;
+        }
+
+        if (! $user->needsInitialInvitationLogin()) {
+            throw new OauthLoginException('OAuth identity cannot be linked to a used invitation account', 'auth.failed.oauth_invitation_account');
+        }
+
+        $user->forceFill([
+            'password' => null,
+            'remember_token' => Str::random(60),
+            'force_password_reset' => false,
+            'email_verified_at' => now(),
+            'created_by_invitation' => false,
+        ])->save();
     }
 
     private function auditIdentityLinked(User $user, string $provider, string $issuer): void

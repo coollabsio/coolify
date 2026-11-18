@@ -6,6 +6,9 @@
     @if (session('error'))
         <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
     @endif
+    @if (session('success'))
+        <span x-data x-init="$wire.dispatch('success', @js(session('success')))" />
+    @endif
 
     @if (data_get($github_app, 'app_id'))
         @php
@@ -47,7 +50,7 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations"
+                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations" :name="$github_app->name ?: 'GitHub App'"
                         data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-1 gap-0.5">
@@ -85,11 +88,13 @@
                                                 source to an application.
                                             </p>
                                         </div>
+                                        @can('update', $github_app)
                                         <a class="button shrink-0 button-highlighted"
                                             href="{{ getInstallationPath($github_app) }}">
                                             Install repositories
                                             <x-external-link />
                                         </a>
+                                        @endcan
                                     </div>
                                 </x-application.settings-section>
                             </div>
@@ -112,7 +117,7 @@
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
                                         @if ($isConnected)
-                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                            <x-forms.button type="button" canGate="update" :canResource="$github_app"
                                                 wire:click.prevent="testConnection">
                                                 Test connection
                                             </x-forms.button>
@@ -170,7 +175,8 @@
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
                                             label="App ID" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                                            id="installationId" label="Installation ID" required />
+                                            id="installationId" label="Installation ID" required
+                                            helper="{{ filled($github_app->installation_account) ? 'Installed on '.$github_app->installation_account.'. ' : '' }}To use this GitHub App with another account or organization, click Repositories and install it there. Coolify adds a new source for each installation." />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientId"
                                             label="Client ID" type="password" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
@@ -293,6 +299,15 @@
                                 <div x-show="!useCustomWebhookEndpoint">
                                     <x-forms.listbox id="webhook_endpoint" label="Instance endpoint"
                                         :options="$endpointOptions" x-model="webhookEndpoint" />
+                                    @if (!$this->hasPublicWebhookEndpoint())
+                                        <x-callout type="warning" title="No public endpoint" class="mt-2">
+                                            This instance has no domain and no public IP, so GitHub cannot send
+                                            webhooks to it. Set the <code>URL</code> or the
+                                            <code>Instance public IPv4</code> in
+                                            <a href="{{ route('settings.index') }}" class="font-medium underline">Settings</a>,
+                                            or use a custom endpoint.
+                                        </x-callout>
+                                    @endif
                                 </div>
                                 <div x-cloak x-show="useCustomWebhookEndpoint">
                                     <x-forms.input canGate="create" :canResource="$github_app"
@@ -319,6 +334,13 @@
                                 ]"
                                 helper="Write access lets Coolify post deployment status and links on pull requests." />
 
+                            <x-forms.listbox id="deployment_status_permissions"
+                                label="GitHub deployments" :options="[
+                                    ['value' => false, 'label' => 'Do not create GitHub deployments'],
+                                    ['value' => true, 'label' => 'Create GitHub deployments'],
+                                ]"
+                                helper="Deployments (write) access lets Coolify show each deployment and its status on GitHub, so pull requests show the preview as deployed." />
+
                             <x-forms.listbox id="github_runners" label="GitHub Actions runners"
                                 :disabled="blank($github_app->organization)"
                                 :options="[
@@ -331,7 +353,7 @@
 
                             <button type="button"
                                 class="button mt-auto w-full justify-center button-highlighted"
-                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
+                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, $wire.deployment_status_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
                                 Register with GitHub
                             </button>
                         </div>
@@ -369,9 +391,10 @@
             </x-callout>
         @endcan
 
+        @can('update', $github_app)
         <script>
             function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint,
-                preview_deployment_permissions, administration, github_runners) {
+                preview_deployment_permissions, deployment_status_permissions, administration, github_runners) {
                 const {
                     organization,
                     html_url
@@ -407,6 +430,9 @@
                 if (preview_deployment_permissions) {
                     default_permissions.pull_requests = 'write';
                     default_events.push('pull_request');
+                }
+                if (deployment_status_permissions) {
+                    default_permissions.deployments = 'write';
                 }
                 if (administration) {
                     default_permissions.administration = 'write';
@@ -446,5 +472,6 @@
                 form.submit();
             }
         </script>
+        @endcan
     @endif
 </div>

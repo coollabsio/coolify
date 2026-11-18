@@ -11,11 +11,22 @@
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
+## Arguments that can be passed:
+## --preview or --nightly - Install the newest version of the preview or nightly channel and switch the instance to that update channel
+
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 CDN="https://cdn.coollabs.io/coolify"
+CHANNEL="stable"
+case "$1" in
+--preview | --nightly)
+    CHANNEL="${1#--}"
+    CDN="https://cdn.coollabs.io/coolify/$CHANNEL"
+    shift
+    ;;
+esac
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -506,6 +517,20 @@ if [ "$OS_TYPE" = "zorin" ]; then
     OS_TYPE="ubuntu"
 fi
 
+# Arch based distributions (Garuda, Manjaro, EndeavourOS, CachyOS, ...) list arch in ID_LIKE
+is_arch_based() {
+    local id_like
+    id_like=$(. "$1" && echo "${ID_LIKE:-}")
+    case " $id_like " in
+    *" arch "*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
+if is_arch_based /etc/os-release; then
+    OS_TYPE="arch"
+fi
+
 if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
@@ -518,9 +543,10 @@ if [ "$OS_TYPE" = 'amzn' ]; then
 fi
 
 # Fetch versions.json once and parse all values from it
-VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
-LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+VERSIONS_JSON=$(curl -L --silent https://cdn.coollabs.io/coolify/versions.json)
+CHANNEL_VERSIONS=$(echo "$VERSIONS_JSON" | sed -n "/^    \"$CHANNEL\": {/,/^    }/p")
+LATEST_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"coolify"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+LATEST_HELPER_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -939,6 +965,22 @@ update_env_var() {
     fi
 }
 
+# Sets the value of a variable, also when it has a value already.
+# Used for values that the user gives explicitly, so that a new run of the installer can correct them.
+set_env_var() {
+    local key="$1"
+    local value="$2"
+
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        # awk reads the value from the environment, so characters such as | & \ in it stay literal
+        KEY="$key" VALUE="$value" awk '!done && index($0, ENVIRON["KEY"] "=") == 1 { $0 = ENVIRON["KEY"] "=" ENVIRON["VALUE"]; done = 1 } { print }' "$ENV_FILE" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+        echo " - Set value of ${key}"
+    else
+        printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+        echo " - Added ${key} and its value as the variable was missing"
+    fi
+}
+
 # Quote a user-supplied value so that Docker Compose and phpdotenv both read it back unchanged
 # (spaces, #, $ and quotes otherwise break parsing or change the value).
 quote_env_value() {
@@ -970,10 +1012,10 @@ update_env_var "PUSHER_BACKEND_PORT" "6001"
 if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
     echo " - Setting predefined root user credentials from environment"
     if [ -n "$ROOT_USERNAME" ]; then
-        update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+        set_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
     fi
-    update_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
-    update_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
+    set_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
+    set_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
 elif [ -n "$ROOT_USERNAME" ] || [ -n "$ROOT_USER_EMAIL" ] || [ -n "$ROOT_USER_PASSWORD" ]; then
     warn "Predefined root user skipped: set both ROOT_USER_EMAIL and ROOT_USER_PASSWORD."
 fi
@@ -1127,7 +1169,25 @@ if [ "$HEALTH" != "healthy" ]; then
     echo " - Please check: docker logs coolify"
     exit 1
 fi
+
+# The seeder skips a root user that exists already. If it cannot create one (for example, the password
+# is too weak), it prints the reasons, which otherwise are only in the logs of the coolify container.
+ROOT_USER_ERRORS=""
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+    ROOT_USER_SEEDER_OUTPUT=$(docker exec coolify php artisan db:seed --class=RootUserSeeder --force 2>&1 || true)
+    echo "$ROOT_USER_SEEDER_OUTPUT"
+    if ! printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | grep -qE "Root user created successfully|Root user already exists"; then
+        ROOT_USER_ERRORS=$(printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | sed -n 's/^[[:space:]]*→[[:space:]]*//p')
+        [ -n "$ROOT_USER_ERRORS" ] || ROOT_USER_ERRORS=$(printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | sed -n 's/^[[:space:]]*ERROR[[:space:]]*//p')
+        [ -n "$ROOT_USER_ERRORS" ] || ROOT_USER_ERRORS="Unknown reason. Check: docker logs coolify"
+    fi
+fi
 step_done
+
+if [ "$CHANNEL" != "stable" ]; then
+    docker exec coolify php artisan app:update-channel "$CHANNEL" || warn "Could not switch the instance to the $CHANNEL update channel, switch it on the update page"
+    ui_flush_warnings
+fi
 
 if [ "$UI_TTY" = true ]; then
     printf '%s\n' "$(ui_bar 100 "done")" >&3
@@ -1167,6 +1227,14 @@ for IP in $PRIVATE_IPS; do
     fi
 done
 
+if [ -n "$ROOT_USER_ERRORS" ]; then
+    printf '\n  %s! The predefined root user was not created:%s\n' "$C_YELLOW" "$C_RESET" >&3
+    while IFS= read -r ROOT_USER_ERROR; do
+        printf '    %s- %s%s\n' "$C_YELLOW" "$ROOT_USER_ERROR" "$C_RESET" >&3
+    done <<<"$ROOT_USER_ERRORS"
+    printf '  %sRun the installer again with corrected ROOT_USER_* values. Registration in the browser stays closed while they are set.%s\n' "$C_YELLOW" "$C_RESET" >&3
+    printf '  %sRequirements: https://coolify.io/docs/start-with-self-hosted#_1-root-user%s\n' "$C_YELLOW" "$C_RESET" >&3
+fi
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
     printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
 fi

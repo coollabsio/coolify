@@ -14,7 +14,7 @@ beforeEach(function () {
 
     Queue::fake();
     Cache::flush();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.2']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.2']], 3600);
 
     $user = User::factory()->create();
     $this->server = Server::factory()->create(['team_id' => $user->teams()->first()->id]);

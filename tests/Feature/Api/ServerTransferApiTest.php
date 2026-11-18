@@ -634,7 +634,7 @@ describe('GET /api/v1/servers/import/check', function () {
     test('lists every check with its result when a server already exists on this instance', function () {
         $listener = stream_socket_server('tcp://127.0.0.1:0');
         $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
-        $this->server->forceFill(['ip' => '127.0.0.1'])->save();
+        $this->server->forceFill(['ip' => '127.0.0.1', 'port' => $port])->save();
 
         $checks = $this->withHeaders(transferHeaders($this->importToken))
             ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
@@ -645,9 +645,23 @@ describe('GET /api/v1/servers/import/check', function () {
         expect(collect($checks)->pluck('ok', 'label')->all())->toMatchArray([
             'the transfer bundle version is supported' => true,
             'no server with the same UUID exists' => true,
-            'no server with the same IP exists' => false,
+            'no server with the same IP and SSH port exists' => false,
             "the target can reach the SSH port of the server (127.0.0.1:{$port})" => true,
         ]);
+        fclose($listener);
+    });
+
+    test('accepts a server with the IP of an existing server and a different SSH port', function () {
+        $listener = stream_socket_server('tcp://127.0.0.1:0');
+        $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
+        $this->server->forceFill(['ip' => '127.0.0.1', 'port' => 22])->save();
+
+        $checks = $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
+            ->assertOk()
+            ->json('checks');
+
+        expect(collect($checks)->pluck('ok', 'label')->get('no server with the same IP and SSH port exists'))->toBeTrue();
         fclose($listener);
     });
 

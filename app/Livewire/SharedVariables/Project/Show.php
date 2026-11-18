@@ -55,6 +55,7 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
+        $this->authorize('viewSharedVariables', $project);
         $this->project = $project;
         if ($this->prefersCanvasView('project_variables')) {
             return $this->redirectRoute('shared-variables.project.canvas', ['project_uuid' => $project->uuid], navigate: true);
@@ -65,7 +66,7 @@ class Show extends Component
     public function switch()
     {
         try {
-            $this->authorize('view', $this->project);
+            $this->authorize('viewSharedVariables', $this->project);
             $this->view = $this->view === 'normal' ? 'dev' : 'normal';
             $this->getDevView();
         } catch (\Throwable $e) {

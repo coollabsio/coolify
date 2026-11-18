@@ -42,11 +42,13 @@ function makeRegistryImageApplication(Environment $environment, StandaloneDocker
     ]);
 }
 
-function runSharedRegistryImageGuard(Application $application): void
+function runSharedRegistryImageGuard(Application $application, bool $restartOnly = false, bool $additionalServer = false): void
 {
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
     $job = $reflection->newInstanceWithoutConstructor();
     $reflection->getProperty('application')->setValue($job, $application);
+    $reflection->getProperty('restart_only')->setValue($job, $restartOnly);
+    $reflection->getProperty('is_this_additional_server')->setValue($job, $additionalServer);
     $reflection->getMethod('ensureRegistryImageIsNotShared')->invoke($job);
 }
 
@@ -58,6 +60,16 @@ describe('deployment guard', function () {
         expect(fn () => runSharedRegistryImageGuard($server))
             ->toThrow(DeploymentException::class, 'The application web also builds the Docker image ghcr.io/acme/monorepo');
     });
+
+    test('allows deployments that reuse a shared image without pushing it', function (bool $restartOnly, bool $additionalServer) {
+        makeRegistryImageApplication($this->environment, $this->destination, ['name' => 'web']);
+        $application = makeRegistryImageApplication($this->environment, $this->destination, ['name' => 'worker']);
+
+        runSharedRegistryImageGuard($application, $restartOnly, $additionalServer);
+    })->with([
+        'restart' => [true, false],
+        'additional server' => [false, true],
+    ])->throwsNoExceptions();
 
     test('allows unique image names', function () {
         makeRegistryImageApplication($this->environment, $this->destination, ['docker_registry_image_name' => 'ghcr.io/acme/web']);

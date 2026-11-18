@@ -126,7 +126,7 @@ it('uses the preview uuid in the Caddy traffic key of a compose preview', functi
         'docker_compose_domains' => $application->docker_compose_domains,
     ]);
 
-    $labels = composeServiceLabels(applicationParser($application, 42, $preview->id), 'web.app-pr-42');
+    $labels = composeServiceLabels(applicationParser($application, 42, $preview->id), 'web.app');
     $key = "{$application->uuid}-42-".traefikSafeServiceNameSegment('web.app');
 
     expect($labels->all())

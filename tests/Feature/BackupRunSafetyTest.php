@@ -359,6 +359,36 @@ it('backs up a service database without a database env variable from the backup 
     'mariadb, selected database' => ['mariadb:11', 'MARIADB_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
     'mysql, all databases' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['dump_all' => true], 'all'],
     'mysql, selected database' => ['mysql:8', 'MYSQL_ROOT_PASSWORD=secret', ['databases_to_backup' => 'shop'], 'shop'],
+    'postgres with the maintenance database, all databases' => ['postgres:16-alpine', "POSTGRES_USER=odoo\nPOSTGRES_DB=postgres", ['dump_all' => true], 'all'],
+]);
+
+it('backs up the databases from the backup settings instead of the container env database', function (string $image, string $env) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team, ['databases_to_backup' => 'shop,blog']);
+    backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->orderBy('id')->pluck('database_name')->all())->toBe(['shop', 'blog']);
+})->with([
+    'mariadb' => ['mariadb:11', "MARIADB_ROOT_PASSWORD=secret\nMARIADB_DATABASE=app"],
+    'mysql' => ['mysql:8', "MYSQL_ROOT_PASSWORD=secret\nMYSQL_DATABASE=app"],
+    'postgres' => ['postgres:16', "POSTGRES_PASSWORD=secret\nPOSTGRES_DB=app"],
+]);
+
+it('backs up the container env database when the backup settings name none', function (string $image, string $env) {
+    $database = backupRunSafetyServiceDatabase($this->server, $this->destination, $this->environment, $image);
+    $backup = backupRunSafetySchedule($database, $this->team);
+    backupRunSafetyFakeRemoteCommands(["docker exec '{$database->name}-{$database->service->uuid}' env" => $env]);
+
+    (new DatabaseBackupJob($backup))->handle();
+
+    expect(ScheduledDatabaseBackupExecution::query()->sole()->database_name)->toBe('app');
+})->with([
+    'mariadb' => ['mariadb:11', "MARIADB_ROOT_PASSWORD=secret\nMARIADB_DATABASE=app"],
+    'mariadb with mysql env' => ['mariadb:11', "MARIADB_ROOT_PASSWORD=secret\nMYSQL_DATABASE=app"],
+    'mysql' => ['mysql:8', "MYSQL_ROOT_PASSWORD=secret\nMYSQL_DATABASE=app"],
+    'postgres' => ['postgres:16', "POSTGRES_PASSWORD=secret\nPOSTGRES_DB=app"],
 ]);
 
 it('records a failed execution and notifies when no service database to back up is known', function (string $image, string $env) {

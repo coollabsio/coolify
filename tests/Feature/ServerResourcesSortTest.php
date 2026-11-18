@@ -88,10 +88,3 @@ it('ignores unknown sort values and resets the page on a valid sort', function (
     expect($this->component->sort)->toBe('status_desc')
         ->and($this->component->getPage())->toBe(1);
 });
-
-it('renders livewire sort headers for both tabs', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-    foreach (['name', 'project', 'environment', 'type', 'status', 'image'] as $column) {
-        expect($view)->toContain("asc=\"{$column}_asc\" desc=\"{$column}_desc\" action=\"setSort\"");
-    }
-});

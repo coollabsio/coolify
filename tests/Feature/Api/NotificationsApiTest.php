@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\User;
 use App\Models\WebhookNotificationSettings;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Once;
 
@@ -35,6 +36,13 @@ beforeEach(function () {
 
     $this->token = $this->user->createToken('test-token', ['*']);
     $this->bearerToken = $this->token->plainTextToken;
+
+    // Webhook URLs and the SMTP host are resolved during validation: answer without DNS.
+    SafeWebhookUrl::resolveHostsUsing(fn (): array => ['93.184.216.34']);
+});
+
+afterEach(function () {
+    SafeWebhookUrl::resolveHostsUsing(null);
 });
 
 function authHeaders(string $token): array

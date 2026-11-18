@@ -31,6 +31,23 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
+        @if (filled($fileStorage->variable_fs_path))
+            <x-callout type="warning" title="Saved host path">
+                This storage keeps its saved host path, so its data does not move. The variable in the Compose file
+                gives <span class="font-mono">{{ $fileStorage->variable_fs_path }}</span>.
+                @can('update', $resource)
+                    <div class="pt-2">
+                        <x-modal-confirmation title="Use the Variable Path?" buttonTitle="Use the variable path"
+                            submitAction="useVariablePath" :confirmWithText="false" :confirmWithPassword="false"
+                            warningMessage="The data stays at the saved host path. Coolify does not copy or delete it."
+                            :actions="[
+                                'From the next deployment, the storage mounts ' . $fileStorage->variable_fs_path . '.',
+                                'Coolify does not move the data from ' . $fileStorage->fs_path . '. Copy it yourself if you need it.',
+                            ]" step2ButtonText="Use the variable path" />
+                    </div>
+                @endcan
+            </x-callout>
+        @endif
         @if ($resource instanceof \App\Models\Application && $resource->git_based())
             @can('update', $resource)
                 <div class="w-full sm:w-96">

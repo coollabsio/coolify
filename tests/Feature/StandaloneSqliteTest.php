@@ -40,7 +40,7 @@ function sqliteApiHeaders(): array
 }
 
 it('creates the data volume and restores into the first configured file', function () {
-    expect($this->database->image)->toBe('peakimages/sqlite:3.53.4-v0.1.0')
+    expect($this->database->image)->toBe('peakimages/sqlite:3.54.1-v0.2.0')
         ->and($this->database->databaseFilePath())->toBe('/var/lib/sqlite/app.db')
         ->and($this->database->persistentStorages()->first()->mount_path)->toBe('/var/lib/sqlite');
 });

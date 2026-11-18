@@ -24,12 +24,6 @@
             'executions' => 'project.service.volume-backups.executions',
             'danger' => 'project.service.volume-backups.danger',
         ],
-        default => [
-            'back' => 'project.database.configuration',
-            'general' => 'project.database.backup.execution',
-            'executions' => 'project.database.backup.executions',
-            'danger' => 'project.database.backup.danger',
-        ],
     };
 
     $items = [
@@ -37,21 +31,19 @@
         ['key' => 'executions', 'label' => 'Executions', 'icon' => 'browser-terminal'],
         ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'danger'],
     ];
-    $backLabel = $context === 'database' ? 'Back to database' : 'Back to backups';
+    $backLabel = 'Back to backups';
     // The resource menu that the page renders one Back away in the main sidebar.
     $parentMenu = match ($context) {
         'application' => 'Application',
-        'database' => 'Database',
         default => 'Service',
     };
     $backParameters = match ($context) {
-        'database' => collect($parameters)->except('backup_uuid')->all(),
         'service' => collect($parameters)->except(['stack_service_uuid', 'backup_uuid'])->all(),
         default => $parameters,
     };
 @endphp
 
-<x-main-nav-menu :depth="1" :back-label="$parentMenu" :back-title="'Back to the '.strtolower($parentMenu).' menu'"
+<x-main-nav-menu :depth="1" :back-label="$parentMenu" :back-title="'Back to the '.strtolower($parentMenu).' menu'" name="Backup"
     data-settings-search-items="{{ json_encode(settingsSearchItems(['Backup' => collect($items)->map(fn (array $item): array => [...$item, 'route' => $routes[$item['key']]])], $parameters)) }}">
     <nav aria-label="Backup settings"
         class="grid grid-cols-1 gap-0.5">

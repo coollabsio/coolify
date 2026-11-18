@@ -19,7 +19,7 @@ class StartLogDrain
      * Bump when the generated files change (image, config, compose, or README), so that the
      * server checks start running log drains again with the new files.
      */
-    public const CONFIG_VERSION = '1';
+    public const CONFIG_VERSION = '4';
 
     public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
 
@@ -56,6 +56,24 @@ class StartLogDrain
             return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
         }
         $serverName = $this->fluentBitValue((string) $server->name);
+        // Rename keeps a key that exists, so the container labels fill a field only when the
+        // Coolify default variables are not on the container. Then the labels are removed.
+        $coolifyFieldsFilter = "[FILTER]
+    Name                modify
+    Match               *
+    Set                 coolify.server_name {$serverName}
+    Rename              COOLIFY_APP_NAME coolify.app_name
+    Rename              COOLIFY_PROJECT_NAME coolify.project_name
+    Rename              COOLIFY_SERVER_IP coolify.server_ip
+    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
+    Rename              coolify.resourceName coolify.app_name
+    Rename              coolify.projectName coolify.project_name
+    Rename              coolify.environmentName coolify.environment_name
+    Rename              coolify.serviceName coolify.service_name
+    Remove              coolify.resourceName
+    Remove              coolify.projectName
+    Remove              coolify.environmentName
+";
         try {
             if ($type === 'none') {
                 return 'No log drain is enabled.';
@@ -76,16 +94,8 @@ class StartLogDrain
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$serverName}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
-[OUTPUT]
+    Exclude log ^127\.0\.0\.1\s
+{$coolifyFieldsFilter}[OUTPUT]
     Name nrlogs
     Match *
     license_key \${LICENSE_KEY}
@@ -110,16 +120,8 @@ class StartLogDrain
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$serverName}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
-[OUTPUT]
+    Exclude log ^127\.0\.0\.1\s
+{$coolifyFieldsFilter}[OUTPUT]
     Name            http
     Match           *
     Host            \${AXIOM_DOMAIN}
@@ -169,6 +171,7 @@ services:
     volumes:
       - ./fluent-bit.conf:/fluent-bit.conf:ro
       - ./parsers.conf:/parsers.conf:ro
+      - ./files:/files:ro
     ports:
       - 127.0.0.1:24224:24224
     labels:
@@ -188,6 +191,7 @@ Files:
 - `fluent-bit.conf` - configuration file for Fluent Bit
 - `docker-compose.yml` - docker-compose file to run Fluent Bit
 - `.env` - environment variables for Fluent Bit
+- `files/` - your own files, such as credentials or certificates. Coolify does not overwrite them. Fluent Bit reads them at `/files`.
 ");
             $license_key = $server->settings->logdrain_newrelic_license_key;
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
@@ -215,6 +219,8 @@ Files:
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
+                "mkdir -p $config_path/files",
+                "chmod 700 $config_path/files",
                 "echo '{$parsers}' | base64 -d | tee $parsers_config > /dev/null",
                 "echo '{$config}' | base64 -d | tee $fluent_bit_config > /dev/null",
                 "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",

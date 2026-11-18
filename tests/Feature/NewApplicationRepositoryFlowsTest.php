@@ -81,7 +81,6 @@ function githubAppRepositoryFlow(): Testable
         'is_system_wide' => false,
     ]);
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/installations/67890/access_tokens' => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/installation/repositories*' => Http::response([
             'total_count' => 1,

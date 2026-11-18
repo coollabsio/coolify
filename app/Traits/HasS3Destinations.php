@@ -53,6 +53,22 @@ trait HasS3Destinations
     }
 
     /**
+     * The storage IDs that are not a stored destination of this schedule yet.
+     * Reads the saved state, so call it before the schedule changes.
+     *
+     * @param  iterable<int, int|string>  $storageIds
+     * @return Collection<int, int>
+     */
+    public function newS3StorageIds(iterable $storageIds): Collection
+    {
+        $currentIds = $this->exists
+            ? $this->s3Storages()->pluck('s3_storages.id')->push($this->getOriginal('s3_storage_id'))->filter()->map(fn ($id): int => (int) $id)
+            : collect();
+
+        return collect($storageIds)->map(fn ($id): int => (int) $id)->filter()->unique()->diff($currentIds)->values();
+    }
+
+    /**
      * Replaces the selected destinations. The current primary destination stays primary when it is still selected.
      *
      * @param  array<int, int|string>  $storageIds

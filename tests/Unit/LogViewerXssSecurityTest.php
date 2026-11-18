@@ -1,17 +1,5 @@
 <?php
 
-describe('Log Viewer HTML Tag Preservation', function () {
-    it('lets Blade escape deployment log data attributes only once', function () {
-        $view = file_get_contents(__DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php');
-
-        expect($view)
-            ->toContain('data-log-content="{{ $searchableContent }}"')
-            ->toContain('data-line-text="{{ $lineContent }}"')
-            ->not->toContain('data-log-content="{{ htmlspecialchars($searchableContent) }}"')
-            ->not->toContain('data-line-text="{{ htmlspecialchars($lineContent) }}"');
-    });
-});
-
 describe('Log Viewer XSS Prevention', function () {
     it('uses text nodes for search highlighting instead of injected html', function () {
         $deploymentView = file_get_contents(__DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php');

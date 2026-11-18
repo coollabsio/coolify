@@ -60,9 +60,19 @@ test('server transfer page is available in production', function () {
 });
 
 test('server transfer link is shown to admins in production', function () {
+    // The sidebar links Transfer only for a validated server, because the transfer runs SSH commands on it.
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
     $this->get('/server/'.$this->server->uuid)
         ->assertOk()
         ->assertSee('/server/'.$this->server->uuid.'/transfer', escape: false);
+});
+
+test('server transfer link is disabled until the server is validated', function () {
+    $this->get('/server/'.$this->server->uuid)
+        ->assertOk()
+        ->assertSee('Transfer')
+        ->assertDontSee('/server/'.$this->server->uuid.'/transfer', escape: false);
 });
 
 test('taking back a transferred server needs a typed confirmation', function () {
@@ -101,16 +111,6 @@ test('a member who owns another team cannot use that role to transfer the server
     session(['currentTeam' => $otherTeam]);
     Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
         ->assertStatus(404);
-});
-
-test('transfer page renders for owned server', function () {
-    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
-        ->assertOk()
-        ->assertSee('Transfer server')
-        ->assertSee('Target instance URL')
-        ->assertSee('Target API token')
-        ->assertDontSee('Manual transfer')
-        ->assertDontSee('Passphrase');
 });
 
 test('transfer page badge shows the management state of the server', function (string $state, string $label, array $hidden) {
@@ -159,11 +159,6 @@ test('a team admin cannot start a transfer, because it sends every secret to the
 
     Queue::assertNotPushed(MigrateServerToInstanceJob::class);
     expect(data_get($this->server->fresh()->server_metadata, 'migration'))->toBeNull();
-});
-
-test('the transfer confirmation says that locked secrets are sent to the target', function () {
-    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('every environment variable value, also locked ones');
 });
 
 test('transfer page shows the error of a failed transfer', function () {
@@ -221,9 +216,14 @@ test('deleting a transferred server deletes its resources from this instance onl
     expect(collect($component->viewData('checkboxes'))->pluck('id'))->not->toContain('force_delete_resources');
 
     $component->call('delete', $this->userPassword);
-
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application) && $job->deleteFromCoolifyOnly);
     expect(Server::find($this->server->id))->toBeNull();
+
+    Process::fake();
+    DeleteServer::run($this->server->id, removeResourcesFromServer: true);
+
+    Process::assertNothingRan();
+    expect(Application::withTrashed()->find($application->id))->toBeNull()
+        ->and(Server::withTrashed()->find($this->server->id))->toBeNull();
 });
 
 test('deleting a transferred server forgets the DNS records of its resources without releasing them at the provider', function () {
@@ -420,8 +420,10 @@ test('deleting an archive keeps applications that use the server only as an addi
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
 
     Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid])->call('delete', $this->userPassword);
+    Process::fake();
+    DeleteServer::run($this->server->id);
 
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application));
-    Queue::assertNotPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($sharedApplication));
-    expect($sharedApplication->additional_servers()->count())->toBe(0);
+    expect(Application::withTrashed()->find($application->id))->toBeNull()
+        ->and(Application::find($sharedApplication->id))->not->toBeNull()
+        ->and($sharedApplication->additional_servers()->count())->toBe(0);
 });

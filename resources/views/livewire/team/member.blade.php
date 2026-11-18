@@ -25,7 +25,17 @@
             @endif
         </div>
     </div>
-    <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
+    <div class="min-w-0">
+        <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
+        @can('manageMembers', currentTeam())
+            @if (data_get($member, 'pivot.role') === 'member')
+                @php($accessSummary = App\Livewire\Team\Member\Access::summary(data_get($member, 'pivot.access')))
+                <div class="mt-0.5 truncate text-[11px] text-neutral-400 dark:text-fg-faint" title="Access: {{ $accessSummary }}">
+                    Access: {{ $accessSummary }}
+                </div>
+            @endif
+        @endcan
+    </div>
     <div>
         <button type="button"
             class="table-filter-value table-filter-badge inline-flex rounded-full border border-transparent bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim"
@@ -42,55 +52,56 @@
     <div class="flex justify-end">
         @can('manageMembers', currentTeam())
             @if ($member->id !== Auth::id())
-                <div x-data="{ open: false }" @keydown.escape.window="open = false">
-                    <button type="button" class="button h-7! px-2.5! text-[11px]!" x-ref="trigger"
-                        @click="open = !open" aria-haspopup="menu" :aria-expanded="open">
-                        Manage
-                    </button>
-                    <template x-teleport="body">
-                        <div x-show="open" x-cloak role="menu" x-anchor.bottom-end.fixed.offset.4="$refs.trigger"
-                            @click.outside="if (! $refs.trigger.contains($event.target)) open = false"
-                            class="listbox-panel w-36! min-w-0! z-50!">
-                            @if (Auth::user()->isOwner())
-                                @if (data_get($member, 'pivot.role') !== 'owner')
-                                    <button type="button" class="listbox-option justify-start!" wire:click="makeOwner"
-                                        @click="open = false">
-                                        Make owner
-                                    </button>
-                                @endif
-                                @if (data_get($member, 'pivot.role') !== 'admin')
-                                    <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
-                                        @click="open = false">
-                                        Make admin
-                                    </button>
-                                @endif
-                                @if (data_get($member, 'pivot.role') !== 'member')
-                                    <button type="button" class="listbox-option justify-start!"
-                                        wire:click="makeReadonly" @click="open = false">
-                                        Make member
-                                    </button>
-                                @endif
-                            @elseif (Auth::user()->isAdmin())
-                                @if (data_get($member, 'pivot.role') === 'admin')
-                                    <button type="button" class="listbox-option justify-start!"
-                                        wire:click="makeReadonly" @click="open = false">
-                                        Make member
-                                    </button>
-                                @elseif (data_get($member, 'pivot.role') === 'member')
-                                    <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
-                                        @click="open = false">
-                                        Make admin
-                                    </button>
-                                @endif
-                            @endif
-                            <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
-                            <button type="button" class="listbox-option justify-start! text-error! hover:text-error!"
-                                wire:click="remove" @click="open = false">
-                                Remove member
+                @if (data_get($member, 'pivot.role') === 'owner' && ! Auth::user()->isOwner())
+                    <x-modal-confirmation title="Remove team member?" submitAction="remove"
+                        :actions="['This user loses access to all resources of this team.']"
+                        :confirmWithText="false" :confirmWithPassword="false"
+                        step2ButtonText="Remove member">
+                        <x-slot:trigger>
+                            <button type="button"
+                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                title="Remove member" aria-label="Remove {{ $member->name }}">
+                                <x-reicon name="trash" class="size-3.5" />
                             </button>
-                        </div>
-                    </template>
-                </div>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
+                @else
+                    <x-table.row-actions label="Member actions">
+                        @if (Auth::user()->isOwner())
+                            @if (data_get($member, 'pivot.role') !== 'owner')
+                                <x-table.row-action wire:click="makeOwner">Make owner</x-table.row-action>
+                            @endif
+                            @if (data_get($member, 'pivot.role') !== 'admin')
+                                <x-table.row-action wire:click="makeAdmin">Make admin</x-table.row-action>
+                            @endif
+                            @if (data_get($member, 'pivot.role') !== 'member')
+                                <x-table.row-action wire:click="makeReadonly">Make member</x-table.row-action>
+                            @endif
+                        @elseif (Auth::user()->isAdmin())
+                            @if (data_get($member, 'pivot.role') === 'admin')
+                                <x-table.row-action wire:click="makeReadonly">Make member</x-table.row-action>
+                            @elseif (data_get($member, 'pivot.role') === 'member')
+                                <x-table.row-action wire:click="makeAdmin">Make admin</x-table.row-action>
+                            @endif
+                        @endif
+                        @if (data_get($member, 'pivot.role') === 'member')
+                            <x-table.row-action
+                                wire:click="$dispatch('open-member-access', { memberId: {{ $member->id }} })">
+                                Edit access
+                            </x-table.row-action>
+                        @endif
+                        <x-slot:danger>
+                            <x-modal-confirmation title="Remove team member?" buttonFullWidth submitAction="remove"
+                                :actions="['This user loses access to all resources of this team.']"
+                                :confirmWithText="false" :confirmWithPassword="false"
+                                step2ButtonText="Remove member">
+                                <x-slot:trigger>
+                                    <x-table.row-action>Remove member</x-table.row-action>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                        </x-slot:danger>
+                    </x-table.row-actions>
+                @endif
             @endif
         @endcan
     </div>

@@ -228,6 +228,7 @@ function restoreScriptResource(string $engine): object
 
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn('postgres:18-alpine');
 
     return $resource;
 }
@@ -642,12 +643,28 @@ test('restores single MySQL and MariaDB SQL backups', function (string $engine, 
     'dump of one database made with --databases' => 'mysql-one-database',
 ]);
 
+test('restores MariaDB backups into a container that sets only the MYSQL variables', function (bool $dumpAll, string $arguments) {
+    $run = restoreScriptRun('mariadb', restoreScriptFixture('mysql-sql'), dumpAll: $dumpAll, env: [
+        'MARIADB_USER' => null,
+        'MARIADB_PASSWORD' => null,
+        'MARIADB_DATABASE' => null,
+        'MARIADB_ROOT_PASSWORD' => null,
+    ]);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(end($run['calls'])['args'])->toBe($arguments);
+})->with([
+    'one database' => [false, '-u app_user -papp_pass app'],
+    'all databases' => [true, '-u root -proot_pass app'],
+]);
+
 test('restores MySQL and MariaDB backups containing all databases after checking the format', function (string $engine, string $fixture) {
     $run = restoreScriptRun($engine, restoreScriptFixture($fixture), dumpAll: true);
 
     expect($run['exit'])->toBe(0, $run['stderr'])
         ->and($run['leftovers'])->toBe([]);
     restoreScriptExpectCalls($run['calls'], [
+        [$engine, '', ['-u root -proot_pass -N -e SELECT 1']],
         [$engine, '', ['-u root -proot_pass -N -e', 'information_schema.processlist']],
         [$engine, '', ['-u root -proot_pass -N -e', 'DROP DATABASE IF EXISTS']],
         [$engine, '', ['-u root -proot_pass']],
@@ -660,6 +677,19 @@ test('restores MySQL and MariaDB backups containing all databases after checking
     'gzip SQL' => 'mysql-sql-gz',
     'tar with one SQL file' => 'mysql-tar',
     'SQL that uses the mysql schema' => 'mysql-cluster',
+]);
+
+test('restores all MySQL and MariaDB databases as the root account that the container accepts', function (string $engine, string $failingLogin, string $arguments) {
+    $run = restoreScriptRun($engine, restoreScriptFixture('mysql-sql'), dumpAll: true, env: ['STUB_FAIL_MATCH' => $failingLogin]);
+
+    $logins = array_map(fn (array $call): string => $call['args'], array_slice($run['calls'], 2));
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($logins)->each->toMatch('/^'.preg_quote($arguments, '/').'( -N -e | -e | app$|$)/')
+        ->and(end($run['calls'])['args'])->toBe($arguments.' app');
+})->with(['mysql', 'mariadb'])->with([
+    'linuxserver.io root without a password' => ['-proot_pass -N -e SELECT 1', '-u root'],
+    'no login works, so the client shows the database error' => ['-N -e SELECT 1', '-u root -proot_pass'],
 ]);
 
 test('skips the MySQL and MariaDB system databases of an all-databases backup by default', function (string $engine, string $fixture) {

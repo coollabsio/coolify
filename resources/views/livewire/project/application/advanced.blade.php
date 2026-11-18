@@ -32,6 +32,12 @@
                         ['value' => false, 'label' => 'Runtime only (preserves cache)'],
                         ['value' => true, 'label' => 'Available during build'],
                     ]" :disabled="! $canUpdate" />
+                <x-forms.listbox id="includeNetworkHostsInBuild" label="Network hosts during build" onChange="instantSave"
+                    helper="When added, the build can reach the containers on the destination network by name. Each time a resource on the network is added or removed, the Docker build cache is invalidated. Preview deployments are never added, and no hosts are added on a build server."
+                    :options="[
+                        ['value' => true, 'label' => 'Add network containers as hosts'],
+                        ['value' => false, 'label' => 'Do not add (preserves cache)'],
+                    ]" :disabled="! $canUpdate" />
             </div>
             @if ($application->git_based())
                 <x-application.settings-subsection id="advanced-deployment-section" title="Deployment"
@@ -42,6 +48,20 @@
                             :options="[
                                 ['value' => true, 'label' => 'Deploy on push (webhooks)'],
                                 ['value' => false, 'label' => 'Manual deployments only'],
+                            ]" :disabled="! $canUpdate" />
+                        <x-forms.listbox id="isAutoCancelQueuedDeploymentsEnabled" label="Queued webhook deployments"
+                            onChange="instantSave"
+                            helper="When a newer push arrives, cancel the older webhook deployments that still wait in the queue, so only the latest commit is built. Manual, API, restart, and rollback deployments are never cancelled."
+                            :options="[
+                                ['value' => true, 'label' => 'Cancel when a newer push arrives'],
+                                ['value' => false, 'label' => 'Deploy every push'],
+                            ]" :disabled="! $canUpdate || $isAutoCancelBuildingDeploymentsEnabled" />
+                        <x-forms.listbox id="isAutoCancelBuildingDeploymentsEnabled" label="Building webhook deployments"
+                            onChange="instantSave"
+                            helper="When a newer push arrives, also stop the older webhook deployment that is still building. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments."
+                            :options="[
+                                ['value' => false, 'label' => 'Let the build finish'],
+                                ['value' => true, 'label' => 'Stop the build when a newer push arrives'],
                             ]" :disabled="! $canUpdate" />
                     </div>
                 </x-application.settings-subsection>
@@ -81,7 +101,7 @@
                                 ['value' => true, 'label' => 'Raw (deploy file as-is)'],
                             ]" :disabled="! $canUpdate" />
                         <x-forms.listbox id="isConnectToDockerNetworkEnabled" label="Predefined network" onChange="instantSave"
-                            helper="By default a compose resource only gets its own internal network. Connecting to a Coolify predefined network may require different internal DNS names. More info <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>here</a>."
+                            helper="By default a compose resource only gets its own internal network. Connecting to a Coolify predefined network may require different internal DNS names.<br><br>Production and its preview deployments share this network: a service name such as <b>db</b> resolves to the production container, also from a preview. Use <b>${SERVICE_NAME_DB}</b> as the hostname to reach the service of the same deployment. More info <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/applications/deployments/preview-deployments#docker-compose-preview-names'>here</a>."
                             :options="[
                                 ['value' => false, 'label' => 'Isolated network only'],
                                 ['value' => true, 'label' => 'Connect to predefined network'],

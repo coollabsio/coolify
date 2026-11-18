@@ -474,6 +474,18 @@ class GithubController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $errors = [];
+        foreach (['owner' => $owner, 'repo' => $repo] as $field => $value) {
+            if (! preg_match('/^[A-Za-z0-9_.-]+$/', (string) $value) || in_array($value, ['.', '..'], true)) {
+                $errors[$field] = ["The {$field} is invalid."];
+            }
+        }
+        if ($errors) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
 
         try {
             $githubApp = GithubApp::where('id', $github_app_id)
@@ -485,7 +497,7 @@ class GithubController extends Controller
             $response = Http::GitHub($githubApp->api_url, $token)
                 ->timeout(20)
                 ->retry(3, 200, throw: false)
-                ->get("/repos/{$owner}/{$repo}/branches");
+                ->get('/repos/'.rawurlencode($owner).'/'.rawurlencode($repo).'/branches');
 
             if ($response->status() !== 200) {
                 return response()->json([

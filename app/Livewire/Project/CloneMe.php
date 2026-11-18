@@ -3,15 +3,19 @@
 namespace App\Livewire\Project;
 
 use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
+use App\Enums\AccessLevel;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class CloneMe extends Component
@@ -62,7 +66,9 @@ class CloneMe extends Component
         $this->servers = Server::query()
             ->where('team_id', $this->project->team_id)
             ->get()
-            ->reject(fn ($server) => $server->isBuildServer());
+            ->reject(fn ($server) => $server->isBuildServer())
+            ->filter(fn ($server) => Gate::allows('placeResource', $server))
+            ->values();
         $this->newName = str(clone_resource_name($this->project->name, new_public_id()))->slug();
     }
 
@@ -99,6 +105,9 @@ class CloneMe extends Component
                 'newName' => ValidationPatterns::nameRules(),
             ]);
             $teamId = $this->project->team_id;
+            if ($type === 'project' && ! app(AccessResolver::class)->allowsTeamWide(auth()->user(), AccessLevel::Write, $teamId)) {
+                throw new AuthorizationException('You are not allowed to create projects in this team.');
+            }
             if (! $this->environment || (int) $this->environment->project_id !== (int) $this->project->id) {
                 throw new \Exception('Environment not found.');
             }
@@ -111,6 +120,7 @@ class CloneMe extends Component
             if (! $selectedDestination) {
                 throw new \Exception('Destination not found.');
             }
+            $this->authorize('placeResource', $selectedDestination->server);
             auditLog('ui.project.clone_started', [
                 'team_id' => $this->project->team_id,
                 'project_uuid' => $this->project->uuid,

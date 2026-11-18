@@ -2,13 +2,20 @@
 
 namespace App\Livewire\Team;
 
+use App\Enums\AccessScope;
+use App\Enums\Role;
+use App\Livewire\Team\Member\Access;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
+use App\Services\Access\Grant;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class InviteLink extends Component
@@ -19,14 +26,34 @@ class InviteLink extends Component
 
     public string $role = 'member';
 
-    protected $rules = [
-        'email' => 'required|email',
-        'role' => 'required|string',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'email' => 'required|email',
+            'role' => ['required', Rule::enum(Role::class)],
+        ];
+    }
+
+    /**
+     * Grants for an invited member, set by the access editor. Checked again on invite.
+     *
+     * @var list<array{scope: string, uuid: string|null, levels: list<string>}>
+     */
+    public array $grants = [];
 
     public function mount()
     {
         $this->email = isDev() ? 'test3@example.com' : '';
+        $this->grants = Grant::listToArray(AccessResolver::defaultMemberGrants());
+    }
+
+    /**
+     * @param  list<array{scope: string, uuid: string|null, levels: list<string>}>  $access
+     */
+    #[On('invitation-access-chosen')]
+    public function setGrants(array $access): void
+    {
+        $this->grants = Grant::listToArray(Grant::listFrom($access));
     }
 
     public function viaEmail()
@@ -39,14 +66,12 @@ class InviteLink extends Component
         $this->generateInviteLink(sendEmail: false);
     }
 
+    /**
+     * Build the link from the instance URL, not from the request host, which a client can set.
+     */
     private function invitationUrl(string $routeName, array $parameters): string
     {
-        $fqdn = instanceSettings()->fqdn;
-        if (filled($fqdn)) {
-            return rtrim($fqdn, '/').route($routeName, $parameters, false);
-        }
-
-        return route($routeName, $parameters);
+        return rtrim(base_url(), '/').route($routeName, $parameters, false);
     }
 
     private function generateInviteLink(bool $sendEmail = false)
@@ -56,12 +81,25 @@ class InviteLink extends Component
             $this->validate();
 
             // Prevent privilege escalation: users cannot invite someone with higher privileges
-            $userRole = auth()->user()->role();
-            if (is_null($userRole) || ($userRole === 'member' && in_array($this->role, ['admin', 'owner']))) {
+            $userRole = Role::tryFrom((string) auth()->user()->role());
+            if (is_null($userRole) || ($userRole === Role::MEMBER && Role::from($this->role)->gt(Role::MEMBER))) {
                 throw new \Exception('Members cannot invite admins or owners.');
             }
-            if ($userRole === 'admin' && $this->role === 'owner') {
+            if ($userRole === Role::ADMIN && Role::from($this->role) === Role::OWNER) {
                 throw new \Exception('Admins cannot invite owners.');
+            }
+
+            $access = null;
+            if ($this->role === 'member') {
+                $grants = Grant::listFrom($this->grants);
+                $validTargets = Access::validTargets(currentTeam()->id);
+                foreach ($grants as $grant) {
+                    $target = $grant->scope === AccessScope::Team ? 'team' : "{$grant->scope->value}:{$grant->uuid}";
+                    if ($grant->levels === [] || ! in_array($target, $validTargets, true)) {
+                        throw new \Exception('Choose valid member access.');
+                    }
+                }
+                $access = Grant::listToArray($grants);
             }
 
             $this->email = strtolower($this->email);
@@ -86,14 +124,15 @@ class InviteLink extends Component
             $user = User::whereEmail($this->email)->first();
 
             // A user who never set a password cannot log in, so they get a magic link with a new temporary password.
-            if (is_null($user) || $user->isUnusedInvitedAccount()) {
+            if (is_null($user) || $user->canReceiveInvitationLoginFrom(currentTeam()->id)) {
                 $password = Str::password();
                 if (is_null($user)) {
-                    $user = User::create([
+                    $user = User::forceCreate([
                         'name' => str($this->email)->before('@'),
                         'email' => $this->email,
                         'password' => Hash::make($password),
                         'force_password_reset' => true,
+                        'created_by_invitation' => true,
                     ]);
                 } else {
                     $user->forceFill(['password' => Hash::make($password)])->save();
@@ -109,13 +148,14 @@ class InviteLink extends Component
                 'role' => $this->role,
                 'link' => $link,
                 'via' => $sendEmail ? 'email' : 'link',
-            ]);
+            ], ['access' => $access]);
             auditLog('ui.team_invitation.created', [
                 'team_id' => currentTeam()->id,
                 'invitation_uuid' => $invitation->uuid,
                 'invitation_email' => $invitation->email,
                 'role' => $invitation->role,
                 'via' => $invitation->via,
+                'access' => $invitation->access,
             ]);
             if ($sendEmail) {
                 $mail = new MailMessage;

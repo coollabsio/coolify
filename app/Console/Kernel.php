@@ -10,6 +10,7 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\CleanupUnusedSshKeys;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
@@ -48,10 +49,15 @@ class Kernel extends ConsoleKernel
             $this->instanceTimezone = config('app.timezone');
         }
 
+        // Files are local to each cloud node; do not dispatch to the shared queue.
+        $this->scheduleInstance->call(fn () => app(CleanupUnusedSshKeys::class)->handle())
+            ->name('cleanup:ssh-keys')
+            ->hourly();
+
         $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
             ->name('cleanup:ssh-mux')
             ->hourly()
-            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
+            ->when(fn () => config('constants.ssh.mux_enabled'));
         // Every cloud node reads its own versions.json, so each node refreshes it (no onOneServer).
         $this->scheduleInstance->call(fn () => refresh_versions_file())
             ->name('versions:refresh-local')
@@ -69,6 +75,8 @@ class Kernel extends ConsoleKernel
             ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->command('cleanup:database-import-uploads')->hourly()->onOneServer();
+        // Deletes upload chunks older than an hour (config/chunk-upload.php), so a more frequent run only starts more PHP processes.
+        $this->scheduleInstance->command('uploads:clear')->hourly();
         $this->scheduleInstance->command('dns:release-orphaned-records')
             ->hourly()
             ->onOneServer()
@@ -89,11 +97,6 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
-            // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleScheduledJobManager();
-
-            $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
-
         } else {
             // Instance Jobs
             $this->scheduleInstance->command('horizon:snapshot')->everyFiveMinutes();
@@ -108,39 +111,45 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
-            // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleScheduledJobManager();
-
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
-            $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
             // Cleanup orphaned PR preview containers daily
             $this->scheduleInstance->job(new CleanupOrphanedPreviewContainersJob)->daily()->onOneServer();
         }
+
+        // Scheduled Jobs (Backups & Tasks). Last, because in sequential mode the scheduler waits for it.
+        $this->scheduleScheduledJobManager();
     }
 
     /**
      * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
      * past the catch-up window, and then due backups and tasks would be skipped.
      *
-     * Sequential mode runs all schedule types after each other in one process. Concurrent mode runs
-     * each type in its own process with its own overlap lock, so a slow type cannot make another type
-     * skip a run, but each process loads the full application every minute (more CPU and memory).
+     * Sequential mode runs all schedule types after each other in one process. The scheduler waits for
+     * it, because a background command starts one more PHP process (schedule:finish) every minute.
+     * schedule:work starts each minute's schedule:run on its own, so a slow run does not delay the next.
+     * Concurrent mode runs each type in its own background process with its own overlap lock, so a
+     * slow type cannot make another type skip a run, but each process loads the full application
+     * every minute (more CPU and memory).
      */
     private function scheduleScheduledJobManager(): void
     {
-        $commands = $this->scheduledJobsDispatchMode() === 'concurrent'
+        $concurrent = $this->scheduledJobsDispatchMode() === 'concurrent';
+        $commands = $concurrent
             ? array_map(fn (string $type) => "scheduled:dispatch --type={$type}", array_keys(ScheduledJobManager::TYPES))
             : ['scheduled:dispatch'];
 
         foreach ($commands as $command) {
-            $this->scheduleInstance->command($command)
+            $event = $this->scheduleInstance->command($command)
                 ->everyMinute()
                 ->onOneServer()
-                ->withoutOverlapping(5)
-                ->runInBackground();
+                ->withoutOverlapping(5);
+
+            if ($concurrent) {
+                $event->runInBackground();
+            }
         }
     }
 

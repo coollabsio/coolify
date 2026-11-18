@@ -4,6 +4,7 @@
             ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings'],
             ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid'],
             ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3'],
+            ['label' => 'Image Scanning', 'route' => 'settings.image-scanning', 'icon' => 'shield-alert'],
         ],
         'Instance' => [
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],

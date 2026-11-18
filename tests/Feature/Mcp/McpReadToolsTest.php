@@ -7,6 +7,7 @@ use App\Mcp\Tools\CoolifyHelp;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\CloudProviderToken;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
@@ -903,6 +904,35 @@ test('list_applications list_databases list_services server_uuid filters use des
         ->not->toContain($otherServerService->uuid);
 });
 
+test('cloud_provider list_tokens rejects a team member with a read token', function () {
+    CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Production Hetzner',
+        'provider' => 'hetzner',
+    ]);
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    session(['currentTeam' => $this->team]);
+    $memberToken = $member->createToken('member-read', ['read'])->plainTextToken;
+    auth()->forgetGuards();
+
+    $response = $this->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$memberToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => 'cloud_provider', 'arguments' => (object) ['action' => 'list_tokens']],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue()
+        ->and($response->getContent())->not->toContain('Production Hetzner');
+});
+
 test('list_tags and get_current_team and list_team_members are team scoped', function () {
     Tag::create(['name' => 'prod', 'team_id' => $this->team->id]);
     Tag::create(['name' => 'theirs', 'team_id' => Team::factory()->create()->id]);
@@ -1694,7 +1724,7 @@ test('team members cannot retrieve logs with sensitive read ability', function (
     // Elevated member tokens are rejected as JSON-RPC errors (HTTP 200) so MCP clients can parse them.
     $response->assertOk();
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('get_logs returns structured next_tools when application is not running', function () {
@@ -1896,7 +1926,7 @@ test('team member with deploy ability cannot call lifecycle tools', function () 
     $response->assertOk();
     expect($response->json('jsonrpc'))->toBe('2.0');
     expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
-        ->toMatch('/team role|Missing required/i');
+        ->toMatch('/more access than you have/');
 });
 
 test('control start with deploy ability queues application deployment', function () {
@@ -2644,4 +2674,87 @@ test('redactLogText redacts JSON secret fields in log lines', function () {
         ->and($mixed)->not->toContain('redactme02')
         ->and($mixed)->not->toContain('redactme03')
         ->and($mixed)->toContain(REDACTED);
+});
+
+test('get_service does not return the server of the service', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['uuid'])->toBe($service->uuid)
+        ->and($data)->toHaveKey('server_status')
+        ->and($data)->not->toHaveKey('server')
+        ->and(json_encode($data))->not->toContain($this->server->ip);
+});
+
+function createComposeServiceForMcp(): Service
+{
+    return Service::factory()->create([
+        'environment_id' => test()->environment->id,
+        'server_id' => test()->server->id,
+        'destination_id' => test()->destination->id,
+        'destination_type' => test()->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      - OBSOLETE=1\n",
+        'docker_compose' => "services:\n  app:\n    image: nginx\n",
+    ]);
+}
+
+test('get_service returns the compose files to a read:sensitive or root token of an owner', function (array $abilities) {
+    $service = createComposeServiceForMcp();
+
+    $response = mcpReadCallWithAbilities($abilities, 'get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])->toMatchArray([
+        'docker_compose_raw' => $service->docker_compose_raw,
+        'docker_compose' => $service->docker_compose,
+    ]);
+})->with([
+    'read:sensitive' => [['read', 'read:sensitive']],
+    'root' => [['root']],
+]);
+
+test('get_service hides locked shared variable values in the generated compose', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'LOCKED_TEAM_SECRET',
+        'value' => 'locked-team-secret-value',
+        'type' => 'team',
+        'team_id' => $this->team->id,
+        'is_shown_once' => true,
+    ]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      FOO: '{{team.LOCKED_TEAM_SECRET}}'\n",
+        'docker_compose' => "services:\n  app:\n    image: nginx\n    environment:\n      FOO: locked-team-secret-value\n",
+    ]);
+
+    $response = mcpReadCallWithAbilities(['read', 'read:sensitive'], 'get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['docker_compose'])->toContain('FOO: <locked>')
+        ->and($data['docker_compose_raw'])->toContain('{{team.LOCKED_TEAM_SECRET}}')
+        ->and(json_encode($data))->not->toContain('locked-team-secret-value');
+});
+
+test('get_service hides the compose files from a token without read:sensitive', function () {
+    $service = createComposeServiceForMcp();
+
+    $response = mcpReadCall('get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+
+    expect(mcpReadJson($response)['data'])
+        ->toHaveKey('uuid', $service->uuid)
+        ->not->toHaveKey('docker_compose_raw')
+        ->not->toHaveKey('docker_compose');
 });

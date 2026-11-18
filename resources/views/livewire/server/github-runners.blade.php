@@ -171,32 +171,8 @@
                                 :placeholder="config('constants.github_runner.image')"
                                 helper="Empty uses the latest official runner image, which Coolify pulls for every runner. Set a tag, for example ghcr.io/actions/actions-runner:2.337.0, to pin a version, or use a custom image based on the official one to add tools. GitHub stops sending jobs to runners that are more than 30 days old." />
                         </div>
-                        <div x-cloak x-show="$wire.dockerMode === 'sysbox'" class="mt-4"
-                            x-effect="if ($wire.dockerMode === 'sysbox' && $wire.isSysboxInstalled === null) $wire.checkSysbox()">
-                            @if ($isSysboxInstalled === true)
-                                <x-callout type="success" title="Sysbox is installed">
-                                    Jobs get a private Docker daemon in an unprivileged container.
-                                </x-callout>
-                            @elseif ($isSysboxInstalled === false)
-                                <x-callout type="warning" title="Sysbox is not installed">
-                                    Isolated Docker needs the Sysbox runtime. Coolify installs Sysbox
-                                    {{ config('constants.github_runner.sysbox.version') }} from the official package
-                                    (Debian and Ubuntu, kernel 5.12 or newer). Docker reloads its configuration, and
-                                    running containers are not restarted.
-                                    @can('update', $server)
-                                        <div class="mt-3">
-                                            <x-forms.button type="button" wire:click="installSysbox"
-                                                wire:loading.attr="disabled" wire:target="installSysbox">
-                                                Install Sysbox
-                                            </x-forms.button>
-                                        </div>
-                                    @endcan
-                                </x-callout>
-                            @else
-                                <x-callout type="info" title="Checking Sysbox">
-                                    Coolify checks if Sysbox is installed on this server.
-                                </x-callout>
-                            @endif
+                        <div x-cloak x-show="$wire.dockerMode === 'sysbox'" class="mt-4">
+                            <livewire:server.sysbox-status :server="$server" />
                         </div>
                     </x-application.settings-section>
 
