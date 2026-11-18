@@ -115,7 +115,7 @@
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                         <h2 class="text-[14px]! leading-5! font-semibold! text-black! dark:text-fg!">Deploy canvas</h2>
-                        <x-beta-badge />
+                        <x-experimental-badge />
                     </div>
                     <p class="mt-0.5 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim">
                         Connect a server, a source, and its settings step by step, then deploy every resource at once.
@@ -277,7 +277,7 @@
                                             <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
                                                 x-text="database.name"></h3>
                                             <template x-if="database.experimental">
-                                                <x-beta-badge class="shrink-0" />
+                                                <x-experimental-badge class="shrink-0" />
                                             </template>
                                         </div>
                                     </div>
