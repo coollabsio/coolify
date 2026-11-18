@@ -137,6 +137,12 @@ services:
     ports: []
     volumes: []
 
+  # Replicas: Docker Compose names the containers, so the parser drops container_name.
+  scaled:
+    image: nginx:alpine
+    deploy:
+      replicas: 3
+
 volumes:
   web-data:
   db-data:

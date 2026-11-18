@@ -52,6 +52,9 @@ it('logs comprehensive error details when failed() is called', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('dockerfile');
+    $mockApplication->shouldReceive('getAttribute')
+        ->with('replicas')
+        ->andReturn(1);
     $mockApplication->shouldReceive('setAttribute')
         ->with('build_pack', 'dockerfile')
         ->andReturnSelf();
@@ -160,6 +163,9 @@ it('handles exceptions with no message gracefully', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('dockerfile');
+    $mockApplication->shouldReceive('getAttribute')
+        ->with('replicas')
+        ->andReturn(1);
     $mockApplication->shouldReceive('setAttribute')
         ->with('build_pack', 'dockerfile')
         ->andReturnSelf();
@@ -239,6 +245,9 @@ it('logs error code 0 correctly', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('dockerfile');
+    $mockApplication->shouldReceive('getAttribute')
+        ->with('replicas')
+        ->andReturn(1);
     $mockApplication->shouldReceive('setAttribute')
         ->with('build_pack', 'dockerfile')
         ->andReturnSelf();
@@ -318,6 +327,9 @@ it('logs the configured timeout when the deployment times out', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('dockerfile');
+    $mockApplication->shouldReceive('getAttribute')
+        ->with('replicas')
+        ->andReturn(1);
 
     $mockSettings = Mockery::mock();
     $mockSettings->shouldReceive('getAttribute')

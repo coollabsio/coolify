@@ -421,6 +421,23 @@ function validateComposeServiceScale(string $serviceName, mixed $service): void
     }
 }
 
+/**
+ * Docker Compose rejects a `container_name` on a service with replicas. A preview runs one container.
+ */
+function applyComposeServiceReplicas(Collection $service, bool $isPreview): void
+{
+    if (max((int) $service->get('scale'), (int) data_get($service, 'deploy.replicas')) <= 1) {
+        return;
+    }
+    if (! $isPreview) {
+        $service->forget('container_name');
+
+        return;
+    }
+    $service->forget('scale');
+    $service->put('deploy', [...(array) $service->get('deploy'), 'replicas' => 1]);
+}
+
 function validateComposeContentVolumeSource(array $volume): void
 {
     if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
@@ -1597,7 +1614,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             );
         }
         validateComposeServiceName((string) $serviceName);
-        validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
@@ -2665,6 +2681,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
+        applyComposeServiceReplicas($payload, $isPullRequest);
         // A security update of this service, while the compose file still names the image it replaced.
         if (($imageOverride = $resource->composeImageOverride((string) $serviceName, $image->isEmpty() ? null : $image->value())) !== null) {
             $payload['image'] = $imageOverride;

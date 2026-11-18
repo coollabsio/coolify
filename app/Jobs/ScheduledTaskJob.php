@@ -172,6 +172,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     // serves from a single container, even while a rolling update keeps two running, so the task
                     // runs in the serving one unless it names a running container exactly.
                     $containers = collect([selectServingContainer($containers)])->filter();
+                } elseif (! $namesExactly) {
+                    $containers = oneContainerPerComposeService($containers);
                 }
                 $containers->each(function ($container) {
                     $this->containers[] = str_replace('/', '', $container['Names']);
@@ -203,7 +205,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || $containerName === $this->task->container || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                if (count($this->containers) == 1 || $containerName === $this->task->container || containerNameMatchesComposeService($containerName, (string) $this->task->container, $this->resource->uuid)) {
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
                     $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName).' '.$this->task->containerCommand();
                     $exec = $this->boundedTaskCommand($execCommand);
