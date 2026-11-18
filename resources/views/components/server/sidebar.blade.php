@@ -162,7 +162,6 @@
             'icon' => 'play-circle',
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost(),
-            'beta' => true,
             'disabled' => ! $server->isFunctional(),
         ],
         [
@@ -204,7 +203,6 @@
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
-            'beta' => true,
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
             'disabled' => ! $server->isFunctional(),
@@ -336,8 +334,6 @@
                         @elseif ($menuItem['warning'] ?? false)
                             <x-reicon name="alert-triangle"
                                 class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                        @elseif ($menuItem['beta'] ?? false)
-                            <x-beta-badge class="ml-auto shrink-0" />
                         @endif
                     </a>
                     <x-starred-menu.toggle menu="server" :page="$menuItem['route']" :label="$menuItem['label']" />
@@ -351,9 +347,6 @@
                                     href="{{ route($child['route'], $serverRouteParameters) }}">
                                     <x-reicon :name="$child['icon']" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $child['label'] }}</span>
-                                    @if ($child['beta'] ?? false)
-                                        <x-beta-badge class="ml-auto shrink-0" />
-                                    @endif
                                 </a>
                             @endforeach
                         </div>

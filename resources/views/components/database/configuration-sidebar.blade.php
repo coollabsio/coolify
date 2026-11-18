@@ -98,9 +98,6 @@
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                    @if ($menuItem['label'] === 'Files')
-                        <x-beta-badge class="ml-auto shrink-0" />
-                    @endif
                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                 </a>
                 <x-starred-menu.toggle menu="database" :page="$menuItem['route']" :label="$menuItem['label']" />

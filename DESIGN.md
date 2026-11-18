@@ -1328,6 +1328,9 @@ A lone “1–2 of 2” bar with disabled controls adds noise and is unnecessary
 Use `x-status-badge` for resource and execution state. It is a small neutral
 pill with a semantic dot, not a full colored rectangle.
 
+Mark a feature that is not stable yet only with `<x-experimental-badge />`, in
+the top right of its page. Never in a sidebar or menu, and no other badge.
+
 Relevant classes:
 
 - `.data-table`
