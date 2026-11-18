@@ -63,12 +63,13 @@ write_versions() {
 	local versions="$WORK_DIR/cdn/json/coolify/versions.json"
 	[ -f "$versions" ] || echo '{}' > "$versions"
 	jq --indent 4 --arg channel "$channel" --arg version "$VERSION" --slurpfile upstream upstream.json '
-		.[$channel] = ({coolify: {$version}} + $upstream[0])
-		| if $channel == "stable" then .coolify = ({v4: {$version}} + ($upstream[0] | del(.traefik))) | .traefik = $upstream[0].traefik else . end
+		$upstream[0].traefik as $traefik
+		| .[$channel] += {coolify: {$version}, $traefik}
+		| if $channel == "stable" then .coolify.v4 = {$version} | .traefik = $traefik else . end
 		| {stable, preview, nightly, coolify, traefik} | with_entries(select(.value))
 	' "$versions" > "$WORK_DIR/versions.json"
 	cp "$WORK_DIR/versions.json" "$versions"
-	ok "versions.json sets the $channel version $BOLD$VERSION$RESET with the helper, Sentinel and Traefik versions of upstream.json"
+	ok "versions.json sets the $channel version $BOLD$VERSION$RESET with the Traefik versions of upstream.json"
 	[ "$channel" != stable ] || ok "versions.json sets the coolify and traefik keys of older instances to the same versions"
 }
 
