@@ -1863,6 +1863,15 @@ $siteAddress {
             && self::caddyDockerProxyImageVersion($this->configuredCaddyProxyImage()) >= [2, 11];
     }
 
+    /**
+     * The cookie policy got `max_age` in Caddy 2.9 (caddy-docker-proxy 2.10).
+     */
+    public function caddySupportsStickyCookieMaxAge(): bool
+    {
+        return $this->caddyRunsCurrentVersion()
+            && self::caddyDockerProxyImageVersion($this->configuredCaddyProxyImage()) >= [2, 10];
+    }
+
     public function isServerApiEnabled(): bool
     {
         return $this->settings->is_sentinel_enabled;

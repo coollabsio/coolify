@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
+use App\Enums\LoadBalancerStrategy;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Rules\ValidIpAllowlist;
+use App\Services\ApplicationLoadBalancer;
 use App\Services\ComposeIncludeFlattener;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
@@ -121,6 +123,10 @@ use Symfony\Component\Yaml\Yaml;
         'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom start command.'],
         'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom build command.'],
         'replicas' => ['type' => 'integer', 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+        'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request.'],
+        'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+        'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+        'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
         'swarm_replicas' => ['type' => 'integer', 'nullable' => true, 'description' => 'Swarm replicas. Only used for swarm deployments.'],
         'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true, 'description' => 'Swarm placement constraints. Only used for swarm deployments.'],
         'custom_docker_run_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom docker run options.'],
@@ -151,6 +157,12 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     public const MAX_REPLICAS = 20;
+
+    public const STICKY_SESSION_COOKIE_NAME_PATTERN = '/^[a-z][a-z0-9_-]{0,63}$/';
+
+    public const MIN_STICKY_SESSION_MAX_AGE = 60;
+
+    public const MAX_STICKY_SESSION_MAX_AGE = 365 * 24 * 60 * 60;
 
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
@@ -251,6 +263,10 @@ class Application extends BaseModel
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
         'replicas',
+        'load_balancer_strategy',
+        'is_sticky_session_enabled',
+        'sticky_session_cookie_name',
+        'sticky_session_max_age',
         'swarm_replicas',
         'swarm_placement_constraints',
         'watch_paths',
@@ -348,6 +364,9 @@ class Application extends BaseModel
             'domain_port_overrides' => 'array',
             'docker_compose_image_overrides' => 'array',
             'replicas' => 'integer',
+            'load_balancer_strategy' => LoadBalancerStrategy::class,
+            'is_sticky_session_enabled' => 'boolean',
+            'sticky_session_max_age' => 'integer',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'restart_limit_reached' => 'boolean',
@@ -843,6 +862,11 @@ class Application extends BaseModel
     public function statusContainerName(): string
     {
         return $this->runsReplicas() ? "Replicas ({$this->replicas})" : 'Container';
+    }
+
+    public function loadBalancer(): ApplicationLoadBalancer
+    {
+        return new ApplicationLoadBalancer($this);
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Actions\Application\LookupGitAppRepository;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
+use App\Enums\LoadBalancerStrategy;
 use App\Http\Controllers\Api\Concerns\HandlesTerminalApi;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
@@ -278,6 +279,19 @@ class ApplicationsController extends Controller
         return response()->json([
             'message' => 'Validation failed.',
             'errors' => ['replicas' => [$reason]],
+        ], 422);
+    }
+
+    private function loadBalancerValidationResponse(Request $request, Application $application): ?JsonResponse
+    {
+        $strategy = LoadBalancerStrategy::tryFrom((string) $request->input('load_balancer_strategy'));
+        if ($strategy === null || $strategy === $application->load_balancer_strategy || ! ($reason = $application->loadBalancer()->strategyUnavailableReason($strategy))) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['load_balancer_strategy' => [$reason]],
         ], 422);
     }
 
@@ -617,6 +631,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -836,6 +854,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -1058,6 +1080,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -1275,6 +1301,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -1480,6 +1510,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -1664,6 +1698,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -1813,7 +1851,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'replicas', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'gitea_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'replicas', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'gitea_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'load_balancer_strategy', 'is_sticky_session_enabled', 'sticky_session_cookie_name', 'sticky_session_max_age', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => ValidationPatterns::nameRules(required: false, nullable: false),
@@ -1994,6 +2032,9 @@ class ApplicationsController extends Controller
             ->setRelation('settings', (new ApplicationSetting)->forceFill($applicationSettings));
         if ($replicasValidation = $this->replicasValidationResponse($request, $requestedApplication)) {
             return $replicasValidation;
+        }
+        if ($loadBalancerValidation = $this->loadBalancerValidationResponse($request, $requestedApplication)) {
+            return $loadBalancerValidation;
         }
         if ($type === 'public') {
             $validationRules = [
@@ -3833,6 +3874,10 @@ class ApplicationsController extends Controller
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
                             'replicas' => ['type' => 'integer', 'minimum' => 1, 'maximum' => Application::MAX_REPLICAS, 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
+                            'load_balancer_strategy' => ['type' => 'string', 'enum' => ['round_robin', 'least_connections', 'least_time', 'client_ip'], 'description' => 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'],
+                            'is_sticky_session_enabled' => ['type' => 'boolean', 'description' => 'Keep a visitor on one replica with a cookie.'],
+                            'sticky_session_cookie_name' => ['type' => 'string', 'description' => 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'],
+                            'sticky_session_max_age' => ['type' => 'integer', 'nullable' => true, 'minimum' => Application::MIN_STICKY_SESSION_MAX_AGE, 'maximum' => Application::MAX_STICKY_SESSION_MAX_AGE, 'description' => 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
@@ -4014,7 +4059,7 @@ class ApplicationsController extends Controller
         $dnsCleanup = app(ManagedDnsRecordCleanup::class);
         $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'replicas', 'github_app_uuid', 'gitea_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'load_balancer_strategy', 'is_sticky_session_enabled', 'sticky_session_cookie_name', 'sticky_session_max_age', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'replicas', 'github_app_uuid', 'gitea_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => ValidationPatterns::nameRules(required: false, nullable: false),
@@ -4113,6 +4158,9 @@ class ApplicationsController extends Controller
         }
         if ($replicasValidation = $this->replicasValidationResponse($request, $application)) {
             return $replicasValidation;
+        }
+        if ($loadBalancerValidation = $this->loadBalancerValidationResponse($request, $application)) {
+            return $loadBalancerValidation;
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -4462,7 +4510,7 @@ class ApplicationsController extends Controller
             // Must run after fqdn is filled: flags are kept only for domains the app still has.
             $application->setNoindexDomains($request->input('noindex_domains') ?? []);
         }
-        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth || $application->isDirty('ports_exposes')) && $server->isProxyShouldRun()) {
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth || $application->isDirty(['ports_exposes', 'replicas', 'load_balancer_strategy', 'is_sticky_session_enabled', 'sticky_session_cookie_name', 'sticky_session_max_age'])) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->withoutAuditLogging(fn () => $application->save());

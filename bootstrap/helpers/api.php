@@ -3,6 +3,7 @@
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
+use App\Enums\LoadBalancerStrategy;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Application;
@@ -388,6 +389,10 @@ function sharedDataApplications(?Application $application = null): array
         'ports_mappings' => ValidationPatterns::portMappingRules(),
         'custom_network_aliases' => 'string|nullable',
         'replicas' => 'integer|min:1|max:'.Application::MAX_REPLICAS,
+        'load_balancer_strategy' => Rule::enum(LoadBalancerStrategy::class),
+        'is_sticky_session_enabled' => 'boolean',
+        'sticky_session_cookie_name' => ['string', 'regex:'.Application::STICKY_SESSION_COOKIE_NAME_PATTERN],
+        'sticky_session_max_age' => 'integer|nullable|min:'.Application::MIN_STICKY_SESSION_MAX_AGE.'|max:'.Application::MAX_STICKY_SESSION_MAX_AGE,
         'base_directory' => ValidationPatterns::directoryPathRules(),
         'publish_directory' => ValidationPatterns::directoryPathRules(),
         'health_check_enabled' => 'boolean',

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LoadBalancerStrategy;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -393,6 +394,26 @@ test('an imported application keeps its replicas', function () {
     $this->importer->import($bundle, teamId: Team::factory()->create()->id);
 
     expect(Application::where('uuid', $applicationUuid)->firstOrFail()->replicas)->toBe(3);
+});
+
+test('an imported application keeps its load balancer', function () {
+    $this->application->forceFill([
+        'load_balancer_strategy' => LoadBalancerStrategy::LeastConnections,
+        'is_sticky_session_enabled' => true,
+        'sticky_session_cookie_name' => 'app_replica',
+        'sticky_session_max_age' => 86400,
+    ])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $applicationUuid = $this->application->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $application = Application::where('uuid', $applicationUuid)->firstOrFail();
+    expect($application->load_balancer_strategy)->toBe(LoadBalancerStrategy::LeastConnections)
+        ->and($application->is_sticky_session_enabled)->toBeTrue()
+        ->and($application->sticky_session_cookie_name)->toBe('app_replica')
+        ->and($application->sticky_session_max_age)->toBe(86400);
 });
 
 test('a static application keeps the port that the user set after turning on static', function () {

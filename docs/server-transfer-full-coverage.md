@@ -97,6 +97,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ➕ | Static site from an uploaded archive (`is_archive_source`) | deployed once. Expected: a redeploy on the target reuses the image on the server |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
 | ➕ | App with replicas | `replicas` 3 on the Scaling page |
+| ➕ | App with a load balancer | `Least connections` and sticky sessions with a custom cookie name for `1 day` on the Scaling page |
 | ➕ | Docker Compose app with a security update | an image override from the Security page (`docker_compose_image_overrides`); the target deploys the new image |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
 | ➕ | Saved SSH host keys | app with a deploy key on a self-hosted Git host, deployed once, so Source → SSH host keys has a line. Expected: the same line on the target |

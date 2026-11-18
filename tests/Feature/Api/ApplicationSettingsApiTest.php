@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\LoadBalancerStrategy;
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -617,6 +619,36 @@ test('the applications API saves the replicas on create and on update', function
 
     $this->patchJson("/api/v1/applications/{$uuid}", ['replicas' => 2])->assertOk();
     expect(Application::where('uuid', $uuid)->firstOrFail()->replicas)->toBe(2);
+});
+
+test('the applications API saves the load balancer', function () {
+    $this->server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value], 'detected_traefik_version' => '3.6.2'])->save();
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))->patchJson("/api/v1/applications/{$this->application->uuid}", [
+        'replicas' => 3,
+        'load_balancer_strategy' => 'least_connections',
+        'is_sticky_session_enabled' => true,
+        'sticky_session_cookie_name' => 'app_replica',
+        'sticky_session_max_age' => 3600,
+    ])->assertOk();
+
+    $application = $this->application->fresh();
+    expect($application->load_balancer_strategy)->toBe(LoadBalancerStrategy::LeastConnections)
+        ->and($application->is_sticky_session_enabled)->toBeTrue()
+        ->and($application->sticky_session_cookie_name)->toBe('app_replica')
+        ->and($application->sticky_session_max_age)->toBe(3600)
+        ->and($application->custom_labels)->toContain('loadbalancer.sticky.cookie.name=app_replica');
+});
+
+test('the applications API rejects a load balancer that the proxy cannot use', function () {
+    $this->server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value], 'detected_traefik_version' => '3.3.7'])->save();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['load_balancer_strategy' => 'least_connections'])
+        ->assertJsonValidationErrors('load_balancer_strategy');
+    $this->patchJson("/api/v1/applications/{$this->application->uuid}", ['sticky_session_cookie_name' => '__Host-Session'])
+        ->assertJsonValidationErrors('sticky_session_cookie_name');
 });
 
 test('the applications API rejects replicas together with a setting that needs one container', function () {
