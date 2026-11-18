@@ -202,7 +202,7 @@ services:
 
   minio-init:
     profiles: ["minio"]
-    image: ghcr.io/coollabsio/mx:0.1.0
+    image: ghcr.io/coollabsio/mx:0.2.1
     pull_policy: always
     restart: "no"
     depends_on:
