@@ -7,11 +7,16 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $openRecommendations = \App\Enums\ApplicationRecommendation::openFor($application);
+        $hasRecommendationsSection = $openRecommendations->isNotEmpty()
+            || \App\Enums\ApplicationRecommendation::dismissedFor($application)->isNotEmpty();
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
                 'route' => 'project.application.configuration',
                 'active' => $currentRoute === 'project.application.configuration',
+                'recommendations' => $openRecommendations,
             ],
             [
                 'label' => 'Domains',
@@ -205,6 +210,7 @@
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
             'project.application.configuration' => array_values(array_filter([
+                $hasRecommendationsSection ? ['id' => 'recommendations-section', 'label' => 'Recommendations'] : null,
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
                 ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
@@ -287,6 +293,9 @@
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                     @if ($menuItem['label'] === 'Files')
                                         <x-beta-badge class="ml-auto shrink-0" />
+                                    @endif
+                                    @if (filled($menuItem['recommendations'] ?? null))
+                                        <x-attention-mark :label="$menuItem['recommendations']->count().' '.str('recommendation')->plural($menuItem['recommendations']->count())" />
                                     @endif
                                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
