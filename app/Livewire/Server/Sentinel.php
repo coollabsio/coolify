@@ -29,6 +29,8 @@ class Sentinel extends Component
 
     public bool $isSentinelDebugEnabled;
 
+    public bool $isContainerLogArchiveEnabled = true;
+
     public ?string $sentinelCustomDockerImage = null;
 
     public function getListeners()
@@ -58,6 +60,7 @@ class Sentinel extends Component
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
+            $this->server->settings->is_container_log_archive_enabled = $this->isContainerLogArchiveEnabled;
             $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
 
@@ -67,6 +70,7 @@ class Sentinel extends Component
             $this->sentinelToken = $this->server->settings->sentinel_token;
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
+            $this->isContainerLogArchiveEnabled = $this->server->settings->is_container_log_archive_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->sentinelStatus = $this->server->sentinelStatus();
         }
@@ -175,7 +179,7 @@ class Sentinel extends Component
             $this->setSentinelRestarting();
             $this->syncData(true);
             auditLog('ui.server.sentinel.updated', $this->auditContext([
-                'changed_fields' => ['is_metrics_enabled', 'sentinel_token', 'sentinel_custom_url', 'is_sentinel_debug_enabled'],
+                'changed_fields' => ['is_metrics_enabled', 'sentinel_token', 'sentinel_custom_url', 'is_sentinel_debug_enabled', 'is_container_log_archive_enabled'],
             ]));
             $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
