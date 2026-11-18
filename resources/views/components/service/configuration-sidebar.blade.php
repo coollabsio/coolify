@@ -77,6 +77,9 @@
                     href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    @if ($menuItem['label'] === 'Files')
+                        <x-experimental-icon class="ml-auto shrink-0" />
+                    @endif
                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                     @if ($menuItem['hasWarning'] ?? false)
                         <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>

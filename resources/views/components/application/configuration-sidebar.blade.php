@@ -285,6 +285,9 @@
                                     >
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                    @if ($menuItem['label'] === 'Files')
+                                        <x-experimental-icon class="ml-auto shrink-0" />
+                                    @endif
                                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
