@@ -104,9 +104,19 @@ COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 RUN chown -R www-data:www-data /terminal
 
+# Configure the Nginx site of the base image
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
+ENV NGINX_FASTCGI_BUFFERS="16 16k"
+ENV NGINX_FASTCGI_BUFFER_SIZE=32k
+ENV TRUSTED_PROXY=off
+
 # Configure Nginx and S6 overlay
 COPY docker/development/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
-COPY docker/development/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
+COPY docker/production/etc/nginx/server-opts.d/coolify.conf /etc/nginx/server-opts.d/coolify.conf
+# Drop HSTS, which would force HTTPS on every subdomain of the dashboard domain, and the
+# year-long caching of static files, which keeps files without a hash in their name stale after an upgrade
+RUN sed -i '/Strict-Transport-Security/d' /etc/nginx/server-opts.d/security.conf && \
+    rm /etc/nginx/server-opts.d/performance.conf
 COPY --chmod=755 docker/development/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN mkdir -p /etc/nginx/conf.d && \
