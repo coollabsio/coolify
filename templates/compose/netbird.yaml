@@ -1,0 +1,197 @@
+# documentation: https://docs.netbird.io/selfhosted/selfhosted-quickstart
+# slogan: Self-hosted NetBird control plane: management, signal, relay, STUN and the web dashboard for your WireGuard®-based overlay network.
+# category: vpn
+# tags: wireguard, mesh-networks, vpn, zero-trust-network-access, sso, open source
+# logo: svgs/netbird.png
+# port: 80
+
+services:
+  # The nginx of the dashboard image also sends the NetBird HTTP paths to netbird-server, so one domain serves everything.
+  netbird-dashboard:
+    image: 'netbirdio/dashboard:v2.97.0' # Released on 12 November 2026
+    environment:
+      - SERVICE_URL_NETBIRD_DASHBOARD_80
+      - 'NETBIRD_MGMT_API_ENDPOINT=${SERVICE_URL_NETBIRD_DASHBOARD}'
+      - 'NETBIRD_MGMT_GRPC_API_ENDPOINT=${SERVICE_URL_NETBIRD_DASHBOARD}'
+      - AUTH_AUDIENCE=netbird-dashboard
+      - AUTH_CLIENT_ID=netbird-dashboard
+      - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET}
+      - 'AUTH_AUTHORITY=${SERVICE_URL_NETBIRD_DASHBOARD}/oauth2'
+      - USE_AUTH0=${USE_AUTH0:-false}
+      - 'AUTH_SUPPORTED_SCOPES=${AUTH_SUPPORTED_SCOPES:-openid profile email groups}'
+      - AUTH_REDIRECT_URI=/nb-auth
+      - AUTH_SILENT_REDIRECT_URI=/nb-silent-auth
+      - NGINX_SSL_PORT=443
+      - LETSENCRYPT_DOMAIN=${LETSENCRYPT_DOMAIN:-none}
+    # The image edits default.conf with "sed -i" at start, which fails on a bind mount, so copy it in place first.
+    entrypoint:
+      - /bin/sh
+      - '-c'
+      - 'cp /netbird/default.conf /etc/nginx/http.d/default.conf && exec /usr/bin/supervisord -c /etc/supervisord.conf'
+    volumes:
+      - type: bind
+        source: ./default.conf
+        target: /netbird/default.conf
+        read_only: true
+        content: |
+          # The default.conf of netbirdio/dashboard, plus the proxy locations for netbird-server.
+          map $http_upgrade $netbird_connection_upgrade {
+            default upgrade;
+            '' '';
+          }
+
+          server {
+            listen 80 default_server;
+            listen [::]:80 default_server;
+
+            root /usr/share/nginx/html;
+
+            location ~ ^/(relay|ws-proxy/|api|oauth2) {
+              proxy_pass http://netbird-server:80;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $netbird_connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+              proxy_read_timeout 1d;
+              proxy_send_timeout 1d;
+              proxy_buffering off;
+            }
+
+            location = /netbird.wasm {
+              root /usr/share/nginx/html;
+              default_type application/wasm;
+            }
+
+            location = /ironrdp-pkg/ironrdp_web_bg.wasm {
+              root /usr/share/nginx/html;
+              default_type application/wasm;
+            }
+
+            location / {
+              try_files $uri $uri.html $uri/ =404;
+              add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+              add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: ws: wss: https:;" always;
+              add_header Last-Modified "";
+              expires off;
+            }
+
+            error_page 404 /404.html;
+            location = /404.html {
+              internal;
+              add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+              add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: ws: wss: https:;" always;
+              add_header Last-Modified "";
+              expires off;
+            }
+          }
+    depends_on:
+      - netbird-server
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-fsS'
+        - '-o'
+        - /dev/null
+        - 'http://127.0.0.1:80/'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Writes config.yaml from the Coolify variables, because Coolify does not put variables into file content.
+  netbird-init:
+    image: 'alpine:3.24.4' # Released on 8 November 2026
+    environment:
+      - 'NETBIRD_URL=${SERVICE_URL_NETBIRD_DASHBOARD}'
+      - 'NETBIRD_AUTH_SECRET=${SERVICE_REALBASE64_32_NBAUTH}'
+      - 'NETBIRD_COOKIE_KEY=${SERVICE_REALBASE64_32_NBCOOKIE}'
+      - 'NETBIRD_STORE_KEY=${SERVICE_REALBASE64_32_NBSTORE}'
+      - 'NETBIRD_LOG_LEVEL=${NETBIRD_LOG_LEVEL:-info}'
+    volumes:
+      - 'netbird-config:/etc/netbird'
+    entrypoint:
+      - /bin/sh
+      - '-euc'
+      - |
+        case "$${NETBIRD_URL}" in
+          https://*) NETBIRD_PORT=443 ;;
+          *) NETBIRD_PORT=80 ;;
+        esac
+        cat > /etc/netbird/config.yaml <<EOF
+        server:
+          listenAddress: ":80"
+          exposedAddress: "$${NETBIRD_URL}:$${NETBIRD_PORT}"
+          stunPorts:
+            - 3478
+          metricsPort: 9090
+          healthcheckAddress: ":9000"
+          logLevel: "$${NETBIRD_LOG_LEVEL}"
+          logFile: "console"
+          authSecret: "$${NETBIRD_AUTH_SECRET}"
+          dataDir: "/var/lib/netbird"
+          auth:
+            issuer: "$${NETBIRD_URL}/oauth2"
+            signKeyRefreshEnabled: true
+            sessionCookieEncryptionKey: "$${NETBIRD_COOKIE_KEY}"
+            dashboardRedirectURIs:
+              - "$${NETBIRD_URL}/nb-auth"
+              - "$${NETBIRD_URL}/nb-silent-auth"
+            cliRedirectURIs:
+              - "http://localhost:53000/"
+          reverseProxy:
+            trustedHTTPProxies:
+              - "10.0.0.0/8"
+              - "172.16.0.0/12"
+              - "192.168.0.0/16"
+          store:
+            engine: "sqlite"
+            encryptionKey: "$${NETBIRD_STORE_KEY}"
+        EOF
+    restart: 'no'
+    exclude_from_hc: true
+
+  # Management, signal, relay and STUN in one container.
+  netbird-server:
+    image: 'netbirdio/netbird-server:0.83.1' # Released on 13 November 2026
+    command:
+      - '--config'
+      - /etc/netbird/config.yaml
+    ports:
+      - '3478:3478/udp'
+    volumes:
+      - 'netbird-config:/etc/netbird:ro'
+      - 'netbird-data:/var/lib/netbird'
+    depends_on:
+      netbird-init:
+        condition: service_completed_successfully
+    # The image has no curl or wget, so bash sends the request. Any HTTP reply on :80 means the server is up.
+    # Do not use /health on :9000: it returns 200 only after a WebSocket dial to the public domain, which fails without hairpin NAT.
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - '-c'
+        - 'exec 3<>/dev/tcp/127.0.0.1/80 && printf "GET / HTTP/1.0\r\n\r\n" >&3 && head -n 1 <&3 | grep -q "^HTTP/"'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    labels:
+      # gRPC needs HTTP/2 to the backend (h2c), so it skips the dashboard nginx and goes here directly.
+      # The rule has no Host, because Coolify escapes variables in labels. These gRPC paths are unique to NetBird.
+      - traefik.enable=true
+      - 'traefik.http.routers.netbird-grpc.rule=PathPrefix(`/signalexchange.SignalExchange/`) || PathPrefix(`/management.ManagementService/`) || PathPrefix(`/management.ProxyService/`)'
+      - traefik.http.routers.netbird-grpc.entrypoints=https
+      - traefik.http.routers.netbird-grpc.tls=true
+      - traefik.http.routers.netbird-grpc.service=netbird-grpc
+      - traefik.http.services.netbird-grpc.loadbalancer.server.port=80
+      - traefik.http.services.netbird-grpc.loadbalancer.server.scheme=h2c
