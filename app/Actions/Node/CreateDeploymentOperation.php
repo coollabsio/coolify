@@ -118,6 +118,10 @@ class CreateDeploymentOperation
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::USER_CAPABILITY);
             }
 
+            if (filled(data_get($revision->configuration, 'runtime_options'))) {
+                $node->ensureReportedCapability(DispatchWorkloadDeployment::RUNTIME_OPTIONS_CAPABILITY);
+            }
+
             if ($workload->node_stack_id !== null) {
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY);
             }

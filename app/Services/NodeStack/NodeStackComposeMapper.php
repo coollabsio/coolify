@@ -32,23 +32,26 @@ class NodeStackComposeMapper
     /** The rule of Sentinel for `user` (`workload.user.v1`): a name or a uid, with an optional `:group` or `:gid`. */
     public const USER_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,31})?\z/';
 
-    /** Sentinel does not mount the socket under these paths. */
-    private const CONTAINER_SOCKET_FORBIDDEN_PATHS = ['/proc', '/sys', '/dev', '/run/secrets'];
-
     /**
-     * Service keys that a workload cannot express yet. The stack runs without them, with a note on
-     * the service. `container_name`, `hostname`, `networks`, `platform`, and `logging` are ignored
-     * without a note: Nodes name, connect, and log every container themselves.
+     * Service keys of `workload.runtime_options.v1` (decision 0028). `container_name`, `hostname`,
+     * `networks`, `platform`, and `logging` are ignored without a note: Nodes name, connect, and
+     * log every container themselves.
      */
-    private const IGNORED_KEYS = [
-        'shm_size' => 'shm_size',
-        'ulimits' => 'ulimits',
-        'tmpfs' => 'tmpfs',
-        'stop_grace_period' => 'stop_grace_period',
-        'deploy' => 'deploy',
-        'tty' => 'tty',
-        'stdin_open' => 'stdin_open',
-    ];
+    public const RUNTIME_OPTION_KEYS = ['shm_size', 'ulimits', 'tmpfs', 'stop_grace_period', 'tty', 'stdin_open'];
+
+    /** Sentinel limits of `workload.runtime_options.v1`: memory sizes, ulimits, tmpfs mounts, and the stop timeout. */
+    public const MAX_RUNTIME_MEMORY_BYTES = 16 * 1024 * 1024 * 1024;
+
+    public const MAX_ULIMITS = 16;
+
+    public const MAX_TMPFS = 8;
+
+    public const MAX_STOP_TIMEOUT_SECONDS = 600;
+
+    public const ULIMIT_NAMES = ['nofile', 'nproc', 'memlock', 'core', 'stack', 'msgqueue', 'sigpending', 'rtprio'];
+
+    /** Sentinel does not write a file, mount a socket, or mount a tmpfs under these paths. */
+    private const FORBIDDEN_PATHS = ['/proc', '/sys', '/dev', '/run/secrets'];
 
     /** Magic commands that need the records of a v4 service. */
     private const UNSUPPORTED_COMMANDS = ['SUPABASEANON', 'SUPABASESERVICE'];
@@ -153,10 +156,7 @@ class NodeStackComposeMapper
             if (filled($service['profiles'] ?? null)) {
                 continue;
             }
-            $notes = array_values(array_map(
-                fn (string $key): string => "{$key} is not supported on Nodes yet and is ignored.",
-                array_keys(array_intersect_key(self::IGNORED_KEYS, array_filter($service, fn ($value): bool => filled($value)))),
-            ));
+            ['resources' => $resources, 'notes' => $notes] = self::deployResources($name, $service['deploy'] ?? null, $variables);
             $entrypoint = self::words($service['entrypoint'] ?? null, $variables);
             $command = self::words($service['command'] ?? null, $variables);
             if ($entrypoint !== []) {
@@ -172,6 +172,8 @@ class NodeStackComposeMapper
             ksort($environment);
 
             ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $files, 'container_socket_paths' => $socketPaths, 'notes' => $mountNotes] = $storage[$name];
+            $usedPaths = [...array_column($volumes, 'path'), ...array_column($stackVolumes, 'path'), ...array_column($files, 'path'), ...$socketPaths];
+            $runtimeOptions = self::runtimeOptions($name, $service, $variables, $resources['memory_limit_bytes'] ?? null, $usedPaths);
             foreach ($files as $file) {
                 $fileBytes += (int) (strlen($file['content_base64']) * 3 / 4);
                 $fileCount++;
@@ -210,6 +212,8 @@ class NodeStackComposeMapper
                 'files' => $files,
                 'container_socket_paths' => $socketPaths,
                 'user' => self::user($name, $service['user'] ?? null, $variables),
+                'resources' => $resources,
+                'runtime_options' => $runtimeOptions,
                 'depends_on' => self::dependencies($service['depends_on'] ?? []),
                 'notes' => [...$notes, ...$mountNotes],
             ];
@@ -223,9 +227,10 @@ class NodeStackComposeMapper
 
     /**
      * The configuration of the first revision of a service: its command, restart policy, files,
-     * the paths where Sentinel mounts the Podman socket of the server, and the user.
+     * the paths where Sentinel mounts the Podman socket of the server, the user, the CPU and
+     * memory of `deploy.resources`, and the runtime options (decision 0028).
      *
-     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>, container_socket_paths: list<string>, user: ?string}  $service  One service of services().
+     * @param  array{command: list<string>, restart_policy: string, files: list<array<string, mixed>>, container_socket_paths: list<string>, user: ?string, resources?: array<string, int|float>, runtime_options?: array<string, mixed>}  $service  One service of services().
      * @return array<string, mixed>
      */
     public static function revisionConfiguration(array $service): array
@@ -236,7 +241,234 @@ class NodeStackComposeMapper
             'files' => $service['files'],
             'container_socket_paths' => $service['container_socket_paths'] ?? [],
             'user' => $service['user'] ?? null,
+            'resources' => $service['resources'] ?? [],
+            'runtime_options' => $service['runtime_options'] ?? [],
         ], fn ($value): bool => $value !== [] && $value !== null);
+    }
+
+    /**
+     * A Compose byte value (`128mb`, `1g`, `500M`, `1024`) in bytes, with 1024 as the unit. Null
+     * when it is not a byte value.
+     */
+    public static function bytes(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value >= 0 ? $value : null;
+        }
+        if (! is_string($value) || preg_match('/\A\s*(\d+(?:\.\d+)?)\s*([kmgt]?)b?\s*\z/i', $value, $match) !== 1) {
+            return null;
+        }
+        $bytes = (float) $match[1] * (1024 ** match (strtolower($match[2])) {
+            'k' => 1,
+            'm' => 2,
+            'g' => 3,
+            't' => 4,
+            default => 0,
+        });
+
+        return $bytes > PHP_INT_MAX ? null : (int) floor($bytes);
+    }
+
+    /**
+     * The CPU and memory of `deploy.resources.limits` and `reservations`, as the fields of the
+     * **Resource Limits** page. The other `deploy` keys are Swarm keys: a note says that they are
+     * ignored.
+     *
+     * @param  array<string, string>  $variables
+     * @return array{resources: array<string, int|float>, notes: list<string>}
+     *
+     * @throws RuntimeException When a value is not a number of CPUs or a byte size.
+     */
+    private static function deployResources(string $serviceName, mixed $deploy, array $variables): array
+    {
+        if (! is_array($deploy) || $deploy === []) {
+            return ['resources' => [], 'notes' => []];
+        }
+        $notes = [];
+        $ignored = array_diff(array_keys(array_filter($deploy, fn ($value): bool => filled($value))), ['resources']);
+        $resources = is_array($deploy['resources'] ?? null) ? $deploy['resources'] : [];
+        foreach (array_diff(array_keys(array_filter($resources, fn ($value): bool => filled($value))), ['limits', 'reservations']) as $key) {
+            $ignored[] = "resources.{$key}";
+        }
+        $result = [];
+        foreach (['limits' => ['cpu_limit', 'memory_limit_bytes'], 'reservations' => ['cpu_reservation', 'memory_reservation_bytes']] as $group => [$cpuField, $memoryField]) {
+            $values = is_array($resources[$group] ?? null) ? $resources[$group] : [];
+            foreach (array_diff(array_keys(array_filter($values, fn ($value): bool => filled($value))), ['cpus', 'memory']) as $key) {
+                $ignored[] = "resources.{$group}.{$key}";
+            }
+            $cpus = $values['cpus'] ?? null;
+            if (filled($cpus)) {
+                $cpus = is_string($cpus) ? self::interpolate($cpus, $variables) : $cpus;
+                if (! is_numeric($cpus) || (float) $cpus < 0.01 || (float) $cpus > 1024) {
+                    throw new RuntimeException("The service {$serviceName} sets deploy.resources.{$group}.cpus to a value that is not 0.01 to 1024 CPUs.");
+                }
+                $result[$cpuField] = (float) $cpus;
+            }
+            $memory = $values['memory'] ?? null;
+            if (filled($memory)) {
+                $bytes = self::bytes(is_string($memory) ? self::interpolate($memory, $variables) : $memory);
+                if ($bytes === null || $bytes < 4 * 1024 * 1024) {
+                    throw new RuntimeException("The service {$serviceName} sets deploy.resources.{$group}.memory to a value that is not a size of at least 4 MiB, for example 512m.");
+                }
+                $result[$memoryField] = $bytes;
+            }
+        }
+        if (isset($result['cpu_limit'], $result['cpu_reservation']) && $result['cpu_reservation'] > $result['cpu_limit']) {
+            throw new RuntimeException("The service {$serviceName} reserves more CPUs than its limit in deploy.resources.");
+        }
+        if (isset($result['memory_limit_bytes'], $result['memory_reservation_bytes']) && $result['memory_reservation_bytes'] > $result['memory_limit_bytes']) {
+            throw new RuntimeException("The service {$serviceName} reserves more memory than its limit in deploy.resources.");
+        }
+        if ($ignored !== []) {
+            $notes[] = 'deploy.'.implode(', deploy.', $ignored).' '.(count($ignored) === 1 ? 'is' : 'are').' ignored on Nodes. Only the CPUs and memory of deploy.resources apply.';
+        }
+
+        return ['resources' => $result, 'notes' => $notes];
+    }
+
+    /**
+     * The runtime options of a service (`workload.runtime_options.v1`, decision 0028) with the
+     * rules of Sentinel. A key that is not set is left out, so the container keeps the Podman
+     * default.
+     *
+     * @param  array<string, mixed>  $service
+     * @param  array<string, string>  $variables
+     * @param  list<string>  $usedPaths  The mount paths of the volumes, files, and sockets of the service.
+     * @return array{shm_size_bytes?: int, ulimits?: list<array{name: string, soft: int, hard: int}>, tmpfs?: list<array{path: string, size_bytes: int}>, stop_timeout_seconds?: int, tty?: true, stdin_open?: true}
+     *
+     * @throws RuntimeException When a value breaks a rule.
+     */
+    private static function runtimeOptions(string $serviceName, array $service, array $variables, ?int $memoryLimit, array $usedPaths): array
+    {
+        $value = fn (mixed $value): mixed => is_string($value) ? trim(self::interpolate($value, $variables)) : $value;
+        $memorySize = function (string $key, int $bytes) use ($serviceName, $memoryLimit): void {
+            if ($bytes < 1 || $bytes > self::MAX_RUNTIME_MEMORY_BYTES) {
+                throw new RuntimeException("The service {$serviceName} sets {$key} to more than 16 GiB or to 0.");
+            }
+            if ($memoryLimit !== null && $bytes > $memoryLimit) {
+                throw new RuntimeException("The service {$serviceName} sets {$key} larger than its memory limit.");
+            }
+        };
+        $options = [];
+
+        $shm = $value($service['shm_size'] ?? null);
+        if (filled($shm)) {
+            $bytes = self::bytes($shm);
+            if ($bytes === null) {
+                throw new RuntimeException("The service {$serviceName} sets shm_size: {$shm}. Use a size, for example 256m or 1g.");
+            }
+            $memorySize('shm_size', $bytes);
+            $options['shm_size_bytes'] = $bytes;
+        }
+
+        $ulimits = $service['ulimits'] ?? null;
+        if (filled($ulimits)) {
+            if (! is_array($ulimits) || array_is_list($ulimits)) {
+                throw new RuntimeException("The service {$serviceName} sets ulimits: to a value that is not a map of names.");
+            }
+            if (count($ulimits) > self::MAX_ULIMITS) {
+                throw new RuntimeException("The service {$serviceName} sets more than ".self::MAX_ULIMITS.' ulimits.');
+            }
+            $limit = function (mixed $limit) use ($value): ?int {
+                $limit = $value($limit);
+
+                return is_int($limit) || (is_string($limit) && preg_match('/\A-?\d{1,19}\z/', $limit) === 1) ? (int) $limit : null;
+            };
+            foreach ($ulimits as $name => $setting) {
+                $name = (string) $name;
+                if (! in_array($name, self::ULIMIT_NAMES, true)) {
+                    throw new RuntimeException("The service {$serviceName} sets the ulimit {$name}, which Nodes do not support. Use ".implode(', ', self::ULIMIT_NAMES).'.');
+                }
+                [$soft, $hard] = is_array($setting)
+                    ? [$limit($setting['soft'] ?? null), $limit($setting['hard'] ?? null)]
+                    : [$limit($setting), $limit($setting)];
+                $valid = $soft !== null && $hard !== null && match (true) {
+                    $soft === -1 && $hard === -1 => true,
+                    $hard === -1 => $soft >= 0,
+                    default => $soft >= 0 && $hard >= 0 && $soft <= $hard,
+                };
+                if (! $valid) {
+                    throw new RuntimeException("The service {$serviceName} sets the ulimit {$name} to an invalid value. Use a number, or soft and hard with soft not above hard; -1 is unlimited.");
+                }
+                $options['ulimits'][] = ['name' => $name, 'soft' => $soft, 'hard' => $hard];
+            }
+        }
+
+        $tmpfs = $service['tmpfs'] ?? null;
+        if (filled($tmpfs)) {
+            $entries = is_array($tmpfs) ? $tmpfs : [$tmpfs];
+            if (count($entries) > self::MAX_TMPFS) {
+                throw new RuntimeException("The service {$serviceName} sets more than ".self::MAX_TMPFS.' tmpfs mounts.');
+            }
+            $paths = [];
+            foreach ($entries as $entry) {
+                if (! is_string($entry)) {
+                    throw new RuntimeException("The service {$serviceName} sets tmpfs: to a value that is not a path.");
+                }
+                [$path, $mountOptions] = array_pad(explode(':', $value($entry), 2), 2, '');
+                $size = 0;
+                foreach (array_filter(explode(',', $mountOptions)) as $option) {
+                    $bytes = str_starts_with($option, 'size=') ? self::bytes(substr($option, 5)) : null;
+                    if ($bytes === null) {
+                        throw new RuntimeException("The service {$serviceName} sets the tmpfs option {$option} at {$path}. Nodes support only size=, for example /tmp:size=64m.");
+                    }
+                    $memorySize("the size of the tmpfs at {$path}", $bytes);
+                    $size = $bytes;
+                }
+                if (! self::validMountPath($path)) {
+                    throw new RuntimeException("The service {$serviceName} mounts a tmpfs at {$path}, which cannot be a mount target on Nodes.");
+                }
+                if (in_array($path, $paths, true) || in_array($path, $usedPaths, true)) {
+                    throw new RuntimeException("The service {$serviceName} mounts a tmpfs and another mount at {$path}.");
+                }
+                $paths[] = $path;
+                $options['tmpfs'][] = ['path' => $path, 'size_bytes' => $size];
+            }
+        }
+
+        $grace = $value($service['stop_grace_period'] ?? null);
+        if (filled($grace)) {
+            $seconds = self::durationSeconds($grace);
+            if ($seconds === null || $seconds < 1 || $seconds > self::MAX_STOP_TIMEOUT_SECONDS) {
+                throw new RuntimeException("The service {$serviceName} sets stop_grace_period: {$grace}. Use 1s to 10m.");
+            }
+            $options['stop_timeout_seconds'] = $seconds;
+        }
+
+        foreach (['tty' => 'tty', 'stdin_open' => 'stdin_open'] as $key => $field) {
+            $flag = $value($service[$key] ?? null);
+            if ($flag === true || $flag === 'true') {
+                $options[$field] = true;
+            } elseif ($flag !== null && $flag !== false && $flag !== 'false' && $flag !== '') {
+                throw new RuntimeException("The service {$serviceName} sets {$key}: to a value that is not true or false.");
+            }
+        }
+
+        return $options;
+    }
+
+    /** The rules of Sentinel for a `files` path, without `:`: absolute, normalized, and not under a forbidden path. */
+    private static function validMountPath(string $path): bool
+    {
+        return strlen($path) <= 4096
+            && str_starts_with($path, '/')
+            && $path !== '/'
+            && ! str_ends_with($path, '/')
+            && preg_match('/[,:\x00-\x1f\x7f]|\/\/|(^|\/)\.\.?(\/|$)/', $path) !== 1
+            && ! collect(self::FORBIDDEN_PATHS)->contains(fn (string $prefix): bool => $path === $prefix || str_starts_with($path, $prefix.'/'));
+    }
+
+    /** A Compose duration (`1m30s`, `500ms`, `10`) in whole seconds, rounded up. Null when it is not a duration. */
+    private static function durationSeconds(mixed $duration): ?int
+    {
+        if (is_int($duration) || (is_string($duration) && ctype_digit($duration))) {
+            return (int) $duration;
+        }
+        if (! is_string($duration) || preg_match('/\A(\d+(?:\.\d+)?(h|ms|m|s|us|ns))+\z/', $duration) !== 1) {
+            return null;
+        }
+
+        return self::seconds($duration, 0, 0, PHP_INT_MAX);
     }
 
     /**
@@ -698,7 +930,7 @@ class NodeStackComposeMapper
         }
         $used = array_flip([...array_column($storage['mounts'], 'path'), ...array_column($storage['files'], 'path')]);
         foreach ($paths as $path) {
-            $forbidden = collect(self::CONTAINER_SOCKET_FORBIDDEN_PATHS)->contains(fn (string $prefix): bool => $path === $prefix || str_starts_with($path, $prefix.'/'));
+            $forbidden = collect(self::FORBIDDEN_PATHS)->contains(fn (string $prefix): bool => $path === $prefix || str_starts_with($path, $prefix.'/'));
             if ($forbidden || str_contains($path, ':')) {
                 throw new RuntimeException("The service {$serviceName} mounts the Docker socket at {$path}, which cannot be a mount target on Nodes.");
             }

@@ -24,8 +24,15 @@ use RuntimeException;
  */
 final readonly class NodeStackComposeDiff
 {
-    /** The keys of a revision configuration that the Compose file owns. */
-    private const REVISION_KEYS = ['command', 'restart_policy', 'files', 'container_socket_paths', 'user'];
+    /**
+     * The keys of a revision configuration that the Compose file owns. A value that the user
+     * changed stays (three-way rule): a limit on the Resource Limits page has priority over
+     * `deploy.resources`.
+     */
+    private const REVISION_KEYS = ['command', 'restart_policy', 'files', 'container_socket_paths', 'user', 'resources'];
+
+    /** Keys that only the Compose file sets, so the new file always wins (decision 0028). */
+    private const FILE_ONLY_REVISION_KEYS = ['runtime_options'];
 
     /**
      * @param  list<array<string, mixed>>  $added  The services of the new file without a workload; see NodeStackComposeMapper::services().
@@ -157,8 +164,10 @@ final readonly class NodeStackComposeDiff
         $revision = null;
         if ($latest !== null) {
             $configuration = $latest->configuration ?? [];
-            foreach (self::REVISION_KEYS as $key) {
-                $value = $take($configuration[$key] ?? null, $previousConfiguration[$key] ?? null, $nextConfiguration[$key] ?? null);
+            foreach ([...self::REVISION_KEYS, ...self::FILE_ONLY_REVISION_KEYS] as $key) {
+                $value = in_array($key, self::FILE_ONLY_REVISION_KEYS, true)
+                    ? ($nextConfiguration[$key] ?? null)
+                    : $take($configuration[$key] ?? null, $previousConfiguration[$key] ?? null, $nextConfiguration[$key] ?? null);
                 if ($value === null) {
                     unset($configuration[$key]);
                 } else {

@@ -30,7 +30,7 @@ class NodeStackCompose
     ];
 
     /** Part of the cache key of templateUnavailableReasons(). Change it when the rules change, so a cached result of older rules is not used. */
-    private const AVAILABILITY_VERSION = 2;
+    private const AVAILABILITY_VERSION = 3;
 
     /** Keys of `build:` that the Node builder cannot use. The first one found is the reason. */
     private const UNSUPPORTED_BUILD_KEYS = [
@@ -70,8 +70,9 @@ class NodeStackCompose
      * @param  bool  $publishedPorts  Every server of the cluster publishes ports (decision 0016), so `ports:` can run.
      * @param  bool  $containerSocket  Every server of the cluster mounts the Podman socket in a container, so a mount of the Docker socket can run.
      * @param  bool  $workloadUser  Every server of the cluster runs a container as the Compose `user:`.
+     * @param  bool  $runtimeOptions  Every server of the cluster sets `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`, `tty`, and `stdin_open` (decision 0028).
      */
-    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false): ?string
     {
         if ($gitComposeDirectory !== null && filled($yaml['include'] ?? null)) {
             return 'The Compose file includes other Compose files (include).';
@@ -79,7 +80,7 @@ class NodeStackCompose
         $services = $yaml['services'] ?? [];
         foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts, $containerSocket, $workloadUser);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -178,17 +179,17 @@ class NodeStackCompose
      *
      * @return array<string, string>
      */
-    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false): array
+    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false): array
     {
         $templates ??= get_service_templates();
         $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
-        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '').($containerSocket ? 'socket:' : '').($workloadUser ? 'user:' : '');
+        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '').($containerSocket ? 'socket:' : '').($workloadUser ? 'user:' : '').($runtimeOptions ? 'runtime:' : '');
 
-        return Cache::remember('node-stack-template-availability:'.self::AVAILABILITY_VERSION.':'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts, $containerSocket, $workloadUser): array {
+        return Cache::remember('node-stack-template-availability:'.self::AVAILABILITY_VERSION.':'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions): array {
             $reasons = [];
             foreach ($composes as $key => $encoded) {
                 try {
-                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts, containerSocket: $containerSocket, workloadUser: $workloadUser);
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts, containerSocket: $containerSocket, workloadUser: $workloadUser, runtimeOptions: $runtimeOptions);
                 } catch (RuntimeException $exception) {
                     $reason = $exception->getMessage();
                 }
@@ -274,7 +275,7 @@ class NodeStackCompose
     }
 
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts, bool $containerSocket, bool $workloadUser): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts, bool $containerSocket, bool $workloadUser, bool $runtimeOptions): ?string
     {
         if (! self::validServiceName($name, $underscoreNames)) {
             return $underscoreNames || ! self::validServiceName($name, true)
@@ -293,6 +294,12 @@ class NodeStackCompose
         }
         if (! $workloadUser && ($service['user'] ?? null) !== null && ($service['user'] ?? null) !== '') {
             return 'sets user:, which needs Sentinel with workload.user.v1 on every server of the cluster';
+        }
+        if (! $runtimeOptions) {
+            $set = array_filter(NodeStackComposeMapper::RUNTIME_OPTION_KEYS, fn (string $key): bool => ($service[$key] ?? null) !== null && ($service[$key] ?? null) !== false && ($service[$key] ?? null) !== '' && ($service[$key] ?? null) !== []);
+            if ($set !== []) {
+                return 'sets '.implode(', ', $set).', which '.(count($set) === 1 ? 'needs' : 'need').' Sentinel with workload.runtime_options.v1 on every server of the cluster';
+            }
         }
         if ($gitComposeDirectory !== null && is_array($service['extends'] ?? null) && filled($service['extends']['file'] ?? null)) {
             return 'extends a service of another Compose file (extends.file)';

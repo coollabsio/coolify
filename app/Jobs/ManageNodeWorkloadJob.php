@@ -29,7 +29,14 @@ class ManageNodeWorkloadJob implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function __construct(public int $operationId) {}
+    public function __construct(public int $operationId)
+    {
+        // A Compose `stop_grace_period` (decision 0028) can be up to 600 seconds: the stop waits for it.
+        $stopTimeout = data_get(NodeOperation::query()->find($operationId)?->request, 'stop_timeout_seconds');
+        if (is_int($stopTimeout)) {
+            $this->timeout = max($this->timeout, $stopTimeout + 150);
+        }
+    }
 
     public function handle(): void
     {

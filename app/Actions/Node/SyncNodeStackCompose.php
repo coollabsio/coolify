@@ -77,7 +77,7 @@ class SyncNodeStackCompose
         $cluster = NodeCluster::query()->findOrFail($stack->node_cluster_id);
         $yaml = NodeStackCompose::parse($compose);
         $composeDirectory = $stack->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket(), $cluster->supportsWorkloadUser());
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket(), $cluster->supportsWorkloadUser(), $cluster->supportsRuntimeOptions());
         if ($reason !== null) {
             throw new RuntimeException("{$this->fileLabel($commitSha)} is not available on Nodes. {$reason}");
         }

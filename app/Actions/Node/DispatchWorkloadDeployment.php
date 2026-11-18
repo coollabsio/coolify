@@ -36,6 +36,9 @@ class DispatchWorkloadDeployment
     /** Sentinel runs the container process as `user`, the Compose `user:` (decision 0023). */
     public const USER_CAPABILITY = 'workload.user.v1';
 
+    /** Sentinel sets `shm_size_bytes`, `ulimits`, `tmpfs`, `stop_timeout_seconds`, `tty`, and `stdin_open` (decision 0028). */
+    public const RUNTIME_OPTIONS_CAPABILITY = 'workload.runtime_options.v1';
+
     /** Sentinel sets the uid, gid, and mode of a secret file (decision 0008 amendment). */
     public const SECRET_OWNER_CAPABILITY = 'workload.secrets.owner.v1';
 
@@ -52,7 +55,7 @@ class DispatchWorkloadDeployment
         }
         if ($plan['replaces'] !== null && $operation->node->containers()->where('node_workload_id', $operation->workload->id)->where('name', $name)->exists()) {
             // A leftover of an earlier deploy can still get traffic. Podman would stop it without the drain.
-            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-clear", $name, NodeWorkloadAction::REMOVE);
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-clear", $name, NodeWorkloadAction::REMOVE, $operation->revision->stopTimeoutSecondsFor($operation->node));
         }
         $response = Http::withToken($token)
             ->acceptJson()
@@ -148,6 +151,11 @@ class DispatchWorkloadDeployment
             // An older Sentinel ignores the field and would start the container as the user of the image.
             $operation->node->ensureReportedCapability(self::USER_CAPABILITY);
         }
+        $runtimeOptions = $configuration['runtime_options'] ?? [];
+        if ($runtimeOptions !== []) {
+            // Flux refuses the fields without the capability; check it here for a clear message.
+            $operation->node->ensureReportedCapability(self::RUNTIME_OPTIONS_CAPABILITY);
+        }
         $stack = $operation->workload->stack;
         $dnsSearch = $stack === null || $operation->node->node_cluster_id === null ? [] : [$stack->searchDomain()];
         if ($dnsSearch !== []) {
@@ -199,6 +207,7 @@ class DispatchWorkloadDeployment
             ...($files === [] ? [] : ['files' => $files]),
             ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
             ...($user === '' ? [] : ['user' => $user]),
+            ...$runtimeOptions,
             ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
             ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
             ...($healthCheck === null ? [] : ['health_check' => [
@@ -341,6 +350,20 @@ class DispatchWorkloadDeployment
             'files.*.mode' => ['present', 'string', 'regex:/\\A(0?[0-7]{3})?\\z/'],
             'files.*.directory' => ['required', 'boolean'],
             'user' => ['sometimes', 'string', 'regex:'.NodeStackComposeMapper::USER_PATTERN],
+            'runtime_options' => ['sometimes', 'array:shm_size_bytes,ulimits,tmpfs,stop_timeout_seconds,tty,stdin_open'],
+            'runtime_options.shm_size_bytes' => ['sometimes', 'integer', 'between:1,'.NodeStackComposeMapper::MAX_RUNTIME_MEMORY_BYTES],
+            'runtime_options.ulimits' => ['sometimes', 'array', 'list', 'max:'.NodeStackComposeMapper::MAX_ULIMITS],
+            'runtime_options.ulimits.*' => ['array:name,soft,hard'],
+            'runtime_options.ulimits.*.name' => ['required', 'string', 'distinct', 'in:'.implode(',', NodeStackComposeMapper::ULIMIT_NAMES)],
+            'runtime_options.ulimits.*.soft' => ['required', 'integer', 'min:-1'],
+            'runtime_options.ulimits.*.hard' => ['required', 'integer', 'min:-1'],
+            'runtime_options.tmpfs' => ['sometimes', 'array', 'list', 'max:'.NodeStackComposeMapper::MAX_TMPFS],
+            'runtime_options.tmpfs.*' => ['array:path,size_bytes'],
+            'runtime_options.tmpfs.*.path' => ['required', 'string', 'max:4096', 'distinct', 'starts_with:/', 'not_regex:/[,:\\x00]/'],
+            'runtime_options.tmpfs.*.size_bytes' => ['required', 'integer', 'between:0,'.NodeStackComposeMapper::MAX_RUNTIME_MEMORY_BYTES],
+            'runtime_options.stop_timeout_seconds' => ['sometimes', 'integer', 'between:1,'.NodeStackComposeMapper::MAX_STOP_TIMEOUT_SECONDS],
+            'runtime_options.tty' => ['sometimes', 'accepted'],
+            'runtime_options.stdin_open' => ['sometimes', 'accepted'],
             'container_socket_paths' => ['sometimes', 'array', 'max:4'],
             'container_socket_paths.*' => ['string', 'max:4096', 'distinct', 'starts_with:/', 'not_regex:/[,:\\x00]/'],
             'health_check' => ['sometimes', 'array:command,description,interval_seconds,timeout_seconds,retries,start_period_seconds'],
@@ -360,6 +383,17 @@ class DispatchWorkloadDeployment
         if ((isset($resources['cpu_limit'], $resources['cpu_reservation']) && $resources['cpu_reservation'] > $resources['cpu_limit'])
             || (isset($resources['memory_limit_bytes'], $resources['memory_reservation_bytes']) && $resources['memory_reservation_bytes'] > $resources['memory_limit_bytes'])) {
             throw new RuntimeException('The workload revision resource configuration is invalid.');
+        }
+        // A limit on the Resource Limits page can be lower than a size of the Compose file.
+        $memoryLimit = $resources['memory_limit_bytes'] ?? null;
+        $sizes = [
+            'shm_size' => $validated['runtime_options']['shm_size_bytes'] ?? 0,
+            ...collect($validated['runtime_options']['tmpfs'] ?? [])->mapWithKeys(fn (array $tmpfs): array => ["the tmpfs at {$tmpfs['path']}" => $tmpfs['size_bytes']])->all(),
+        ];
+        foreach ($sizes as $name => $bytes) {
+            if ($memoryLimit !== null && $bytes > $memoryLimit) {
+                throw new RuntimeException("The size of {$name} is larger than the memory limit of the application. Raise the memory limit on the Resource Limits page.");
+            }
         }
 
         return $validated;

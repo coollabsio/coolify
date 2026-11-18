@@ -29,6 +29,8 @@ class CreateLifecycleOperation
         ?int $stopTimeoutSeconds = null,
     ): NodeOperation {
         $node->ensureCapability('workload.lifecycle.v1');
+        // The Compose `stop_grace_period` of the service, unless the caller needs another time.
+        $stopTimeoutSeconds ??= $revision->stopTimeoutSecondsFor($node);
         if ($stopTimeoutSeconds !== null) {
             if ($stopTimeoutSeconds < 1 || $stopTimeoutSeconds > 600) {
                 throw new RuntimeException('The stop timeout must be 1 to 600 seconds.');

@@ -36,6 +36,23 @@ class NodeWorkloadRevision extends BaseModel
         return filled(data_get($this->configuration, 'container_socket_paths'));
     }
 
+    /** The Compose `stop_grace_period` in seconds (decision 0028), or null for the default of 10 seconds. */
+    public function stopTimeoutSeconds(): ?int
+    {
+        $seconds = data_get($this->configuration, 'runtime_options.stop_timeout_seconds');
+
+        return is_int($seconds) ? $seconds : null;
+    }
+
+    /**
+     * The stop timeout that Coolify sends to a server on a stop, restart, or remove: the Compose
+     * `stop_grace_period`, when the server takes a stop timeout.
+     */
+    public function stopTimeoutSecondsFor(Node $node): ?int
+    {
+        return $node->supportsCapability('workload.stop_timeout.v1') === true ? $this->stopTimeoutSeconds() : null;
+    }
+
     public function workload(): BelongsTo
     {
         return $this->belongsTo(NodeWorkload::class, 'node_workload_id');

@@ -204,8 +204,9 @@ class SyncNodeWorkloadSet
                 'operation_id' => $entry->operation?->uuid ?? '',
                 'entry_hash' => $entry->entry_hash,
                 'redeploy' => (bool) $entry->redeploy,
-                // A stop of a move or a restore gives a database time to flush its data.
-                'stop_timeout_seconds' => data_get($entry->operation?->request, 'stop_timeout_seconds'),
+                // A stop of a move or a restore gives a database time to flush its data. Else the Compose
+                // `stop_grace_period`, which is part of the configuration hash of the revision.
+                'stop_timeout_seconds' => data_get($entry->operation?->request, 'stop_timeout_seconds') ?? $entry->revision->stopTimeoutSeconds(),
             ];
         })->values()->all();
     }

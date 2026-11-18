@@ -245,7 +245,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
         }
         $name = $plan['replaces']->containerName($operation->workload);
         try {
-            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-retire", $name, NodeWorkloadAction::REMOVE);
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-retire", $name, NodeWorkloadAction::REMOVE, $operation->revision?->stopTimeoutSecondsFor($operation->node));
             $retired = ['replaced_container' => $name];
         } catch (Throwable $exception) {
             report($exception);
@@ -264,7 +264,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             return '';
         }
         try {
-            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-discard", $plan['slot']->containerName($operation->workload), NodeWorkloadAction::REMOVE);
+            DispatchWorkloadLifecycle::send($operation->node, "{$operation->uuid}-discard", $plan['slot']->containerName($operation->workload), NodeWorkloadAction::REMOVE, $operation->revision?->stopTimeoutSecondsFor($operation->node));
         } catch (Throwable $exception) {
             report($exception);
         }
