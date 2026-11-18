@@ -1,6 +1,6 @@
 # Decision 0028: Compose keys that Nodes ignore today
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-16**
 
