@@ -157,7 +157,11 @@ differ from the decision above:
 - **Ignored keys.** `user`, `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`,
   `deploy`, `tty`, and `stdin_open` are ignored, with a note on the service.
   (Later: `user` works since step 3, see "User of a service". Decision 0028
-  maps the other keys.)
+  maps the other keys since 2026-11-18: `shm_size`, `ulimits`, `tmpfs`,
+  `stop_grace_period`, `tty`, and `stdin_open` need
+  `workload.runtime_options.v1` on every server of the cluster, and
+  `deploy.resources` becomes the CPU and memory of the **Resource Limits**
+  page. Only the other `deploy` keys are still ignored, with a note.)
   Read-only volumes are mounted read-write. A service with `profiles` is not
   created.
 - **Health check.** The Compose health check is kept in
