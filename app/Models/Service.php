@@ -14,6 +14,7 @@ use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -208,6 +209,95 @@ class Service extends BaseModel
      * Get query builder for services owned by current team.
      * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
      */
+    /**
+     * Filter the services of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no service.
+     * The name is a case-insensitive substring match. Status is computed, so use pageByStatus() for it.
+     *
+     * @param  array{project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($server, $standaloneDockerIds, $swarmDockerIds) {
+                    $q->where('server_id', $server->id)
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
+                });
+            })
+            ->when($name !== null, fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
+    }
+
+    /**
+     * Filter services by their computed status (case-insensitive substring), ordered by name and id.
+     * Scans in chunks so large teams never hydrate every service at once.
+     * The returned services have their applications and databases loaded (status columns only).
+     *
+     * @return array{0: int, 1: Collection<int, Service>} total matches and the services of the page
+     */
+    public static function pageByStatus(Builder $query, string $status, int $offset = 0, ?int $limit = null): array
+    {
+        $statusNeedle = strtolower(trim($status));
+        $matched = collect();
+        $total = 0;
+
+        $query
+            ->with([
+                'applications:id,service_id,status,exclude_from_status',
+                'databases:id,service_id,status,exclude_from_status',
+            ])
+            ->reorder()
+            ->orderBy('name')
+            ->orderBy('id')
+            ->chunk(100, function ($chunk) use ($statusNeedle, $offset, $limit, &$matched, &$total) {
+                foreach ($chunk as $service) {
+                    if (! str_contains(strtolower((string) $service->status), $statusNeedle)) {
+                        continue;
+                    }
+
+                    if ($total >= $offset && ($limit === null || $total < $offset + $limit)) {
+                        $matched->push($service);
+                    }
+
+                    $total++;
+                }
+            });
+
+        return [$total, $matched->values()];
+    }
+
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');

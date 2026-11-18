@@ -30,6 +30,7 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\ResourceStartActivity;
+use App\Support\StandaloneDatabaseList;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +39,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
 class DatabasesController extends Controller
@@ -322,10 +324,22 @@ class DatabasesController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'project_uuid', in: 'query', description: 'Filter databases by project UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_uuid', in: 'query', description: 'Filter databases by environment UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter databases by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', in: 'query', description: 'Filter databases by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'name', in: 'query', description: 'Filter databases by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'page', in: 'query', description: 'Page number. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', description: 'Items per page. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100)),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all databases',
+                description: 'Get all databases. An unknown project, environment, or server UUID gives an empty list.',
+                headers: [
+                    new OA\Header(header: 'X-Total-Count', description: 'Total number of databases that match the filters. Sent only for paginated responses.', schema: new OA\Schema(type: 'integer')),
+                ],
                 content: new OA\JsonContent(
                     type: 'array',
                     items: new OA\Items(ref: '#/components/schemas/Database'),
@@ -339,6 +353,7 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function databases(Request $request)
@@ -347,15 +362,35 @@ class DatabasesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $databases = collect();
+
+        $validator = Validator::make($request->query(), [
+            'project_uuid' => ['nullable', 'string', 'max:255'],
+            'environment_uuid' => ['nullable', 'string', 'max:255'],
+            'server_uuid' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $validated = $validator->validated();
+
         $databaseRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
-        foreach ($projects as $project) {
-            $databases = $databases->merge($project->databases($databaseRelations));
+        $rows = StandaloneDatabaseList::query($teamId, Arr::only($validated, ['project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']));
+        $headers = [];
+        if (isset($validated['page']) || isset($validated['per_page'])) {
+            $headers['X-Total-Count'] = $rows ? (clone $rows)->count() : 0;
+            $rows?->forPage((int) ($validated['page'] ?? 1), (int) ($validated['per_page'] ?? 50));
         }
+        $databases = StandaloneDatabaseList::models($rows?->get() ?? [], $databaseRelations);
 
         if ($request->attributes->get('can_read_sensitive', false) === true) {
             // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
@@ -388,7 +423,7 @@ class DatabasesController extends Controller
             return $this->removeSensitiveData($database);
         });
 
-        return response()->json($databases);
+        return response()->json($databases, 200, $headers);
     }
 
     #[OA\Get(

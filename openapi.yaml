@@ -262,9 +262,68 @@ paths:
           required: false
           schema:
             type: string
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter applications by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter applications by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter applications by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter applications by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter applications by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          name: page
+          in: query
+          description: 'Page number. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
       responses:
         '200':
-          description: 'Get all applications.'
+          description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              description: 'Total number of applications that match the filters. Sent only for paginated responses.'
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -275,6 +334,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5057,9 +5118,69 @@ paths:
       summary: List
       description: 'List all databases.'
       operationId: list-databases
+      parameters:
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter databases by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter databases by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter databases by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter databases by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter databases by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          name: page
+          in: query
+          description: 'Page number. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
       responses:
         '200':
-          description: 'Get all databases'
+          description: 'Get all databases. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              description: 'Total number of databases that match the filters. Sent only for paginated responses.'
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -5070,6 +5191,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -7706,10 +7829,30 @@ paths:
           schema:
             type: string
         -
+          name: page
+          in: query
+          description: 'Page number. page and per_page take precedence over skip and take.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+            minimum: 1
+        -
           name: skip
           in: query
-          description: 'Number of records to skip.'
+          description: 'Number of records to skip. Deprecated: use page and per_page.'
           required: false
+          deprecated: true
           schema:
             type: integer
             default: 0
@@ -7717,8 +7860,9 @@ paths:
         -
           name: take
           in: query
-          description: 'Number of records to take.'
+          description: 'Number of records to take. Deprecated: use page and per_page.'
           required: false
+          deprecated: true
           schema:
             type: integer
             default: 10
@@ -14464,9 +14608,69 @@ paths:
       summary: List
       description: 'List all services.'
       operationId: list-services
+      parameters:
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter services by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter services by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter services by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter services by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter services by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          name: page
+          in: query
+          description: 'Page number. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page. When page or per_page is set, the response is paginated.'
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+            minimum: 1
       responses:
         '200':
-          description: 'Get all services'
+          description: 'Get all services. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              description: 'Total number of services that match the filters. Sent only for paginated responses.'
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -14477,6 +14681,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
