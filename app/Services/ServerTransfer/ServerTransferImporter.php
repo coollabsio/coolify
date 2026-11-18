@@ -1579,6 +1579,7 @@ class ServerTransferImporter
                     'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
                     'preserve_compose_null' => (bool) data_get($variable, 'preserve_compose_null', false),
                     'comment' => data_get($variable, 'comment'),
+                    'compose_services' => data_get($variable, 'compose_services'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
                     'resourceable_id' => $resource->id,

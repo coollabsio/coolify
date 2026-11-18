@@ -246,7 +246,7 @@
             condition: service_healthy
         env_file:
           - custom.env
-          - .env
+          - .coolify.web.env
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
@@ -333,7 +333,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -385,7 +385,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.my-app.env
       www:
         image: 'nginx:alpine'
         environment:
@@ -435,7 +435,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.www.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -492,7 +492,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.blog.env
       gateway:
         image: traefik/whoami
         environment:
@@ -542,7 +542,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway.env
       gateway-ws:
         image: traefik/whoami
         environment:
@@ -593,7 +593,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway-ws.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -638,7 +638,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.worker.env
       scheduler:
         image: 'nginx:alpine'
         command:
@@ -681,7 +681,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.scheduler.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -734,7 +734,7 @@
           - coolify.service.subType=database
           - coolify.service.subName=db
         env_file:
-          - .env
+          - .coolify.db.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -775,7 +775,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
-          - .env
+          - .coolify.sidecar.env
     volumes:
       db-data:
         driver_opts:
@@ -1061,7 +1061,7 @@
             condition: service_healthy
         env_file:
           - custom.env
-          - .env
+          - .coolify.web.env
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
@@ -1155,7 +1155,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -1214,7 +1214,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.my-app.env
       www:
         image: 'nginx:alpine'
         environment:
@@ -1269,7 +1269,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.www.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -1333,7 +1333,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.blog.env
       gateway:
         image: traefik/whoami
         environment:
@@ -1388,7 +1388,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway.env
       gateway-ws:
         image: traefik/whoami
         environment:
@@ -1444,7 +1444,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway-ws.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -1489,7 +1489,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.worker.env
       scheduler:
         image: 'nginx:alpine'
         command:
@@ -1532,7 +1532,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.scheduler.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -1585,7 +1585,7 @@
           - coolify.service.subType=database
           - coolify.service.subName=db
         env_file:
-          - .env
+          - .coolify.db.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -1626,7 +1626,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
-          - .env
+          - .coolify.sidecar.env
     volumes:
       db-data:
         driver_opts:
@@ -1915,7 +1915,7 @@
             condition: service_healthy
         env_file:
           - custom.env
-          - .env
+          - .coolify.web.env
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
@@ -2009,7 +2009,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -2068,7 +2068,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.my-app.env
       www:
         image: 'nginx:alpine'
         environment:
@@ -2123,7 +2123,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.www.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -2187,7 +2187,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.blog.env
       gateway:
         image: traefik/whoami
         environment:
@@ -2242,7 +2242,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway.env
       gateway-ws:
         image: traefik/whoami
         environment:
@@ -2298,7 +2298,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.gateway-ws.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -2361,7 +2361,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.worker.env
       scheduler:
         image: 'nginx:alpine'
         command:
@@ -2422,7 +2422,7 @@
         networks:
           referenceservice00000001: null
         env_file:
-          - .env
+          - .coolify.scheduler.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -2475,7 +2475,7 @@
           - coolify.service.subType=database
           - coolify.service.subName=db
         env_file:
-          - .env
+          - .coolify.db.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -2529,7 +2529,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
-          - .env
+          - .coolify.sidecar.env
     volumes:
       db-data:
         driver_opts:

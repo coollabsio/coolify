@@ -209,6 +209,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_args;
 
+    /** @var array<string, list<string>>|null */
+    private ?array $compose_environment_scopes = null;
+
     /** @var array<string, string>|null */
     private ?array $remote_secrets_cache = null;
 
@@ -948,15 +951,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
-            $composeFile = $this->parseComposeFileForDeployment();
-            // Always add .env file to services
-            $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
-
-                return $service;
-            });
-            $composeFile['services'] = $services->toArray();
+            $composeFile = $this->scope_compose_service_environment(convertToArray($this->parseComposeFileForDeployment()));
 
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
@@ -987,7 +982,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Save runtime environment variables AFTER the build
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
-        $this->save_runtime_environment_variables();
+        $runtimeEnvironmentVariables = $this->save_runtime_environment_variables();
+        if (! $this->application->settings->is_raw_compose_deployment_enabled) {
+            $this->save_compose_service_environment_files($runtimeEnvironmentVariables, array_keys(data_get($composeFile, 'services', [])));
+        }
 
         $this->pull_docker_compose_images();
         $this->imageScan()->applyComposeStartPins();
@@ -1021,6 +1019,119 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Gives each Compose service its own runtime env file. A build that gets its build arguments from the
+     * command line also gets the scoped ones in its build section, because the command line reaches every build.
+     */
+    private function scope_compose_service_environment(array $composeFile): array
+    {
+        $scopes = $this->compose_environment_scopes();
+        $passesCommandLineBuildArgs = ! $this->application->settings->use_build_secrets && $this->build_args instanceof Collection;
+
+        foreach (data_get($composeFile, 'services', []) as $serviceName => $service) {
+            $service['env_file'] = [composeServiceEnvironmentFile((string) $serviceName)];
+
+            if ($passesCommandLineBuildArgs && isset($service['build'])) {
+                $baseName = $this->compose_service_base_name((string) $serviceName);
+                $scopedKeys = collect($this->env_args ?? [])->keys()
+                    ->filter(fn (mixed $key): bool => array_key_exists((string) $key, $scopes) && composeVariableReachesService((string) $key, $scopes, $baseName));
+
+                if ($scopedKeys->isNotEmpty()) {
+                    $build = is_string($service['build']) ? ['context' => $service['build']] : $service['build'];
+                    $args = $build['args'] ?? [];
+                    foreach ($scopedKeys as $key) {
+                        $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Compose build arguments');
+                        if (array_is_list($args)) {
+                            $hasKey = collect($args)->contains(fn (mixed $arg): bool => explode('=', (string) $arg, 2)[0] === $key);
+                            if (! $hasKey) {
+                                $args[] = $key;
+                            }
+                        } elseif (! array_key_exists($key, $args)) {
+                            $args[$key] = null;
+                        }
+                    }
+                    $build['args'] = $args;
+                    $service['build'] = $build;
+                }
+            }
+
+            $composeFile['services'][$serviceName] = $service;
+        }
+
+        return $composeFile;
+    }
+
+    private function hasScopedComposeBuildSecrets(): bool
+    {
+        return $this->dockerSecretsSupported && ! empty($this->build_secrets) && $this->compose_environment_scopes() !== [];
+    }
+
+    /**
+     * @return array<string, list<string>> The variables of this deployment that only some Compose services get.
+     */
+    private function compose_environment_scopes(): array
+    {
+        if ($this->build_pack !== 'dockercompose') {
+            return [];
+        }
+
+        return $this->compose_environment_scopes ??= composeEnvironmentVariableScopes(
+            $this->pull_request_id === 0
+                ? $this->application->environment_variables()->whereNotNull('compose_services')->get()
+                : $this->application->environment_variables_preview()->whereNotNull('compose_services')->get()
+        );
+    }
+
+    /**
+     * A preview deployment adds "-pr-<id>" to the Compose service names. Scopes use the names of the Compose file.
+     */
+    private function compose_service_base_name(string $serviceName): string
+    {
+        $suffix = "-pr-{$this->pull_request_id}";
+
+        return $this->pull_request_id !== 0 && str_ends_with($serviceName, $suffix)
+            ? substr($serviceName, 0, -strlen($suffix))
+            : $serviceName;
+    }
+
+    /**
+     * Writes the env file of each Compose service: the runtime variables that reach the service.
+     *
+     * @param  Collection<int, string>  $environmentVariables  Lines in KEY=VALUE format.
+     * @param  array<int, string>  $serviceNames
+     */
+    private function save_compose_service_environment_files(Collection $environmentVariables, array $serviceNames): void
+    {
+        if ($serviceNames === []) {
+            return;
+        }
+
+        $scopes = $this->compose_environment_scopes();
+        $workdirCommands = [];
+        $configurationCommands = [];
+        foreach ($serviceNames as $serviceName) {
+            $file = composeServiceEnvironmentFile((string) $serviceName);
+            $base64 = base64_encode(composeEnvironmentLinesForService($environmentVariables, $scopes, $this->compose_service_base_name((string) $serviceName))->implode("\n"));
+            $workdirCommands[] = [
+                executeInDocker($this->deployment_uuid, "rm -f $this->workdir/{$file} && echo '{$base64}' | base64 -d | tee $this->workdir/{$file} > /dev/null"),
+                'skip_command_log' => true,
+            ];
+            $configurationCommands[] = ["rm -f $this->configuration_dir/{$file}", 'hidden' => true];
+            $configurationCommands[] = ["echo '{$base64}' | base64 -d | tee $this->configuration_dir/{$file} > /dev/null", 'skip_command_log' => true];
+        }
+
+        $this->application_deployment_queue->addLogEntry('Creating the env file of each Compose service.', hidden: true);
+        $this->execute_remote_command(...$workdirCommands);
+
+        if ($this->use_build_server) {
+            $this->server = $this->mainServer;
+            $this->execute_remote_command(...$configurationCommands);
+            $this->server = $this->build_server;
+        } else {
+            $this->execute_remote_command(...$configurationCommands);
+        }
+    }
+
+    /**
      * Builds the images of the Compose services that have a build section.
      */
     private function build_docker_compose_images(mixed $composeFile, ?Collection $buildEnvironment): void
@@ -1035,6 +1146,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->save_buildtime_environment_variables($buildEnvironment->merge($this->compose_build_interpolation_variables($composeFile, $buildEnvironment)));
 
         if ($this->docker_compose_custom_build_command) {
+            if ($this->hasScopedComposeBuildSecrets()) {
+                $this->application_deployment_queue->addLogEntry('Warning: a custom build command builds all services in one call, so Docker Compose gives each build the build secrets of all services, also the ones limited to other containers.');
+            }
             // Auto-inject -f (compose file) and --env-file flags using helper function
             $build_command = injectDockerComposeFlags(
                 $this->docker_compose_custom_build_command,
@@ -1092,9 +1206,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Adding build arguments to Docker Compose build command.');
             }
 
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
-            );
+            // One `docker compose build` gives every build the secrets of all services, so scoped secrets need one build per service.
+            $buildsPerService = is_array($composeFile) && $this->hasScopedComposeBuildSecrets();
+            $commands = $buildsPerService
+                ? collect(data_get($composeFile, 'services', []))->filter(fn (mixed $service): bool => isset($service['build']))->keys()
+                    ->map(fn (mixed $serviceName): string => $command.' '.escapeshellarg((string) $serviceName))->values()->all()
+                : [$command];
+            if ($buildsPerService) {
+                $this->application_deployment_queue->addLogEntry('Building each Compose service separately, so that each build gets only its own build secrets.');
+            }
+
+            foreach ($commands as $buildCommand) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, $buildCommand), 'hidden' => true],
+                );
+            }
         }
     }
 
@@ -2285,7 +2411,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
     }
 
-    private function save_runtime_environment_variables()
+    /**
+     * @return Collection<int, string> The runtime variables, in KEY=VALUE format.
+     */
+    private function save_runtime_environment_variables(): Collection
     {
         // This method saves the .env file with ALL runtime variables
         // For builds, it should be called AFTER the build to include runtime-only variables
@@ -2364,7 +2493,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            return;
+            return $environment_variables;
         }
 
         // Write the environment variables to file
@@ -2409,6 +2538,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ]
             );
         }
+
+        return $environment_variables;
     }
 
     /**
@@ -5831,7 +5962,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ];
             });
 
-            $this->build_args = generateDockerBuildArgs($vars_with_metadata);
+            // A scoped Compose variable goes to its builds through their build section (scope_compose_service_environment()).
+            $scopes = $this->compose_environment_scopes();
+            $this->build_args = generateDockerBuildArgs($vars_with_metadata->reject(fn (array $variable): bool => array_key_exists((string) $variable['key'], $scopes)));
 
             if ($secrets_hash) {
                 $this->build_args->push('--build-arg '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"));
@@ -6140,7 +6273,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ]);
     }
 
-    private function modify_dockerfile_for_secrets($dockerfile_path)
+    private function modify_dockerfile_for_secrets($dockerfile_path, ?string $composeServiceName = null)
     {
         // Only process if build secrets are enabled and we have secrets to mount
         if (empty($this->build_secrets)) {
@@ -6170,6 +6303,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $variables = $this->application->build_pack === 'nixpacks'
             ? collect($this->nixpacks_plan_json->get('variables'))
             : $this->env_args;
+        if ($composeServiceName !== null) {
+            $scopes = $this->compose_environment_scopes();
+            $baseName = $this->compose_service_base_name($composeServiceName);
+            $variables = $variables->filter(fn (mixed $value, mixed $key): bool => composeVariableReachesService((string) $key, $scopes, $baseName));
+        }
         if ($variables->isEmpty()) {
             return;
         }
@@ -6297,7 +6435,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $isMultiStage = count($fromIndices) > 1;
 
             $argsToAdd = collect([]);
+            $scopes = $this->compose_environment_scopes();
+            $baseName = $this->compose_service_base_name((string) $serviceName);
             foreach ($variables as $key => $value) {
+                if (! composeVariableReachesService((string) $key, $scopes, $baseName)) {
+                    continue;
+                }
                 $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
                 $argsToAdd->push("ARG {$key}");
             }
@@ -6372,7 +6515,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
-                $this->modify_dockerfile_for_secrets($fullDockerfilePath);
+                $this->modify_dockerfile_for_secrets($fullDockerfilePath, (string) $serviceName);
                 $this->application_deployment_queue->addLogEntry("Modified Dockerfile for service {$serviceName} to use build secrets.");
             }
         }
@@ -6472,7 +6615,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (! isset($service['build']['secrets'])) {
                     $service['build']['secrets'] = [];
                 }
+                $baseName = $this->compose_service_base_name((string) $serviceName);
                 foreach (array_keys($secrets) as $key) {
+                    if (! composeVariableReachesService((string) $key, $this->compose_environment_scopes(), $baseName)) {
+                        continue;
+                    }
                     if (! in_array($key, $service['build']['secrets'])) {
                         $service['build']['secrets'][] = $key;
                     }
