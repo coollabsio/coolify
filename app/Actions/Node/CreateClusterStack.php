@@ -99,6 +99,7 @@ class CreateClusterStack
                 'template' => $template,
                 'compose_raw' => $compose,
                 'compose_parsed' => $yaml,
+                'compose_mapping_version' => NodeStackComposeMapper::MAPPING_VERSION,
                 'variables' => [],
                 ...($git === null ? [] : [
                     'git_repository' => $git->repository,

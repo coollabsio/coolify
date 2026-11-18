@@ -48,6 +48,12 @@ class NodeStackComposeMapper
 
     public const MAX_STOP_TIMEOUT_SECONDS = 600;
 
+    /**
+     * The version of the mapping that a stack stores in `compose_mapping_version`. Version 2 maps
+     * `deploy.resources` (decision 0028). Before it, the services of a file got no resources.
+     */
+    public const MAPPING_VERSION = 2;
+
     public const ULIMIT_NAMES = ['nofile', 'nproc', 'memlock', 'core', 'stack', 'msgqueue', 'sigpending', 'rtprio'];
 
     /** Sentinel does not write a file, mount a socket, or mount a tmpfs under these paths. */

@@ -144,6 +144,12 @@ Built on 2026-11-18 with Sentinel `619dec7` and `f3e39d0` (images
   The Git sync uses the three-way rule for `resources`, so a value from the
   page stays. The other `deploy` keys get the note "deploy.replicas is
   ignored on Nodes".
+- `node_stacks.compose_mapping_version` records the mapping that gave the
+  stored file to the services. Version 2 maps `deploy.resources`. For a stack
+  from before (null), the sync reads the resources of the stored file as
+  none, because its services got none: a service without resources takes
+  the resources of the new file, and a value from the page stays. Such a
+  stack syncs once also when the file is the same.
 - `NodeCluster::supportsRuntimeOptions()` gates the template list, the create
   pages, and the Git sync: "The service clickhouse sets ulimits, which needs
   Sentinel with workload.runtime_options.v1 on every server of the cluster".

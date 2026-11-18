@@ -69,7 +69,8 @@ class SyncNodeStackCompose
      */
     private function sync(NodeStack $stack, string $compose, string $commitSha, ?User $requestedBy, bool $userIsActor = false): ?array
     {
-        if ($compose === $stack->compose_raw) {
+        // A stack that an older mapping mapped syncs once also with the same file, to get the new values.
+        if ($compose === $stack->compose_raw && $stack->compose_mapping_version >= NodeStackComposeMapper::MAPPING_VERSION) {
             $this->deleteRemovedServices($stack, $requestedBy);
 
             return null;
@@ -98,7 +99,7 @@ class SyncNodeStackCompose
                 NodeStackComposeMapper::services($previousYaml, $stored, $composeDirectory),
                 NodeStackComposeMapper::services($yaml, $variables, $composeDirectory),
             ]);
-            $previous = NodeStackComposeMapper::services($previousYaml, $stored, $composeDirectory, $sharedKeys);
+            $previous = self::asMappedBefore($stack, NodeStackComposeMapper::services($previousYaml, $stored, $composeDirectory, $sharedKeys));
             $next = NodeStackComposeMapper::services($yaml, $variables, $composeDirectory, $sharedKeys);
             $workloads = NodeWorkload::query()->withoutGlobalScopes()
                 ->where('node_stack_id', $stack->id)
@@ -165,6 +166,7 @@ class SyncNodeStackCompose
             $stack->update([
                 'compose_raw' => $compose,
                 'compose_parsed' => $yaml,
+                'compose_mapping_version' => NodeStackComposeMapper::MAPPING_VERSION,
                 'variables' => $variables,
                 'compose_changes' => $summary,
             ]);
@@ -179,6 +181,24 @@ class SyncNodeStackCompose
         }
 
         return $summary;
+    }
+
+    /**
+     * The services of the stored file as the mapping of the stack gave them to the workloads. A
+     * mapping before version 2 gave no resources, so a workload without resources has the value
+     * of the file, and the resources of the new file apply. A limit on the Resource Limits page
+     * differs from that value and stays.
+     *
+     * @param  list<array<string, mixed>>  $services
+     * @return list<array<string, mixed>>
+     */
+    private static function asMappedBefore(NodeStack $stack, array $services): array
+    {
+        if ($stack->compose_mapping_version >= 2) {
+            return $services;
+        }
+
+        return array_map(fn (array $service): array => [...$service, 'resources' => []], $services);
     }
 
     private function applyChange(NodeCluster $cluster, NodeStackServiceChange $change, User $actor): void
