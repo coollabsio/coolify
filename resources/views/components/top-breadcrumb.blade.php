@@ -67,7 +67,8 @@
     $githubAppUuid = request()->route('github_app_uuid');
     $gitlabAppUuid = request()->route('gitlab_app_uuid');
     $giteaAppUuid = request()->route('gitea_app_uuid');
-    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid ?? $giteaAppUuid;
+    $originAppUuid = request()->route('origin_app_uuid');
+    $sourceUuid = $githubAppUuid ?? $gitlabAppUuid ?? $giteaAppUuid ?? $originAppUuid;
     $sources = $sourceUuid && $team ? $team->sources()->sortBy('name')->values() : collect();
     $currentSource = $sources->firstWhere('uuid', $sourceUuid);
     $destinationUuid = request()->route('destination_uuid');
@@ -154,9 +155,11 @@
 
     @if ($currentSource)
         @php
-            $sourceConnected = $currentSource instanceof \App\Models\GithubApp
-                ? filled($currentSource->installation_id)
-                : filled($currentSource->access_token);
+            $sourceConnected = match (true) {
+                $currentSource instanceof \App\Models\GithubApp => filled($currentSource->installation_id),
+                $currentSource instanceof \App\Models\OriginApp => $currentSource->isConnected(),
+                default => filled($currentSource->access_token),
+            };
         @endphp
         <x-breadcrumb-switcher title="Sources" :label="$currentSource->name ?: 'Source'" :uuid="$currentSource->uuid" :items="$sources->map(fn ($source) => [
             'label' => $source->name ?: class_basename($source),
@@ -164,6 +167,7 @@
             'href' => match (true) {
                 $source instanceof \App\Models\GithubApp => route('source.github.show', ['github_app_uuid' => $source->uuid]),
                 $source instanceof \App\Models\GiteaApp => route('source.gitea.show', ['gitea_app_uuid' => $source->uuid]),
+                $source instanceof \App\Models\OriginApp => route('source.origin.show', ['origin_app_uuid' => $source->uuid]),
                 default => route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]),
             },
             'active' => $source->getMorphClass() === $currentSource->getMorphClass() && $source->uuid === $currentSource->uuid,

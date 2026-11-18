@@ -9,6 +9,7 @@ use App\Models\ApplicationPreview;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\OriginApp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -321,6 +322,7 @@ class ApplicationPreviewsController extends Controller
             GithubApp::class => 'github',
             GitlabApp::class => 'gitlab',
             GiteaApp::class => 'gitea',
+            OriginApp::class => 'origin',
             default => null,
         };
     }

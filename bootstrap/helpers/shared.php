@@ -15,6 +15,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\OriginApp;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -5068,7 +5069,7 @@ function gitRepositorySlug(?string $gitRepository): string
     return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
 }
 
-function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|null $source = null): array
+function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|OriginApp|null $source = null): array
 {
     $repository = $gitRepository;
     $providerInfo = [

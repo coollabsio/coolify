@@ -21,6 +21,8 @@
         <livewire:project.new.gitlab-private-repository :type="$type" />
     @elseif ($type === 'private-gitea-app')
         <livewire:project.new.gitea-private-repository :type="$type" />
+    @elseif ($type === 'private-origin-app')
+        <livewire:project.new.origin-private-repository :type="$type" />
     @elseif ($type === 'private-deploy-key')
         <livewire:project.new.github-private-repository-deploy-key :type="$type" />
     @elseif ($type === 'dockerfile')

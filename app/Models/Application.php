@@ -863,11 +863,24 @@ class Application extends BaseModel
         );
     }
 
+    /**
+     * Origin repositories are browsed on cursor.com, not on the git host.
+     */
+    private function originWebUrl(): ?string
+    {
+        return $this->source instanceof OriginApp && filled($this->git_repository)
+            ? "https://cursor.com/codebase/{$this->git_repository}"
+            : null;
+    }
+
     public function gitBranchLocation(): Attribute
     {
         return Attribute::make(
             get: function () {
                 $base_dir = $this->base_directory ?? '/';
+                if ($this->originWebUrl()) {
+                    return $this->originWebUrl();
+                }
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
                         return "{$this->sourceRepositoryUrl()}/src/branch/{$this->git_branch}{$base_dir}";
@@ -896,6 +909,9 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
+                if ($this->originWebUrl()) {
+                    return $this->originWebUrl();
+                }
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     return "{$this->sourceRepositoryUrl()}/settings/hooks";
                 }
@@ -913,6 +929,9 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
+                if ($this->originWebUrl()) {
+                    return $this->originWebUrl();
+                }
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
                         return "{$this->sourceRepositoryUrl()}/commits/branch/{$this->git_branch}";
@@ -945,6 +964,9 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): ?string
     {
+        if ($this->originWebUrl()) {
+            return $this->originWebUrl();
+        }
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
                 return "{$this->sourceRepositoryUrl()}/commits/{$link}";
@@ -1996,6 +2018,18 @@ class Application extends BaseModel
                 ];
             }
 
+            if ($this->source->getMorphClass() === OriginApp::class) {
+                ['repoUrl' => $fullRepoUrl] = $this->originGitAuth($customRepository);
+                $base_command = "{$base_command} ".escapeshellarg($fullRepoUrl);
+                $commands->push($exec_in_docker ? executeInDocker($deployment_uuid, $base_command) : $base_command);
+
+                return [
+                    'commands' => $commands->implode(' && '),
+                    'branch' => $branch,
+                    'fullRepoUrl' => $fullRepoUrl,
+                ];
+            }
+
             if (in_array($this->source->getMorphClass(), [GitlabApp::class, GiteaApp::class], true)) {
                 $oauthSource = $this->source;
                 $isGiteaSource = $oauthSource instanceof GiteaApp;
@@ -2182,6 +2216,25 @@ class Application extends BaseModel
         $port = isset($url['port']) ? ":{$url['port']}" : '';
 
         return "{$scheme}://{$url['host']}{$port}/";
+    }
+
+    /**
+     * Authenticated Origin clone URL and a git -c option that lets same-host submodules use the same token.
+     * The installation token lives five minutes or less, so it is minted for each command.
+     *
+     * @return array{repoUrl: string, gitConfigOption: string}
+     */
+    private function originGitAuth(string $repository): array
+    {
+        $url = parse_url((string) $this->source->html_url) ?: [];
+        $scheme = $url['scheme'] ?? 'https';
+        $host = $this->urlHostWithPort($url);
+        $encodedToken = rawurlencode(generateOriginInstallationToken($this->source));
+
+        return [
+            'repoUrl' => "{$scheme}://x-access-token:{$encodedToken}@{$host}/{$repository}.git",
+            'gitConfigOption' => '-c '.escapeshellarg("url.{$scheme}://x-access-token:{$encodedToken}@{$host}/.insteadOf={$scheme}://{$host}/"),
+        ];
     }
 
     private function gitCommand(string $command): array
@@ -2383,6 +2436,30 @@ class Application extends BaseModel
                     'branch' => $branch,
                     'fullRepoUrl' => $fullRepoUrl,
                     'git' => 'git'.(isset($gitConfigOption) ? " {$gitConfigOption}" : ''),
+                ];
+            }
+
+            if ($this->source->getMorphClass() === OriginApp::class) {
+                ['repoUrl' => $fullRepoUrl, 'gitConfigOption' => $gitConfigOption] = $this->originGitAuth($customRepository);
+                $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
+                $git_clone_command = "{$git_clone_command} ".escapeshellarg($fullRepoUrl)." {$escapedBaseDir}";
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
+
+                if ($pull_request_id !== 0) {
+                    // Origin has no refs/pull/{id}/head, so fetch the pull request's head branch.
+                    $headRef = originPullRequestHeadRef($this->source, $customRepository, $pull_request_id);
+                    $branch = "refs/heads/{$headRef}:{$pr_branch_name}";
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOption} fetch origin ".escapeshellarg($branch)." && {$git_checkout_command}";
+                }
+
+                $commands->push($exec_in_docker ? executeInDocker($deployment_uuid, $git_clone_command) : $git_clone_command);
+
+                return [
+                    'commands' => $commands->implode(' && '),
+                    'branch' => $branch,
+                    'fullRepoUrl' => $fullRepoUrl,
+                    'git' => "git {$gitConfigOption}",
                 ];
             }
 

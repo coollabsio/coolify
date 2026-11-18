@@ -133,6 +133,7 @@ use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
 use App\Livewire\Source\Gitea\Change as GiteaChange;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Source\Gitlab\Change as GitLabChange;
+use App\Livewire\Source\Origin\Change as OriginChange;
 use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
@@ -626,6 +627,7 @@ Route::middleware(['auth', 'access.team-wide'])->group(function () {
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
     Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');
     Route::get('/source/gitea/{gitea_app_uuid}', GiteaChange::class)->name('source.gitea.show');
+    Route::get('/source/origin/{origin_app_uuid}', OriginChange::class)->name('source.origin.show');
 });
 
 Route::middleware(['auth'])->group(function () {

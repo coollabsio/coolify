@@ -18,6 +18,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\OriginApp;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -166,7 +167,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $dockerImagePreviewTag = null;
 
-    private GithubApp|GitlabApp|GiteaApp|string $source = 'other';
+    private GithubApp|GitlabApp|GiteaApp|OriginApp|string $source = 'other';
 
     private StandaloneDocker|SwarmDocker $destination;
 
@@ -3962,6 +3963,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $lsRemoteRef = "refs/pull/{$this->pull_request_id}/head";
             } elseif ($this->git_type === 'gitlab') {
                 $lsRemoteRef = "refs/merge-requests/{$this->pull_request_id}/head";
+            } elseif ($this->git_type === 'origin') {
+                // Origin previews fetch the pull request's head branch: "refs/heads/{head}:pr-{id}-coolify".
+                $lsRemoteRef = str($this->branch)->before(':')->value();
             } else {
                 // Fallback to the original value if provider-specific ref is unknown
                 $lsRemoteRef = $local_branch;
