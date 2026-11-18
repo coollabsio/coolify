@@ -9,7 +9,9 @@ use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Exception;
@@ -167,7 +169,9 @@ class General extends Component
                 ? ['nullable']
                 : ValidationPatterns::applicationDomainRules(),
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
-            'gitRepository' => 'required',
+            'gitRepository' => isset($this->application) && $this->gitRepository === $this->application->getOriginal('git_repository')
+                ? ['required']
+                : ['required', 'string', new ValidGitRepositoryUrl(allowRepositoryPath: true)],
             'gitBranch' => ['required', 'string', new ValidGitBranch],
             'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
             'installCommand' => $this->changedCommandRules('installCommand', 'install_command'),
@@ -871,6 +875,15 @@ class General extends Component
 
             $this->syncData(toModel: true);
 
+            $otherApplication = $this->application->isDirty(['docker_registry_image_name', 'build_pack'])
+                ? $this->application->otherApplicationBuildingSameImage()
+                : null;
+            if ($otherApplication) {
+                $this->addError('dockerRegistryImageName', $this->application->sharedImageNameMessage($otherApplication));
+
+                return;
+            }
+
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
             }
@@ -986,6 +999,7 @@ class General extends Component
             $this->application->refresh();
             $this->dispatch('name-changed', uuid: $this->application->uuid, name: $this->application->name);
             $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, $this->application->team()->id);
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($this->application, $previousDnsHostnames);
             $this->syncData();
             if ($oldPortsExposes !== $this->application->ports_exposes || $oldCustomNetworkAliases !== $this->application->custom_network_aliases) {
                 $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);

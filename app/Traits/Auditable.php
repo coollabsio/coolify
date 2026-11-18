@@ -90,7 +90,7 @@ trait Auditable
             "{$resourceType}_uuid" => $this->getAttribute('uuid'),
             "{$resourceType}_name" => $this->getAttribute('name') ?? $this->getAttribute('key'),
             'changed_fields' => $changedFields,
-        ], $this->auditChanges(
+        ], $action === 'created' && ($this->auditCreatedChanges ?? true) === false ? [] : $this->auditChanges(
             $action,
             $action === 'updated' ? $changedFields : array_keys($this->getAttributes()),
         ));

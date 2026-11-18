@@ -136,7 +136,6 @@ test('instance backup settings render when the instance database has no backup s
 
     Livewire::test(SettingsBackup::class)
         ->assertOk()
-        ->assertSet('executions', [])
         ->assertSee('Backup is not configured')
         ->assertSee('Configure backup');
 });

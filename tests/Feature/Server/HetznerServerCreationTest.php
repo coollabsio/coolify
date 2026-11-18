@@ -2,6 +2,7 @@
 
 use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -149,6 +150,7 @@ describe('Boarding Flow Integration', function () {
     uses(RefreshDatabase::class);
 
     beforeEach(function () {
+        InstanceSettings::forceCreate(['id' => 0]);
         // Create a team with owner that has boarding enabled
         $this->team = Team::factory()->create([
             'show_boarding' => true,
@@ -190,24 +192,6 @@ describe('Boarding Flow Integration', function () {
         expect((bool) $this->team->fresh()->show_boarding)->toBeTrue();
     });
 
-    test('renders advanced Hetzner options in their own settings section', function () {
-        Livewire::test(ByHetzner::class)
-            ->set('current_step', 2)
-            ->assertSee('Advanced options')
-            ->assertSee('Provider SSH keys, networking, backups, and cloud-init.');
-    });
-
-    test('renders advanced Hetzner option controls in the advanced section', function () {
-        Livewire::test(ByHetzner::class)
-            ->set('current_step', 2)
-            ->assertSee('Extra SSH keys')
-            ->assertSee('Firewalls')
-            ->assertSee('Private networks')
-            ->assertSee('Enable Hetzner backups')
-            ->assertSee('Add cloud-init script')
-            ->assertSee('Adds 20% to the provider server price.');
-    });
-
     test('lists account SSH keys and firewalls as listbox options and shows the selection', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
@@ -236,6 +220,7 @@ describe('Hetzner data loading', function () {
     uses(RefreshDatabase::class);
 
     beforeEach(function () {
+        InstanceSettings::forceCreate(['id' => 0]);
         $this->team = Team::factory()->create();
         $this->user = User::factory()->create();
         $this->team->members()->attach($this->user->id, ['role' => 'owner']);

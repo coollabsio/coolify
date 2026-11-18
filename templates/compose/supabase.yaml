@@ -885,6 +885,9 @@ services:
           sources:
             docker_host:
               type: docker_logs
+              # Only collect logs of this stack. Other Supabase stacks on the same server have their own Vector.
+              include_labels:
+                - 'com.docker.compose.project=${COOLIFY_RESOURCE_UUID?COOLIFY_RESOURCE_UUID is required}'
               exclude_containers:
                 - supabase-vector
 

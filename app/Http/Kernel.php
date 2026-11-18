@@ -22,6 +22,7 @@ use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
 use App\Http\Middleware\RequireTeamTwoFactor;
+use App\Http\Middleware\ThrottleFailedApiRequests;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateSignature;
@@ -58,6 +59,7 @@ class Kernel extends HttpKernel
         AddServerTimingHeaders::class,
         TrustProxies::class,
         HandleCors::class,
+        ThrottleFailedApiRequests::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
         TrimStrings::class,

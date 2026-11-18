@@ -135,6 +135,15 @@ services:
     networks:
       - coolify
 
+  coolify-helper:
+    image: coollabsio/coolify-helper:dev
+    pull_policy: build
+    build:
+      context: https://github.com/coollabsio/coolify-helper.git#main:src
+      args:
+        - IMAGE_VERSION=dev
+    command: ["true"]
+
   testing-host:
     profiles: ["testing-host"]
     image: coolify-testing-host:dev
@@ -152,6 +161,8 @@ services:
       - postgres_data:/data/coolify/_volumes/database
       - redis_data:/data/coolify/_volumes/redis
       - minio_data:/data/coolify/_volumes/minio
+      # Image scanner files: the scanner containers bind-mount these paths through the host daemon.
+      - /data/coolify/image-scans:/data/coolify/image-scans
     networks:
       coolify:
         # Seeders use this hostname for the localhost server.
@@ -166,7 +177,10 @@ services:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_PORT:-1025}:1025"
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
-      - coolify
+      coolify:
+        # The seeded instance SMTP settings (InstanceSettingsSeeder) use coolify-mail:1025.
+        aliases:
+          - coolify-mail
 
   minio:
     profiles: ["minio"]

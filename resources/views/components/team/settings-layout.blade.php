@@ -18,6 +18,12 @@
             'active' => request()->routeIs('team.audit-log'),
             'icon' => 'time-back',
         ] : null,
+        [
+            'label' => 'Image Scanning',
+            'route' => 'team.image-scanning',
+            'active' => request()->routeIs('team.image-scanning'),
+            'icon' => 'shield-alert',
+        ],
         isInstanceAdmin() ? [
             'label' => 'Admin View',
             'route' => 'team.admin-view',

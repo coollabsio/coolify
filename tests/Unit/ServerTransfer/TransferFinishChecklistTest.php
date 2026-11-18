@@ -101,7 +101,6 @@ test('the GitHub App webhook step checks the URL at GitHub and sets it with one 
     $key = "github_app_webhook:{$this->githubApp->uuid}";
     $hookUrl = 'https://coolify-a.test/webhooks/source/github/events';
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => function ($request) use (&$hookUrl) {
             if ($request->method() === 'PATCH') {
                 $hookUrl = $request['url'];
@@ -195,7 +194,6 @@ test('a failed check shows a short message and keeps the technical reason as det
     finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
     $this->checklist->start($this->server);
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => Http::response(['message' => 'Bad credentials'], 401),
     ]);
 

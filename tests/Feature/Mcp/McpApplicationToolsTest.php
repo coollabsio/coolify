@@ -418,7 +418,12 @@ test('manage_preview creates, updates and deletes a preview of the token team', 
     expect(mcpAppIsError($writeOnly))->toBeTrue()
         ->and(mcpAppText($writeOnly))->toContain('deploy');
 
-    $created = mcpAppCall($deployToken, 'manage_preview', ['action' => 'create', 'uuid' => $this->application->uuid, 'data' => ['pull_request_id' => 7, 'git_type' => 'github', 'instant_deploy' => false]]);
+    $deployOnly = mcpAppCall($deployToken, 'manage_preview', ['action' => 'create', 'uuid' => $this->application->uuid, 'data' => ['pull_request_id' => 7, 'git_type' => 'github', 'instant_deploy' => false]]);
+    expect(mcpAppIsError($deployOnly))->toBeTrue()
+        ->and(mcpAppText($deployOnly))->toContain('Missing required permissions: write')
+        ->and(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse();
+
+    $created = mcpAppCall(mcpAppToken($this->user, ['write', 'deploy']), 'manage_preview', ['action' => 'create', 'uuid' => $this->application->uuid, 'data' => ['pull_request_id' => 7, 'git_type' => 'github', 'instant_deploy' => false]]);
     expect(mcpAppIsError($created))->toBeFalse(mcpAppText($created))
         ->and(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 7)->exists())->toBeTrue();
 

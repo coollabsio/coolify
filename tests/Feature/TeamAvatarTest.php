@@ -29,7 +29,7 @@ beforeEach(function () {
 function giveTeamStoredAvatar(Team $team): string
 {
     $path = "team-avatars/{$team->id}/avatar.jpg";
-    $team->forceFill(['avatar_path' => $path, 'avatar_storage_type' => 'local'])->save();
+    $team->forceFill(['avatar_path' => $path, 'avatar_storage_type' => 'local'])->saveQuietly();
     Storage::disk('images')->put($path, 'avatar-content');
 
     return $path;
@@ -51,6 +51,22 @@ it('stores a team avatar using the instance image storage setting', function () 
         ->and($this->team->avatar_storage_type)->toBe('local')
         ->and($this->team->avatar_s3_storage_id)->toBeNull();
     Storage::disk('images')->assertExists($this->team->avatar_path);
+});
+
+it('changes the team avatar URL when an existing avatar is replaced', function () {
+    Storage::fake('images');
+    giveTeamStoredAvatar($this->team);
+    $oldUrl = team_avatar_url($this->team->fresh());
+    $upload = UploadedFile::fake()->createWithContent('team.jpg', file_get_contents(base_path('tests/Fixtures/project-icon.jpg')));
+
+    $this->travel(1)->minutes();
+
+    Livewire::test(Index::class)
+        ->set('avatar', $upload)
+        ->call('uploadAvatar')
+        ->assertHasNoErrors();
+
+    expect(team_avatar_url($this->team->fresh()))->not->toBe($oldUrl);
 });
 
 it('does not let a team member change the team avatar', function () {
@@ -123,7 +139,7 @@ it('deletes the avatar file when the team is deleted', function () {
 it('shows team avatars in the team switcher', function () {
     $otherTeam = Team::factory()->create(['name' => 'Zeta']);
     $this->user->teams()->attach($otherTeam, ['role' => 'member']);
-    $otherTeam->forceFill(['avatar_path' => "team-avatars/{$otherTeam->id}/avatar.jpg", 'avatar_storage_type' => 'local'])->save();
+    $otherTeam->forceFill(['avatar_path' => "team-avatars/{$otherTeam->id}/avatar.jpg", 'avatar_storage_type' => 'local'])->saveQuietly();
     $this->user->load('teams');
 
     Livewire::test(SwitchTeam::class)

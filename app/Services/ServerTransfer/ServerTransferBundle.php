@@ -52,6 +52,8 @@ class ServerTransferBundle
         'dns_zones' => 1000,
         'managed_dns_records' => 10000,
         'ssl_certificates' => 10000,
+        'image_scan_policies' => 10000,
+        'image_scan_ignores' => 20000,
         'warnings' => 1000,
         'post_transfer_checklist' => 1000,
     ];
@@ -382,6 +384,7 @@ class ServerTransferBundle
             self::check($errors, "{$at}.scheduled_tasks.{$i}.command", $task['command'] ?? null, ['required', 'string']);
             self::check($errors, "{$at}.scheduled_tasks.{$i}.container", $task['container'] ?? null, ['nullable', ...ValidationPatterns::containerNameRules()]);
             self::checkCron($errors, "{$at}.scheduled_tasks.{$i}.frequency", $task['frequency'] ?? '');
+            self::check($errors, "{$at}.scheduled_tasks.{$i}.disabled_reason", $task['disabled_reason'] ?? null, ['nullable', 'string', 'max:1000']);
         }
     }
 

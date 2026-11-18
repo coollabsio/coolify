@@ -507,6 +507,89 @@ function dockerRemoveCommand(string $container): string
     return dockerCommandIgnoringError($command, 'No such container:');
 }
 
+/**
+ * Lists the containers of a Compose project, one JSON object per line, for composeContainersWithRemovedVolumes().
+ */
+function composeProjectMountsCommand(string $projectName): string
+{
+    $format = '{"name":{{json .Name}},"service":{{json (index .Config.Labels "com.docker.compose.service")}},"imageVolumes":{{json .Config.Volumes}},"mounts":{{json .Mounts}}}';
+
+    return 'docker ps -aq --filter '.escapeshellarg("label=com.docker.compose.project={$projectName}")
+        .' | xargs -r docker inspect --format '.escapeshellarg($format).' 2>/dev/null || true';
+}
+
+/**
+ * `docker compose up` gives a recreated container the mount of the old container at each path
+ * that the image declares with VOLUME. This also keeps a volume that the user deleted in Coolify,
+ * so its old data comes back (#6875). Returns the containers to remove before `up`.
+ *
+ * Only a volume that Coolify made (its name starts with "{uuid}_") and that has no storage row
+ * anymore counts. A volume that is only removed from the Compose file still has its row, and an
+ * external volume or a bind mount is not Coolify's, so Compose keeps using them as before.
+ *
+ * @param  string  $projectMounts  output of composeProjectMountsCommand()
+ * @param  array<string, mixed>  $composeServices  the services of the Compose file that `up` starts
+ * @param  list<string>  $storageNames  names of the storage rows that the resource still has
+ * @return array<string, string> container name => volume that the user deleted
+ */
+function composeContainersWithRemovedVolumes(string $projectMounts, array $composeServices, string $uuid, array $storageNames): array
+{
+    $normalize = fn (string $path): string => rtrim($path, '/') ?: '/';
+    $containers = [];
+    foreach (preg_split('/\R/', trim($projectMounts)) as $line) {
+        $container = json_decode($line, true);
+        $service = data_get($container, 'service');
+        if (! is_array($container) || ! is_string($service) || ! is_array(data_get($composeServices, $service))) {
+            continue;
+        }
+        $targets = composeServiceVolumeTargets(data_get($composeServices, "{$service}.volumes", []));
+        if ($targets === null) {
+            continue;
+        }
+        $imageVolumes = array_map($normalize, array_keys(data_get($container, 'imageVolumes') ?? []));
+        foreach (data_get($container, 'mounts') ?? [] as $mount) {
+            $name = (string) data_get($mount, 'Name');
+            $path = $normalize((string) data_get($mount, 'Destination'));
+            if (data_get($mount, 'Type') !== 'volume' || ! str_starts_with($name, "{$uuid}_") || in_array($name, $storageNames, true)
+                || ! in_array($path, $imageVolumes, true) || in_array($path, $targets, true)) {
+                continue;
+            }
+            $containers[ltrim((string) data_get($container, 'name'), '/')] = $name;
+        }
+    }
+
+    return $containers;
+}
+
+/**
+ * The container paths of the volumes of a Compose service, or null when a path is not literal
+ * (for example `${DATA_PATH}`).
+ *
+ * @return list<string>|null
+ */
+function composeServiceVolumeTargets(mixed $volumes): ?array
+{
+    $targets = [];
+    foreach (is_array($volumes) ? $volumes : [] as $volume) {
+        if (is_array($volume)) {
+            $target = data_get($volume, 'target');
+        } else {
+            // source:target:mode, where the source can contain colons, for example ${DATA:-/data}.
+            $parts = explode(':', (string) $volume);
+            if (count($parts) > 1 && preg_match('/^[a-zA-Z,]+$/', end($parts))) {
+                array_pop($parts);
+            }
+            $target = end($parts);
+        }
+        if (! is_string($target) || ! str_starts_with($target, '/')) {
+            return null;
+        }
+        $targets[] = rtrim($target, '/') ?: '/';
+    }
+
+    return $targets;
+}
+
 function dockerNetworkRemoveCommand(string $network): string
 {
     $command = 'docker network rm '.escapeShellValue($network);
@@ -854,6 +937,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         } else {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
+        $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
@@ -2124,7 +2208,7 @@ function generateDockerBuildArgs($variables): Collection
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key' and 'value'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
@@ -2138,11 +2222,6 @@ function generateDockerEnvFlags($variables): string
 
             if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
                 throw new InvalidArgumentException('Invalid environment variable key.');
-            }
-
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
-            if ($isMultiline) {
-                $value = trim($value, "'");
             }
 
             return '-e '.escapeshellarg("{$key}={$value}");

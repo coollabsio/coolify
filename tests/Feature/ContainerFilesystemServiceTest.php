@@ -32,11 +32,15 @@ function fsServer(): Server
     $team = Team::factory()->create();
     $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
 
-    return Server::factory()->create([
+    $server = Server::factory()->create([
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
         'ip' => '203.0.113.10',
     ]);
+    // These tests read the faked ssh commands in order; the host key check would add a key scan.
+    $server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
+
+    return $server;
 }
 
 it('sorts directories before files, then by name case-insensitively', function () {

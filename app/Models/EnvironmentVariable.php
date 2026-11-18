@@ -8,11 +8,17 @@ use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use PDOException;
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -28,7 +34,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -41,6 +47,9 @@ use OpenApi\Attributes as OA;
 class EnvironmentVariable extends BaseModel
 {
     use Auditable;
+
+    /** The key is in the metadata of the row, and the flags of a new variable have little audit value. */
+    protected bool $auditCreatedChanges = false;
 
     /**
      * Flags that a "# coolify:" line of the developer view can set, with their defaults.
@@ -110,6 +119,7 @@ class EnvironmentVariable extends BaseModel
         'is_multiline' => 'boolean',
         'is_literal' => 'boolean',
         'is_preview' => 'boolean',
+        'is_production_value_copy' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'uses_legacy_escaping' => 'boolean',
@@ -132,8 +142,17 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping',
     ];
 
+    /**
+     * Not stored: false leaves the preview copy of a new production variable of an application empty.
+     * It cannot copy the value when the "New preview variables" setting of the application is "Leave empty".
+     */
+    public ?bool $copyValueToPreview = null;
+
     protected static function booted()
     {
+        static::creating(function (ModelsEnvironmentVariable $environment_variable) {
+            $environment_variable->version = config('constants.coolify.version');
+        });
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
             if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
@@ -146,9 +165,15 @@ class EnvironmentVariable extends BaseModel
                     $application = Application::find($environment_variable->resourceable_id);
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
-                        ModelsEnvironmentVariable::create([
+                        // The preview copy is part of the same change, so it gets no audit rows of its own.
+                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false
+                            && $environment_variable->copyValueToPreview !== false;
+                        // forceFill: is_production_value_copy is not fillable.
+                        $preview = (new ModelsEnvironmentVariable)->forceFill([
                             'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
+                            // Without production values, the copy only shows which keys the previews need.
+                            'value' => $usesProductionValue ? $environment_variable->value : '',
+                            'is_production_value_copy' => $usesProductionValue && filled($environment_variable->value),
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
@@ -160,17 +185,24 @@ class EnvironmentVariable extends BaseModel
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
                         ]);
+                        $preview->withoutAuditLogging(fn () => $preview->save());
                     }
                 }
             }
-            $environment_variable->update([
-                'version' => config('constants.coolify.version'),
-            ]);
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+            if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
+                $environmentVariable->is_shown_once = true;
+            }
             if ($environmentVariable->preserve_compose_null && $environmentVariable->isDirty('value') && $environmentVariable->value !== null) {
                 $environmentVariable->preserve_compose_null = false;
+            }
+            $environmentVariable->authorizeAddedSharedVariableReferences();
+            // A changed preview value is the user's own value, not the copy of production.
+            if ($environmentVariable->exists && $environmentVariable->is_preview && $environmentVariable->isDirty('value')) {
+                $environmentVariable->is_production_value_copy = false;
             }
             $environmentVariable->updateIsShared();
         });
@@ -190,6 +222,62 @@ class EnvironmentVariable extends BaseModel
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * The variables of one resource and preview flag that have the given key.
+     */
+    public function scopeForResourceKey(Builder $query, string $resourceableType, int $resourceableId, bool $isPreview, string $key): Builder
+    {
+        return $query->where('resourceable_type', $resourceableType)
+            ->where('resourceable_id', $resourceableId)
+            ->where('is_preview', $isPreview)
+            ->where('key', $key);
+    }
+
+    /**
+     * The other variables of this resource and preview flag that have the given key (by default its own key).
+     */
+    public function sameKeyVariables(?string $key = null): Builder
+    {
+        return static::query()
+            ->forResourceKey($this->resourceable_type, $this->resourceable_id, (bool) $this->is_preview, $key ?? $this->key)
+            ->whereKeyNot($this->getKey());
+    }
+
+    /**
+     * The table has no unique index on resource and key, so two requests that create the same key at the
+     * same time (parallel Compose parses or saves) could both insert it. Inserts of one key wait for each
+     * other, and a second row is refused like a unique index refuses it, so firstOrCreate() returns the
+     * existing row.
+     */
+    protected function performInsert(Builder $query)
+    {
+        if ($this->resourceable_type === null || $this->resourceable_id === null) {
+            return parent::performInsert($query);
+        }
+
+        $connection = $this->getConnection();
+
+        return $connection->transaction(function () use ($connection, $query) {
+            if ($connection->getDriverName() === 'pgsql') {
+                // Held until the transaction commits, so the next insert of this key sees this row.
+                $connection->select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                    "environment_variables:{$this->resourceable_type}:{$this->resourceable_id}:".(int) (bool) $this->is_preview.":{$this->key}",
+                ]);
+            }
+
+            if ($this->sameKeyVariables()->exists()) {
+                throw new UniqueConstraintViolationException(
+                    $connection->getName(),
+                    'insert into "environment_variables"',
+                    [],
+                    new PDOException("Environment variable {$this->key} already exists."),
+                );
+            }
+
+            return parent::performInsert($query);
+        });
     }
 
     public function scopeWithoutBuildpackControlVariables(Builder $query): Builder
@@ -257,18 +345,29 @@ class EnvironmentVariable extends BaseModel
     }
 
     /**
-     * Resolved value for display and copy. References to locked shared variables keep their
-     * reference text, so the UI never reveals a value that is only shown once.
+     * Resolved value for display and copy. References to locked shared variables, and to shared
+     * variables whose value the user cannot read, keep their reference text.
      */
     public function displayRealValue(): ?string
     {
-        return $this->resolveRealValue(revealLockedSharedVariables: false);
+        return $this->resolveRealValue(revealLockedSharedVariables: false, canReveal: self::sharedVariablesReadableBy(auth()->user()));
+    }
+
+    /**
+     * Filter for the shared variables whose value the user can read. Without a user, none.
+     *
+     * @return Closure(SharedEnvironmentVariable): bool
+     */
+    public static function sharedVariablesReadableBy(?User $user): Closure
+    {
+        return fn (SharedEnvironmentVariable $shared): bool => $user !== null && Gate::forUser($user)->allows('viewSensitive', $shared);
     }
 
     /**
      * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     * @param  (Closure(SharedEnvironmentVariable): bool)|null  $canReveal
      */
-    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true, ?Collection $sharedVariables = null): ?string
+    private function resolveRealValue(bool $revealLockedSharedVariables = true, bool $escapeLegacyValue = true, ?Collection $sharedVariables = null, ?Closure $canReveal = null): ?string
     {
         if (! $this->relationLoaded('resourceable')) {
             $this->load('resourceable');
@@ -289,9 +388,13 @@ class EnvironmentVariable extends BaseModel
             $resource->load('destination.server');
         }
 
-        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables, $sharedVariables);
+        $value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables, $sharedVariables, $canReveal);
 
-        return $value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping ? $value : $this->legacyEscapedValue($value);
+        if ($value === null || ! $escapeLegacyValue || ! $this->uses_legacy_escaping) {
+            return $value;
+        }
+
+        return method_exists($resource, 'useExactEscaping') && $resource->useExactEscaping($this) ? $value : $this->legacyEscapedValue($value);
     }
 
     /**
@@ -354,9 +457,12 @@ class EnvironmentVariable extends BaseModel
         return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
-    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true)
+    /**
+     * @param  (Closure(SharedEnvironmentVariable): bool)|null  $canReveal  Resolve only the shared variables that pass this filter.
+     */
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true, ?Closure $canReveal = null)
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables);
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables, canReveal: $canReveal);
     }
 
     public function getResolvedValueWithServer($server = null)
@@ -634,6 +740,85 @@ class EnvironmentVariable extends BaseModel
         return array_map(fn (array $match): array => ['type' => $match[1], 'key' => $match[2]], $matches);
     }
 
+    /**
+     * A user can only add a reference to a shared variable whose value they can read, because the
+     * resource gets the resolved value. References that the stored value already has are kept, so
+     * the other fields stay editable. Queue jobs and console commands have no user.
+     *
+     * @throws ValidationException
+     */
+    private function authorizeAddedSharedVariableReferences(): void
+    {
+        if ($this->isDirty('value')) {
+            self::authorizeAddedSharedVariableReferencesIn($this->resourceable, $this->exists ? $this->getOriginal('value') : null, $this->value, 'value');
+        }
+    }
+
+    /**
+     * Rejects references to shared variables that are new in $value and that the logged-in user cannot read.
+     * Also used for compose files, where the parser resolves the same references.
+     *
+     * @throws ValidationException
+     */
+    public static function authorizeAddedSharedVariableReferencesIn(?Model $resource, ?string $storedValue, ?string $value, string $field): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || ! str_contains((string) $value, '{{')) {
+            return;
+        }
+
+        $storedReferences = self::sharedVariableReferences($storedValue);
+        foreach (self::sharedVariableReferences($value) as $reference) {
+            if (! in_array($reference['type'], SHARED_VARIABLE_TYPES, true) || in_array($reference, $storedReferences, true)) {
+                continue;
+            }
+
+            $scope = self::sharedVariableScope($resource, $reference['type']);
+            if ($scope === null || Gate::forUser($user)->denies('viewSensitive', $scope)) {
+                $name = "{$reference['type']}.{$reference['key']}";
+
+                throw ValidationException::withMessages([
+                    $field => self::isBlockedOnlyByTokenScope($user, $scope)
+                        ? "This API token is limited to selected projects, environments, or resources, so it cannot reference the {$reference['type']} shared variable {$name}. Use a token for the whole team."
+                        : "You cannot reference the shared variable {$name}, because you cannot read its value.",
+                ]);
+            }
+        }
+    }
+
+    /**
+     * True when the user is an admin who can read team and server variables, but the API token of the request
+     * is limited to selected projects, environments, or resources.
+     */
+    private static function isBlockedOnlyByTokenScope(User $user, ?SharedEnvironmentVariable $scope): bool
+    {
+        return $scope !== null
+            && in_array($scope->type, ['team', 'server'], true)
+            && data_get($user->currentAccessToken(), 'scopes') !== null
+            && $user->isAdminOfTeam((int) $scope->team_id);
+    }
+
+    /**
+     * An unsaved shared variable of the given type for the resource. The policy decides by the
+     * scope, so a reference to a key that does not exist yet is checked like an existing one.
+     */
+    private static function sharedVariableScope(?Model $resource, string $type): ?SharedEnvironmentVariable
+    {
+        $teamId = $resource?->team()?->id;
+        if ($teamId === null) {
+            return null;
+        }
+
+        $environment = data_get($resource, 'environment');
+
+        return new SharedEnvironmentVariable([
+            'type' => $type,
+            'team_id' => $teamId,
+            'project_id' => data_get($environment, 'project_id'),
+            'environment_id' => data_get($environment, 'id'),
+        ]);
+    }
+
     public function resolveReferencedValue(): ?string
     {
         $value = $this->value;
@@ -654,13 +839,14 @@ class EnvironmentVariable extends BaseModel
 
     /**
      * @param  Collection<int, SharedEnvironmentVariable>|null  $sharedVariables
+     * @param  (Closure(SharedEnvironmentVariable): bool)|null  $canReveal
      */
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true, ?Collection $sharedVariables = null)
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true, ?Collection $sharedVariables = null, ?Closure $canReveal = null)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
         }
-        $environment_variable = trim($environment_variable);
+        $environment_variable = self::withoutEdgeWhitespace($environment_variable);
         $sharedEnvsFound = str($environment_variable)->matchAll('/{{(.*?)}}/');
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
@@ -699,7 +885,7 @@ class EnvironmentVariable extends BaseModel
                     ->where('team_id', $resource->team()->id)
                     ->where("{$type}_id", $id)
                     ->first();
-            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
+            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once) && ($canReveal === null || $canReveal($found))) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
         }
@@ -713,7 +899,19 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return trim(decrypt($environment_variable));
+        return self::withoutEdgeWhitespace(decrypt($environment_variable));
+    }
+
+    /**
+     * Single-line values lose their edge whitespace. Multiline content (a private key, a
+     * certificate, a config file) is kept as it is, because tools such as OpenSSH reject a key
+     * without its trailing newline.
+     */
+    private static function withoutEdgeWhitespace(string $value): string
+    {
+        $trimmed = trim($value);
+
+        return str_contains($trimmed, "\n") ? $value : $trimmed;
     }
 
     private function set_environment_variables(?string $environment_variable = null): ?string
@@ -721,13 +919,8 @@ class EnvironmentVariable extends BaseModel
         if (is_null($environment_variable)) {
             return null;
         }
-        $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt($environment_variable);
-        }
 
-        return encrypt($environment_variable);
+        return encrypt(self::withoutEdgeWhitespace($environment_variable));
     }
 
     protected function key(): Attribute

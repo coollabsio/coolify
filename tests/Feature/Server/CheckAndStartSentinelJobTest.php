@@ -22,7 +22,7 @@ beforeEach(function () {
     config()->set('constants.ssh.max_retries', 1);
     config()->set('constants.ssh.mux_enabled', false);
     Http::preventStrayRequests();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
 
     $user = User::factory()->create();
     $team = $user->teams()->first();
@@ -110,7 +110,7 @@ it('does not restart a Sentinel whose health check is still starting', function 
 
 it('restarts a running Sentinel that stopped pushing, at most once per hour', function () {
     Cache::flush();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
     $this->server->forceFill(['sentinel_updated_at' => now()->subMinutes(15), 'sentinel_waiting_since' => null])->save();
     fakeRemoteProcesses([
         '*docker ps*' => Process::result(output: 'running Up 2 hours (healthy)'),
@@ -124,7 +124,7 @@ it('restarts a running Sentinel that stopped pushing, at most once per hour', fu
 
 it('does not restart a Sentinel that started recently and has not pushed yet', function () {
     Cache::flush();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
     $this->server->forceFill(['sentinel_updated_at' => now()->subDays(5), 'sentinel_waiting_since' => now()->subMinutes(3)])->save();
     fakeRemoteProcesses([
         '*docker ps*' => Process::result(output: 'running Up 3 minutes (healthy)'),
@@ -165,7 +165,7 @@ it('reads the push status with the token from inside the Sentinel container on a
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'docker exec coolify-sentinel sh -c '\\''curl")
-        && str_contains(remoteProcessScript($process), 'Bearer $TOKEN'));
+        && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf -H @-'));
 });
 
 it('does not restart a starting Sentinel whose API does not answer yet', function () {

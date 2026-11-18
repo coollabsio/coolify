@@ -3,14 +3,33 @@
     <x-application.settings-section id="maintenance-section" title="Maintenance mode"
         helper="Show a maintenance page with a 503 status on all domains of this resource. The containers keep running, and the change applies without a redeploy.">
         @if ($this->isSupported)
+            <x-slot:badges>
+                {{-- The inline wrapper puts the badge text on the same line as the title text. --}}
+                <span>
+                    @if ($isMaintenanceEnabled)
+                        <x-status-badge label="On" type="success" />
+                    @else
+                        <x-status-badge label="Off" type="neutral" />
+                    @endif
+                </span>
+            </x-slot:badges>
+            @can('update', $resource)
+                <x-slot:actions>
+                    <x-modal-confirmation wire:key="maintenance-toggle-{{ $isMaintenanceEnabled ? 'on' : 'off' }}"
+                        :ignoreWire="false" submitAction="toggleMaintenance" :confirmWithText="false"
+                        :confirmWithPassword="false" :isErrorButton="! $isMaintenanceEnabled"
+                        :title="$isMaintenanceEnabled ? 'Disable maintenance mode?' : 'Enable maintenance mode?'"
+                        :buttonTitle="$isMaintenanceEnabled ? 'Disable maintenance' : 'Enable maintenance'"
+                        :step2ButtonText="$isMaintenanceEnabled ? 'Disable maintenance' : 'Enable maintenance'"
+                        :warningMessage="$isMaintenanceEnabled
+                            ? 'Visitors can reach this resource again right away.'
+                            : 'Visitors cannot reach this resource until you disable maintenance mode.'"
+                        :actions="$isMaintenanceEnabled
+                            ? ['All domains of this resource serve the resource again.']
+                            : ['All domains of this resource show the maintenance page with a 503 status.', 'The containers keep running.']" />
+                </x-slot:actions>
+            @endcan
             <div class="flex flex-col gap-4">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox canGate="update" :canResource="$resource" id="isMaintenanceEnabled"
-                        label="Maintenance mode" onChange="instantSaveMaintenance" :options="[
-                            ['value' => false, 'label' => 'Off: serve the resource'],
-                            ['value' => true, 'label' => 'On: show the maintenance page'],
-                        ]" />
-                </div>
                 <x-forms.textarea canGate="update" :canResource="$resource" id="maintenancePage" rows="10" monospace
                     label="Custom maintenance page (HTML)"
                     placeholder="Leave empty to use the Coolify default maintenance page."

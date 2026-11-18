@@ -53,6 +53,8 @@ function makeMuxServer(): Server
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
     ]);
+    // These tests count ssh processes; the host key check would add a key scan.
+    $server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
 
     Storage::disk('ssh-keys')->put("ssh_key@{$server->privateKey->uuid}", $server->privateKey->private_key);
 
@@ -133,7 +135,7 @@ it('reuses a healthy master regardless of its absolute age', function () {
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
     Process::assertNotRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
@@ -200,8 +202,8 @@ it('bounds the control commands used to stop a mux master', function () {
 
     SshMultiplexingHelper::removeMuxFile($server);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O check') && $process->timeout === 5);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop') && $process->timeout === 5);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O check') && $process->timeout === 5);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop') && $process->timeout === 5);
 });
 
 it('replaces a master whose health check times out', function () {
@@ -220,7 +222,7 @@ it('replaces a master whose health check times out', function () {
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
     Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
 });
 
@@ -242,6 +244,32 @@ it('gives the mux health check at least the server connection timeout', function
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'health_check_ok') && $process->timeout === 30);
     Process::assertNotRan(fn ($process) => str_contains($process->command, '-O check') && $process->timeout !== 5);
+});
+
+it('runs the mux health check with the server port and key, and never as a new master', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+    ]);
+    $server = makeMuxServer();
+    $server->update(['port' => 2222]);
+    $server->settings->update(['connection_timeout' => 17]);
+    $server = $server->fresh();
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 0),
+        '*health_check_ok*' => Process::result(output: 'health_check_ok', exitCode: 0),
+    ]);
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'health_check_ok')
+        && str_contains($process->command, '-o ControlMaster=no ')
+        && ! str_contains($process->command, 'ControlMaster=auto')
+        && str_contains($process->command, "-p '2222' ")
+        && str_contains($process->command, '-i '.escapeshellarg($server->privateKey->getKeyLocation()).' ')
+        && str_contains($process->command, '-o ConnectTimeout=17 ')
+        && str_contains($process->command, '-o StrictHostKeyChecking=no '));
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
@@ -324,7 +352,7 @@ it('quotes the mux socket and key paths in every local ssh command', function ()
     Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command)
         && str_contains($process->command, "-o ControlPath={$socket} ")
         && str_contains($process->command, "-i {$key} "));
-    Process::assertRan(fn ($process) => str_contains($process->command, "ssh -O check -o ControlPath={$socket} "));
+    Process::assertRan(fn ($process) => str_contains($process->command, "ssh -F /dev/null -O check -o ControlPath={$socket} "));
     Process::assertDidntRun(fn ($process) => str_contains($process->command, 'mux_x;touch /tmp/pwn;# ')
         || str_contains($process->command, '-i /') || str_contains($process->command, 'ControlPath=/'));
 });
@@ -393,7 +421,7 @@ it('kills only old orphaned ssh masters whose control socket no longer exists', 
 ".
             "333 1 30 ssh -fN -o ControlMaster=auto -o ControlPath={$youngSocket} root@1.2.3.4
 "),
-        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
+        '*ssh -F /dev/null -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -423,7 +451,7 @@ it('kills a ControlPersist master whose control socket was removed', function ()
         'ps*' => Process::result(output: "111 1 5000 ssh: {$liveSocket} [mux]\n".
             "222 1 5000 ssh: {$removedSocket} [mux]\n".
             "333 1 5000 ssh: /tmp/other/mux_removed [mux]\n"),
-        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
+        '*ssh -F /dev/null -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -451,7 +479,7 @@ it('kills ssh -fN processes that share a live ControlPath but do not own it', fu
         'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n".
             "222 1 7000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n".
             "333 1 9000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
-        '*ssh -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
+        '*ssh -F /dev/null -O check*' => Process::result(errorOutput: 'Master running (pid=111)'),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -463,7 +491,7 @@ it('kills ssh -fN processes that share a live ControlPath but do not own it', fu
     Process::assertRan(fn ($process) => $process->command === 'kill -9 '.escapeshellarg('222'));
     Process::assertRan(fn ($process) => $process->command === 'kill -9 '.escapeshellarg('333'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill') && str_contains($process->command, '111'));
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -O check'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O check'), 1);
 
     File::delete($socket);
 });
@@ -478,7 +506,7 @@ it('does not kill ssh -fN processes when the socket owner is unknown', function 
 
     Process::fake([
         'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
-        '*ssh -O check*' => Process::result(exitCode: 255, errorOutput: 'Control socket connect: Connection refused'),
+        '*ssh -F /dev/null -O check*' => Process::result(exitCode: 255, errorOutput: 'Control socket connect: Connection refused'),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -694,8 +722,8 @@ it('removes mux files for non-existent servers when reaping is enabled', functio
 
     expect(Storage::disk('ssh-mux')->exists($file))->toBeFalse();
     expect(SshMultiplexingHelper::isMuxProcessRetiring('333', "/var/www/html/storage/app/ssh/mux/{$file}"))->toBeTrue();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O exit'));
 });
 
 it('marks a stale mux process as retiring before stopping it', function () {
@@ -779,7 +807,7 @@ it('does not reap ssh processes when the socket owner check times out', function
     $timeouts = [];
     Process::fake([
         'ps*' => Process::result(output: "111 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$socket} root@1.2.3.4\n"),
-        '*ssh -O check*' => muxProcessTimeout($timeouts),
+        '*ssh -F /dev/null -O check*' => muxProcessTimeout($timeouts),
         'kill*' => Process::result(exitCode: 0),
     ]);
 
@@ -810,7 +838,7 @@ it('does not remove a healthy mux connection based on its absolute age', functio
     $method->invoke($job);
 
     expect(Storage::disk('ssh-mux')->exists($file))->toBeTrue();
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
 });
 
 it('keeps mux files for non-existent servers in dry-run mode', function () {

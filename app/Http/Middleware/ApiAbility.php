@@ -22,6 +22,7 @@ class ApiAbility extends CheckForAnyAbility
         'deployments',
         'resources',
         'version',
+        'vulnerabilities',
     ];
 
     public const SCOPED_ACCESS_DENIED_MESSAGE = 'This API token is limited to selected projects, environments, or resources, so it cannot use this endpoint.';

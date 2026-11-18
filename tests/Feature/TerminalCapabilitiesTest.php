@@ -7,7 +7,7 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use phpseclib3\Crypt\RSA;
+use phpseclib3\Crypt\EC;
 
 uses(RefreshDatabase::class);
 
@@ -18,7 +18,7 @@ it('probes container capabilities with exactly one elevation layer', function (s
     $team = Team::factory()->create();
     $key = PrivateKey::create([
         'name' => 'Terminal test key',
-        'private_key' => RSA::createKey(1024)->toString('OpenSSH'),
+        'private_key' => EC::createKey('Ed25519')->toString('OpenSSH'),
         'team_id' => $team->id,
     ]);
     $server = Server::factory()->create([

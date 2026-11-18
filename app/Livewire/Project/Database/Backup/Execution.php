@@ -23,8 +23,6 @@ class Execution extends Component
 
     public ?ScheduledDatabaseBackup $backup;
 
-    public $executions;
-
     public $s3s;
 
     public array $parameters = [];
@@ -73,10 +71,8 @@ class Execution extends Component
         if (! $backup) {
             return redirect()->route('dashboard');
         }
-        $executions = collect($backup->executions)->sortByDesc('created_at');
         $this->database = $database;
         $this->backup = $backup;
-        $this->executions = $executions;
         $this->s3s = S3Storage::query()
             ->where('team_id', $database->team()->id)
             ->where('is_usable', true)

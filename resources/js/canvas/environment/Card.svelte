@@ -1,6 +1,7 @@
 <script>
   // A resource card (or, connect view, a shared variable / tag card).
   import { isSource, MAX_CHILDREN, statusLabel, statusTone, statusWord, TYPE_LABELS } from '../../environment-canvas.js';
+  import Icon from './Icon.svelte';
   import NodeIcon from './NodeIcon.svelte';
   import StatusDot from './StatusDot.svelte';
 
@@ -11,6 +12,7 @@
   const DROP_TARGET = 'border-coollabs! dark:border-warning! ring-4 ring-coollabs/15 dark:ring-warning/15';
 
   const extra = $derived(node.extra_zones?.length || 0);
+  const security = $derived(node.security?.text ? node.security : null);
   const children = $derived(node.children || []);
   const chip = 'inline-flex h-5 max-w-[9rem] items-center truncate rounded-full border border-neutral-200 bg-neutral-50 px-1.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-fg-dim';
   const stop = e => e.stopPropagation();
@@ -109,9 +111,24 @@
     >{node.urls[0].replace(/^https?:\/\//, '')}</a>
   {/if}
 
-  {#if extra}
-    <div class="mt-2 flex min-w-0 flex-wrap gap-1 overflow-hidden h-5">
-      <span class={chip} title={zoneNames.join(', ')}>+{extra} {extra === 1 ? 'server' : 'servers'}</span>
+  {#if extra || security}
+    <div class="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 overflow-hidden h-5">
+      {#if security}
+        <!-- The security marker, same as x-image-scan.marker: the icon is error (update_now) or neutral (no_fix). -->
+        <span
+          class="inline-flex h-5 shrink-0 items-center gap-1 text-xs leading-none font-medium text-neutral-700 dark:text-white {security.tooltip ? 'cursor-help' : ''}"
+          role="img"
+          aria-label={security.label}
+          data-tooltip={security.tooltip || undefined}
+          data-tooltip-wrap={security.tooltip ? '' : undefined}
+        >
+          <Icon name="shieldAlert" class="size-4 {security.status === 'update_now' ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'}" />
+          <span aria-hidden="true">{security.text}</span>
+        </span>
+      {/if}
+      {#if extra}
+        <span class={chip} title={zoneNames.join(', ')}>+{extra} {extra === 1 ? 'server' : 'servers'}</span>
+      {/if}
     </div>
   {/if}
 

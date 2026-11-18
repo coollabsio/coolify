@@ -197,6 +197,27 @@ it('reverts a notification event toggle to the saved value when saving fails', f
     'slack' => [Slack::class, 'slackWebhookUrl', 'deploymentSuccessSlackNotifications', 'slackNotificationSettings', 'deployment_success_slack_notifications'],
 ]);
 
+it('turns the automatic security updates event off and on for every channel', function (string $component, string $channel) {
+    [, $team] = actingAsEnableActionOwner();
+    $property = 'serverAutoUpdate'.ucfirst($channel).'Notifications';
+    $column = "server_auto_update_{$channel}_notifications";
+    $settings = $team->{$channel.'NotificationSettings'};
+    expect((bool) $settings->{$column})->toBeTrue();
+
+    $page = Livewire::test($component)->call('toggleEvent', $property)->assertSet($property, false);
+    expect((bool) $settings->fresh()->{$column})->toBeFalse();
+
+    $page->call('toggleEvent', $property)->assertSet($property, true);
+    expect((bool) $settings->fresh()->{$column})->toBeTrue();
+})->with([
+    'email' => [Email::class, 'email'],
+    'discord' => [Discord::class, 'discord'],
+    'slack' => [Slack::class, 'slack'],
+    'telegram' => [Telegram::class, 'telegram'],
+    'pushover' => [Pushover::class, 'pushover'],
+    'webhook' => [Webhook::class, 'webhook'],
+]);
+
 it('reverts the discord mention setting to the saved value when saving fails', function () {
     [, $team] = actingAsEnableActionOwner();
     $team->discordNotificationSettings->update(['discord_ping_enabled' => true]);

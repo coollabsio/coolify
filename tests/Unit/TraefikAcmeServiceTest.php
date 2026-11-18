@@ -53,10 +53,9 @@ it('removes only the selected certificate and preserves all other ACME data', fu
     $service = app(TraefikAcmeService::class);
     $certificates = $service->certificates(traefikAcmeFixture());
 
-    $updated = json_decode($service->deleteCertificate(
+    $updated = json_decode($service->deleteCertificates(
         traefikAcmeFixture(),
-        'letsencrypt',
-        $certificates[0]['id'],
+        [$certificates[0]['id']],
     ), true, flags: JSON_THROW_ON_ERROR);
 
     expect($updated['letsencrypt']['Account']['Email'])->toBe('admin@example.com')
@@ -70,7 +69,7 @@ it('rejects invalid files and unknown certificate identifiers', function () {
 
     expect(fn () => $service->certificates('{invalid'))
         ->toThrow(RuntimeException::class, 'invalid JSON')
-        ->and(fn () => $service->deleteCertificate(traefikAcmeFixture(), 'letsencrypt', 'missing'))
+        ->and(fn () => $service->deleteCertificates(traefikAcmeFixture(), ['missing']))
         ->toThrow(RuntimeException::class, 'could not be found');
 });
 
@@ -88,3 +87,42 @@ it('reads the expiry date from the base64-encoded PEM chain Traefik stores', fun
 
     expect(app(TraefikAcmeService::class)->certificates($contents)[0]['expires_at'])->toBe($expiresAt);
 });
+
+it('removes several certificates of different resolvers in one pass', function () {
+    $service = app(TraefikAcmeService::class);
+    $certificates = $service->certificates(traefikAcmeFixture());
+
+    $updated = json_decode($service->deleteCertificates(
+        traefikAcmeFixture(),
+        [$certificates[1]['id'], $certificates[2]['id']],
+    ), true, flags: JSON_THROW_ON_ERROR);
+
+    expect(collect($updated['letsencrypt']['Certificates'])->pluck('domain.main')->all())->toBe(['example.com'])
+        ->and($updated['zerossl']['Certificates'])->toBe([])
+        ->and($updated['zerossl']['Account']['Email'])->toBe('admin@example.org')
+        ->and(fn () => $service->deleteCertificates(traefikAcmeFixture(), [$certificates[0]['id'], 'missing']))
+        ->toThrow(RuntimeException::class, 'could not be found');
+});
+
+it('finds the host names in Traefik labels, configuration files, and resource URLs', function () {
+    $text = '{"traefik.http.routers.http-0-abc.rule":"Host(`App.Example.com`) && PathPrefix(`/`)"}'."\n"
+        ."rule: Host(`api.example.net`)\ndomains:\n  - main: '*.wild.example.org'\nhttps://shop.example.com:8443/path,http://www.example.com";
+
+    expect(app(TraefikAcmeService::class)->hostnames($text))
+        ->toHaveKeys(['app.example.com', 'api.example.net', '*.wild.example.org', 'shop.example.com', 'www.example.com']);
+});
+
+it('treats a certificate as used when a host matches its domain, an alternative name, or its wildcard', function (array $hosts, bool $inUse) {
+    $certificate = ['main_domain' => 'Example.com', 'sans' => ['www.example.com', '*.apps.example.com']];
+
+    expect(app(TraefikAcmeService::class)->isInUse($certificate, array_fill_keys($hosts, true)))->toBe($inUse);
+})->with([
+    'main domain' => [['example.com'], true],
+    'alternative name' => [['www.example.com'], true],
+    'host below the wildcard' => [['shop.apps.example.com'], true],
+    'wildcard named in the configuration' => [['*.apps.example.com'], true],
+    'host two levels below the wildcard' => [['a.shop.apps.example.com'], false],
+    'parent of the wildcard' => [['apps.example.com'], false],
+    'other domain' => [['example.net', 'other.example.com'], false],
+    'no hosts' => [[], false],
+]);

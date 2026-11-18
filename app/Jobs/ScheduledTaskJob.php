@@ -11,6 +11,7 @@ use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
+use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use App\Services\ScheduledJobDeliveryService;
@@ -178,8 +179,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 });
             }
+            // A stopped resource is not a task failure: it sends no notification and does not count toward auto-disable.
             if (count($this->containers) == 0) {
-                throw new \Exception('ScheduledTaskJob failed: No containers running.');
+                $this->task_log->update([
+                    'status' => 'skipped',
+                    'message' => 'Skipped: the resource has no running container.',
+                ]);
+
+                return;
             }
 
             if (count($this->containers) > 1 && empty($this->task->container)) {
@@ -188,9 +195,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || $containerName === $this->task->container || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
-                    $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
-                    $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName)." {$cmd}";
+                    $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName).' '.$this->task->containerCommand();
                     $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
@@ -201,6 +207,15 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     ]);
 
                     $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
+                    if ($this->task->recordSuccess()) {
+                        $this->team?->notify(new ScheduledJobRecovered(
+                            failureEvent: 'scheduled_task_failure',
+                            title: "Scheduled task ({$this->task->name}) works again.",
+                            webhookEvent: 'task_recovered',
+                            url: $this->task->url(),
+                            webhookData: ['task_name' => $this->task->name, 'task_uuid' => $this->task->uuid],
+                        ));
+                    }
 
                     return;
                 }
@@ -344,7 +359,16 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        // Notify team about permanent failure
-        $this->team?->notify(new TaskFailed($this->task, $safeErrorMessage));
+        try {
+            $disabled = $this->task->recordFailure();
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Could not record the scheduled task failure', [
+                'task_id' => $this->task->uuid,
+                'error' => $e->getMessage(),
+            ]);
+            $disabled = false;
+        }
+
+        $this->team?->notify(new TaskFailed($this->task, $safeErrorMessage, disabled: $disabled));
     }
 }

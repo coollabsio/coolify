@@ -5,9 +5,18 @@
     x: 0,
     y: 0,
     below: false,
+    wrap: false,
     activeTarget: null,
+    label(target) {
+        return target.dataset.tooltip || target.getAttribute('aria-label') || target.title;
+    },
+    {{-- Close and dismiss (X) buttons are obvious, so they get no tooltip. --}}
+    isDismiss(target) {
+        return /^(close|dismiss)\b/i.test(this.label(target) || '');
+    },
     isIconAction(target) {
         if (target.matches('[data-icon-tooltip-ignore]')) return false;
+        if (this.isDismiss(target)) return false;
         if (target.matches('[data-tooltip], .icon-button')) return true;
         return target.hasAttribute('aria-label')
             && target.childElementCount === 1
@@ -15,9 +24,11 @@
     },
     prepare(root) {
         root.querySelectorAll?.('button[title], a[title], [data-tooltip]').forEach((target) => {
-            if (!this.isIconAction(target)) return;
-            target.dataset.iconTooltip = target.dataset.tooltip || target.getAttribute('aria-label') || target.title;
-            if (!target.getAttribute('aria-label')) target.setAttribute('aria-label', target.dataset.iconTooltip);
+            const dismiss = this.isDismiss(target);
+            if (!dismiss && !this.isIconAction(target)) return;
+            const label = this.label(target);
+            if (!dismiss) target.dataset.iconTooltip = label;
+            if (!target.getAttribute('aria-label')) target.setAttribute('aria-label', label);
             target.removeAttribute('title');
         });
     },
@@ -34,6 +45,8 @@
         if (!text) return;
         this.activeTarget = target;
         this.text = text;
+        {{-- Long sentences opt in to wrapping with data-tooltip-wrap; short labels stay on one line. --}}
+        this.wrap = target.hasAttribute('data-tooltip-wrap');
         this.positioned = false;
         this.visible = true;
         const rect = target.getBoundingClientRect();
@@ -74,7 +87,7 @@
         x-transition:leave="transition-opacity ease-in duration-75"
         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
         :style="`left: ${x}px; top: ${y}px;`"
-        :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
-        class="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-dropdown dark:border-white/10 dark:bg-raised">
+        :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible', wrap ? 'max-w-xs whitespace-normal' : 'whitespace-nowrap']"
+        class="pointer-events-none fixed z-[10000] rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-dropdown dark:border-white/10 dark:bg-raised">
     </div>
 </div>

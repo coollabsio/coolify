@@ -37,7 +37,6 @@
         "phpseclib/phpseclib": "^3.0.57",
         "pion/laravel-chunk-upload": "^1.6.3",
         "poliander/cron": "^3.3.1",
-        "purplepixie/phpdns": "^2.4.0",
         "pusher/pusher-php-server": "^7.3.0",
         "resend/resend-laravel": "^1.6.0",
         "socialiteproviders/authentik": "^5.3.0",

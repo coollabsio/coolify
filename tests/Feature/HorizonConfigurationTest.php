@@ -98,12 +98,13 @@ test('cloud production runs one fixed-size pool per queue with default process c
         'HORIZON_DEFAULT_PROCESSES' => null,
         'HORIZON_MAINTENANCE_PROCESSES' => null,
         'HORIZON_WEBHOOKS_PROCESSES' => null,
+        'HORIZON_SENTINEL_PROCESSES' => null,
     ]));
 
     $production = $parsed['production'];
-    expect(array_keys($production))->toBe(['deployments', 'crons', 'high', 'default', 'maintenance', 'webhooks']);
+    expect(array_keys($production))->toBe(['deployments', 'crons', 'high', 'default', 'maintenance', 'webhooks', 'sentinel']);
 
-    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 60, 'webhooks' => 10] as $queue => $processes) {
+    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 60, 'webhooks' => 10, 'sentinel' => 20] as $queue => $processes) {
         $pool = $production[$queue];
         expect($pool->queue)->toBe($queue)
             ->and($pool->balancing())->toBeFalse()
@@ -152,7 +153,7 @@ test('cloud queue helpers route to queues that have a dedicated pool', function 
 
     $production = horizonSupervisorsFor(loadHorizonConfigWithEnv(['SELF_HOSTED' => 'false']))['production'];
 
-    expect($production)->toHaveKeys([deployment_queue(), crons_queue(), maintenance_queue(), webhooks_queue()]);
+    expect($production)->toHaveKeys([deployment_queue(), crons_queue(), maintenance_queue(), webhooks_queue(), sentinel_queue()]);
 });
 
 test('self-hosted queue helpers route to a queue the s6 supervisor drains', function () {

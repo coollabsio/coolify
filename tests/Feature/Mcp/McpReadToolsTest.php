@@ -7,6 +7,7 @@ use App\Mcp\Tools\CoolifyHelp;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\CloudProviderToken;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
@@ -901,6 +902,35 @@ test('list_applications list_databases list_services server_uuid filters use des
     $serviceUuids = collect(mcpReadJson($services)['data'])->pluck('uuid');
     expect($serviceUuids)->toContain($swarmService->uuid)
         ->not->toContain($otherServerService->uuid);
+});
+
+test('cloud_provider list_tokens rejects a team member with a read token', function () {
+    CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Production Hetzner',
+        'provider' => 'hetzner',
+    ]);
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    session(['currentTeam' => $this->team]);
+    $memberToken = $member->createToken('member-read', ['read'])->plainTextToken;
+    auth()->forgetGuards();
+
+    $response = $this->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$memberToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => 'cloud_provider', 'arguments' => (object) ['action' => 'list_tokens']],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue()
+        ->and($response->getContent())->not->toContain('Production Hetzner');
 });
 
 test('list_tags and get_current_team and list_team_members are team scoped', function () {
@@ -2644,4 +2674,22 @@ test('redactLogText redacts JSON secret fields in log lines', function () {
         ->and($mixed)->not->toContain('redactme02')
         ->and($mixed)->not->toContain('redactme03')
         ->and($mixed)->toContain(REDACTED);
+});
+
+test('get_service does not return the server of the service', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('get_service', ['uuid' => $service->uuid]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['uuid'])->toBe($service->uuid)
+        ->and($data)->toHaveKey('server_status')
+        ->and($data)->not->toHaveKey('server')
+        ->and(json_encode($data))->not->toContain($this->server->ip);
 });

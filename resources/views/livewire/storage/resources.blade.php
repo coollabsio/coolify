@@ -17,11 +17,12 @@
 
             <div class="overflow-x-auto">
                 <div
-                    class="grid min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    class="grid min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(12rem,1.2fr)_4.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Backup target</div>
                     <div>Frequency</div>
                     <div>Status</div>
                     <div>Storage</div>
+                    <div class="text-right">Actions</div>
                 </div>
                 @foreach ($groupedBackups as $backups)
                     @php
@@ -77,7 +78,7 @@
                             ])->values()->all();
                         @endphp
                         <div
-                            class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
+                            class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(12rem,1.2fr)_4.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
                             x-show="search === '' || '{{ strtolower(addslashes($databaseName)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($backup->frequency)) }}'.includes(search.toLowerCase())">
                             <div class="min-w-0">
                                 @if ($resourceLink)
@@ -104,16 +105,20 @@
                                     portal />
                                 <button type="button" class="button shrink-0"
                                     wire:click="moveBackup({{ $backup->id }})">Move</button>
-                                <div wire:key="disableS3-{{ $backup->id }}">
-                                    <x-modal-confirmation title="Remove this storage from the backup schedule?"
-                                        submitAction="disableS3({{ $backup->id }})" :confirmWithText="false"
-                                        :confirmWithPassword="false" step2ButtonText="Remove storage"
-                                        :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
-                                        <x-slot:trigger>
-                                            <button type="button" class="button shrink-0 text-error">Disable</button>
-                                        </x-slot:trigger>
-                                    </x-modal-confirmation>
-                                </div>
+                            </div>
+                            <div class="flex justify-end" wire:key="disableS3-{{ $backup->id }}">
+                                <x-modal-confirmation title="Remove this storage from the backup schedule?"
+                                    submitAction="disableS3({{ $backup->id }})" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Remove storage"
+                                    :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
+                                    <x-slot:trigger>
+                                        <button type="button"
+                                            class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                            title="Disable storage" aria-label="Remove this storage from the backup schedule">
+                                            <x-reicon name="trash" class="size-3.5" />
+                                        </button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
                             </div>
                         </div>
                     @endforeach
@@ -131,7 +136,7 @@
                         ])->values()->all();
                     @endphp
                     <div
-                        class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
+                        class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(12rem,1.2fr)_4.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
                         x-show="search === '' || '{{ strtolower(addslashes($targetName)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($targetType)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($resourceName ?? '')) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($backup->frequency)) }}'.includes(search.toLowerCase())">
                         <div class="min-w-0">
                             <div class="truncate font-medium text-black dark:text-fg">{{ $targetName }}</div>
@@ -149,16 +154,20 @@
                                 portal />
                             <button type="button" class="button shrink-0"
                                 wire:click="moveVolumeBackup({{ $backup->id }})">Move</button>
-                            <div wire:key="disableVolumeS3-{{ $backup->id }}">
-                                <x-modal-confirmation title="Remove this storage from the backup schedule?"
-                                    submitAction="disableVolumeS3({{ $backup->id }})" :confirmWithText="false"
-                                    :confirmWithPassword="false" step2ButtonText="Remove storage"
-                                    :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
-                                    <x-slot:trigger>
-                                        <button type="button" class="button shrink-0 text-error">Disable</button>
-                                    </x-slot:trigger>
-                                </x-modal-confirmation>
-                            </div>
+                        </div>
+                        <div class="flex justify-end" wire:key="disableVolumeS3-{{ $backup->id }}">
+                            <x-modal-confirmation title="Remove this storage from the backup schedule?"
+                                submitAction="disableVolumeS3({{ $backup->id }})" :confirmWithText="false"
+                                :confirmWithPassword="false" step2ButtonText="Remove storage"
+                                :actions="['Backups from this schedule will no longer be uploaded to this storage. S3 backup turns off when no other storage remains.']">
+                                <x-slot:trigger>
+                                    <button type="button"
+                                        class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                        title="Disable storage" aria-label="Remove this storage from the backup schedule">
+                                        <x-reicon name="trash" class="size-3.5" />
+                                    </button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
                         </div>
                     </div>
                 @endforeach

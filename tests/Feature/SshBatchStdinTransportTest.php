@@ -31,6 +31,8 @@ const SSH_STDIN_SECRET = 'rr-n5-secret-Zq81xLp';
 
 beforeEach(function () {
     config()->set('constants.ssh.mux_enabled', false);
+    // The stub ssh cannot answer the host key scan.
+    config()->set('constants.ssh.host_key_checking', 'off');
     config()->set('constants.ssh.max_retries', 3);
     config()->set('constants.ssh.retry_base_delay', 0);
     config()->set('constants.ssh.retry_max_delay', 0);

@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -202,9 +204,38 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($configuration['options'] as $key => $value) {
             $command .= ' --opt '.escapeshellarg("{$key}={$value}");
         }
+        foreach ($this->composeVolumeLabels() as $key => $value) {
+            $command .= ' --label '.escapeshellarg("{$key}={$value}");
+        }
         $command .= ' '.escapeshellarg($this->targetVolume);
 
         return 'sh -c '.escapeshellarg($command);
+    }
+
+    /**
+     * The labels that Docker Compose puts on a volume it creates. Without the project label, every
+     * `docker compose up` of the resource warns that the volume "was not created by Docker Compose".
+     * The project is the `--project-name` of the resource: the service UUID for a service, else the
+     * resource UUID (a standalone database uses its configuration directory, which is its UUID).
+     * The volume key in the generated Compose file is the volume name.
+     *
+     * @return array<string, string>
+     */
+    protected function composeVolumeLabels(): array
+    {
+        $resource = $this->persistentVolume->resource;
+        $project = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase
+            ? $resource->service?->uuid
+            : $resource?->uuid;
+
+        if (blank($project)) {
+            return [];
+        }
+
+        return [
+            'com.docker.compose.project' => (string) $project,
+            'com.docker.compose.volume' => $this->targetVolume,
+        ];
     }
 
     /**

@@ -96,9 +96,6 @@ function fakeGithubInstallationVerification(int $appId, string $apiUrl = 'https:
 {
     Http::preventStrayRequests();
     Http::fake([
-        "{$apiUrl}/zen" => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         "{$apiUrl}/app/installations/*" => Http::response([
             'id' => 555,
             'app_id' => $appId,
@@ -110,9 +107,6 @@ function fakeGithubInstallationVerificationFailure(): void
 {
     Http::preventStrayRequests();
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/*' => Http::response(['message' => 'Not Found'], 404),
     ]);
 }
@@ -367,7 +361,6 @@ it('verifies ghe dot com installations through the data residency api host', fun
     $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
         ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/zen');
     Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/app/installations/123456');
 });
 
@@ -420,9 +413,11 @@ it('redirects to the github app with the reason when the server clock is out of 
     configureGithubAppCredentials($this->githubApp);
     Http::preventStrayRequests();
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->addMinutes(5)->toRfc7231String(),
-        ]),
+        'https://api.github.com/app/installations/*' => Http::response(
+            ['message' => "'Issued at' claim ('iat') must be an Integer representing a time in the past"],
+            401,
+            ['Date' => now()->addMinutes(5)->toRfc7231String()],
+        ),
     ]);
     cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 

@@ -56,7 +56,7 @@ function runInstallScriptDockerDaemonStep(string $scriptPath, ?string $daemonJso
     return ['config' => $config, 'restarted' => str_contains($output, 'RESTARTED'), 'output' => $output];
 }
 
-$installScripts = ['stable install' => 'scripts/install.sh', 'nightly install' => 'other/nightly/install.sh'];
+$installScripts = ['stable install' => 'scripts/install.sh'];
 
 it('does not create daemon.json or restart Docker when containers are running', function (string $scriptPath) {
     $result = runInstallScriptDockerDaemonStep($scriptPath, null, runningContainers: 30);

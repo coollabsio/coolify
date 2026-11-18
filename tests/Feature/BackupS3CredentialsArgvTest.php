@@ -63,6 +63,8 @@ function s3ArgvTestSetup(string $sshUser): array
     $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->shouldReceive('files')->zeroOrMoreTimes()->andReturn([]);
     $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
+    $disk->shouldReceive('temporaryUploadUrl')->zeroOrMoreTimes()
+        ->andReturnUsing(fn (string $key) => ['url' => "https://8.8.8.8/storage/v1/s3/bucket/{$key}?X-Amz-Signature=presigned", 'headers' => []]);
     $sshDisk = Storage::fake('ssh-keys');
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
@@ -205,6 +207,36 @@ it('makes mc use virtual-hosted-style URLs when the storage turns path-style URL
     'virtual-hosted-style' => [false, 'mc alias set --api S3v4 --path off temporary https://8.8.8.8'],
 ]);
 
+it('makes mc skip the TLS certificate check only when the storage skips it', function (bool $skipTlsVerification) {
+    [$team, $server, $storage] = s3ArgvTestSetup('root');
+    $storage->update(['skip_tls_verification' => $skipTlsVerification]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $database = create_standalone_postgresql($environment->id, $destination, ['status' => 'running:healthy']);
+    $backup = new ScheduledDatabaseBackup;
+    $backup->forceFill([
+        'enabled' => true,
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $storage->id,
+        'frequency' => 'daily',
+        'databases_to_backup' => 'app',
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'team_id' => $team->id,
+    ])->save();
+    $backup->syncS3Storages([$storage->id]);
+    $processes = s3ArgvTestFakeSsh();
+
+    (new DatabaseBackupJob($backup->fresh()))->handle();
+
+    $helperStart = $processes->sole(fn (array $process) => str_contains($process['command']."\n".$process['input'], '--name backup-of-'));
+    expect(str_contains($helperStart['command']."\n".$helperStart['input'], '-e MC_INSECURE=true'))->toBe($skipTlsVerification);
+})->with([
+    'checks the certificate' => [false],
+    'skips the check' => [true],
+]);
+
 it('passes the S3 keys of a volume backup to mc on stdin, not in a command line', function (string $sshUser, bool $streamToS3) {
     [$team, $server, $storage] = s3ArgvTestSetup($sshUser);
     $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
@@ -237,3 +269,89 @@ it('passes the S3 keys of a volume backup to mc on stdin, not in a command line'
         ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], 'mc pipe')))->toBe($streamToS3);
     s3ArgvTestAssertSecretOnlyOnStdin($processes, $sshUser !== 'root');
 })->with(['root', 'deploy'])->with(['local archive upload' => false, 'S3-only stream' => true]);
+
+/**
+ * @param  Collection<int, array{command: string, input: ?string}>  $processes
+ */
+function s3ArgvTestAssertCurlUpload(Collection $processes, string $backupLocation, bool $nonRoot): void
+{
+    $configProcess = $processes->sole(fn (array $process) => str_contains($process['command'], 'cat > /tmp/s3-transfer.curl'));
+    $otherProcesses = $processes->reject(fn (array $process) => $process === $configProcess);
+
+    expect($configProcess['input'])->toBe(implode("\n", [
+        'url = "https://8.8.8.8/storage/v1/s3/bucket/'.ltrim($backupLocation, '/').'?X-Amz-Signature=presigned"',
+        'silent',
+        'show-error',
+        'upload-file = "'.$backupLocation.'"',
+        'fail-with-body',
+        'output = "/dev/stderr"',
+    ])."\n")
+        ->and(str_contains($configProcess['command'], 'sudo docker exec -i'))->toBe($nonRoot)
+        ->and($otherProcesses->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], 'curl --config /tmp/s3-transfer.curl')))->toBeTrue()
+        ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], 'mc alias set')))->toBeFalse()
+        ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], 'mc pipe')))->toBeFalse()
+        ->and($otherProcesses->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], 'X-Amz-Signature')))->toBeFalse()
+        ->and($processes->contains(fn (array $process) => str_contains($process['command']."\n".$process['input'], S3_ARGV_TEST_SECRET)))->toBeFalse();
+}
+
+it('uploads a database backup with curl and a presigned URL when the endpoint has a path', function (string $sshUser) {
+    [$team, $server, $storage] = s3ArgvTestSetup($sshUser);
+    $storage->update(['endpoint' => 'https://8.8.8.8/storage/v1/s3']);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $database = create_standalone_postgresql($environment->id, $destination, ['status' => 'running:healthy']);
+    $backup = new ScheduledDatabaseBackup;
+    $backup->forceFill([
+        'enabled' => true,
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $storage->id,
+        'frequency' => 'daily',
+        'databases_to_backup' => 'app',
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'team_id' => $team->id,
+    ])->save();
+    $backup->syncS3Storages([$storage->id]);
+    $processes = s3ArgvTestFakeSsh();
+
+    (new DatabaseBackupJob($backup->fresh()))->handle();
+
+    $execution = $backup->executions()->sole();
+    expect($execution->s3_uploaded)->toBeTrue();
+    s3ArgvTestAssertCurlUpload($processes, $execution->filename, $sshUser !== 'root');
+})->with(['root', 'deploy']);
+
+it('writes a local archive and uploads it with curl when a volume backup endpoint has a path', function () {
+    [$team, $server, $storage] = s3ArgvTestSetup('root');
+    $storage->update(['endpoint' => 'https://8.8.8.8/storage/v1/s3']);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $volume = LocalPersistentVolume::create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $storage->id,
+    ]);
+    $processes = s3ArgvTestFakeSsh();
+
+    (new VolumeBackupJob($backup))->handle();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($execution->status)->toBe('success')
+        ->and($execution->s3_uploaded)->toBeTrue()
+        ->and($execution->local_storage_deleted)->toBeTrue();
+    s3ArgvTestAssertCurlUpload($processes, $execution->filename, false);
+});

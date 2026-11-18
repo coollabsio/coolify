@@ -757,9 +757,7 @@ describe('validation', function () {
     });
 
     it('accepts external volumes with a literal name', function (string $compose) {
-        validateDockerComposeForInjection($compose);
-
-        expect(true)->toBeTrue();
+        expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
     })->with([
         'short' => [EXTERNAL_VOLUME_SHORT_COMPOSE],
         'long' => [EXTERNAL_VOLUME_LONG_COMPOSE],

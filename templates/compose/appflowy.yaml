@@ -225,6 +225,8 @@ services:
       - GOTRUE_DISABLE_SIGNUP=false
       - GOTRUE_SITE_URL=appflowy-flutter://
       - GOTRUE_URI_ALLOW_LIST=**
+      # AppFlowy Web sends Redirect_to cross-origin, which GoTrue's CORS preflight rejects by default
+      - GOTRUE_CORS_ALLOWED_HEADERS=redirect_to
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
       - GOTRUE_DB_DRIVER=postgres

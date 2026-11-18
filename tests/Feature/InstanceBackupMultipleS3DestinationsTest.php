@@ -14,9 +14,11 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Database\BackupFailed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -134,4 +136,86 @@ it('links the instance backup from the storage resources page', function () {
     Livewire::test(StorageResources::class, ['storage' => $this->secondStorage])
         ->assertSee('coolify-db')
         ->assertSeeHtml(route('settings.backup'));
+});
+
+it('lets a root team owner enable S3 for the instance backup', function () {
+    $owner = User::factory()->create();
+    $this->rootTeam->members()->attach($owner->id, ['role' => 'owner']);
+    $this->actingAs($owner);
+
+    Livewire::test(BackupEdit::class, ['backup' => $this->backup->fresh(), 'availableS3Storages' => collect()])
+        ->set('saveS3', true)
+        ->set('s3StorageIds', [$this->firstStorage->id])
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($this->backup->fresh()->save_s3)->toBeTruthy();
+});
+
+it('denies a root team member to enable S3 for the instance backup', function () {
+    $member = User::factory()->create();
+    $this->rootTeam->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(BackupEdit::class, ['backup' => $this->backup->fresh(), 'availableS3Storages' => collect()])
+        ->set('saveS3', true)
+        ->set('s3StorageIds', [$this->firstStorage->id])
+        ->call('submit');
+
+    expect($this->backup->fresh()->save_s3)->toBeFalsy();
+});
+
+it('finds the root team when a root team admin downloads an instance backup', function () {
+    $execution = ScheduledDatabaseBackupExecution::create([
+        'scheduled_database_backup_id' => $this->backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/coolify/coolify-db-0/pg-dump-coolify-1.dmp',
+        'local_storage_deleted' => true,
+    ]);
+
+    $this->get(route('download.backup', $execution->id))
+        ->assertNotFound()
+        ->assertJson(['message' => 'Backup not found locally on the server.']);
+});
+
+it('denies a root team member to download an instance backup', function () {
+    $member = User::factory()->create();
+    $this->rootTeam->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    $execution = ScheduledDatabaseBackupExecution::create([
+        'scheduled_database_backup_id' => $this->backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/coolify/coolify-db-0/pg-dump-coolify-1.dmp',
+        'local_storage_deleted' => true,
+    ]);
+
+    $this->get(route('download.backup', $execution->id))->assertForbidden();
+});
+
+it('links instance backup notifications to the instance backup page', function () {
+    $notification = new BackupFailed($this->backup, $this->database->fresh(), 'error', 'coolify');
+
+    expect($notification->toWebhook()['url'])->toBe(route('settings.backup'));
+});
+
+it('hides the instance database from the API of the root team', function () {
+    InstanceSettings::find(0)->update(['is_api_enabled' => true]);
+    $this->app['auth']->forgetGuards();
+    $owner = User::factory()->create();
+    $this->rootTeam->members()->attach($owner->id, ['role' => 'owner']);
+    $plainTextToken = Str::random(40);
+    $token = $owner->tokens()->create([
+        'name' => 'root',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['root'],
+        'team_id' => 0,
+    ]);
+    $this->withToken($token->getKey().'|'.$plainTextToken);
+    $uuid = $this->database->fresh()->uuid;
+
+    $this->getJson("/api/v1/databases/{$uuid}")->assertNotFound();
+    $this->deleteJson("/api/v1/databases/{$uuid}")->assertNotFound();
+
+    expect(StandalonePostgresql::find(0))->not->toBeNull();
 });

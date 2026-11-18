@@ -123,7 +123,7 @@ class AuditEvent extends Model
      */
     public static function recordModelMutation(string $event, array $context, array $changes): void
     {
-        self::recordWithChanges($event, $context, $changes);
+        self::recordWithChanges($event, $context, $changes ?: null);
     }
 
     /**
@@ -135,17 +135,21 @@ class AuditEvent extends Model
         try {
             $attributes = self::attributesFor($event, $context, $changes, $level);
 
+            // Write at commit, not with defer(): PHP skips the terminate phase when it stops a
+            // request early (client abort, fatal error), and the committed change would have no row.
             DB::afterCommit(function () use ($attributes): void {
-                defer(function () use ($attributes): void {
+                try {
+                    self::query()->create($attributes);
+                } catch (Throwable $exception) {
                     try {
-                        self::query()->create($attributes);
-                    } catch (Throwable $exception) {
                         Log::warning('Audit event persistence failed', [
                             'event' => $attributes['event'],
                             'exception' => $exception::class,
                         ]);
+                    } catch (Throwable) {
+                        // Audit failures must not interrupt the action.
                     }
-                })->always();
+                }
             });
         } catch (Throwable $exception) {
             Log::warning('Audit event preparation failed', [
@@ -161,6 +165,11 @@ class AuditEvent extends Model
      */
     private static function attributesFor(string $event, array $context, ?array $changes, string $level): array
     {
+        // API tokens store team_id as a string. Keep it an integer, so JSON filters on metadata work.
+        if (is_string($context['team_id'] ?? null) && ctype_digit($context['team_id'])) {
+            $context['team_id'] = (int) $context['team_id'];
+        }
+
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
             ?? (array_key_exists('team_id', $context)
                 ? $context['team_id']
@@ -198,10 +207,12 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes', 'actor_email', 'actor_ip', 'actor_user_agent'])),
             'changes' => $changes,
-            'ip_address' => app()->bound('request') ? (client_ip(request()) ?: null) : null,
-            'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
+            'ip_address' => data_get($context, 'actor_ip')
+                ?? (app()->bound('request') ? (client_ip(request()) ?: null) : null),
+            'user_agent' => Str::limit((string) (data_get($context, 'actor_user_agent')
+                ?? (app()->bound('request') ? request()->userAgent() : null)), 200, '') ?: null,
         ];
     }
 
@@ -228,6 +239,53 @@ class AuditEvent extends Model
         return Application::query()
             ->where('uuid', $applicationUuid)
             ->first()?->team()?->id;
+    }
+
+    /**
+     * Removes the personal data of a deleted user: from the events that the user did,
+     * and from the events about the user (team member, impersonation, deletion).
+     */
+    public static function anonymizeUser(User $user): void
+    {
+        $replacement = '[deleted user]';
+        $personalValues = array_filter([Str::lower((string) $user->email), Str::lower((string) $user->name)]);
+
+        self::query()
+            ->where(fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query->where('actor_type', 'user')->where('actor_id', $user->id))
+                ->orWhereJsonContains('metadata->member_id', $user->id)
+                ->orWhereJsonContains('metadata->target_user_id', $user->id)
+                ->orWhereJsonContains('metadata->deleted_user_id', $user->id))
+            ->chunkById(self::PRUNE_BATCH_SIZE, function ($events) use ($personalValues, $replacement, $user): void {
+                foreach ($events as $event) {
+                    if ($event->actor_type === 'user' && (int) $event->actor_id === (int) $user->id) {
+                        $event->actor_name = $replacement;
+                        $event->actor_email = null;
+                        $event->ip_address = null;
+                        $event->user_agent = null;
+                    }
+
+                    if ($event->resource_name !== null && in_array(Str::lower($event->resource_name), $personalValues, true)) {
+                        $event->description = $replacement.substr($event->description, strlen($event->resource_name));
+                        $event->resource_name = $replacement;
+                    }
+
+                    $event->metadata = self::replacePersonalValues($event->metadata, $personalValues, $replacement);
+                    $event->save();
+                }
+            });
+    }
+
+    /**
+     * @param  array<int, string>  $personalValues
+     */
+    private static function replacePersonalValues(mixed $value, array $personalValues, string $replacement): mixed
+    {
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => self::replacePersonalValues($item, $personalValues, $replacement), $value);
+        }
+
+        return is_string($value) && in_array(Str::lower($value), $personalValues, true) ? $replacement : $value;
     }
 
     /**

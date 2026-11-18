@@ -20,6 +20,18 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
+                        {{-- Only the view that is not current shows, as an icon: the button switches to that view. --}}
+                        <div class="view-toggle w-fit">
+                            @foreach (['list' => ['List view', 'unordered-list'], 'grid' => ['Grid view', 'grid']] as $mode => [$viewLabel, $icon])
+                                <button type="button" @click="setViewMode('{{ $mode }}')"
+                                    x-show="viewMode !== '{{ $mode }}'" x-cloak title="{{ $viewLabel }}"
+                                    aria-label="{{ $viewLabel }}"
+                                    class="relative flex h-7.5 w-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:hover:text-white">
+                                    <x-reicon :name="$icon" class="size-3.5" />
+                                </button>
+                            @endforeach
+                        </div>
+
                         <x-table.dropdown panel-class="w-48!">
                             <x-slot:trigger><button type="button" class="button"
                                 aria-haspopup="listbox" :aria-expanded="open">
@@ -95,7 +107,7 @@
             {{-- A full page load: the canvas uses the minimal layout. --}}
             <a href="{{ route('deploy-canvas', ['project' => data_get($parameters, 'project_uuid'), 'environment' => data_get($parameters, 'environment_uuid')]) }}"
                 x-show="search === ''"
-                class="mt-6 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
+                class="mt-6 flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-[0_1px_2px_rgb(0_0_0/0.05)] transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:shadow-none dark:hover:border-white/[0.14]">
                 <div
                     class="flex size-11 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                     <x-reicon name="deploy-canvas" class="size-5" />
@@ -116,7 +128,11 @@
             </a>
 
             <div x-show="loading" class="mt-6">
-                <x-skeleton.cards :count="6" label="Loading resources" />
+                <x-skeleton.cards x-show="viewMode === 'grid'" :count="6" label="Loading resources" />
+                <div x-show="viewMode === 'list'" x-cloak
+                    class="overflow-hidden rounded-xl border border-neutral-200 dark:border-white/[0.08]">
+                    <x-skeleton.list :rows="8" label="Loading resources" />
+                </div>
             </div>
             <div x-show="!loading" class="mt-6 flex flex-col gap-6">
                 <section
@@ -128,89 +144,94 @@
                             <h2>Applications</h2>
                         </div>
                     </div>
-                    <div
-                        class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
-                        <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
-                                @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
-                                @keydown.space.self.prevent="setType(application.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                                <div class="flex min-w-0 items-start gap-3">
+                    <div class="application-settings-section-body" :class="viewMode === 'list' && 'is-flush'">
+                        <div class="text-left" :class="viewClasses.container">
+                            <template x-for="application in filteredGitBasedApplications" :key="application.name">
+                                <article role="button" tabindex="0" :aria-label="'Configure ' + application.name"
+                                    @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
+                                    @keydown.space.self.prevent="setType(application.id)"
+                                    class="group flex cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                                    :class="viewClasses.item">
+                                    <div class="flex min-w-0 items-start gap-3" :class="viewClasses.header">
+                                        <div
+                                            class="flex shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]"
+                                            :class="viewClasses.logo">
+                                            <template x-if="!application.logoDark">
+                                                <img class="size-full object-contain" :src="application.logo" alt="" />
+                                            </template>
+                                            <template x-if="application.logoDark">
+                                                <span class="size-full">
+                                                    <img class="size-full object-contain block dark:hidden"
+                                                        :src="application.logo" alt="" />
+                                                    <img class="size-full object-contain hidden dark:block"
+                                                        :src="application.logoDark" alt="" />
+                                                </span>
+                                            </template>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
+                                                x-text="application.name"></h3>
+                                            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
+                                                Git source
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-[12px] leading-5 text-neutral-600 dark:text-fg-dim" :class="viewClasses.description"
+                                        x-html="window.sanitizeHTML(application.description)"></p>
+
                                     <div
-                                        class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <template x-if="!application.logoDark">
+                                        class="flex items-center gap-1.5" :class="viewClasses.footer">
+                                        <a class="icon-button" title="Documentation" aria-label="Documentation" :href="application.documentation" target="_blank"
+                                            rel="noopener noreferrer" @click.stop>
+                                            <x-reicon name="documentation" class="size-4" />
+                                        </a>
+                                        <span class="button" :class="viewClasses.action">
+                                            Configure
+                                            <x-reicon name="arrow-right" class="size-3.5" />
+                                        </span>
+                                    </div>
+                                </article>
+                            </template>
+
+                            <template x-for="application in filteredDockerBasedApplications" :key="application.name">
+                                <article role="button" tabindex="0" :aria-label="'Configure ' + application.name"
+                                    @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
+                                    @keydown.space.self.prevent="setType(application.id)"
+                                    class="group flex cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                                    :class="viewClasses.item">
+                                    <div class="flex min-w-0 items-start gap-3" :class="viewClasses.header">
+                                        <div
+                                            class="flex shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]"
+                                            :class="viewClasses.logo">
                                             <img class="size-full object-contain" :src="application.logo" alt="" />
-                                        </template>
-                                        <template x-if="application.logoDark">
-                                            <span class="size-full">
-                                                <img class="size-full object-contain block dark:hidden"
-                                                    :src="application.logo" alt="" />
-                                                <img class="size-full object-contain hidden dark:block"
-                                                    :src="application.logoDark" alt="" />
-                                            </span>
-                                        </template>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
+                                                x-text="application.name"></h3>
+                                            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
+                                                Docker source
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0 flex-1">
-                                        <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
-                                            x-text="application.name"></h3>
-                                        <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                                            Git source
-                                        </p>
-                                    </div>
-                                </div>
 
-                                <p class="mt-3 line-clamp-2 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim"
-                                    x-html="window.sanitizeHTML(application.description)"></p>
+                                    <p class="text-[12px] leading-5 text-neutral-600 dark:text-fg-dim" :class="viewClasses.description"
+                                        x-text="application.description"></p>
 
-                                <div
-                                    class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
-                                    <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer" @click.stop>
-                                        Docs
-                                    </a>
-                                    <span class="button button-highlighted ml-auto">
-                                        Deploy
-                                        <x-reicon name="arrow-right" class="size-3.5" />
-                                    </span>
-                                </div>
-                            </article>
-                        </template>
-
-                        <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
-                                @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
-                                @keydown.space.self.prevent="setType(application.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                                <div class="flex min-w-0 items-start gap-3">
                                     <div
-                                        class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <img class="size-full object-contain" :src="application.logo" alt="" />
+                                        class="flex items-center gap-1.5" :class="viewClasses.footer">
+                                        <a class="icon-button" title="Documentation" aria-label="Documentation" :href="application.documentation" target="_blank"
+                                            rel="noopener noreferrer" @click.stop>
+                                            <x-reicon name="documentation" class="size-4" />
+                                        </a>
+                                        <span class="button" :class="viewClasses.action">
+                                            Configure
+                                            <x-reicon name="arrow-right" class="size-3.5" />
+                                        </span>
                                     </div>
-                                    <div class="min-w-0 flex-1">
-                                        <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
-                                            x-text="application.name"></h3>
-                                        <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                                            Docker source
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <p class="mt-3 line-clamp-2 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim"
-                                    x-text="application.description"></p>
-
-                                <div
-                                    class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
-                                    <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer" @click.stop>
-                                        Docs
-                                    </a>
-                                    <span class="button button-highlighted ml-auto">
-                                        Deploy
-                                        <x-reicon name="arrow-right" class="size-3.5" />
-                                    </span>
-                                </div>
-                            </article>
-                        </template>
+                                </article>
+                            </template>
+                        </div>
                     </div>
                 </section>
 
@@ -223,62 +244,65 @@
                             <h2>Databases</h2>
                         </div>
                     </div>
-                    <div
-                        class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
-                        <template x-for="database in filteredDatabases" :key="database.id">
-                            <article role="button" tabindex="0" :aria-label="'Deploy ' + database.name"
-                                @click="setType(database.id)" @keydown.enter.self.prevent="setType(database.id)"
-                                @keydown.space.self.prevent="setType(database.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                                <div class="flex min-w-0 items-center gap-3">
+                    <div class="application-settings-section-body" :class="viewMode === 'list' && 'is-flush'">
+                        <div class="text-left" :class="viewClasses.container">
+                            <template x-for="database in filteredDatabases" :key="database.id">
+                                <article role="button" tabindex="0" :aria-label="'Configure ' + database.name"
+                                    @click="setType(database.id)" @keydown.enter.self.prevent="setType(database.id)"
+                                    @keydown.space.self.prevent="setType(database.id)"
+                                    class="group flex cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                                    :class="viewClasses.item">
+                                    <div class="flex min-w-0 items-center gap-3" :class="viewClasses.header">
+                                        <div
+                                            class="flex shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]"
+                                            :class="viewClasses.logo">
+                                            <template x-if="database.logo && database.logo.trim().startsWith('<')">
+                                                <span
+                                                    class="flex size-full items-center justify-center [&>div]:h-full! [&>div]:w-full! [&>div]:bg-transparent! [&>div]:p-0! [&>div>svg]:h-full! [&>div>svg]:w-full! [&>svg]:h-full! [&>svg]:w-full! [&>svg]:bg-transparent! [&>svg]:p-0!"
+                                                    x-html="database.logo"></span>
+                                            </template>
+                                            <template x-if="database.logo && !database.logo.trim().startsWith('<') && !database.logoDark">
+                                                <img class="size-full object-contain" :src="database.logo" alt="" />
+                                            </template>
+                                            <template x-if="database.logo && !database.logo.trim().startsWith('<') && database.logoDark">
+                                                <span class="size-full">
+                                                    <img class="size-full object-contain block dark:hidden"
+                                                        :src="database.logo" alt="" />
+                                                    <img class="size-full object-contain hidden dark:block"
+                                                        :src="database.logoDark" alt="" />
+                                                </span>
+                                            </template>
+                                        </div>
+                                        <div class="flex min-w-0 flex-1 items-center gap-2">
+                                            <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
+                                                x-text="database.name"></h3>
+                                            <template x-if="database.experimental">
+                                                <x-beta-badge class="shrink-0" />
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-[12px] leading-5 text-neutral-600 dark:text-fg-dim" :class="viewClasses.description"
+                                        x-text="database.description"></p>
+
                                     <div
-                                        class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <template x-if="database.logo && database.logo.trim().startsWith('<')">
-                                            <span
-                                                class="flex size-full items-center justify-center [&>div]:h-full! [&>div]:w-full! [&>div]:bg-transparent! [&>div]:p-0! [&>div>svg]:h-full! [&>div>svg]:w-full! [&>svg]:h-full! [&>svg]:w-full! [&>svg]:bg-transparent! [&>svg]:p-0!"
-                                                x-html="database.logo"></span>
-                                        </template>
-                                        <template x-if="database.logo && !database.logo.trim().startsWith('<') && !database.logoDark">
-                                            <img class="size-full object-contain" :src="database.logo" alt="" />
-                                        </template>
-                                        <template x-if="database.logo && !database.logo.trim().startsWith('<') && database.logoDark">
-                                            <span class="size-full">
-                                                <img class="size-full object-contain block dark:hidden"
-                                                    :src="database.logo" alt="" />
-                                                <img class="size-full object-contain hidden dark:block"
-                                                    :src="database.logoDark" alt="" />
-                                            </span>
-                                        </template>
+                                        class="flex items-center gap-1.5" :class="viewClasses.footer">
+                                        <a :href="databaseDocsUrl(database)" target="_blank" rel="noopener noreferrer"
+                                            class="icon-button" title="Documentation" aria-label="Documentation" @click.stop>
+                                            <x-reicon name="documentation" class="size-4" />
+                                        </a>
+                                        <a :href="databaseWebsiteUrl(database)" target="_blank" rel="noopener noreferrer"
+                                            class="icon-button" title="Website" aria-label="Website" @click.stop>
+                                            <x-reicon name="globe" class="size-4" />
+                                        </a>
+                                        <span class="button" :class="viewClasses.action">
+                                            Configure
+                                            <x-reicon name="arrow-right" class="size-3.5" />
+                                        </span>
                                     </div>
-                                    <div class="flex min-w-0 flex-1 items-center gap-2">
-                                        <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
-                                            x-text="database.name"></h3>
-                                        <template x-if="database.experimental">
-                                            <x-status-badge status="Experimental" type="warning" class="shrink-0" />
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <p class="mt-3 line-clamp-2 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim"
-                                    x-text="database.description"></p>
-
-                                <div
-                                    class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
-                                    <a :href="databaseDocsUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button" @click.stop>
-                                        Docs
-                                    </a>
-                                    <a :href="databaseWebsiteUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button" @click.stop>
-                                        Website
-                                    </a>
-                                    <span class="button button-highlighted ml-auto">
-                                        Deploy
-                                        <x-reicon name="arrow-right" class="size-3.5" />
-                                    </span>
-                                </div>
-                            </article>
-                        </template>
+                                </article>
+                            </template>
+                        </div>
                     </div>
                 </section>
 
@@ -297,22 +321,26 @@
                             </div>
                         </div>
                     </div>
-                    <div class="application-settings-section-body">
+                    <div class="application-settings-section-body" :class="viewMode === 'list' && 'is-flush'">
+                        <div :class="viewMode === 'list' && 'px-4 pt-4'">
                         <x-callout type="info" title="Trademarks policy" class="mb-4">
                             The respective trademarks mentioned here are owned by the respective companies, and use of them
                             does not imply any affiliation or endorsement.
                         </x-callout>
+                        </div>
 
-                        <div class="grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
+                        <div class="text-left" :class="viewClasses.container">
                             <template x-for="service in filteredServices" :key="service.name">
-                                <article role="button" tabindex="0" :aria-label="'Deploy ' + service.name"
+                                <article role="button" tabindex="0" :aria-label="'Configure ' + service.name"
                                     @click="setType('one-click-service-' + service.id)"
                                     @keydown.enter.self.prevent="setType('one-click-service-' + service.id)"
                                     @keydown.space.self.prevent="setType('one-click-service-' + service.id)"
-                                    class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
-                                    <div class="flex min-w-0 items-start gap-3">
+                                    class="group flex cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                                :class="viewClasses.item">
+                                    <div class="flex min-w-0 items-start gap-3" :class="viewClasses.header">
                                         <div
-                                            class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                                            class="flex shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]"
+                                        :class="viewClasses.logo">
                                             <img class="h-full w-full object-contain p-2" :src="service.logo"
                                                 x-on:error="if (!$el.dataset.cdnTried) { $el.dataset.cdnTried = 'true'; $el.src = service.logo_cdn_url; } else if (!$el.dataset.defaultTried) { $el.dataset.defaultTried = 'true'; $el.src = service.logo_default_url; }" />
                                         </div>
@@ -329,23 +357,23 @@
                                             x-text="service.arm_only ? 'ARM only' : 'AMD only'"></span>
                                     </div>
 
-                                    <p class="mt-3 line-clamp-2 text-[12px] leading-5 text-neutral-600 dark:text-fg-dim"
+                                    <p class="text-[12px] leading-5 text-neutral-600 dark:text-fg-dim" :class="viewClasses.description"
                                         x-text="service.slogan || service.description || 'Deploy this service with a ready-to-use Coolify template.'">
                                     </p>
 
                                     <div
-                                        class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
+                                        class="flex items-center gap-1.5" :class="viewClasses.footer">
                                         <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
                                             rel="noopener noreferrer" @mouseenter="resolveDocLink(service)" @click.stop
-                                            class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
-                                            Docs
+                                            class="icon-button" title="Documentation" aria-label="Documentation" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
+                                            <x-reicon name="documentation" class="size-4" />
                                         </a>
                                         <a x-show="service.website" :href="service.website"
-                                            target="_blank" rel="noopener noreferrer" class="button" @click.stop>
-                                            Website
+                                            target="_blank" rel="noopener noreferrer" class="icon-button" title="Website" aria-label="Website" @click.stop>
+                                            <x-reicon name="globe" class="size-4" />
                                         </a>
-                                        <span class="button button-highlighted ml-auto">
-                                            Deploy
+                                        <span class="button" :class="viewClasses.action">
+                                            Configure
                                             <x-reicon name="arrow-right" class="size-3.5" />
                                         </span>
                                     </div>
@@ -385,7 +413,34 @@
                                 label: 'Services'
                             }
                         ],
-                        filterOpen: false,
+                        viewMode: localStorage.getItem('new-resource-view') === 'grid' ? 'grid' : 'list',
+                        setViewMode(mode) {
+                            this.viewMode = mode;
+                            localStorage.setItem('new-resource-view', mode);
+                        },
+                        get viewClasses() {
+                            if (this.viewMode === 'list') {
+                                return {
+                                    container: 'flex flex-col divide-y divide-neutral-200 overflow-hidden rounded-[calc(0.5rem-1px)] dark:divide-white/[0.07]',
+                                    item: 'items-center gap-4 px-4 py-2.5 hover:bg-neutral-50 dark:hover:bg-white/[0.025]',
+                                    logo: 'size-8 rounded-lg',
+                                    header: 'flex-1 items-center! lg:w-64 lg:flex-none',
+                                    description: 'hidden min-w-0 flex-1 truncate lg:block',
+                                    footer: 'w-44 shrink-0 justify-end',
+                                    action: '',
+                                };
+                            }
+
+                            return {
+                                container: 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3',
+                                item: 'min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]',
+                                logo: 'size-11 rounded-xl',
+                                header: '',
+                                description: 'mt-3 line-clamp-2',
+                                footer: 'mt-auto border-t border-neutral-200 pt-3 dark:border-white/[0.07]',
+                                action: 'ml-auto',
+                            };
+                        },
                         categoryOpen: false,
                         categorySearch: '',
                         selectedCategory: '',
@@ -412,39 +467,39 @@
                         databaseLinks: {
                             postgresql: {
                                 docs: 'https://www.postgresql.org/docs/',
-                                website: 'https://www.postgresql.org/'
+                                website: 'https://www.postgresql.org/?ref=coolify.io'
                             },
                             mysql: {
                                 docs: 'https://dev.mysql.com/doc/',
-                                website: 'https://www.mysql.com/'
+                                website: 'https://www.mysql.com/?ref=coolify.io'
                             },
                             mariadb: {
                                 docs: 'https://mariadb.com/kb/en/documentation/',
-                                website: 'https://mariadb.org/'
+                                website: 'https://mariadb.org/?ref=coolify.io'
                             },
                             redis: {
                                 docs: 'https://redis.io/docs/latest/',
-                                website: 'https://redis.io/'
+                                website: 'https://redis.io/?ref=coolify.io'
                             },
                             keydb: {
                                 docs: 'https://docs.keydb.dev/',
-                                website: 'https://keydb.dev/'
+                                website: 'https://keydb.dev/?ref=coolify.io'
                             },
                             dragonfly: {
                                 docs: 'https://www.dragonflydb.io/docs',
-                                website: 'https://www.dragonflydb.io/'
+                                website: 'https://www.dragonflydb.io/?ref=coolify.io'
                             },
                             mongodb: {
                                 docs: 'https://www.mongodb.com/docs/',
-                                website: 'https://www.mongodb.com/'
+                                website: 'https://www.mongodb.com/?ref=coolify.io'
                             },
                             clickhouse: {
                                 docs: 'https://clickhouse.com/docs',
-                                website: 'https://clickhouse.com/'
+                                website: 'https://clickhouse.com/?ref=coolify.io'
                             },
                             sqlite: {
                                 docs: 'https://sqlite.org/docs.html',
-                                website: 'https://sqlite.org/'
+                                website: 'https://sqlite.org/?ref=coolify.io'
                             }
                         },
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }
@@ -662,7 +717,7 @@
                                 {{ $server->description ?: $server->ip }}
                             </span>
                         </span>
-                        <x-status-badge status="running" text="Ready" />
+                        <x-status-badge type="success" status="Running" />
                     </button>
                 @empty
                     @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
@@ -689,7 +744,7 @@
                             <span class="block text-[11px] text-neutral-500 dark:text-fg-faint">Build-only servers
                                 cannot host resources.</span>
                         </span>
-                        <x-status-badge status="exited" text="Build only" />
+                        <x-status-badge status="Build only" />
                         <a href="{{ route('server.show', ['server_uuid' => $buildServer->uuid]) }}"
                             {{ wireNavigate() }} class="button">Settings</a>
                     </div>
@@ -733,7 +788,7 @@
                                 <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Network:
                                     {{ $standaloneDocker->network }}</span>
                             </span>
-                            <x-status-badge status="running" text="Standalone Docker" />
+                            <x-status-badge type="success" status="Standalone Docker" />
                         </button>
                     @endforeach
                 @endif
@@ -748,9 +803,9 @@
                     needs bundled extensions.</p>
             </div>
             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:18-alpine'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:18-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 18 <span
@@ -771,9 +826,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:17-alpine'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:17-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 17</div>
@@ -792,9 +847,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:16-alpine'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:16-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 16</div>
@@ -813,9 +868,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('supabase/postgres:17.4.1.032'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('supabase/postgres:17.11.0.018'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">Supabase PostgreSQL</div>
@@ -834,9 +889,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgis/postgis:17-3.5-alpine'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgis/postgis:18-3.7-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PostGIS <span
@@ -857,9 +912,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg18'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('pgvector/pgvector:pg18'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PGVector 18</div>
@@ -878,9 +933,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="group relative flex min-h-24 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]"
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
-                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg17'))"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('pgvector/pgvector:pg17'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
                         <div class="text-[13px] font-semibold text-black dark:text-fg">PGVector 17</div>
@@ -889,6 +944,60 @@
                         </div>
                     </div>
                     <a href="https://github.com/pgvector/pgvector" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    @endif
+    @if ($current_step === 'select-redis-type')
+        <div x-data="{ selecting: false }">
+            <div class="mb-4">
+                <h2 class="text-[15px]! font-semibold!">Select a Redis or Valkey image</h2>
+                <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">Both work with the same clients, commands,
+                    and configuration.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('valkey/valkey:9-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="text-[13px] font-semibold text-black dark:text-fg">Valkey 9 <span
+                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">Default</span></div>
+                        <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                            An open-source (BSD) fork of Redis from the Linux Foundation. It works with all Redis clients.
+                        </div>
+                    </div>
+                    <a href="https://hub.docker.com/r/valkey/valkey/" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('redis:8'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="text-[13px] font-semibold text-black dark:text-fg">Redis 8</div>
+                        <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                            The original in-memory key-value store.
+                        </div>
+                    </div>
+                    <a href="https://hub.docker.com/_/redis/" target="_blank"
                         @click.stop
                         class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                         title="View documentation">

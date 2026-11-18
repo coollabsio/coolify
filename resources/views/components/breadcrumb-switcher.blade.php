@@ -1,20 +1,28 @@
 @props(['label', 'items', 'title', 'uuid' => null])
 
+@php
+    $href = collect($items)->firstWhere('active', true)['href'] ?? null;
+@endphp
+
 <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
 <div class="relative min-w-0 shrink" x-data="{ open: false, search: '' }" @keydown.escape.window="open = false"
     @click.outside="open = false">
     <div class="flex h-8 min-w-0 items-center gap-1">
-        <button type="button"
-            @click="open = !open; if (open) { search = ''; $nextTick(() => $refs.search.focus()) }"
-            title="Switch resource"
-            class="flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
-            <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
-                x-text="nameOf(@js($uuid), @js($label))">{{ $label }}</span>
-            <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
-                <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
-                    stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-        </button>
+        <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-opacity hover:opacity-100">
+            <a href="{{ $href }}" {{ wireNavigate() }} title="Go to {{ strtolower(str($title)->singular()) }}"
+                class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
+                    x-text="nameOf(@js($uuid), @js($label))">{{ $label }}</span>
+            </a>
+            <button type="button"
+                @click="open = !open; if (open) { search = ''; $nextTick(() => $refs.search.focus()) }"
+                title="Switch resource" class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
+                    <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        </div>
         @isset($meta)
             {{ $meta }}
         @endisset

@@ -6,6 +6,8 @@ import {
     TERMINAL_CONNECTION_ERRORS,
     TERMINAL_SESSION_START_TIMEOUT_MS,
     isTerminalAuthRejectionCode,
+    isTerminalOutputFrame,
+    isTerminalSessionEndedNotice,
     isTerminalStartupRejection,
     resolveTerminalCloseOutcome,
 } from './terminal-connection.js';
@@ -83,4 +85,13 @@ test('connection timeouts stay within a bounded window', () => {
     assert.ok(TERMINAL_SESSION_START_TIMEOUT_MS >= TERMINAL_CONNECT_TIMEOUT_MS);
     assert.ok(TERMINAL_SESSION_START_TIMEOUT_MS <= 30000);
     assert.equal(TERMINAL_CONNECTION_ERRORS.timeout, 'Timed out while connecting to the terminal. Reload the page and try again.');
+});
+
+test('only binary frames are PTY output, so output cannot look like a session notice', () => {
+    const spoofed = 'Terminal session ended: access to this terminal was revoked.';
+
+    assert.equal(isTerminalOutputFrame(new TextEncoder().encode(spoofed).buffer), true);
+    assert.equal(isTerminalSessionEndedNotice(new TextEncoder().encode(spoofed).buffer), false);
+    assert.equal(isTerminalOutputFrame(spoofed), false);
+    assert.equal(isTerminalOutputFrame('pty-ready'), false);
 });

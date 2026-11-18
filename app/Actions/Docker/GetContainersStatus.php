@@ -9,6 +9,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -125,6 +126,11 @@ class GetContainersStatus implements ShouldBeUnique
         $databases = $this->server->databases();
         $services = $this->server->services()->get();
         $previews = $this->server->previews();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds(collect($this->applications)
+            ->concat($previews)
+            ->concat($databases)
+            ->concat($services->flatMap(fn ($service) => $service->applications))
+            ->concat($services->flatMap(fn ($service) => $service->databases)));
         $foundApplications = [];
         $foundApplicationPreviews = [];
         $foundDatabases = [];
@@ -554,6 +560,8 @@ class GetContainersStatus implements ShouldBeUnique
 
         // Aggregate multi-container service statuses
         $this->aggregateServiceContainerStatuses($services);
+
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
 
         ServiceChecked::dispatch($this->server->team->id);
     }

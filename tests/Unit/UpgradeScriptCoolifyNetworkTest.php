@@ -64,19 +64,19 @@ it('stops the upgrade before any container changes when the coolify network has 
         ->and($result['status'])->toStartWith('error|')
         ->toContain('fd00:1::1/64')
         ->toContain('systemctl restart docker');
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('keeps a readable coolify network', function (string $script) {
     $result = runUpgradeScriptEnsureCoolifyNetwork($script, existingGateways: '172.19.0.1 fd00:1::1 ', createdIpv6Gateway: 'unused');
 
     expect($result)->toBe(['exitCode' => 0, 'calls' => [], 'status' => '']);
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('creates the coolify network with IPv6', function (string $script) {
     $result = runUpgradeScriptEnsureCoolifyNetwork($script, existingGateways: null, createdIpv6Gateway: 'fd00:1::1');
 
     expect($result)->toBe(['exitCode' => 0, 'calls' => ['network create --attachable --ipv6 coolify'], 'status' => '']);
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('recreates a new coolify network without IPv6 when Docker reports its gateway with a prefix length', function (string $script) {
     $result = runUpgradeScriptEnsureCoolifyNetwork($script, existingGateways: null, createdIpv6Gateway: 'fd00:1::1/64');
@@ -90,4 +90,4 @@ it('recreates a new coolify network without IPv6 when Docker reports its gateway
         ],
         'status' => '',
     ]);
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);

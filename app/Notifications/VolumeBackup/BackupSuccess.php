@@ -2,14 +2,20 @@
 
 namespace App\Notifications\VolumeBackup;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledVolumeBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupSuccess extends CustomEmailNotification
+/**
+ * With a warning, it goes to the failure channels: then it is sent at most once a day until a run has no warning again.
+ */
+class BackupSuccess extends CustomEmailNotification implements ThrottledNotification
 {
     public string $resourceName;
 
@@ -19,7 +25,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public ?string $url = null;
 
-    public function __construct(ScheduledVolumeBackup $backup, public ?string $warning = null)
+    public function __construct(public ScheduledVolumeBackup $backup, public ?string $warning = null)
     {
         $this->onQueue('high');
         $resource = $backup->targetResource();
@@ -28,6 +34,16 @@ class BackupSuccess extends CustomEmailNotification
         $this->frequency = $backup->frequency;
 
         $this->url = $backup->resourceUrl();
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->warning ? $this->backup : null;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array

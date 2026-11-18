@@ -18,13 +18,16 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Services\Access\AccessResolver;
+use App\Support\DeletesEmptyDirectories;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
+function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:18-alpine'): StandalonePostgresql
 {
     $database = new StandalonePostgresql;
     $database->uuid = new_public_id();
@@ -190,7 +193,7 @@ function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker 
     $database = new StandaloneSqlite;
     $database->uuid = new_public_id();
     $database->name = 'sqlite-database-'.$database->uuid;
-    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
+    $database->image = 'peakimages/sqlite:3.54.1-v0.2.0';
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -276,6 +279,12 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         $filenames = [$filenames];
     }
 
+    if (! $s3->isS3()) {
+        deleteBackupsFromFileStorage($filenames, $s3);
+
+        return;
+    }
+
     $disk = Storage::build([
         'driver' => 's3',
         'key' => $s3->key,
@@ -285,6 +294,7 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'endpoint' => $s3->endpoint,
         'use_path_style_endpoint' => $s3->usesPathStyleEndpoint(),
         'aws_url' => $s3->awsUrl(),
+        'http' => ['verify' => ! $s3->skip_tls_verification],
         'throw' => true,
     ]);
 
@@ -296,6 +306,52 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
 
     if (! $deleted) {
         throw new RuntimeException('One or more S3 backup files could not be deleted.');
+    }
+}
+
+/**
+ * Deletes backup files from an SFTP, FTPS, or WebDAV storage. A file that is gone already counts as deleted, as on S3.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteBackupsFromFileStorage(array $filenames, S3Storage $storage): void
+{
+    try {
+        $disk = $storage->filesystem();
+        foreach ($filenames as $filename) {
+            if ($disk->exists($filename) && ! $disk->delete($filename)) {
+                throw new RuntimeException("{$filename} could not be deleted.");
+            }
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('One or more backup files could not be deleted from the '.$storage->type->label().' storage.', previous: $exception);
+    }
+
+    deleteEmptyFileStorageDirectories($disk, $filenames);
+}
+
+/**
+ * Deletes the directories of deleted backup files that are empty now, and their empty parents, below the base path of
+ * the storage. The server refuses a directory with content, so a file that another backup writes now stays.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteEmptyFileStorageDirectories(FilesystemAdapter $disk, array $filenames): void
+{
+    $adapter = $disk->getAdapter();
+    if (! $adapter instanceof DeletesEmptyDirectories) {
+        return;
+    }
+
+    $directories = collect($filenames)->map(fn (string $filename): string => dirname(trim($filename, '/')))->unique();
+    foreach ($directories as $directory) {
+        try {
+            while ($directory !== '.' && $directory !== '' && $adapter->deleteEmptyDirectory($directory)) {
+                $directory = dirname($directory);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Could not delete an empty backup directory: '.$exception->getMessage());
+        }
     }
 }
 

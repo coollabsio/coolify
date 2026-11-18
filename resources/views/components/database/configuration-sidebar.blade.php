@@ -12,7 +12,6 @@
         ['label' => 'Environment Variables', 'route' => 'project.database.environment-variables', 'icon' => 'variables'],
         ['label' => 'Persistent Storage', 'route' => 'project.database.persistent-storage', 'icon' => 'storages'],
         ['label' => 'Backups', 'route' => 'project.database.backup.index', 'icon' => 'database', 'visible' => $database->isBackupSolutionAvailable()],
-        ['label' => 'Import Backup', 'route' => 'project.database.import-backup', 'icon' => 'upload', 'navigate' => false, 'visible' => auth()->user()?->can('update', $database)],
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
         ['label' => 'Runtime Logs', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
@@ -22,6 +21,8 @@
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
+        ['label' => 'Security', 'route' => 'project.database.vulnerabilities', 'icon' => 'shield-alert',
+            'security' => \App\Services\ImageScan\SecurityStatus::stored($database)->status->value],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'danger'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
@@ -34,9 +35,9 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics', 'Security'],
         'Deploy' => ['Servers'],
-        'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
+        'Automation' => ['Webhooks', 'Backups'],
         'Operations' => ['Resource Operations', 'Resource Limits', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
     ];
@@ -59,8 +60,18 @@
 @endphp
 
 @php
+    // Pages that the user can star (components/starred-menu)
+    $starrableMenuItems = $configurationItems->map(fn (array $item): array => [
+        'key' => $item['route'],
+        'label' => $item['label'],
+        'icon' => $item['icon'],
+        'href' => route($item['route'], $databaseRouteParameters),
+        'active' => $item['active'],
+        'navigate' => $item['navigate'] ?? true,
+    ])->values()->all();
+
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $database->name);
 @endphp
 
 {{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.
@@ -75,11 +86,13 @@
 @endif
     <nav aria-label="Database settings"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="database" :items="$starrableMenuItems" />
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
+                <div class="starred-menu-row">
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
@@ -88,7 +101,10 @@
                     @if ($menuItem['label'] === 'Files')
                         <x-beta-badge class="ml-auto shrink-0" />
                     @endif
+                    <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                 </a>
+                <x-starred-menu.toggle menu="database" :page="$menuItem['route']" :label="$menuItem['label']" />
+                </div>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
                     <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{

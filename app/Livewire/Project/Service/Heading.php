@@ -35,11 +35,18 @@ class Heading extends Component
 
     public $title = 'Configuration';
 
+    /**
+     * The container statuses of the stack resources at the last check.
+     * The heading polls them, so it tells the resource cards when they change.
+     */
+    public ?string $resourceStatuses = null;
+
     public function mount()
     {
         $this->authorizeService('view');
 
         $this->checkDeployments();
+        $this->resourceStatuses = $this->currentResourceStatuses();
 
         if (str($this->service->status)->contains('running') && is_null($this->service->config_hash)) {
             $this->service->isConfigurationChanged(true);
@@ -64,12 +71,31 @@ class Heading extends Component
         $this->authorizeService('view');
 
         $this->checkDeployments();
+        $this->dispatchIfResourceStatusesChanged();
 
         if ($this->service->server->isFunctional()) {
             GetContainersStatus::dispatch($this->service->server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }
+    }
+
+    private function dispatchIfResourceStatusesChanged(): void
+    {
+        $statuses = $this->currentResourceStatuses();
+        if ($statuses === $this->resourceStatuses) {
+            return;
+        }
+
+        $this->resourceStatuses = $statuses;
+        $this->dispatch('serviceResourceStatusesChanged');
+    }
+
+    private function currentResourceStatuses(): string
+    {
+        return $this->service->applications->pluck('status', 'uuid')
+            ->merge($this->service->databases->pluck('status', 'uuid'))
+            ->toJson();
     }
 
     public function manualCheckStatus()

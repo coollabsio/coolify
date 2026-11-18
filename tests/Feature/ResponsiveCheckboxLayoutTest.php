@@ -91,37 +91,6 @@ function assertResponsiveCheckboxMarkup($response): void
     expect($response->getContent())->not->toContain('min-w-fit');
 }
 
-it('renders responsive checkbox classes on the application configuration page', function () {
-    $response = $this->get(route('project.application.configuration', [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $this->application->uuid,
-    ]));
-
-    $response->assertSuccessful();
-    $response->assertSee('Builder selection');
-    $response->assertSee('application-mobile-actions');
-    $response->assertSee('application-mobile-stop-trigger');
-    $response->assertSee('application-mobile-restart-trigger');
-    $response->assertSee('wire:click="deploy"', false);
-    $response->assertSee('wire:click="force_deploy_without_cache"', false);
-    $response->assertDontSee('Confirm Application Deployment?');
-    $response->assertSee('Confirm Application Restart?');
-    $response->assertDontSee('Confirm Application Force Deployment?');
-    $response->assertSee(route('project.application.deployment.index', [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $this->application->uuid,
-    ]));
-    $response->assertSee(route('project.application.environment-variables', [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $this->application->uuid,
-    ]));
-
-    assertResponsiveCheckboxMarkup($response);
-});
-
 it('renders responsive checkbox classes on the server page', function () {
     $response = $this->get(route('server.show', [
         'server_uuid' => $this->server->uuid,

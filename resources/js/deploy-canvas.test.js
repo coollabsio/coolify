@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freeSpot, zoomShortcut } from './canvas-core.js';
-import { canFollow, domainList, fresh, logoOf, onlyOption, parseEnvVars, planOf, splitImage, targetFrom, uniqueLabels, withDeploy, withoutSecrets, withTarget } from './deploy-canvas.js';
+import { TYPES, canFollow, domainList, fresh, logoOf, onlyOption, parseEnvVars, planOf, splitImage, targetFrom, uniqueLabels, withDeploy, withoutSecrets, withTarget } from './deploy-canvas.js';
 
 test('splits the tag out of an image name', () => {
     assert.deepEqual(splitImage('nginx:alpine', 'latest'), { name: 'nginx', tag: 'alpine' });
@@ -167,6 +167,7 @@ test('shows the logo of what a source step creates, like the rest of Coolify', (
     assert.equal(src('database', { engine: 'postgresql' }), '/svgs/resources/postgres.svg');
     assert.equal(src('database', { engine: 'mysql' }), '/svgs/resources/mysql.svg');
     assert.equal(logoOf(node('n', 'database', { engine: 'keydb' })).dark, '/svgs/resources/keydb-dark.svg');
+    assert.equal(src('database', { engine: 'sqlite' }), '/svgs/resources/sqlite.svg');
     assert.equal(src('git', { mode: 'public', buildPack: 'railpack' }), '/svgs/resources/public-repo.svg');
     assert.equal(src('git', { mode: 'github', buildPack: 'railpack' }), '/svgs/resources/github-app.svg');
     assert.equal(src('git', { mode: 'key', buildPack: 'railpack' }), '/svgs/resources/deploy-key.svg');
@@ -186,4 +187,9 @@ test('reads the browser zoom shortcut so the canvas can zoom instead', () => {
     assert.equal(key('-'), null);
     assert.equal(key('-', { ctrlKey: true, altKey: true }), null);
     assert.equal(key('s', { metaKey: true }), null);
+});
+
+test('offers every database engine of the New resource page', () => {
+    const engines = TYPES.database.fields.find(f => f.key === 'engine').options.map(([value]) => value);
+    assert.deepEqual(engines, ['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'sqlite']);
 });

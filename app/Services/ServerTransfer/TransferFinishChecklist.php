@@ -9,6 +9,7 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
+use App\Models\PrivateKey;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceApplication;
@@ -230,12 +231,14 @@ class TransferFinishChecklist
         $applications = $server->applications()->unique('id')->values();
         $serviceApplications = $server->services()->with('applications')->get()->flatMap->applications;
         $runnerConfig = $server->githubRunnerConfig()->with('githubApp')->first();
+        $weakKeyError = $server->privateKey ? PrivateKey::validationError($server->privateKey->private_key) : null;
         $items = [
             $this->item('server_connection', 'server', 'Connection to the server'),
             $this->item('sentinel', 'server', 'Sentinel sends its data to this instance'),
             // The SSH key moved with the server, so the previous instance still has a copy of it.
             $this->item('previous_ssh_key', 'server', 'Remove the SSH key of the previous instance from the server',
-                'The previous instance keeps a copy of the SSH key. Add a new key of this instance to the server and select it here, then remove the old public key from ~/.ssh/authorized_keys on the server.',
+                'The previous instance keeps a copy of the SSH key. Open the SSH key of this server in Security > Private Keys and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.'
+                .($weakKeyError ? " The key is also weak: {$weakKeyError} Rotate key replaces it with an Ed25519 key." : ''),
                 [], route('server.private-key', ['server_uuid' => $server->uuid], false), 'Open private key'),
         ];
 
@@ -408,13 +411,28 @@ class TransferFinishChecklist
     }
 
     /**
+     * The IPv4 and IPv6 addresses of a host name, in the normalized form of normalizeIpAddress().
+     *
+     * @return array<int, string>
+     */
+    private function resolveIps(string $host): array
+    {
+        $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
+
+        return array_values(array_filter(array_map(
+            fn (array $record): ?string => isset($record['ip']) || isset($record['ipv6']) ? normalizeIpAddress($record['ip'] ?? $record['ipv6']) : null,
+            $records,
+        )));
+    }
+
+    /**
      * @return array{0: string, 1: string, 2: string|null}
      */
     private function checkDomain(Server $server, string $host): array
     {
-        $serverIps = filter_var($server->ip, FILTER_VALIDATE_IP) ? [$server->ip] : (gethostbynamel($server->ip) ?: []);
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
-        $ips = array_values(array_filter(array_map(fn (array $record) => $record['ip'] ?? $record['ipv6'] ?? null, $records)));
+        $serverIp = normalizeIpAddress($server->ip);
+        $serverIps = filter_var($serverIp, FILTER_VALIDATE_IP) ? [$serverIp] : $this->resolveIps($serverIp);
+        $ips = $this->resolveIps($host);
         if ($ips === []) {
             return ['action', 'The domain does not resolve.', null];
         }
@@ -449,6 +467,7 @@ class TransferFinishChecklist
             ->withHeaders(['Authorization' => 'Bearer '.generateGithubJwt($githubApp), 'Accept' => 'application/vnd.github+json'])
             ->{$method}(rtrim($githubApp->api_url, '/').$path, $data);
         if (! $response->successful()) {
+            assertGithubClockInSync($response);
             throw new RuntimeException('GitHub answered with HTTP '.$response->status().': '.data_get($response->json(), 'message', 'no details'));
         }
 

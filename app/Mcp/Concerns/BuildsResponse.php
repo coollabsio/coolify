@@ -37,8 +37,7 @@ trait BuildsResponse
 
         // sentinel / observability secrets
         'sentinel_token', 'sentinel_custom_url',
-        'logdrain_newrelic_license_key', 'logdrain_axiom_api_key',
-        'logdrain_custom_config', 'logdrain_custom_config_parser',
+        'logdrain_config',
 
         // database passwords
         'postgres_password', 'dragonfly_password', 'keydb_password',

@@ -849,7 +849,7 @@ it('creates StandaloneSqlite with all fillable attributes', function () {
         'is_log_drain_enabled' => false,
         'is_include_timestamps' => false,
         'status' => 'running',
-        'image' => 'peakimages/sqlite:3.53.4-v0.1.0',
+        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
         'limits_memory' => '1g',
         'limits_memory_swap' => '2g',
         'limits_memory_swappiness' => 30,

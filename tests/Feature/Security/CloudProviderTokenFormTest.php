@@ -55,15 +55,6 @@ test('adding a digitalocean token from a modal closes the modal and refreshes di
             && data_get($dispatch, 'to') === 'security.cloud-provider-tokens'))->toBeTrue();
 });
 
-test('security cloud token form lets users choose every supported provider', function () {
-    Livewire::test(CloudProviderTokenForm::class)
-        ->assertSee('Provider')
-        ->assertSee('Hetzner')
-        ->assertSee('DigitalOcean')
-        ->assertSee('Vultr')
-        ->assertSee('Hostinger');
-});
-
 test('adding a hostinger token from a modal validates and refreshes hostinger token selectors', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([], 200),

@@ -134,19 +134,19 @@ test('the project page reopens the canvas when the user left it on the canvas vi
         ->get(route('project.canvas', $parameters))
         ->assertOk()
         ->assertSee('data-endpoint="/projects/'.$this->project->uuid.'/canvas"', false)
-        ->assertCookie("coolify_{$this->admin->id}_project_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_project_view", 'canvas');
 
     projectCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_project_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_project_view", 'canvas')
         ->get(route('project.show', $parameters))
         ->assertRedirect(route('project.canvas', $parameters));
 
     // The table / grid links on the canvas pick the list view again.
     projectCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_project_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_project_view", 'canvas')
         ->get(route('project.show', [...$parameters, 'view' => 'grid']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_project_view", 'grid');
+        ->assertPlainCookie("coolify_{$this->admin->id}_project_view", 'grid');
 });
 
 test('the projects canvas shows every project of the team as a zone, grouped by environment', function () {
@@ -230,18 +230,18 @@ test('the projects page reopens the canvas when the user left it on the canvas v
     projectCanvasSession($this, $this->admin, $this->team)
         ->get(route('project.canvas.index'))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_projects_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_projects_view", 'canvas');
 
     projectCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_projects_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_projects_view", 'canvas')
         ->get(route('project.index'))
         ->assertRedirect(route('project.canvas.index'));
 
     projectCanvasSession($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_projects_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_projects_view", 'canvas')
         ->get(route('project.index', ['view' => 'table']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_projects_view", 'table');
+        ->assertPlainCookie("coolify_{$this->admin->id}_projects_view", 'table');
 });
 
 test('an admin creates an environment from the project canvas', function () {

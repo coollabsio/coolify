@@ -14,6 +14,23 @@ class ExportUsers extends Command
 
     protected $description = 'Export subscribed and unsubscribed verified Coolify Cloud users to separate CSV files';
 
+    /**
+     * The import format of the email platform. cloud:cleanup-unsubscribed-teams writes deleted users in the same format.
+     */
+    public const CSV_HEADER = [
+        'email',
+        'first_name',
+        'last_name',
+        'lifetime_value_currency',
+        'lifetime_value_amount',
+        'utm_campaign',
+        'utm_source',
+        'utm_medium',
+        'utm_content',
+        'utm_term',
+        'phone',
+    ];
+
     public function handle(): int
     {
         if (! isCloud()) {
@@ -48,22 +65,8 @@ class ExportUsers extends Command
         $unsubscribedCount = 0;
 
         try {
-            $header = [
-                'email',
-                'first_name',
-                'last_name',
-                'lifetime_value_currency',
-                'lifetime_value_amount',
-                'utm_campaign',
-                'utm_source',
-                'utm_medium',
-                'utm_content',
-                'utm_term',
-                'phone',
-            ];
-
-            $this->writeCsvRow($subscribedOutput, $header);
-            $this->writeCsvRow($unsubscribedOutput, $header);
+            self::writeCsvRow($subscribedOutput, self::CSV_HEADER);
+            self::writeCsvRow($unsubscribedOutput, self::CSV_HEADER);
 
             foreach (User::query()
                 ->select(['id', 'email', 'name'])
@@ -74,28 +77,13 @@ class ExportUsers extends Command
                         ->whereRelation('subscription', 'stripe_invoice_paid', true),
                 ])
                 ->lazyById(500) as $user) {
-                $nameParts = preg_split('/\s+/u', trim((string) $user->name), 2) ?: [];
-                [$firstName, $lastName] = array_pad($nameParts, 2, '');
-
-                $row = [
-                    $user->email,
-                    $firstName,
-                    $lastName,
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                ];
+                $row = self::csvRow($user);
 
                 if ($user->is_subscribed) {
-                    $this->writeCsvRow($subscribedOutput, $row);
+                    self::writeCsvRow($subscribedOutput, $row);
                     $subscribedCount++;
                 } else {
-                    $this->writeCsvRow($unsubscribedOutput, $row);
+                    self::writeCsvRow($unsubscribedOutput, $row);
                     $unsubscribedCount++;
                 }
             }
@@ -115,10 +103,21 @@ class ExportUsers extends Command
     }
 
     /**
+     * @return list<string>
+     */
+    public static function csvRow(User $user): array
+    {
+        $nameParts = preg_split('/\s+/u', trim((string) $user->name), 2) ?: [];
+        [$firstName, $lastName] = array_pad($nameParts, 2, '');
+
+        return [$user->email, $firstName, $lastName, '', '', '', '', '', '', '', ''];
+    }
+
+    /**
      * @param  resource  $output
      * @param  array<int, mixed>  $fields
      */
-    private function writeCsvRow($output, array $fields): void
+    public static function writeCsvRow($output, array $fields): void
     {
         if (fputcsv($output, $fields, ',', '"', '') === false) {
             throw new RuntimeException('Unable to write the CSV file.');

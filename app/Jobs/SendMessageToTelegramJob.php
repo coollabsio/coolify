@@ -81,12 +81,6 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $payload = [
-            // 'parse_mode' => 'markdown',
-            'reply_markup' => json_encode([
-                'inline_keyboard' => [
-                    [...$inlineButtons],
-                ],
-            ]),
             'chat_id' => trim($this->chatId),
             'text' => $this->text,
         ];
@@ -94,6 +88,21 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
             $payload['message_thread_id'] = $this->threadId;
         }
 
-        return $this->sendNotificationRequest('Telegram', $url, fn () => Http::post($url, $payload));
+        $response = $this->sendNotificationRequest('Telegram', $url, fn () => Http::post($url, [
+            ...$payload,
+            'reply_markup' => json_encode(['inline_keyboard' => [$inlineButtons]]),
+        ]));
+
+        // Telegram rejects the whole message when it cannot open a button URL (for example localhost or an IP address without a domain).
+        if ($inlineButtons !== [] && $response->status() === 400
+            && Str::contains((string) $response->json('description'), ['button url', 'button_url'], true)) {
+            $links = collect($inlineButtons)->map(fn (array $button) => "{$button['text']}: {$button['url']}")->implode("\n");
+            $response = $this->sendNotificationRequest('Telegram', $url, fn () => Http::post($url, [
+                ...$payload,
+                'text' => "{$this->text}\n\n{$links}",
+            ]));
+        }
+
+        return $response;
     }
 }

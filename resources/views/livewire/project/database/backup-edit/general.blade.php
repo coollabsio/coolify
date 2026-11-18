@@ -24,9 +24,14 @@
         </x-slot:actions>
 
         <div class="space-y-5">
+            @php
+                $isServiceSqlDatabase = $backup->database instanceof \App\Models\ServiceDatabase
+                    && str($backup->database->databaseType())->contains(['postgres', 'mysql', 'mariadb']);
+            @endphp
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0
                     || $backup->database_type === 'App\Models\StandaloneMysql'
-                    || $backup->database_type === 'App\Models\StandaloneMariadb')
+                    || $backup->database_type === 'App\Models\StandaloneMariadb'
+                    || $isServiceSqlDatabase)
                 <div class="grid w-full gap-4">
                     <x-forms.listbox id="dumpAll" label="Database selection" onChange="instantSave" :options="[
                         ['value' => true, 'label' => 'All databases'],
@@ -67,7 +72,11 @@
                                     placeholder="Type a database and press Enter" />
                             </div>
                             <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">
-                                Add one or more database names. Leave empty to include the default database.
+                                @if ($isServiceSqlDatabase)
+                                    Add one or more database names. Leave empty to back up the database that the container env names.
+                                @else
+                                    Add one or more database names. Leave empty to include the default database.
+                                @endif
                             </p>
                         </div>
                     @endif
@@ -92,7 +101,7 @@
                     helper="Uses the deployment server timezone, or the instance timezone when none is configured."
                     required />
                 <x-forms.input label="Timeout" id="timeout" type="number" min="60"
-                    helper="Maximum backup runtime in seconds." required />
+                    helper="Maximum runtime in seconds of the complete backup run: the dumps and S3 uploads of all databases." required />
                 <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
                     min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />

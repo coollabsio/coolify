@@ -36,6 +36,10 @@
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
             @endif
+            @if ($sameAsProduction)
+                <span class="table-badge shrink-0"
+                    title="This preview variable has the production value: an unchanged copy of the production variable, or the same value. Change the value to give previews their own value.">Production value</span>
+            @endif
             @if ($composeInfo)
                 <span class="table-badge shrink-0"
                     title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>
@@ -87,7 +91,7 @@
                 @endif
             @endforeach
         @endif
-        <div class="flex items-center gap-0.5 justify-self-end">
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
             @if ($this->connectLink)
                 <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
                     title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">
@@ -126,11 +130,10 @@
                                     class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
                             </div>
                         @elseif ($isLocked)
-                            <div class="w-full">
-                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
-                                <input disabled type="text" value="Hidden after locking"
-                                    class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
-                            </div>
+                            <x-forms.input id="newLockedValue" type="password" label="Value" :copyable="false"
+                                placeholder="Hidden after locking. Enter a new value to replace it."
+                                helper="The locked value cannot be shown. Leave this empty to keep it."
+                                :disabled="!$canUpdate || $isDisabled" />
                         @else
                             {{-- Multiline: same shell while loading/loaded to avoid layout jump. --}}
                             <div x-show="isMultiline" x-cloak wire:key="env-show-value-multiline-{{ $env->id }}"
@@ -283,7 +286,12 @@
                                     </a>
                                 @endif
                                 @if ($canUpdate && !$isLocked && !$isMagicVariable)
-                                    <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
+                                    <div wire:key="env-lock-action-{{ $env->id }}">
+                                        <x-modal-confirmation title="Lock Environment Variable?" buttonTitle="Lock"
+                                            submitAction="lock"
+                                            :actions="['The value will be hidden. You cannot see or copy it again.', 'You can still replace the value with a new one, but you cannot unlock the variable.']"
+                                            :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Lock" />
+                                    </div>
                                 @endif
                                 @if ($canUpdate && !$isDisabled)
                                     <fieldset disabled wire:dirty.attr.remove="disabled">

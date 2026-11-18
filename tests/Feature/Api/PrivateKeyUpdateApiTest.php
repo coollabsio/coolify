@@ -55,6 +55,17 @@ test('a private key update still replaces and validates the key when it is sent'
     expect($this->key->fresh()->fingerprint)->toBe(PrivateKey::generateFingerprint($newKey));
 });
 
+test('a rejected key returns JSON 422 also when the client does not ask for JSON', function () {
+    $this->call('PATCH', '/api/v1/security/keys/'.$this->key->uuid, server: [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_AUTHORIZATION' => 'Bearer '.$this->bearerToken,
+    ], content: json_encode(['private_key' => 'not a key']))
+        ->assertUnprocessable()
+        ->assertJson(['message' => 'The private key is invalid. Paste an unencrypted private key, not a public key or a certificate.']);
+
+    expect($this->key->fresh()->fingerprint)->toBe(PrivateKey::generateFingerprint($this->keyMaterial));
+});
+
 test('a private key of another team cannot be renamed', function () {
     $otherTeam = Team::factory()->create();
     $foreign = PrivateKey::create(['name' => 'Theirs', 'private_key' => generateSSHKey('ed25519')['private'], 'team_id' => $otherTeam->id]);
