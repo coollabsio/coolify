@@ -128,7 +128,7 @@ class CreateApplication
     private function buildPublic(Application $application, array $data): void
     {
         $application->name = $data['name'] ?? generate_application_name($data['git_repository'], $data['git_branch']);
-        $httpsRepository = scpStyleGitUrlToHttps($application->git_repository);
+        $httpsRepository = sshGitUrlToHttps($application->git_repository);
         if (is_string($httpsRepository)) {
             $application->git_repository = $httpsRepository;
         }

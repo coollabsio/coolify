@@ -87,7 +87,7 @@
                     }
                     @endif
                     const editor = monaco.editor.create($refs.monacoEditorElement, {
-                        value: monacoContent,
+                        value: monacoContent ?? '',
                         theme: document.documentElement.classList.contains('dark') ? 'coolify-dark' : 'vs',
                         wordWrap: 'on',
                         readOnly: '{{ $readonly ?? false }}',
@@ -138,8 +138,8 @@
                     @endif
         
                     $watch('monacoContent', value => {
-                        if (editor.getValue() !== value) {
-                            editor.setValue(value);
+                        if (editor.getValue() !== (value ?? '')) {
+                            editor.setValue(value ?? '');
                         }
                     });
         

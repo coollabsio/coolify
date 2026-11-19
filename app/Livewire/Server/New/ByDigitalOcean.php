@@ -3,6 +3,8 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -15,12 +17,14 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ByDigitalOcean extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     public int $current_step = 1;
 
@@ -153,7 +157,7 @@ class ByDigitalOcean extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -171,7 +175,7 @@ class ByDigitalOcean extends Component
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
-                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
+                'selected_cloud_init_script_id' => ['nullable', 'integer', Rule::exists('cloud_init_scripts', 'id')->where('team_id', currentTeam()->id)],
             ]);
         }
 
@@ -223,7 +227,7 @@ class ByDigitalOcean extends Component
     public function nextStep()
     {
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {
@@ -296,7 +300,9 @@ class ByDigitalOcean extends Component
             $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
         }
 
-        return "{$providerName} API error: {$details}";
+        $prefix = "{$providerName} API error: ";
+
+        return str_starts_with($details, $prefix) ? $details : $prefix.$details;
     }
 
     public function getAvailableSizesProperty(): array
@@ -464,10 +470,16 @@ class ByDigitalOcean extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
@@ -478,7 +490,7 @@ class ByDigitalOcean extends Component
             // Persist the server immediately so the droplet is always tracked
             // in Coolify, even if waiting for the public IP fails below.
             $server = DB::transaction(function () use ($dropletId, $droplet): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit(currentTeam()->id, [
                     'name' => strtolower(trim($this->server_name)),
                     'ip' => Server::PLACEHOLDER_IP,
                     'user' => 'root',
@@ -493,6 +505,7 @@ class ByDigitalOcean extends Component
                 $server->proxy->set('status', 'exited');
                 $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
                 $server->save();
+                $this->applyImageScanning($server);
 
                 return $server;
             });
@@ -510,6 +523,8 @@ class ByDigitalOcean extends Component
                 // Non-fatal: the server page polling backfills the IP later.
                 report($e);
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update([

@@ -1,65 +1,37 @@
 @php
+    // Team admins can open only the team-scoped AI page; hide the instance pages from their search.
+    $instanceOnly = ! isInstanceAdmin();
     $settingsMenuSections = [
         'Configuration' => [
-            ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings', 'gate' => 'instance'],
-            ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid', 'gate' => 'instance'],
-            ['label' => 'AI & MCP', 'route' => 'settings.ai', 'icon' => 'feedback', 'gate' => 'team'],
-            ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3', 'gate' => 'instance'],
+            ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings', 'disabled' => $instanceOnly],
+            ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid', 'disabled' => $instanceOnly],
+            ['label' => 'AI Assistant', 'route' => 'settings.ai', 'icon' => 'feedback'],
+            ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3', 'disabled' => $instanceOnly],
+            ['label' => 'Image Scanning', 'route' => 'settings.image-scanning', 'icon' => 'shield-alert', 'disabled' => $instanceOnly],
         ],
         'Instance' => [
-            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database', 'gate' => 'instance'],
-            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail', 'gate' => 'instance'],
-            ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys', 'gate' => 'instance'],
-            ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'icon' => 'calendar', 'gate' => 'instance'],
+            ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys', 'disabled' => $instanceOnly],
+            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail', 'disabled' => $instanceOnly],
+            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database', 'disabled' => $instanceOnly],
         ],
     ];
-
-    $isInstanceAdmin = isInstanceAdmin();
-    $isTeamAdmin = auth()->user()?->isAdmin() ?? false;
-    $canSeeMenuItem = fn (array $item): bool => match ($item['gate']) {
-        'instance' => $isInstanceAdmin,
-        'team' => $isTeamAdmin,
-        default => false,
-    };
 @endphp
 
+{{-- The pages are in the Settings submenu of the main sidebar (components/navbar.blade.php). --}}
 <section class="application-settings-workspace w-full max-w-none">
     <header class="settings-mobile-header xl:hidden">
         <h1 class="settings-mobile-title">Instance Settings</h1>
         <p class="settings-mobile-description">Configure global settings for this Coolify instance.</p>
     </header>
-    <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        <aside class="application-settings-navigation min-w-0 xl:self-start">
-            <nav aria-label="Instance settings"
-                class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                @php $renderedSection = false; @endphp
-                @foreach ($settingsMenuSections as $section => $menuItems)
-                    @php $visibleItems = array_filter($menuItems, $canSeeMenuItem); @endphp
-                    @continue(empty($visibleItems))
-                    <div @class([
-                        'nav-section col-span-full hidden xl:block',
-                        'mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.06]' => $renderedSection,
-                    ])>{{ $section }}</div>
-                    @php $renderedSection = true; @endphp
-                    @foreach ($visibleItems as $menuItem)
-                        <a wire:key="instance-settings-{{ str($menuItem['label'])->slug() }}"
-                            @class(['menu-item', 'menu-item-active' => request()->routeIs($menuItem['route'])])
-                            {{ wireNavigate() }} href="{{ route($menuItem['route']) }}">
-                            <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                            <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                        </a>
-                        @if ($menuItem['route'] === 'settings.oauth' && isset($submenu))
-                            <div class="col-span-full ml-5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
-                                {{ $submenu }}
-                            </div>
-                        @endif
-                    @endforeach
-                @endforeach
-            </nav>
-        </aside>
-
-        <div class="min-w-0">
-            {{ $slot }}
-        </div>
+    {{-- Feeds the page search with the settings pages. --}}
+    <div hidden data-settings-search-items="{{ json_encode(settingsSearchItems($settingsMenuSections, [])) }}"></div>
+    @isset($submenu)
+        {{-- Sub-items of the current page, under its entry in the main sidebar. --}}
+        @teleport('#main-nav-active-children')
+            <div>{{ $submenu }}</div>
+        @endteleport
+    @endisset
+    <div class="min-w-0">
+        {{ $slot }}
     </div>
 </section>

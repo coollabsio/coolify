@@ -69,10 +69,17 @@ class DeleteServer implements Approvable, HasApprovalForm, Tool
             return 'The Coolify host server cannot be deleted.';
         }
 
-        if ($server->hasDefinedResources()) {
+        // Same rules as the REST delete endpoint, without its force/provider options.
+        if ($server->isTransferredAway()) {
+            return "Server \"{$server->name}\" is managed by another Coolify instance. Delete it in the Coolify UI instead.";
+        }
+
+        if ($server->primaryResources()->isNotEmpty()) {
             return "Server \"{$server->name}\" still has resources. Delete them first.";
         }
 
+        // Applications that use the server only as an additional destination keep running elsewhere.
+        $server->detachAdditionalApplications();
         $server->delete();
         DeleteServerAction::dispatch($server->id, false, $server->hetzner_server_id, $server->cloud_provider_token_id, $server->team_id);
 

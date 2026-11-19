@@ -88,7 +88,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public function toWebhook(): array
     {
-        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+        $url = $this->database->link() ?? base_url();
 
         return [
             'success' => true,

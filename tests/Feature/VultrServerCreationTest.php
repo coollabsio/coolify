@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByVultr;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -9,12 +10,15 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'app.maintenance.driver' => 'file',
         'cache.default' => 'array',
@@ -238,21 +242,12 @@ it('requires IPv6 when public IPv4 is disabled', function () {
         ->assertHasErrors(['enable_ipv6']);
 });
 
-it('uses the shared dropdown UI for advanced Vultr options', function () {
-    Livewire::test(ByVultr::class)
-        ->set('current_step', 2)
-        ->assertSee('Advanced Vultr options')
-        ->assertSeeHtml('dropdownOpen')
-        ->assertSeeHtml('x-ref="panel"')
-        ->assertSee('Additional SSH Keys (from Vultr)')
-        ->assertSee('Network Configuration')
-        ->assertSee('Cloud-Init Script');
-});
-
-it('renders only the full width buy button at the bottom of the Vultr form', function () {
-    Livewire::test(ByVultr::class)
+it('renders a single buy button and no back button on the Vultr form', function () {
+    $html = Livewire::test(ByVultr::class)
         ->set('current_step', 2)
         ->assertDontSee('wire:click="previousStep"', false)
-        ->assertSeeHtml('class="button w-full"')
-        ->assertSee('Buy & Create Server', false);
+        ->assertSee('Buy and create')
+        ->html();
+
+    expect(substr_count($html, 'type="submit"'))->toBe(1);
 });

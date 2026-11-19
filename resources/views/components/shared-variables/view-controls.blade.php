@@ -13,19 +13,15 @@
         </button>
     </div>
 
-    <div
-        class="view-toggle w-fit">
-        <button type="button" @click="viewMode = 'list'; localStorage.setItem('{{ $storageKey }}', 'list')"
-            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-            :class="viewMode === 'list' ? 'control-selected' : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-            aria-label="List view" title="List view">
-            <x-reicon name="unordered-list" class="size-3.5" />
-        </button>
-        <button type="button" @click="viewMode = 'grid'; localStorage.setItem('{{ $storageKey }}', 'grid')"
-            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
-            :class="viewMode === 'grid' ? 'control-selected' : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
-            aria-label="Grid view" title="Grid view">
-            <x-reicon name="grid" class="size-3.5" />
-        </button>
+    {{-- Only the view that is not current shows, as an icon: the button switches to that view. --}}
+    <div class="view-toggle w-fit">
+        @foreach (['list' => ['List view', 'unordered-list'], 'grid' => ['Grid view', 'grid']] as $mode => [$viewLabel, $icon])
+            <button type="button" @click="viewMode = '{{ $mode }}'; localStorage.setItem('{{ $storageKey }}', '{{ $mode }}')"
+                x-show="viewMode !== '{{ $mode }}'" x-cloak
+                title="{{ $viewLabel }}" aria-label="{{ $viewLabel }}"
+                class="relative flex h-7.5 w-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:hover:text-white">
+                <x-reicon :name="$icon" class="size-3.5" />
+            </button>
+        @endforeach
     </div>
 </div>

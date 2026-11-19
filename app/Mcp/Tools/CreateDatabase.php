@@ -2,83 +2,38 @@
 
 namespace App\Mcp\Tools;
 
-use App\Actions\Database\CreateDatabase as CreateDatabaseAction;
-use App\Actions\Shared\ResolveResourcePlacement;
-use App\Enums\NewDatabaseTypes;
-use App\Exceptions\ResourcePlacementException;
-use App\Mcp\Concerns\BuildsResponse;
-use App\Mcp\Concerns\ResolvesTeam;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Mcp\Request;
-use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-class CreateDatabase extends Tool
+#[IsReadOnly(false)]
+#[IsDestructive]
+class CreateDatabase extends RestActionTool
 {
-    use BuildsResponse;
-    use ResolvesTeam;
-
     protected string $name = 'create_database';
 
-    protected string $description = 'Create a standalone database (postgresql|mysql|mariadb|mongodb|redis|keydb|dragonfly|clickhouse) in a project/environment on a server owned by the authenticated team. Requires write ability (deploy ability when instant_deploy=true).';
+    protected string $description = 'Create a standalone database (postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse, sqlite) in a project of the authenticated team. Requires write ability (instant_deploy also needs deploy). Connection URLs are not returned. Same validation and permissions as the REST API.';
 
-    public function handle(Request $request): Response
+    protected function actions(): array
     {
-        $instantDeploy = filter_var($request->get('instant_deploy'), FILTER_VALIDATE_BOOLEAN);
-        if ($error = $this->ensureAbility($request, $instantDeploy ? 'deploy' : 'write', $this->name)) {
-            return $error;
+        $actions = [];
+        foreach (['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'sqlite'] as $type) {
+            $actions[$type] = ['method' => 'POST', 'path' => "databases/{$type}", 'ability' => 'write', 'description' => "create a {$type} database"];
         }
 
-        $teamId = $this->resolveTeamId($request);
-        if (is_null($teamId)) {
-            return $this->mcpError($request, 'Invalid token.');
-        }
-
-        $type = NewDatabaseTypes::tryFrom((string) $request->get('type'));
-        if (! $type) {
-            return $this->mcpError($request, 'type must be one of: '.collect(NewDatabaseTypes::cases())->pluck('value')->implode(', '));
-        }
-
-        try {
-            $placement = ResolveResourcePlacement::run(
-                $teamId,
-                (string) $request->get('project_uuid'),
-                $request->get('environment_name'),
-                $request->get('environment_uuid'),
-                (string) $request->get('server_uuid'),
-                $request->get('destination_uuid'),
-            );
-            $database = CreateDatabaseAction::run($placement, $type, array_filter([
-                'name' => $request->get('name'),
-                'description' => $request->get('description'),
-            ]), $request->get('image'), $instantDeploy);
-        } catch (ResourcePlacementException $e) {
-            return $this->mcpError($request, $e->getMessage());
-        }
-
-        auditLog('mcp.create_database', ['team_id' => $teamId, 'uuid' => $database->uuid, 'type' => $type->value]);
-
-        return $this->mcpSuccess($request, $this->respond([
-            'ok' => true,
-            'uuid' => $database->uuid,
-            'type' => $type->value,
-            'next_tools' => [['tool' => 'get_database', 'args' => ['uuid' => $database->uuid]]],
-        ]), ['resource_uuid' => $database->uuid]);
+        return $actions;
     }
 
-    public function schema(JsonSchema $schema): array
+    protected function pathParams(): array
     {
-        return [
-            'type' => $schema->string()->description('postgresql|mysql|mariadb|mongodb|redis|keydb|dragonfly|clickhouse')->required(),
-            'project_uuid' => $schema->string()->description('Project UUID.')->required(),
-            'server_uuid' => $schema->string()->description('Server UUID.')->required(),
-            'environment_name' => $schema->string()->description('Provide this or environment_uuid.'),
-            'environment_uuid' => $schema->string()->description('Provide this or environment_name.'),
-            'destination_uuid' => $schema->string()->description('Required only when the server has multiple destinations.'),
-            'name' => $schema->string()->description('Optional name.'),
-            'description' => $schema->string()->description('Optional description.'),
-            'image' => $schema->string()->description('Optional docker image override.'),
-            'instant_deploy' => $schema->boolean()->description('Start the database immediately after creation.'),
-        ];
+        return [];
+    }
+
+    protected function dataDescription(): string
+    {
+        return 'Request body, same fields as the REST API. Required: project_uuid, environment_name or environment_uuid, server_uuid; destination_uuid when the server has several destinations. '
+            .'Optional: name, description, image, is_public, public_port (1024-65535), public_port_timeout, limits_memory, limits_memory_swap, limits_memory_swappiness, limits_memory_reservation, limits_cpus, limits_cpuset, limits_cpu_shares, tags, instant_deploy (needs deploy ability). '
+            .'Type fields: postgresql: postgres_user, postgres_password, postgres_db, postgres_initdb_args, postgres_host_auth_method, postgres_conf (base64). mysql: mysql_root_password, mysql_user, mysql_password, mysql_database, mysql_conf (base64). '
+            .'mariadb: mariadb_root_password, mariadb_user, mariadb_password, mariadb_database, mariadb_conf (base64). mongodb: mongo_initdb_root_username, mongo_initdb_root_password, mongo_initdb_database, mongo_conf (base64). '
+            .'redis: redis_password, redis_conf (base64). keydb: keydb_password, keydb_conf (base64). dragonfly: dragonfly_password. clickhouse: clickhouse_admin_user, clickhouse_admin_password. sqlite: sqlite_databases.';
     }
 }

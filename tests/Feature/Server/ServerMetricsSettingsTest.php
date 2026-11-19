@@ -16,22 +16,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows metrics collection settings inside the main metrics section instead of a separate section', function () {
-    $metricsView = file_get_contents(resource_path('views/livewire/server/charts.blade.php'));
-    $sentinelView = file_get_contents(resource_path('views/livewire/server/sentinel.blade.php'));
-
-    expect($metricsView)
-        ->not->toContain('id="server-metrics-collection-section"')
-        ->toContain('id="sentinelMetricsRefreshRateSeconds"')
-        ->toContain('id="sentinelMetricsHistoryDays"')
-        ->toContain('id="sentinelPushIntervalSeconds"')
-        ->and($sentinelView)
-        ->not->toContain('id="server-sentinel-metrics-section"')
-        ->not->toContain('id="sentinelMetricsRefreshRateSeconds"')
-        ->not->toContain('id="sentinelMetricsHistoryDays"')
-        ->not->toContain('id="sentinelPushIntervalSeconds"');
-});
-
 it('saves metrics collection settings from the server metrics page', function () {
     Queue::fake();
 
@@ -69,25 +53,19 @@ it('validates metrics collection settings on the server metrics page', function 
         ]);
 });
 
-it('uses the local datetime axis so server charts show day separators', function () {
-    $metricsView = file_get_contents(resource_path('views/livewire/server/charts.blade.php'));
+it('refreshes short server metric ranges live and starts long ranges paused', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_sentinel_enabled = true;
+    $server->settings->is_metrics_enabled = true;
+    $server->settings->saveQuietly();
 
-    expect($metricsView)
-        ->not->toContain('datetimeUTC: true')
-        ->and(substr_count($metricsView, 'datetimeUTC: false'))
-        ->toBe(3);
-});
+    $component = Livewire::test(Charts::class, ['server_uuid' => $server->uuid])
+        ->assertSet('live', true);
+    expect($component->instance()->pollSeconds())->toBe(5);
 
-it('updates CPU and memory charts together when the time range changes', function () {
-    $component = file_get_contents(app_path('Livewire/Server/Charts.php'));
-    $metricsView = file_get_contents(resource_path('views/livewire/server/charts.blade.php'));
+    $component->set('interval', 43200)->assertSet('live', false);
+    expect($component->instance()->pollSeconds())->toBeNull();
 
-    expect($component)
-        ->toContain('"refreshChartData-{$this->chartId}-metrics"')
-        ->toContain("'cpuSeries' => \$cpuMetrics")
-        ->toContain("'memorySeries' => \$memoryMetrics")
-        ->and($metricsView)
-        ->toContain("Livewire.on('refreshChartData-{!! \$chartId !!}-metrics'")
-        ->toContain('data.cpuSeries')
-        ->toContain('data.memorySeries');
+    $component->set('live', true);
+    expect($component->instance()->pollSeconds())->toBe(60);
 });

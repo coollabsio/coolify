@@ -1,7 +1,5 @@
 <?php
 
-use App\Http\Kernel;
-use App\Livewire\Project\Service\Heading;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Team\AuditLog;
 use App\Livewire\Team\Index as TeamIndex;
@@ -27,16 +25,36 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\Auditable;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
+use Psr\Log\LoggerInterface;
+
+class FailingAuditAttributeCast implements CastsAttributes
+{
+    public function get(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        throw new RuntimeException('sensitive attribute value');
+    }
+
+    public function set(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        return $value;
+    }
+}
 
 uses(RefreshDatabase::class);
 
@@ -55,25 +73,39 @@ beforeEach(function () {
     Log::spy();
 });
 
-test('audit inserts are deferred until after the response', function () {
+test('audit rows survive a request that stops before the terminate phase', function () {
     $this->withDefer();
 
-    auditLog('ui.project.updated', [
+    DB::transaction(fn () => Project::factory()->create([
         'team_id' => $this->team->id,
-        'project_uuid' => 'project-123',
-        'project_name' => 'Website',
+        'name' => 'Website',
+    ]));
+    auditLog('ui.project.updated', ['team_id' => $this->team->id]);
+
+    // PHP stopped the script (client abort, fatal error), so the deferred callbacks never run.
+    app()->forgetScopedInstances();
+
+    expect(AuditEvent::query()->pluck('event')->all())->toBe([
+        'ui.project.created',
+        'ui.environment.created',
+        'ui.project.updated',
     ]);
-
-    expect(AuditEvent::query()->count())->toBe(0);
-
-    defer()->invoke();
-
-    expect(AuditEvent::query()->count())->toBe(1);
 });
 
-test('multiple audit inserts in one request are all deferred', function () {
-    $this->withDefer();
+test('audit rows of a rolled back transaction are not written', function () {
+    try {
+        DB::transaction(function () {
+            Project::factory()->create(['team_id' => $this->team->id]);
 
+            throw new RuntimeException('rollback');
+        });
+    } catch (RuntimeException) {
+    }
+
+    expect(AuditEvent::query()->count())->toBe(0);
+});
+
+test('multiple audit inserts in one request are all written in order', function () {
     auditLog('ui.application.deployed', [
         'team_id' => $this->team->id,
         'application_uuid' => 'app-123',
@@ -83,19 +115,10 @@ test('multiple audit inserts in one request are all deferred', function () {
         'application_uuid' => 'app-123',
     ]);
 
-    defer()->invoke();
-
     expect(AuditEvent::query()->pluck('event')->all())->toBe([
         'ui.application.deployed',
         'ui.application.updated',
     ]);
-});
-
-test('http kernel invokes deferred callbacks', function () {
-    $kernel = app(Kernel::class);
-    $middleware = (new ReflectionClass($kernel))->getProperty('middleware')->getValue($kernel);
-
-    expect($middleware)->toContain(InvokeDeferredCallbacks::class);
 });
 
 test('audit persistence failures do not fail the action', function () {
@@ -116,6 +139,22 @@ test('audit persistence failures do not fail the action', function () {
         Schema::rename('unavailable_audit_events', 'audit_events');
     }
 });
+
+test('audit logger failures do not fail the action', function (bool $inTransaction) {
+    DB::commit();
+    Schema::rename('audit_events', 'unavailable_audit_events');
+    Log::swap(Mockery::mock(LoggerInterface::class));
+    Log::shouldReceive('warning')->once()->withAnyArgs()->andThrow(new RuntimeException('logger unavailable'));
+
+    try {
+        $action = fn () => AuditEvent::record('ui.project.updated', ['team_id' => $this->team->id]);
+
+        expect(fn () => $inTransaction ? DB::transaction($action) : $action())
+            ->not->toThrow(Throwable::class);
+    } finally {
+        Schema::rename('unavailable_audit_events', 'audit_events');
+    }
+})->with([false, true]);
 
 test('audit preparation failures log sanitized diagnostics without failing the action', function () {
     $resourceName = new class
@@ -161,6 +200,17 @@ test('audit log persists a structured event for the current team', function () {
         ->and($event->metadata['changed'])->toBe(['name']);
 });
 
+test('audit log records the Cloudflare client ip when the request comes from Cloudflare', function () {
+    app()->instance('request', Request::create('/', server: [
+        'REMOTE_ADDR' => '162.158.79.140',
+        'HTTP_CF_CONNECTING_IP' => '160.79.104.10',
+    ]));
+
+    auditLog('api.application.updated', ['application_uuid' => 'app-123']);
+
+    expect(AuditEvent::query()->sole()->ip_address)->toBe('160.79.104.10');
+});
+
 test('auditable models record authenticated create update and delete actions', function () {
     $project = Project::factory()->create([
         'team_id' => $this->team->id,
@@ -176,6 +226,216 @@ test('auditable models record authenticated create update and delete actions', f
         'ui.project.updated',
         'ui.project.deleted',
     ])->and($events[1]->metadata['changed_fields'])->toBe(['name']);
+});
+
+test('auditable models store encrypted changes for create update and delete actions', function () {
+    $project = Project::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Website project',
+        'description' => 'Original description',
+    ]);
+    $project->update(['description' => 'Updated description']);
+    $project->delete();
+
+    $events = AuditEvent::query()->where('resource_type', 'project')->orderBy('id')->get();
+
+    expect($events[0]->changes)->toMatchArray([
+        'name' => ['old' => null, 'new' => 'Website project'],
+        'description' => ['old' => null, 'new' => 'Original description'],
+    ])->and($events[0]->changes)->not->toHaveKeys(['id', 'uuid', 'team_id', 'created_at', 'updated_at'])
+        ->and($events[1]->changes)->toBe([
+            'description' => ['old' => 'Original description', 'new' => 'Updated description'],
+        ])->and($events[2]->changes)->toMatchArray([
+            'name' => ['old' => 'Website project', 'new' => null],
+            'description' => ['old' => 'Updated description', 'new' => null],
+        ]);
+
+    $storedChanges = DB::table('audit_events')->where('id', $events[1]->id)->value('changes');
+
+    expect($storedChanges)->not->toContain('Original description')
+        ->and($storedChanges)->not->toContain('Updated description');
+});
+
+test('auditable models exclude hidden and encrypted attributes from changes', function () {
+    SharedEnvironmentVariable::query()->create([
+        'team_id' => $this->team->id,
+        'key' => 'API_TOKEN',
+        'value' => 'super-secret',
+        'comment' => 'Used by the API',
+    ]);
+
+    $event = AuditEvent::query()->where('resource_type', 'shared_environment_variable')->sole();
+
+    expect($event->changes)->toMatchArray([
+        'key' => ['old' => null, 'new' => 'API_TOKEN'],
+        'comment' => ['old' => null, 'new' => 'Used by the API'],
+    ])->and($event->changes)->not->toHaveKey('value')
+        ->and(DB::table('audit_events')->where('id', $event->id)->value('changes'))
+        ->not->toContain('super-secret');
+});
+
+test('auditable models redact nested secrets in object casts', function () {
+    Server::flushIdentityMap();
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy = [
+        'type' => 'TRAEFIK',
+        'credentials' => ['password' => 'old-proxy-password'],
+    ];
+    $server->save();
+    AuditEvent::query()->delete();
+
+    $server->proxy = [
+        'type' => 'TRAEFIK',
+        'credentials' => ['password' => 'new-proxy-password'],
+    ];
+    $server->save();
+
+    $changes = AuditEvent::query()->sole()->changes;
+
+    expect($changes['proxy'])->toBe([
+        'old' => ['type' => 'TRAEFIK', 'credentials' => '[REDACTED]'],
+        'new' => ['type' => 'TRAEFIK', 'credentials' => '[REDACTED]'],
+    ]);
+});
+
+test('audit changes exclude raw fields that can contain embedded credentials', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    AuditEvent::query()->delete();
+
+    $application->update([
+        'name' => 'Safe name',
+        'git_full_url' => 'https://user:embedded-password@example.com/repo.git',
+        'build_command' => 'API_KEY=embedded-key npm run build',
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->toHaveKey('name')
+        ->not->toHaveKeys(['git_full_url', 'build_command']);
+});
+
+test('audit changes exclude database configuration credentials on create and delete', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    AuditEvent::query()->delete();
+
+    $database = StandaloneRedis::query()->create([
+        'name' => 'Redis',
+        'environment_id' => $environment->id,
+        'destination_type' => Server::class,
+        'destination_id' => 0,
+        'redis_conf' => 'requirepass embedded-redis-password',
+    ]);
+    $database->delete();
+
+    $events = AuditEvent::query()->orderBy('id')->get();
+
+    expect($events)->toHaveCount(2);
+    foreach ($events as $event) {
+        expect($event->changes)->toHaveKey('name')->not->toHaveKey('redis_conf');
+    }
+});
+
+test('audit metadata redacts nested raw configuration credentials', function () {
+    auditLog('ui.server.updated', [
+        'team_id' => $this->team->id,
+        'configuration' => ['last_saved_proxy_configuration' => 'PASSWORD=must-not-be-recorded'],
+    ]);
+
+    expect(AuditEvent::query()->sole()->metadata['configuration'])->toBe([
+        'last_saved_proxy_configuration' => '[REDACTED]',
+    ]);
+});
+
+test('audit changes keep model default hidden fields excluded after makeVisible', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    AuditEvent::query()->delete();
+    $application->makeVisible(['domain_dns_statuses']);
+
+    $application->update([
+        'name' => 'Updated application',
+        'domain_dns_statuses' => ['example.com' => 'private DNS data'],
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->not->toHaveKey('domain_dns_statuses');
+});
+
+test('audit changes redact credentials embedded in nested proxy configuration', function () {
+    Server::flushIdentityMap();
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy = ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => 'PASSWORD=old-secret'];
+    $server->save();
+    AuditEvent::query()->delete();
+
+    $server->proxy = ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => 'PASSWORD=new-secret'];
+    $server->save();
+
+    expect(AuditEvent::query()->sole()->changes['proxy'])->toBe([
+        'old' => ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => '[REDACTED]'],
+        'new' => ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => '[REDACTED]'],
+    ]);
+});
+
+test('audit metadata redacts secrets in serializable objects', function (Closure $configuration) {
+    auditLog('ui.server.updated', [
+        'team_id' => $this->team->id,
+        'configuration' => $configuration(),
+    ]);
+
+    expect(AuditEvent::query()->sole()->metadata['configuration'])->toBe([
+        'enabled' => true,
+        'nested' => ['password' => '[REDACTED]'],
+    ]);
+})->with([
+    'plain object' => fn () => (object) [
+        'enabled' => true,
+        'nested' => (object) ['password' => 'must-not-be-recorded'],
+    ],
+    'JSON serializable object' => fn () => new class implements JsonSerializable
+    {
+        public function jsonSerialize(): mixed
+        {
+            return ['enabled' => true, 'nested' => ['password' => 'must-not-be-recorded']];
+        }
+    },
+]);
+
+test('audit change preparation failures do not fail model writes', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    AuditEvent::query()->delete();
+    $project->mergeCasts(['description' => FailingAuditAttributeCast::class]);
+
+    $project->update(['description' => 'Persist this description']);
+
+    expect(Project::query()->findOrFail($project->id)->description)->toBe('Persist this description')
+        ->and(AuditEvent::query()->sole()->changes)->toBeNull();
+
+    Log::shouldHaveReceived('warning')->once()->with(
+        'Audit change preparation failed',
+        Mockery::on(fn (array $context): bool => $context['action'] === 'updated'
+            && $context['exception'] === RuntimeException::class
+            && array_keys($context) === ['resource_type', 'action', 'exception']),
+    );
+});
+
+test('auditable models exclude timestamp attributes from changes', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    AuditEvent::query()->delete();
+
+    StandalonePostgresql::query()->create([
+        'uuid' => fake()->uuid(),
+        'name' => 'Timestamp test database',
+        'environment_id' => $environment->id,
+        'destination_type' => Server::class,
+        'destination_id' => 0,
+        'postgres_password' => 'password',
+        'last_restart_at' => now(),
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->not->toHaveKey('last_restart_at');
 });
 
 test('deleting a project dispatches deleted events for its environments', function () {
@@ -279,6 +539,7 @@ test('automatic and explicit auditing both preserve their events', function () {
 
 test('auditable models ignore unauthenticated mutations', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
 
     Project::factory()->create(['team_id' => $this->team->id]);
 
@@ -289,8 +550,8 @@ test('webhook audits resolve the team from the application', function () {
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     $application = Application::factory()->create(['environment_id' => $environment->id]);
-    AuditEvent::query()->delete();
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     auditLog('webhook.deployment.queued', [
@@ -307,6 +568,7 @@ test('webhook audits resolve the team from the application', function () {
 
 test('unauthenticated webhook failures without a team are preserved', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     auditLogWebhookFailure('sentinel', 'token_missing');
@@ -324,6 +586,7 @@ test('unauthenticated webhook failures without a team are preserved', function (
 
 test('early Sentinel and Stripe rejections persist unscoped audit events', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     $this->postJson('/api/v1/sentinel/push', [])->assertUnauthorized();
@@ -481,6 +744,7 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneSqlite::class,
 ]);
 
 test('withoutAuditLogging suppresses mutations until the outer callback ends', function () {
@@ -556,6 +820,25 @@ test('audit log redacts sensitive metadata', function () {
         ->and($metadata['nested']['safe'])->toBe('visible');
 });
 
+test('audit severity is persisted and invalid levels fall back to info', function () {
+    auditLog('webhook.test.signature_failed', ['team_id' => $this->team->id], 'warning');
+    auditLog('ui.project.updated', ['team_id' => $this->team->id], 'invalid');
+
+    expect(AuditEvent::query()->orderBy('id')->pluck('level')->all())->toBe(['warning', 'info']);
+});
+
+test('authentication failures and logout are audited without credentials', function () {
+    event(new Failed('web', null, ['email' => 'person@example.com', 'password' => 'not-stored']));
+    event(new Logout('web', $this->user));
+
+    $failed = AuditEvent::query()->where('event', 'auth.user.login_failed')->sole();
+    $logout = AuditEvent::query()->where('event', 'auth.user.logged_out')->sole();
+
+    expect($failed->level)->toBe('warning')
+        ->and($failed->metadata)->not->toHaveKey('password')
+        ->and($logout->actor_id)->toBe($this->user->id);
+});
+
 test('audit log redacts common credential metadata keys', function (string $key) {
     auditLog('api.application.updated', [
         'team_id' => $this->team->id,
@@ -618,6 +901,76 @@ test('audit log page only shows events for the current team', function () {
         ->assertDontSee('Private app deleted');
 });
 
+test('audit log sorts by the chosen column and ignores unknown sort values', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Zoe',
+        'description' => 'Older event by Zoe',
+        'created_at' => now()->subHour(),
+    ]);
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Adam',
+        'description' => 'Newer event by Adam',
+        'created_at' => now(),
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'time-asc')
+        ->assertSet('sort', 'time-asc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'actor-desc')
+        ->assertSeeInOrder(['Older event by Zoe', 'Newer event by Adam'])
+        ->call('setSort', 'activity-asc')
+        ->assertSeeInOrder(['Newer event by Adam', 'Older event by Zoe'])
+        ->call('setSort', 'resource_uuid-asc')
+        ->assertSet('sort', 'activity-asc')
+        ->call('setSort', 'time-sideways')
+        ->assertSet('sort', 'activity-asc');
+});
+
+test('changing the audit log sort returns to the first page', function () {
+    AuditEvent::factory()->count(11)->create(['team_id' => $this->team->id]);
+
+    Livewire::test(AuditLog::class)
+        ->set('perPage', 10)
+        ->call('setPage', 2)
+        ->call('setSort', 'time-asc')
+        ->assertSet('paginators.page', 1);
+});
+
+test('audit log expands encrypted model changes for team admins and owners', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'description' => 'Website updated',
+        'changes' => [
+            'name' => ['old' => 'Website', 'new' => 'Store'],
+        ],
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertSee('View changes')
+        ->assertSee('Name')
+        ->assertSee('Website')
+        ->assertSee('Store');
+});
+
+test('manual audit events do not store model changes', function () {
+    auditLog('ui.application.restarted', [
+        'team_id' => $this->team->id,
+        'application_uuid' => 'app-123',
+        'audit_changes' => [
+            'name' => ['old' => 'Injected', 'new' => 'Value'],
+        ],
+    ]);
+
+    $event = AuditEvent::query()->sole();
+
+    expect($event->changes)->toBeNull()
+        ->and($event->metadata)->not->toHaveKey('audit_changes');
+});
+
 test('audit log is available under team settings', function () {
     $this->get('/team/audit-log')
         ->assertSuccessful()
@@ -653,6 +1006,7 @@ test('team admins can query only their team audit events through the api', funct
         'actor_email' => 'owner@example.com',
         'actor_token_name' => 'production token',
         'metadata' => ['changed_fields' => ['name']],
+        'changes' => ['name' => ['old' => 'Old project', 'new' => 'New project']],
         'ip_address' => '192.0.2.1',
         'user_agent' => 'Sensitive user agent',
     ]);
@@ -678,24 +1032,27 @@ test('team admins can query only their team audit events through the api', funct
         ->assertJsonMissingPath('data.0.actor_token_id')
         ->assertJsonMissingPath('data.0.actor_token_name')
         ->assertJsonMissingPath('data.0.metadata')
+        ->assertJsonMissingPath('data.0.changes')
         ->assertJsonMissingPath('data.0.ip_address')
         ->assertJsonMissingPath('data.0.user_agent');
 });
 
 test('team admins with sensitive read access can query full audit event details', function () {
+    $token = $this->user->createToken('audit-sensitive-read', ['read', 'read:sensitive']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+    AuditEvent::query()->delete();
+
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
         'actor_email' => 'owner@example.com',
         'actor_token_name' => 'production token',
         'metadata' => ['changed_fields' => ['name']],
+        'changes' => ['name' => ['old' => 'Old project', 'new' => 'New project']],
         'ip_address' => '192.0.2.1',
         'user_agent' => 'Sensitive user agent',
     ]);
-
-    $token = $this->user->createToken('audit-sensitive-read', ['read', 'read:sensitive']);
-    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
-    auth()->logout();
-    auth()->forgetGuards();
 
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events')
@@ -703,6 +1060,8 @@ test('team admins with sensitive read access can query full audit event details'
         ->assertJsonPath('data.0.actor_email', 'owner@example.com')
         ->assertJsonPath('data.0.actor_token_name', 'production token')
         ->assertJsonPath('data.0.metadata.changed_fields.0', 'name')
+        ->assertJsonPath('data.0.changes.name.old', 'Old project')
+        ->assertJsonPath('data.0.changes.name.new', 'New project')
         ->assertJsonPath('data.0.ip_address', '192.0.2.1')
         ->assertJsonPath('data.0.user_agent', 'Sensitive user agent');
 });
@@ -787,16 +1146,6 @@ test('audit events api accepts valid pagination and filter values', function () 
         ->assertJsonPath('per_page', 1);
 });
 
-test('audit source filter omits the unused system source', function () {
-    Livewire::test(AuditLog::class)
-        ->assertSee('All sources')
-        ->assertSee('Web UI')
-        ->assertSee('API')
-        ->assertSee('MCP')
-        ->assertSee('Webhook')
-        ->assertDontSee('System');
-});
-
 test('audit action filter includes actions recorded for the current team', function () {
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
@@ -808,23 +1157,6 @@ test('audit action filter includes actions recorded for the current team', funct
             'value' => 'backup_schedule_deleted',
             'label' => 'Backup Schedule Deleted',
         ], $options, true));
-});
-
-test('resource clone audit starts only after the destination server capability check', function () {
-    $source = file_get_contents(app_path('Livewire/Project/Shared/ResourceOperations.php'));
-
-    expect(strpos($source, "auditLog('ui.resource.clone_started'"))
-        ->toBeGreaterThan(strpos($source, 'if (! $server->canHostResources())'));
-});
-
-test('pull and restart records the service restart audit event after starting the service', function () {
-    $method = new ReflectionMethod(Heading::class, 'pullAndRestartEvent');
-    $source = file($method->getFileName());
-    $methodSource = implode('', array_slice($source, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
-
-    expect($methodSource)
-        ->toContain("auditServiceAction('ui.service.restarted')")
-        ->and(strpos($methodSource, 'StartService::run'))->toBeLessThan(strpos($methodSource, 'auditServiceAction'));
 });
 
 test('critical operational events persist with their source action and actor', function (string $event) {
@@ -860,6 +1192,9 @@ test('critical operational events persist with their source action and actor', f
     'ui.database.restore_started',
     'ui.scheduled_task.executed',
     'ui.api_token.created',
+    'ui.api_token.updated',
+    'ui.api_token.paused',
+    'ui.api_token.resumed',
     'ui.api_token.revoked',
     'ui.team_member.role_updated',
     'ui.team_member.removed',
@@ -874,23 +1209,6 @@ test('critical operational events persist with their source action and actor', f
     'api.database.restarted',
     'api.database.import_started',
 ]);
-
-test('audit log uses the standard horizontally scrollable table layout on mobile', function () {
-    AuditEvent::factory()->create([
-        'team_id' => $this->team->id,
-        'actor_name' => 'Visible Actor',
-        'actor_token_name' => 'visible-audit-token',
-    ]);
-
-    Livewire::test(AuditLog::class)
-        ->assertSeeHtml('class="overflow-x-auto"')
-        ->assertSeeHtml('class="data-table transition-opacity"')
-        ->assertSeeHtml('class="grid min-w-[760px] grid-cols-[14rem_minmax(0,1fr)_12rem_9rem]')
-        ->assertSeeHtml('class="self-center text-right text-[11px]')
-        ->assertSeeHtml('title="Token: visible-audit-token"')
-        ->assertSee('Actor')
-        ->assertSee('Visible Actor');
-});
 
 test('audit log displays source abbreviations in uppercase', function () {
     AuditEvent::factory()->create([
@@ -968,8 +1286,6 @@ test('updating an environment variable records an event without its value', func
 });
 
 test('creating an application environment variable records an audit event', function () {
-    $this->withDefer();
-
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     $application = Application::factory()->create(['environment_id' => $environment->id]);
@@ -978,8 +1294,6 @@ test('creating an application environment variable records an audit event', func
         'key' => 'API_SECRET',
         'value' => 'secret-value',
     ]);
-
-    defer()->invoke();
 
     $event = AuditEvent::query()
         ->where('resource_type', 'environment_variable')

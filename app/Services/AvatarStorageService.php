@@ -28,11 +28,11 @@ class AvatarStorageService
         $oldS3StorageId = $user->avatar_s3_storage_id;
         $oldPath = $user->avatar_path;
 
-        $user->update([
+        $user->fill([
             'avatar_path' => $path,
             'avatar_storage_type' => $storageType,
             'avatar_s3_storage_id' => $s3StorageId,
-        ]);
+        ])->touch();
 
         if ($oldPath && ($oldStorageType !== $storageType || $oldS3StorageId !== $s3StorageId)) {
             $this->disk($oldStorageType ?? 'local', $oldS3StorageId)->delete($oldPath);
@@ -74,7 +74,7 @@ class AvatarStorageService
             return Storage::disk('images');
         }
 
-        $storage = S3Storage::query()->whereKey($s3StorageId)->where('is_usable', true)->first();
+        $storage = S3Storage::query()->s3Only()->whereKey($s3StorageId)->where('is_usable', true)->first();
         if (! $storage) {
             throw new RuntimeException('The configured S3 storage is not available.');
         }

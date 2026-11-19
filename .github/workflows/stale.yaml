@@ -1,0 +1,37 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: stale
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    name: Close stale issues and pull requests
+    permissions:
+      issues: write # label, comment on and close the stale issues
+      pull-requests: write # label, comment on and close the stale pull requests
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
+    steps:
+      - name: Close the issues and pull requests that wait for feedback or changes
+        uses: actions/stale@v11.0.0
+        with:
+          only-labels: "💤 Waiting for feedback, 💤 Waiting for changes"
+          days-before-stale: 14
+          days-before-close: 7
+          stale-issue-label: "⏱︎ Stale"
+          stale-pr-label: "⏱︎ Stale"
+          labels-to-remove-when-unstale: "⏱︎ Stale, 💤 Waiting for feedback, 💤 Waiting for changes"
+          stale-issue-message: This issue will be automatically closed in a few days if no response is received. Please provide an update with the requested information.
+          stale-pr-message: This pull request requires attention. If no changes or response is received within the next few days, it will be automatically closed. Please update your PR or leave a comment with the requested information.
+          close-issue-message: This issue has been automatically closed due to inactivity.
+          close-pr-message: Thank you for your contribution. Due to inactivity, this PR was automatically closed. If you would like to continue working on this change in the future, feel free to reopen this PR or submit a new one.
+          operations-per-run: 100

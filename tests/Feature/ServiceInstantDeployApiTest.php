@@ -21,7 +21,7 @@ function isStartServiceJob($job): bool
     return $job instanceof JobDecorator && $job->getAction() instanceof StartService;
 }
 
-function instantDeployHeaders(string $token): array
+function serviceInstantDeployHeaders(string $token): array
 {
     return ['Authorization' => 'Bearer '.$token, 'Content-Type' => 'application/json'];
 }
@@ -46,7 +46,7 @@ beforeEach(function () {
 });
 
 test('instant_deploy queues StartService once creation and url validation succeed', function () {
-    $response = $this->withHeaders(instantDeployHeaders($this->bearerToken))
+    $response = $this->withHeaders(serviceInstantDeployHeaders($this->bearerToken))
         ->postJson('/api/v1/services', [
             'project_uuid' => $this->project->uuid,
             'server_uuid' => $this->server->uuid,
@@ -60,7 +60,7 @@ test('instant_deploy queues StartService once creation and url validation succee
 });
 
 test('a url failure rolls the service back and never queues a deploy', function () {
-    $response = $this->withHeaders(instantDeployHeaders($this->bearerToken))
+    $response = $this->withHeaders(serviceInstantDeployHeaders($this->bearerToken))
         ->postJson('/api/v1/services', [
             'project_uuid' => $this->project->uuid,
             'server_uuid' => $this->server->uuid,

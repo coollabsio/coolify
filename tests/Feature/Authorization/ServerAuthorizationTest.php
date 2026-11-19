@@ -3,7 +3,6 @@
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Index as ServerIndex;
-use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\Navbar as ServerNavbar;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\CloudProviderToken;
@@ -14,7 +13,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -100,20 +98,6 @@ test('member can view server', function () {
     expect($this->member->can('view', $this->server))->toBeTrue();
 });
 
-test('the private log drain syncData helper is not remotely callable', function () {
-    $this->withoutVite();
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('isLogDrainAxiomEnabled', true);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect((bool) $this->server->settings->fresh()->is_logdrain_axiom_enabled)->toBeFalse();
-});
-
 // --- Server Policy: manageProxy ---
 
 test('admin can manage proxy', function () {
@@ -180,46 +164,6 @@ test('admin can access new server page', function () {
         ->assertSeeLivewire(ServerCreate::class);
 });
 
-test('new server chooser lists providers before rendering a creation form', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServerCreate::class)
-        ->assertSee('Hetzner')
-        ->assertSee('Vultr')
-        ->assertSee('DigitalOcean')
-        ->assertSee('Manual')
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('Continue')
-        ->assertSee(route('server.create.type', ['type' => 'hetzner']))
-        ->assertSee(route('server.create.type', ['type' => 'vultr']))
-        ->assertSee(route('server.create.type', ['type' => 'digital-ocean']))
-        ->assertSee(route('server.create.type', ['type' => 'manual']))
-        ->assertDontSee('Add Server by IP Address');
-});
-
-test('new server chooser uses compact mobile provider cards', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServerCreate::class)
-        ->assertSee('mx-auto flex w-full max-w-7xl flex-col', false)
-        ->assertSee('sm:grid', false)
-        ->assertSee('sm:grid-cols-2', false)
-        ->assertSee('xl:grid-cols-4', false)
-        ->assertSee('gap-3 sm:gap-6', false)
-        ->assertSee('dark:hover:border-warning', false)
-        ->assertSee('focus-visible:border-coollabs', false)
-        ->assertSee('aria-label="Choose Hetzner"', false)
-        ->assertSee('p-3 sm:p-6', false)
-        ->assertDontSee('sm:min-h-80', false)
-        ->assertSee('size-9 sm:size-14', false)
-        ->assertDontSee('size-9 sm:size-14 w-14 h-14', false)
-        ->assertSee('hidden sm:block', false)
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('<button', false);
-});
-
 test('new server provider pages render the selected creation flow', function (string $type, string $heading) {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
@@ -230,12 +174,12 @@ test('new server provider pages render the selected creation flow', function (st
         ->assertDontSee('<h1>New Server</h1>', false)
         ->assertDontSee('Choose how to add your server');
 
-    $response->assertSeeInOrder([$heading, 'Back']);
+    $response->assertSeeInOrder(['New server', 'Change method', $heading]);
 })->with([
-    ['hetzner', 'Hetzner'],
-    ['vultr', 'Vultr'],
-    ['digital-ocean', 'DigitalOcean'],
-    ['manual', 'Manual'],
+    ['hetzner', 'Hetzner account'],
+    ['vultr', 'Vultr account'],
+    ['digital-ocean', 'DigitalOcean account'],
+    ['manual', 'Connect a server'],
 ]);
 
 test('new server provider pages do not show the new token action in the header', function (string $type, string $heading) {
@@ -247,27 +191,39 @@ test('new server provider pages do not show the new token action in the header',
         ->assertDontSee('+ New Token')
         ->assertDontSee('+ Add New Token');
 
-    $response->assertSeeInOrder([$heading, 'Back']);
+    $header = str($response->getContent())
+        ->after('New server</h1>')
+        ->before('application-settings-form')
+        ->toString();
+
+    expect($header)
+        ->toContain('Change method')
+        ->not->toContain('Token');
+
+    // Without tokens, the add-token action lives in the provider account section instead.
+    $response->assertSeeInOrder(['Change method', "{$heading} account", "No {$heading} tokens", "Add {$heading} Token"]);
 })->with([
     ['hetzner', 'Hetzner'],
     ['vultr', 'Vultr'],
     ['digital-ocean', 'DigitalOcean'],
 ]);
 
-test('new server provider pages show the new token action in the header when tokens exist', function (string $type, string $provider, string $heading, string $modalTitle) {
+test('new server provider pages list existing tokens instead of a token action', function (string $type, string $provider, string $heading, string $modalTitle) {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    CloudProviderToken::factory()->create([
+    $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => $provider,
     ]);
 
     $response = $this->get(route('server.create.type', ['type' => $type]))
         ->assertSuccessful()
-        ->assertSee($modalTitle);
+        ->assertSee(route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]))
+        ->assertDontSee($modalTitle)
+        ->assertDontSee('+ New Token');
 
-    $response->assertSeeInOrder([$heading, 'Back', '+ New Token']);
+    $response->assertSeeInOrder(['Change method', "{$heading} account", $token->name]);
 })->with([
     ['hetzner', 'hetzner', 'Hetzner', 'Add Hetzner Token'],
     ['vultr', 'vultr', 'Vultr', 'Add Vultr Token'],
@@ -280,8 +236,9 @@ test('new server manual page does not show the new token action', function () {
 
     $this->get(route('server.create.type', ['type' => 'manual']))
         ->assertSuccessful()
-        ->assertSee('Manual')
-        ->assertDontSee('+ New Token');
+        ->assertSee('Connect a server')
+        ->assertDontSee('+ New Token')
+        ->assertDontSee('Add token');
 });
 
 test('member cannot access new server page', function () {

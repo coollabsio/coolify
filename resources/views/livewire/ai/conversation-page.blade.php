@@ -109,13 +109,19 @@
                                     <x-reicon name="archive" class="size-4 shrink-0 opacity-70" />
                                     Archive
                                 </button>
-                                <button type="button"
-                                    class="listbox-option justify-start! gap-2.5! text-error! hover:bg-error/10!"
-                                    wire:click="deleteThread({{ $thread['id'] }})" wire:confirm="Delete this conversation?"
-                                    x-on:click="menuOpen = false" role="menuitem">
-                                    <x-reicon name="trash" class="size-4 shrink-0 opacity-70" />
-                                    Delete
-                                </button>
+                                <x-modal-confirmation title="Delete this conversation?"
+                                    submitAction="deleteThread({{ $thread['id'] }})" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Delete conversation"
+                                    :actions="['The conversation and its messages will be permanently deleted.']">
+                                    <x-slot:trigger>
+                                        <button type="button"
+                                            class="listbox-option justify-start! gap-2.5! text-error! hover:bg-error/10!"
+                                            x-on:click="menuOpen = false" role="menuitem">
+                                            <x-reicon name="trash" class="size-4 shrink-0 opacity-70" />
+                                            Delete
+                                        </button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
                             </div>
                         @endif
                     @endif
@@ -178,14 +184,19 @@
                                             <x-reicon name="archive" class="size-4 shrink-0 opacity-70" />
                                             Unarchive
                                         </button>
-                                        <button type="button"
-                                            class="listbox-option justify-start! gap-2.5! text-error! hover:bg-error/10!"
-                                            wire:click="deleteThread({{ $thread['id'] }})"
-                                            wire:confirm="Delete this conversation?" x-on:click="menuOpen = false"
-                                            role="menuitem">
-                                            <x-reicon name="trash" class="size-4 shrink-0 opacity-70" />
-                                            Delete
-                                        </button>
+                                        <x-modal-confirmation title="Delete this conversation?"
+                                            submitAction="deleteThread({{ $thread['id'] }})" :confirmWithText="false"
+                                            :confirmWithPassword="false" step2ButtonText="Delete conversation"
+                                            :actions="['The conversation and its messages will be permanently deleted.']">
+                                            <x-slot:trigger>
+                                                <button type="button"
+                                                    class="listbox-option justify-start! gap-2.5! text-error! hover:bg-error/10!"
+                                                    x-on:click="menuOpen = false" role="menuitem">
+                                                    <x-reicon name="trash" class="size-4 shrink-0 opacity-70" />
+                                                    Delete
+                                                </button>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
                                     </div>
                                 @endif
                             </div>

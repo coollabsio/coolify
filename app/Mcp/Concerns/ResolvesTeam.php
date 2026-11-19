@@ -2,27 +2,19 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Ai\Support\AssistantActor;
+use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
+use App\Models\Server;
+use App\Services\Access\AccessResolver;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 
 trait ResolvesTeam
 {
-    /**
-     * Abilities that team members must not exercise (parity with ApiAbility).
-     *
-     * @var array<int, string>
-     */
-    private const MEMBER_DISALLOWED_ABILITIES = [
-        'root',
-        'write',
-        'write:sensitive',
-        'deploy',
-        'read:sensitive',
-    ];
-
     protected function ensureAbility(Request $request, string $ability = 'read', ?string $tool = null): ?Response
     {
-        $user = $request->user() ?? auth()->user();
+        $user = $request->user();
         if (! $user) {
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'unauthenticated']);
 
@@ -30,44 +22,70 @@ trait ResolvesTeam
         }
 
         $token = $user->currentAccessToken();
+        if (! $token && AssistantActor::is($user)) {
+            return $this->ensureAssistantAbility($request, $ability, $tool);
+        }
+        if (! $token || $token->team_id === null) {
+            $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'invalid_token']);
 
-        if ($token) {
-            // --- Token path (external MCP client): unchanged behavior. ---
-            $teamId = $token->team_id;
-            if ($teamId !== null) {
-                // Fresh pivot lookup (avoid stale $user->teams cache after role changes).
-                $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
-                $isAdminOrOwner = in_array($role, ['admin', 'owner'], true);
+            return Response::error('Invalid token.');
+        }
 
-                if (! $isAdminOrOwner) {
-                    $tokenAbilities = $token->abilities ?? [];
-                    $disallowed = array_intersect($tokenAbilities, self::MEMBER_DISALLOWED_ABILITIES);
-                    if ($disallowed !== [] || in_array($ability, self::MEMBER_DISALLOWED_ABILITIES, true)) {
-                        $this->auditMcpTool($request, $tool, 'denied', [
-                            'reason' => 'member_role',
-                            'required_ability' => $ability,
-                        ]);
-
-                        return Response::error('Missing required team role.');
-                    }
-                }
-            }
-
-            if ($token->can('root') || $token->can($ability)) {
-                return null;
-            }
-
+        // Same check as api.token.team, for tools that run without the HTTP middleware.
+        if (! EnsureTokenBelongsToCurrentTeamMember::tokenWithinCreatorAccess($user, $token, (int) $token->team_id)) {
             $this->auditMcpTool($request, $tool, 'denied', [
-                'reason' => 'missing_ability',
+                'reason' => 'token_exceeds_access',
                 'required_ability' => $ability,
             ]);
 
-            return Response::error("Missing required permissions: {$ability}");
+            return Response::error(EnsureTokenBelongsToCurrentTeamMember::EXCEEDS_ACCESS_MESSAGE);
         }
 
-        // --- Session path (in-app agent, no token): authorize by team role. ---
-        $teamId = currentTeam()?->id;
-        if (is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+        if ($token->can('root') || $token->can($ability)) {
+            return null;
+        }
+
+        $this->auditMcpTool($request, $tool, 'denied', [
+            'reason' => 'missing_ability',
+            'required_ability' => $ability,
+        ]);
+
+        return Response::error("Missing required permissions: {$ability}");
+    }
+
+    /**
+     * Destructive tools must call this so agents cannot cause damage or downtime without an explicit confirm=true.
+     */
+    protected function ensureConfirmed(Request $request, string $action): ?Response
+    {
+        if (filter_var($request->get('confirm'), FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        return $this->mcpError($request, "{$action} requires confirm=true.");
+    }
+
+    /**
+     * Same rule as the REST API (ApiSensitiveData): a root or read:sensitive token of a team admin or owner.
+     */
+    protected function canReadSensitiveData(Request $request): bool
+    {
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        if (! $token || ! ($token->can('root') || $token->can('read:sensitive'))) {
+            return false;
+        }
+
+        return $token->team_id !== null && $user->isAdminOfTeam((int) $token->team_id);
+    }
+
+    /**
+     * The assistant reads with the user's session team and makes changes only through its
+     * approval-gated native tools, so it may use read abilities only.
+     */
+    private function ensureAssistantAbility(Request $request, string $ability, ?string $tool): ?Response
+    {
+        if ($this->resolveTeamId($request) === null) {
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'no_team']);
 
             return Response::error('No accessible team.');
@@ -77,41 +95,40 @@ trait ResolvesTeam
             return null;
         }
 
-        $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
-        if (in_array($role, ['admin', 'owner'], true)) {
-            return null;
-        }
+        $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'assistant_read_only', 'required_ability' => $ability]);
 
-        $this->auditMcpTool($request, $tool, 'denied', [
-            'reason' => 'member_role',
-            'required_ability' => $ability,
-        ]);
-
-        return Response::error('Missing required team role.');
+        return Response::error("Missing required permissions: {$ability}");
     }
 
     protected function resolveTeamId(Request $request): ?int
     {
-        $user = $request->user() ?? auth()->user();
-        if (! $user) {
-            return null;
-        }
-
-        $token = $user->currentAccessToken();
-
-        // Token path (external MCP): team comes from the token.
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
         $teamId = $token?->team_id;
-
-        // Session path (in-app agent, no token): fall back to the current team.
-        if (is_null($teamId) && is_null($token)) {
+        if (! $token && AssistantActor::is($user)) {
             $teamId = currentTeam()?->id;
         }
 
-        if (is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+        if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
             return null;
         }
 
         return (int) $teamId;
+    }
+
+    /**
+     * Servers of the team, or none for a token or member limited to some projects, environments, or resources.
+     *
+     * @return Builder<Server>
+     */
+    protected function visibleServers(Request $request, int $teamId): Builder
+    {
+        $query = Server::whereTeamId($teamId);
+        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     protected function mcpSuccess(Request $request, Response $response, array $context = []): Response

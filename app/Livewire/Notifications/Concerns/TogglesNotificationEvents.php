@@ -19,7 +19,9 @@ trait TogglesNotificationEvents
         'serverReachable',
         'serverUnreachable',
         'serverPatch',
+        'serverAutoUpdate',
         'traefikOutdated',
+        'imageVulnerabilities',
     ];
 
     public function toggleEvent(string $property): void
@@ -33,6 +35,14 @@ trait TogglesNotificationEvents
         abort_unless(in_array($property, $allowedProperties, true), 404);
 
         $this->{$property} = ! $this->{$property};
-        $this->saveModel();
+
+        try {
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->{$property} = ! $this->{$property};
+            $this->settings->refresh();
+
+            handleError($e, $this);
+        }
     }
 }

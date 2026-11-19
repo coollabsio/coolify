@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -172,12 +173,17 @@ class ProjectController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
-        $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
-        collect(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'])
-            ->flatMap(fn (string $relation) => $environment->{$relation})
-            ->each(fn ($resource) => exposeSensitiveFields($resource));
+        // Redis connection URLs read REDIS_PASSWORD and REDIS_USERNAME; load the variables once, not per database.
+        $relations = ['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'];
+        $environment = $environment->load([...$relations, 'redis.runtime_environment_variables']);
+        $payload = $environment->withoutRelations()->toArray();
+        foreach ($relations as $relation) {
+            $payload[$relation] = $environment->{$relation}
+                ->map(fn ($resource) => Arr::except(serializeApiResource($resource), 'runtime_environment_variables'))
+                ->all();
+        }
 
-        return response()->json(serializeApiResponse($environment));
+        return response()->json(serializeApiResponse($payload));
     }
 
     #[OA\Post(

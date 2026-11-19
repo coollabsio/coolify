@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Support\AssistantActor;
 use App\Mcp\Tools\GetCurrentTeam;
 use App\Models\InstanceSettings;
 use App\Models\Team;
@@ -14,7 +15,10 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->member = User::factory()->create();
     $this->member->teams()->attach($this->team, ['role' => 'member']);
+    AssistantActor::set($this->member->id);
 });
+
+afterEach(fn () => AssistantActor::clear());
 
 test('a read tool resolves the team from the session when there is no token', function () {
     $this->actingAs($this->member);
@@ -33,4 +37,31 @@ test('a read tool denies a session team the user does not belong to', function (
     $response = app(GetCurrentTeam::class)->handle(new McpRequest([]));
 
     expect($response->isError())->toBeTrue();
+});
+
+test('a tokenless user without the assistant marker is denied', function () {
+    AssistantActor::clear();
+    $this->actingAs($this->member);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    $response = app(GetCurrentTeam::class)->handle(new McpRequest([]));
+
+    expect($response->isError())->toBeTrue();
+});
+
+test('the assistant marker allows reads only', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    $tool = new class extends GetCurrentTeam
+    {
+        public function check(McpRequest $request, string $ability): bool
+        {
+            return $this->ensureAbility($request, $ability, 'test') === null;
+        }
+    };
+
+    expect($tool->check(new McpRequest([]), 'read'))->toBeTrue()
+        ->and($tool->check(new McpRequest([]), 'write'))->toBeFalse()
+        ->and($tool->check(new McpRequest([]), 'deploy'))->toBeFalse();
 });

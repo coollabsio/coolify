@@ -636,3 +636,29 @@ describe('maxRestartCount validation', function () {
         expect($result)->toBe('exited');
     });
 });
+
+describe('health check in start period', function () {
+    test('keeps running:starting from status strings', function (array $statuses, string $expected) {
+        expect($this->aggregator->aggregateFromStrings(collect($statuses)))->toBe($expected);
+    })->with([
+        'one starting container' => [['running:starting'], 'running:starting'],
+        'starting with healthy' => [['running:healthy', 'running:starting'], 'running:starting'],
+        'starting with no health check' => [['running:unknown', 'running:starting'], 'running:starting'],
+        'unhealthy wins over starting' => [['running:starting', 'running:unhealthy'], 'running:unhealthy'],
+    ]);
+
+    test('keeps running:starting from container objects', function () {
+        $containers = collect([
+            ['State' => ['Status' => 'running', 'Health' => ['Status' => 'starting']]],
+            ['State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']]],
+        ]);
+
+        expect($this->aggregator->aggregateFromContainers($containers))->toBe('running:starting');
+    });
+
+    test('keeps running:starting for a compose service', function () {
+        $compose = "services:\n  nginx:\n    image: nginx:alpine\n";
+
+        expect($this->aggregator->aggregateForCompose(collect(['nginx' => 'running:starting']), $compose))->toBe('running:starting');
+    });
+});

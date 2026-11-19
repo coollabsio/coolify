@@ -3,35 +3,6 @@
 use App\Models\Application;
 
 /**
- * This matches the CURRENT (broken) behavior without negation support
- * which is what the old Application.php had
- */
-function matchWatchPathsCurrentBehavior(array $changed_files, ?array $watch_paths): array
-{
-    if (is_null($watch_paths) || empty($watch_paths)) {
-        return [];
-    }
-
-    $matches = [];
-    foreach ($changed_files as $file) {
-        foreach ($watch_paths as $pattern) {
-            $pattern = trim($pattern);
-            if (empty($pattern)) {
-                continue;
-            }
-            // Old implementation just uses fnmatch directly
-            // This means !patterns are treated as literal strings
-            if (fnmatch($pattern, $file)) {
-                $matches[] = $file;
-                break;
-            }
-        }
-    }
-
-    return $matches;
-}
-
-/**
  * Use the shared implementation from Application model
  */
 function matchWatchPaths(array $changed_files, ?array $watch_paths): array
@@ -256,24 +227,6 @@ it('handles multiple negation patterns', function () {
     expect(matchWatchPaths(['docs/api.html'], $watch_paths))->toBeEmpty();
     expect(matchWatchPaths(['README.md'], $watch_paths))->toBeEmpty();
     expect(matchWatchPaths(['CHANGELOG.md'], $watch_paths))->toBeEmpty();
-});
-
-it('demonstrates current broken behavior with negation patterns', function () {
-    // This test demonstrates the CURRENT broken behavior
-    // where negation patterns are treated as literal strings
-    $changed_files = ['docker-compose/index.ts'];
-    $watch_paths = ['!docker-compose-test/**'];
-
-    // With the current broken implementation, this returns empty
-    // because it tries to match files starting with literal "!"
-    $matches = matchWatchPathsCurrentBehavior($changed_files, $watch_paths);
-    expect($matches)->toBeEmpty(); // This is why your webhook doesn't trigger!
-
-    // Even if the file had ! in the path, fnmatch would treat ! as a literal character
-    // not as a negation operator, so it still wouldn't match the pattern correctly
-    $changed_files = ['test/file.ts'];
-    $matches = matchWatchPathsCurrentBehavior($changed_files, $watch_paths);
-    expect($matches)->toBeEmpty();
 });
 
 it('handles order based matching with conflicting patterns', function () {

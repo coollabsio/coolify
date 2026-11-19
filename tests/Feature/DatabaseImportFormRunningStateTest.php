@@ -66,6 +66,11 @@ class ImportFormRunningStateTestComponent extends ImportForm
         $this->loadAvailableS3Storages();
     }
 
+    protected function serverFileExists(string $path): bool
+    {
+        return true;
+    }
+
     public function render()
     {
         return view('livewire.project.database.import-form');
@@ -78,7 +83,8 @@ function importForm(): Testable
         'database' => test()->database,
         'server' => test()->server,
     ])
-        ->set('filename', 'backup.dump')
+        ->set('customLocation', '/backups/backup.dump')
+        ->call('checkFile')
         ->set('s3StorageId', 1)
         ->set('s3Path', '/backups/backup.dump')
         ->set('s3FileSize', 1024);

@@ -20,11 +20,11 @@
                 description="Add a provider token to provision new cloud servers." icon-name="keys" size="sm" />
         @else
             <div>
-                <div class="grid grid-cols-[minmax(0,1fr)_8rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                <div class="grid grid-cols-[minmax(0,1fr)_8rem_4.5rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_4.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div class="pl-11">Token</div>
                     <div class="text-center">Provider</div>
                     <div class="hidden sm:block">Description</div>
-                    <div class="w-7"></div>
+                    <div class="text-right">Actions</div>
                 </div>
                 @foreach ($tokens as $savedToken)
                     <x-modal-input title="Edit Cloud Token" isFullWidth :wireIgnore="false" :contentClicks="false"
@@ -32,7 +32,7 @@
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                         <x-slot:content>
                     <div
-                        class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_8rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_1.75rem] dark:hover:bg-white/[0.025]"
+                        class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_8rem_4.5rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)_4.5rem] dark:hover:bg-white/[0.025]"
                     >
                         <div class="flex min-w-0 items-center gap-3">
                             <div
@@ -52,10 +52,12 @@
                             </span>
                         </div>
                         <p class="hidden truncate text-[12px] text-neutral-500 sm:block dark:text-fg-dim">{{ $savedToken->description ?: '-' }}</p>
-                        <button type="button" class="icon-button" title="Edit cloud token"
-                            aria-label="Edit {{ $savedToken->name }}" @click="modalOpen=true">
-                            <x-reicon name="settings" class="size-3.5" />
-                        </button>
+                        <div class="flex justify-end">
+                            <button type="button" class="icon-button" title="Edit cloud token"
+                                aria-label="Edit {{ $savedToken->name }}" @click="modalOpen=true">
+                                <x-reicon name="settings" class="size-3.5" />
+                            </button>
+                        </div>
                     </div>
                         </x-slot:content>
                         <livewire:security.cloud-provider-token.show :cloud_token_uuid="$savedToken->uuid"

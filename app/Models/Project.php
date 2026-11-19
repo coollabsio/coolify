@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,7 @@ use OpenApi\Attributes as OA;
 class Project extends BaseModel
 {
     use Auditable, HasFactory;
-    use ClearsGlobalSearchCache;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -31,6 +32,15 @@ class Project extends BaseModel
         'team_id',
         'uuid',
     ];
+
+    protected array $auditExclude = ['canvas_position'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_position' => 'array',
+        ];
+    }
 
     /**
      * Get query builder for projects owned by current team.
@@ -130,6 +140,11 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
     }
 
+    public function sqlites()
+    {
+        return $this->hasManyThrough(StandaloneSqlite::class, Environment::class);
+    }
+
     public function mongodbs()
     {
         return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
@@ -156,6 +171,7 @@ class Project extends BaseModel
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
@@ -168,7 +184,8 @@ class Project extends BaseModel
             ->concat($this->mariadbs()->with($with)->get())
             ->concat($this->keydbs()->with($with)->get())
             ->concat($this->dragonflies()->with($with)->get())
-            ->concat($this->clickhouses()->with($with)->get());
+            ->concat($this->clickhouses()->with($with)->get())
+            ->concat($this->sqlites()->with($with)->get());
     }
 
     public function navigateTo()

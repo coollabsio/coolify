@@ -23,7 +23,7 @@ yarn-error.log
 /.ssh
 .ignition.json
 .env.dusk.local
-docker/coolify-realtime/node_modules
+docker/coolify-terminal/node_modules
 
 /storage/*.key
 /storage/app/backups
@@ -31,8 +31,9 @@ docker/coolify-realtime/node_modules
 /storage/app/ssh/mux
 /storage/app/tmp
 /storage/app/debugbar
-/storage/logs
-/storage/pail
-
-
-
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/pail/*
+!/storage/pail/.gitignore
+/storage/framework/**
+!/storage/framework/**/.gitignore

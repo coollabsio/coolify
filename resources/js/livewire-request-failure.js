@@ -15,6 +15,13 @@ export function createLivewireRequestFailureHandler({ now = Date.now } = {}) {
     let lastToastGestureAt = Number.NEGATIVE_INFINITY;
 
     return ({ status, content, preventDefault, gestureAt = Number.NEGATIVE_INFINITY }) => {
+        // While Coolify restarts for an upgrade, any request can fail (proxy errors, then the new
+        // version answering the old page). The upgrade modal shows the progress, so show no error page.
+        if (window.coolifyUpgradeInProgress) {
+            preventDefault();
+            return;
+        }
+
         if (!INFRASTRUCTURE_FAILURE_STATUSES.has(status)) {
             return;
         }

@@ -3,22 +3,80 @@
 namespace App\Rules;
 
 use App\Models\InstanceSettings;
+use App\Services\Dns\DnsResolver;
 use Closure;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\UriComparator;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Log;
-use PurplePixie\PhpDns\DNSQuery;
-use PurplePixie\PhpDns\DNSTypes;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 use Throwable;
 
 class SafeWebhookUrl implements ValidationRule
 {
+    private const DEFAULT_PORTS = ['https' => 443, 'http' => 80, 'sftp' => 22, 'ftps' => 21];
+
+    /** @var (Closure(string): array<int, string>)|null */
+    private static ?Closure $fakeResolver = null;
+
     /**
      * @param  (Closure(string): array<int, string>)|null  $resolver
-     */
-    /**
      * @param  array<int, string>  $trustedInternalHosts
+     * @param  bool  $allowPrivateNetworks  Allow private, CGNAT, and unique local addresses and internal hostnames.
+     *                                      Loopback, link-local (cloud metadata), and reserved targets stay blocked.
+     * @param  array<int, string>  $schemes  The URL schemes to accept, for example sftp for a backup storage.
+     * @param  bool  $preferSystemDns  Ask the system resolver before the custom DNS servers.
+     * @param  int  $customDnsTimeout  Seconds to wait for each custom DNS server query.
      */
-    public function __construct(private ?Closure $resolver = null, private array $trustedInternalHosts = []) {}
+    public function __construct(
+        private ?Closure $resolver = null,
+        private array $trustedInternalHosts = [],
+        private bool $allowPrivateNetworks = false,
+        private array $schemes = ['http', 'https'],
+        private bool $preferSystemDns = false,
+        private int $customDnsTimeout = 5,
+    ) {}
+
+    /**
+     * Git sources such as GitHub Enterprise or GitLab often run on a private network.
+     * Self-hosted instances allow them. Coolify Cloud keeps them blocked.
+     */
+    public static function forGitSource(): static
+    {
+        return new static(allowPrivateNetworks: self::gitSourcesMayUsePrivateNetworks());
+    }
+
+    /**
+     * SMTP hosts get the targets of git sources. They are often internal names (split-horizon DNS,
+     * Docker networks), so the system resolver answers first, and a send does not wait long for
+     * custom DNS servers.
+     */
+    public static function forSmtpHost(): static
+    {
+        return new static(
+            allowPrivateNetworks: self::gitSourcesMayUsePrivateNetworks(),
+            preferSystemDns: true,
+            customDnsTimeout: 2,
+        );
+    }
+
+    /**
+     * Resolve hosts with the given callback instead of DNS in every rule without its own
+     * resolver, so tests never send DNS queries. Pass null to reset.
+     *
+     * @param  (Closure(string): array<int, string>)|null  $resolver
+     */
+    public static function resolveHostsUsing(?Closure $resolver): void
+    {
+        self::$fakeResolver = $resolver;
+    }
+
+    public static function gitSourcesMayUsePrivateNetworks(): bool
+    {
+        return ! isCloud();
+    }
 
     /**
      * Run the validation rule.
@@ -37,8 +95,8 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($value, PHP_URL_SCHEME) ?? '');
-        if (! in_array($scheme, ['https', 'http'])) {
-            $fail('The :attribute must use the http or https scheme.');
+        if (! in_array($scheme, $this->schemes, true)) {
+            $fail('The :attribute must use the '.implode(' or ', $this->schemes).' scheme.');
 
             return;
         }
@@ -109,9 +167,10 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * Build HTTP client options that pin the validated host to the resolved IPs.
      *
+     * @param  (Closure(string): array<int, string>)|null  $resolver
      * @return array<string, mixed>
      */
-    public static function httpClientOptions(string $url, array $trustedInternalHosts = []): array
+    public static function httpClientOptions(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false): array
     {
         $options = ['allow_redirects' => false];
 
@@ -119,7 +178,7 @@ class SafeWebhookUrl implements ValidationRule
             throw new \RuntimeException('Webhook URL DNS pinning is unavailable.');
         }
 
-        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts, $resolver, $allowPrivateNetworks);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return $options;
@@ -145,7 +204,33 @@ class SafeWebhookUrl implements ValidationRule
     }
 
     /**
-     * Build mc --resolve mappings that pin the endpoint host for S3 backups.
+     * Redirect options that follow up to five redirects on the same scheme, host and port.
+     * The DNS pin from httpClientOptions() covers only that host and port, so a redirect
+     * to another origin is refused. Git providers use such redirects for renamed repositories.
+     *
+     * @return array<string, mixed>
+     */
+    public static function sameOriginRedirectOptions(): array
+    {
+        return [
+            'max' => 5,
+            'strict' => true,
+            'referer' => false,
+            'protocols' => ['http', 'https'],
+            'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $target): void {
+                if (UriComparator::isCrossOrigin($request->getUri(), $target)) {
+                    throw new RequestException(
+                        "Refused a redirect to another host ({$target->getScheme()}://{$target->getAuthority()}).",
+                        $request,
+                        $response,
+                    );
+                }
+            },
+        ];
+    }
+
+    /**
+     * Build mc --resolve mappings, IPv4 first, that pin the endpoint host for S3 backups.
      *
      * @return array<int, string>
      */
@@ -157,17 +242,79 @@ class SafeWebhookUrl implements ValidationRule
             return [];
         }
 
-        // The MinIO client keeps one --resolve IP per host and parses it with Go's
-        // netip.ParseAddr, which rejects bracketed IPv6. Emit a single entry, preferring
-        // IPv4 for reachability, without brackets.
-        $preferredIps = array_values(array_filter(
-            $target['ips'],
-            fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false,
-        ));
+        // mc parses --resolve values with Go's netip.ParseAddr, which rejects bracketed IPv6.
+        // mc also keeps one IP per host, so S3Storage::minioClientResolveOptions() picks one entry.
+        $ips = $target['ips'];
+        usort($ips, fn (string $a, string $b): int => self::isIpv6($a) <=> self::isIpv6($b));
 
-        $ip = $preferredIps[0] ?? $target['ips'][0];
+        return array_map(fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], $ip), $ips);
+    }
 
-        return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
+    /**
+     * The address to connect to for an endpoint that is not HTTP (SFTP, FTPS): the validated IP of its host, so a
+     * DNS change after the check cannot send the connection to another address.
+     *
+     * @param  array<int, string>  $schemes
+     * @param  array<int, string>  $trustedInternalHosts
+     */
+    public static function pinnedAddress(string $url, array $schemes, array $trustedInternalHosts = []): string
+    {
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts, schemes: $schemes);
+
+        return $target['ips'] === [] ? $target['host'] : self::preferredIp($target['ips']);
+    }
+
+    /**
+     * @param  non-empty-array<int, string>  $ips
+     */
+    private static function preferredIp(array $ips): string
+    {
+        foreach ($ips as $ip) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                return $ip;
+            }
+        }
+
+        return $ips[0];
+    }
+
+    private static function isIpv6(string $ip): bool
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+    }
+
+    /**
+     * Resolve and check a host for a connection that is not HTTP (for example SMTP).
+     * The caller checks the host syntax first. "ips" has the checked addresses, or is empty
+     * when the host is an IP address.
+     *
+     * @return array{status: 'allowed'|'blocked'|'link_local'|'unresolved', ips: array<int, string>}
+     */
+    public function checkConnectionHost(string $host): array
+    {
+        $host = rtrim($this->normalizeHostForIpCheck(strtolower($host)), '.');
+
+        if ($this->isBlockedHostname($host) && ! $this->isAllowedHostname($host)) {
+            $this->logBlockedHost('connection host', $host);
+
+            return ['status' => 'blocked', 'ips' => []];
+        }
+
+        $isIp = filter_var($host, FILTER_VALIDATE_IP) !== false;
+        $ips = $isIp ? [$host] : $this->resolveHost($host);
+        if ($ips === []) {
+            return ['status' => 'unresolved', 'ips' => []];
+        }
+
+        foreach ($ips as $ip) {
+            if (! $this->isAllowedIp($ip, $host)) {
+                $this->logBlockedIp('connection host', $host, $ip);
+
+                return ['status' => $this->isLinkLocalIp($ip) ? 'link_local' : 'blocked', 'ips' => []];
+            }
+        }
+
+        return ['status' => 'allowed', 'ips' => $isIp ? [] : $ips];
     }
 
     public static function redactedUrlForLog(string $url): string
@@ -186,9 +333,13 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = []): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false, array $schemes = ['http', 'https']): array
     {
-        $rule = new self(trustedInternalHosts: $trustedInternalHosts);
+        $rule = new self(resolver: $resolver, trustedInternalHosts: $trustedInternalHosts, allowPrivateNetworks: $allowPrivateNetworks, schemes: $schemes);
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new \RuntimeException('Webhook URL is invalid.');
+        }
+
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || $host === '') {
             throw new \RuntimeException('Webhook URL host could not be resolved.');
@@ -199,7 +350,11 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?? '');
-        $port = parse_url($url, PHP_URL_PORT) ?: ($scheme === 'https' ? 443 : 80);
+        if (! in_array($scheme, $schemes, true)) {
+            throw new \RuntimeException('Webhook URL scheme is unsafe.');
+        }
+
+        $port = parse_url($url, PHP_URL_PORT) ?: self::DEFAULT_PORTS[$scheme];
         $hostForDns = rtrim($rule->normalizeHostForIpCheck(strtolower($host)), '.');
 
         if (filter_var($hostForDns, FILTER_VALIDATE_IP)) {
@@ -221,6 +376,10 @@ class SafeWebhookUrl implements ValidationRule
             }
         }
 
+        if ($rule->isBlockedHostname($hostForDns) && ! $rule->isAllowedHostname($hostForDns)) {
+            throw new \RuntimeException('Webhook URL host is unsafe.');
+        }
+
         return ['host' => $hostForDns, 'port' => $port, 'ips' => $resolvedIps];
     }
 
@@ -236,12 +395,22 @@ class SafeWebhookUrl implements ValidationRule
      */
     private function resolveHost(string $host): array
     {
-        if ($this->resolver instanceof Closure) {
-            return array_values(array_filter(($this->resolver)($host), fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
+        $resolver = $this->resolver ?? self::$fakeResolver;
+        if ($resolver instanceof Closure) {
+            return array_values(array_filter($resolver($host), fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
         }
 
         if ($host === 'localhost') {
             return ['127.0.0.1', '::1'];
+        }
+
+        if ($this->preferSystemDns) {
+            $systemResolvedIps = $this->resolveHostWithSystemDns($host);
+            $customDnsServers = $this->customDnsServers();
+
+            return $systemResolvedIps !== [] || $customDnsServers === []
+                ? $systemResolvedIps
+                : $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
         }
 
         $customDnsServers = $this->customDnsServers();
@@ -298,12 +467,11 @@ class SafeWebhookUrl implements ValidationRule
         $ips = [];
 
         foreach ($dnsServers as $dnsServer) {
-            foreach ([DNSTypes::NAME_A, DNSTypes::NAME_AAAA] as $type) {
+            foreach ([DnsResolver::TYPE_A, DnsResolver::TYPE_AAAA] as $type) {
                 try {
-                    $query = new DNSQuery($dnsServer, 53, 5);
-                    $records = $query->query($host, $type);
+                    $records = queryDnsServer($dnsServer, $host, $type, $this->customDnsTimeout);
 
-                    if ($records === false || $query->hasError()) {
+                    if ($records === false) {
                         continue;
                     }
 
@@ -333,7 +501,7 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         return array_values(array_filter(array_map(
-            fn (string $server): string => trim($server),
+            fn (string $server): string => normalizeIpAddress($server),
             explode(',', $servers),
         ), fn (string $server): bool => filter_var($server, FILTER_VALIDATE_IP) !== false));
     }
@@ -359,7 +527,11 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         if ($this->isPrivateIp($ip)) {
-            return $this->isAllowedHostname($host) || $this->isAllowlistedIp($ip);
+            return $this->allowPrivateNetworks || $this->isAllowedHostname($host) || $this->isAllowlistedIp($ip);
+        }
+
+        if ($this->allowPrivateNetworks && $this->ipv4InCidr($ip, '100.64.0.0/10')) {
+            return true;
         }
 
         return $this->isAllowlistedIp($ip);
@@ -456,6 +628,7 @@ class SafeWebhookUrl implements ValidationRule
             '::1/128',
             '::ffff:0:0/96',
             '64:ff9b::/96',
+            '64:ff9b:1::/48',
             '100::/64',
             '2001::/23',
             '2001:2::/48',
@@ -477,8 +650,16 @@ class SafeWebhookUrl implements ValidationRule
 
     private function isBlockedHostname(string $host): bool
     {
-        return in_array($host, ['localhost'], true)
-            || str_ends_with($host, '.local')
+        if ($host === 'localhost') {
+            return true;
+        }
+
+        // The resolved addresses of internal hostnames are still checked.
+        if ($this->allowPrivateNetworks) {
+            return false;
+        }
+
+        return str_ends_with($host, '.local')
             || str_ends_with($host, '.internal')
             || str_ends_with($host, '.cluster.local');
     }

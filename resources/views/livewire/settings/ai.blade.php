@@ -1,13 +1,13 @@
 <div>
     <x-slot:title>
-        AI & MCP | Coolify
+        AI Assistant | Coolify
     </x-slot>
 
     <x-settings.layout>
         <div class="flex min-w-0 flex-col gap-6">
             @if ($isInstanceAdmin)
-                <x-application.settings-section id="instance-ai-section" title="AI assistant & MCP"
-                    helper="Instance-wide switches. When the AI assistant is disabled here, no team can use it regardless of their own settings.">
+                <x-application.settings-section id="instance-ai-section" title="AI assistant"
+                    helper="Instance-wide switch. When the AI assistant is disabled here, no team can use it regardless of their own settings.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.listbox canGate="update" :canResource="$settings" id="is_ai_assistant_enabled" label="AI assistant"
                             helper="Enable the built-in AI assistant for this instance. Teams still bring their own provider key."
@@ -15,18 +15,7 @@
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
-                        <x-forms.listbox canGate="update" :canResource="$settings" id="is_mcp_server_enabled" label="MCP server"
-                            helper="Expose the authenticated Streamable HTTP endpoint at /mcp." onChange="instantSave"
-                            :options="[
-                                ['value' => true, 'label' => 'Enabled'],
-                                ['value' => false, 'label' => 'Disabled'],
-                            ]" />
                     </div>
-                    @if ($is_mcp_server_enabled)
-                        <x-callout type="info" title="MCP endpoint" class="mt-4">
-                            <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
-                        </x-callout>
-                    @endif
                 </x-application.settings-section>
             @endif
 
@@ -65,11 +54,8 @@
 
                     <form wire:submit="addCredential" class="flex flex-col gap-4">
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.select canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newProvider" label="Provider">
-                                @foreach ($providers as $provider)
-                                    <option value="{{ $provider->value }}">{{ $provider->label() }}</option>
-                                @endforeach
-                            </x-forms.select>
+                            <x-forms.listbox canGate="create" :canResource="\App\Models\AiProviderCredential::class" id="newProvider" label="Provider"
+                                :options="collect($providers)->map(fn ($provider) => ['value' => $provider->value, 'label' => $provider->label()])->all()" />
                             <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newModel" label="Model" placeholder="gpt-5" />
                             <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" type="password" allowToPeak wire:model="newApiKey" label="API key" />
                             <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newBaseUrl" label="Base URL"

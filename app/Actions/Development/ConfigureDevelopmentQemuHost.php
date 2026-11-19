@@ -14,6 +14,7 @@ class ConfigureDevelopmentQemuHost
     public function handle(): void
     {
         $this->ensureDevelopmentEnvironment();
+        $this->ensureValidInstance();
         $this->installDependencies();
         $this->runOrFail('systemctl enable --now libvirtd');
         $this->configureLibvirtNetwork();
@@ -24,7 +25,7 @@ class ConfigureDevelopmentQemuHost
 
     private function installDependencies(): void
     {
-        $binaries = ['curl', 'docker', 'iptables', 'qemu-img', 'virsh', 'virt-install'];
+        $binaries = ['curl', 'docker', 'iptables', 'qemu-img', 'virsh', 'virt-install', 'xorriso'];
         $check = collect($binaries)->map(fn (string $binary) => 'command -v '.escapeshellarg($binary))->implode(' && ');
 
         if (Process::run($check)->successful()) {
@@ -36,7 +37,7 @@ class ConfigureDevelopmentQemuHost
         }
 
         $this->runOrFail('apt-get update');
-        $this->runOrFail('DEBIAN_FRONTEND=noninteractive apt-get install -y curl iptables libvirt-clients libvirt-daemon-system qemu-utils qemu-system-x86 virtinst');
+        $this->runOrFail('DEBIAN_FRONTEND=noninteractive apt-get install -y curl iptables libvirt-clients libvirt-daemon-system qemu-utils qemu-system-x86 virtinst xorriso');
     }
 
     private function configureLibvirtNetwork(): void
@@ -45,7 +46,7 @@ class ConfigureDevelopmentQemuHost
         $networkInfo = Process::run('virsh net-info '.escapeshellarg($network));
 
         if ($networkInfo->failed()) {
-            $networkXml = config('development-qemu.storage_path').'/libvirt-network.xml';
+            $networkXml = config('development-qemu.storage_path')."/libvirt-network-{$network}.xml";
             File::ensureDirectoryExists(dirname($networkXml), 0777, true);
             File::put($networkXml, $this->libvirtNetworkXml($network));
             $this->runOrFail('virsh net-define '.escapeshellarg($networkXml));
@@ -82,7 +83,12 @@ class ConfigureDevelopmentQemuHost
             throw new RuntimeException('Unable to determine the Coolify Docker network subnet.');
         }
 
-        $rule = sprintf('-s %s -d %s -o virbr0 -j ACCEPT', escapeshellarg($subnet), escapeshellarg(config('development-qemu.subnet')));
+        $rule = sprintf(
+            '-s %s -d %s -o %s -j ACCEPT',
+            escapeshellarg($subnet),
+            escapeshellarg(config('development-qemu.subnet')),
+            escapeshellarg(config('development-qemu.bridge')),
+        );
 
         Process::run("iptables -D LIBVIRT_FWI {$rule}");
         $this->runOrFail("iptables -I LIBVIRT_FWI 1 {$rule}");
@@ -90,14 +96,22 @@ class ConfigureDevelopmentQemuHost
 
     private function libvirtNetworkXml(string $network): string
     {
+        $bridge = config('development-qemu.bridge');
+        $gateway = config('development-qemu.gateway');
+        $prefix = (int) config('development-qemu.prefix');
+        $networkAddress = ip2long(explode('/', config('development-qemu.subnet'))[0]);
+        $netmask = long2ip((0xFFFFFFFF << (32 - $prefix)) & 0xFFFFFFFF);
+        $rangeStart = long2ip($networkAddress + 2);
+        $rangeEnd = long2ip($networkAddress + (2 ** (32 - $prefix)) - 2);
+
         return <<<XML
 <network>
   <name>{$network}</name>
   <forward mode="nat"/>
-  <bridge name="virbr0" stp="on" delay="0"/>
-  <ip address="192.168.122.1" netmask="255.255.255.0">
+  <bridge name="{$bridge}" stp="on" delay="0"/>
+  <ip address="{$gateway}" netmask="{$netmask}">
     <dhcp>
-      <range start="192.168.122.2" end="192.168.122.254"/>
+      <range start="{$rangeStart}" end="{$rangeEnd}"/>
     </dhcp>
   </ip>
 </network>
@@ -117,6 +131,29 @@ XML;
     {
         if (! in_array(config('app.env'), ['local', 'development', 'dev'], true)) {
             throw new RuntimeException('QEMU host configuration may only run in development environments.');
+        }
+    }
+
+    /**
+     * Instance names become part of libvirt domain names ("coolify-dev-{instance}--{profile}"),
+     * so they must not contain repeated, leading, or trailing dashes that would blur that separator.
+     */
+    private function ensureValidInstance(): void
+    {
+        $instance = config('development-qemu.instance');
+
+        if ($instance === null) {
+            return;
+        }
+
+        if (! preg_match('/^[a-z0-9_]+(?:-[a-z0-9_]+)*$/', $instance)) {
+            throw new RuntimeException("Invalid DEVELOPMENT_QEMU_INSTANCE: {$instance}. Use [a-z0-9_-] without leading, trailing, or repeated dashes.");
+        }
+
+        $slot = config('development-qemu.slot');
+
+        if (! is_int($slot) || $slot < 1 || $slot > 254) {
+            throw new RuntimeException('DEVELOPMENT_QEMU_SLOT must be an integer between 1 and 254 when DEVELOPMENT_QEMU_INSTANCE is set.');
         }
     }
 }

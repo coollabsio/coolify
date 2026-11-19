@@ -11,7 +11,8 @@
                 description="Send team notifications to a Discord channel through an incoming webhook.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$discordEnabled" enabledProperty="discordEnabled"
-                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
@@ -24,7 +25,7 @@
                         ]" />
                     <div class="lg:col-span-2">
                         @can('update', $settings)
-                            <x-forms.input type="password" required id="discordWebhookUrl" label="Webhook URL"
+                            <x-forms.input type="password" :required="$discordEnabled" id="discordWebhookUrl" label="Webhook URL"
                                 helper="Create an incoming webhook in your Discord server settings." />
                         @else
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />

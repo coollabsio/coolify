@@ -28,11 +28,10 @@
                 @break
 
             @case('select')
-                <x-forms.select :label="$field['label']" wire:model="{{ $model }}">
-                    @foreach ($field['options'] as $option)
-                        <option value="{{ $option }}">{{ $option }}</option>
-                    @endforeach
-                </x-forms.select>
+                {{-- The listbox binds through `id`; htmlId keeps the DOM id free of dots. --}}
+                <x-forms.listbox :id="$model" :htmlId="'approval-'.md5($model)" :label="$field['label']"
+                    :required="$field['required']" :helper="$field['help']"
+                    :options="array_map(fn ($option) => ['value' => $option, 'label' => $option], $field['options'])" />
                 @break
 
             @case('locked')

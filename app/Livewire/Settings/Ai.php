@@ -22,9 +22,6 @@ class Ai extends Component
     #[Validate('boolean')]
     public bool $is_ai_assistant_enabled = false;
 
-    #[Validate('boolean')]
-    public bool $is_mcp_server_enabled = false;
-
     public bool $isAiEnabled = true;
 
     public string $newProvider = 'openai';
@@ -43,7 +40,6 @@ class Ai extends Component
         $this->settings = instanceSettings();
         $this->isInstanceAdmin = isInstanceAdmin();
         $this->is_ai_assistant_enabled = $this->settings->is_ai_assistant_enabled ?? false;
-        $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
         $this->isAiEnabled = currentTeam()->is_ai_assistant_enabled;
     }
 
@@ -53,10 +49,8 @@ class Ai extends Component
             $this->authorize('update', $this->settings);
             $this->validate([
                 'is_ai_assistant_enabled' => 'boolean',
-                'is_mcp_server_enabled' => 'boolean',
             ]);
             $this->settings->is_ai_assistant_enabled = $this->is_ai_assistant_enabled;
-            $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Throwable $e) {

@@ -160,10 +160,24 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain('<span>DNS status</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain("service-domain-group-{$this->webApp->id}")
-        ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(substr_count($html, '<span>Domain</span>'))->toBe(1)
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
+
+it('loads no domain favicon when proxy labels add HTTP basic auth to the service', function (string $labels) {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n    labels:\n{$labels}",
+    ]);
+
+    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSee('https://api.example.com')
+        ->html();
+
+    expect($html)->not->toContain('https://api.example.com/favicon.ico');
+})->with([
+    'traefik list' => ["      - traefik.http.middlewares.auth.basicauth.users=admin:hash\n"],
+    'caddy map' => ["      caddy.basic_auth.admin: hash\n"],
+]);
 
 it('removes consecutive service domains by stable row identity after indexes change', function () {
     $this->apiApp->update([
@@ -189,17 +203,16 @@ it('deletes the managed dns record when removing a service domain by key with de
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->apiApp->getMorphClass(),
-        'resource_id' => $this->apiApp->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'api.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->apiApp);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -207,6 +220,7 @@ it('deletes the managed dns record when removing a service domain by key with de
             'type' => 'A',
             'name' => 'api.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 
@@ -260,6 +274,17 @@ it('shows and persists the HTTP redirect control for HTTPS service applications'
     expect($this->service->fresh()->docker_compose)->not->toContain('middlewares=redirect-to-https');
 });
 
+it('persists the redirect type for service applications', function () {
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet("permanentRedirects.{$this->apiApp->id}", false)
+        ->assertSee('Redirect type')
+        ->call('updatePermanentRedirect', $this->apiApp->id, true)
+        ->assertHasNoErrors();
+
+    expect($this->apiApp->fresh()->is_permanent_redirect_enabled)->toBeTrue()
+        ->and($this->service->fresh()->docker_compose)->toContain('middlewares=redirect-to-https-permanent');
+});
+
 it('hides the HTTP redirect control for HTTP-only service applications', function () {
     $this->apiApp->update(['fqdn' => 'http://api.example.com']);
 
@@ -289,25 +314,6 @@ it('opens address fields and service-wide redirects in the same settings dialog 
     }
 });
 
-it('uses segmented fields when adding and editing service domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.domain-input id="newDomainParts"')
-        ->toContain('<x-forms.domain-input id="editingDomainParts"')
-        ->not->toContain('placeholder="https://app.example.com"');
-});
-
-it('matches the application domains toolbar heading and top spacing', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('<div class="flex flex-wrap items-center gap-2">')
-        ->toContain('<h2 id="domains-section">Domains</h2>')
-        ->not->toContain('<div class="mt-2 flex flex-wrap items-center gap-2">')
-        ->not->toContain('<h3>Domains</h3>');
-});
-
 it('resets the add domain dns gate when segmented domain fields change', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('addDomainDnsFailed', true)
@@ -330,21 +336,6 @@ it('does not add a single-label hostname as a service domain', function () {
         ->assertDispatched('error');
 
     expect($this->apiApp->fresh()->fqdn)->toBeNull();
-});
-
-it('shows dns entries control next to Add', function () {
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSuccessful()
-        ->assertSee('DNS entries')
-        ->assertSee('Manual records');
-});
-
-it('exposes the dns entries dropdown expanded state', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/shared/cloudflare-autoconfigure.blade.php'));
-
-    expect($view)
-        ->toContain('x-bind:aria-expanded="dnsEntriesOpen"')
-        ->toContain('x-show="dnsEntriesOpen"');
 });
 
 it('lists dns entries for service hosts that still need dns', function () {
@@ -504,34 +495,6 @@ it('adds a domain when the compose service has an empty environment section', fu
         ->assertDispatched('success');
 
     expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
-});
-
-it('keeps a stable key for the rendered domain list', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('wire:key="service-domains-list"')
-        ->toContain('wire:key="service-domain-rows-{{ $appId }}"')
-        ->not->toContain('md5(serialize($domainRows))');
-});
-
-it('provides client-side search for service domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('x-model="domainSearch"')
-        ->toContain('class="ml-auto flex flex-wrap items-center gap-2"')
-        ->toContain('<div class="relative shrink-0">')
-        ->toContain('placeholder="Search services or domains"')
-        ->toContain('x-show="matchesDomainSearch(')
-        ->toContain('title="No domains found"')
-        ->toContain('hasDomainSearchResults(');
-});
-
-it('does not duplicate the service name as a badge in the domain cell', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)->not->toContain('domains-service-mobile table-badge');
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {
@@ -776,7 +739,7 @@ YAML,
         ->assertDispatched('success');
 });
 
-it('saves after confirming both a domain conflict and a missing required port', function () {
+it('saves after confirming both a domain conflict and a different port', function () {
     $this->service->update([
         'docker_compose_raw' => <<<'YAML'
 services:
@@ -791,7 +754,9 @@ YAML,
 
     $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
-        ->set('newDomain', 'https://api.example.com')
+        ->set('newDomainParts.host', 'api.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->set('newDomainPartsChanged', true)
         ->call('addDomain')
         ->assertSet('showDomainConflictModal', true)
         ->call('confirmDomainUsage')
@@ -799,8 +764,8 @@ YAML,
         ->assertSet('showPortWarningModal', true)
         ->assertSet('forceSaveDomains', true)
         ->assertSee('Use a different port?')
-        ->assertSee('Keep required port')
-        ->assertSee('Use this port anyway');
+        ->assertSee('Keep port 8000')
+        ->assertSee('Use port 3000 anyway');
 
     $component
         ->call('confirmRemovePort')
@@ -811,7 +776,28 @@ YAML,
         ->assertDispatched('success');
 
     expect(explode(',', (string) $this->webApp->fresh()->fqdn))
-        ->toBe(['https://api.example.com']);
+        ->toBe(['https://api.example.com'])
+        ->and($this->webApp->fresh()->domain_port_overrides)->toBe(['https://api.example.com' => 3000]);
+});
+
+it('does not warn about the port when a domain with an empty port is renamed', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n    environment:\n      - SERVICE_URL_API_8080\n  web:\n    image: nginx:alpine\n",
+    ]);
+    $this->apiApp->update(['fqdn' => 'https://api.example.com']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'renamed.example.com')
+        ->set('editingDomainParts.port', '')
+        ->set('editingDomainPartsChanged', true)
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+    expect($this->apiApp->fqdn)->toBe('https://renamed.example.com')
+        ->and($this->apiApp->domain_port_overrides)->toBeNull();
 });
 
 it('loads persisted dns status for service applications', function () {
@@ -958,9 +944,6 @@ it('updates search engine indexing from the service domains view', function () {
 
     expect($this->apiApp->refresh()->noindexDomains()->all())
         ->toBe(['https://api.example.com']);
-
-    expect(file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php')))
-        ->not->toContain('<select');
 });
 
 it('regenerates a service application domain only when the modal is saved', function () {
@@ -1052,7 +1035,6 @@ it('shows an inherited internal port badge from the coolify service env port', f
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet('domainRows.0.internal_port', 3000)
         ->assertSet('domainRows.0.has_port_override', false)
-        ->set('dnsValidationEnabled', false)
         ->call('startEdit', 0)
         ->assertSet('editingDomainParts.port', '3000')
         ->call('updateDomain')
@@ -1147,53 +1129,6 @@ it('keeps the edited domain selected when settings refresh and reorder rows', fu
         ->and($this->webApp->fresh()->fqdn)->toBe('https://broken.example.com');
 });
 
-it('renders compact icon-only domain actions with accessible labels', function () {
-    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])->html();
-    $document = new DOMDocument;
-    @$document->loadHTML($html);
-    $xpath = new DOMXPath($document);
-
-    foreach (['Check DNS', 'Settings for https://api.example.com', 'Remove domain'] as $label) {
-        $buttons = $xpath->query('//button[@aria-label="'.$label.'"]');
-        expect($buttons->length)->toBe(1);
-        $button = $buttons->item(0);
-        expect(trim($button->textContent))->toBe('')
-            ->and($button->getAttribute('class'))->toContain('icon-button')
-            ->and($button->getAttribute('title'))->not->toBe('');
-    }
-
-    expect($html)->not->toContain('aria-label="More actions for');
-});
-
-it('uses the shared mobile domain summary layout', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('Domain routing summary')
-        ->toContain('No redirects')
-        ->toContain('Noindex');
-});
-
-it('uses explicit modal actions for pending domain edits', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)->not->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('wire:click="regenerateEditingDomain"')
-        ->toContain('wire:click="updateDomain"')
-        ->toContain('Save');
-});
-
-it('opens service domain settings from browser data and shows a dns spinner', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)
-        ->not->toContain('wire:click="startEdit(')
-        ->toContain('@click="openEditDomain(')
-        ->toContain('<x-loading compact aria-label="Checking DNS"')
-        ->not->toContain('<x-loading-on-button wire:loading.delay');
-});
-
 it('uses the dns badge as progress for single and all service checks', function (string $action, array $parameters) {
     Queue::fake();
 
@@ -1283,39 +1218,47 @@ it('still checks domain conflicts when inheriting a redirect counterpart port', 
         ->and($this->webApp->fresh()->domain_port_overrides['https://www.example.com'])->toBe(8080);
 });
 
-it('renders domain settings in compact columns instead of a second summary line', function () {
-    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])->html();
-    foreach (['Protocol redirect', 'Domain redirect', 'Internal port', 'Search indexing'] as $heading) {
-        expect($html)->toContain('<span>'.$heading.'</span>');
-    }
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-    expect($view)->toContain('service-domain-detail')
-        ->not->toContain('gap-x-3 gap-y-1');
+it('restarts a service dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $domain = 'https://api.example.com';
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
+    $index = collect($component->get('domainRows'))->search(fn (array $row): bool => $row['url'] === $domain);
+
+    expect($index)->not->toBeFalse();
+
+    $component->call('checkDomainDns', $index)
+        ->assertSet("domainRows.{$index}.dns_status", 'checking');
+
+    expect($this->apiApp->fresh()->domain_dns_statuses[$domain]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
 });
 
-it('renders each domain table header below its service heading', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-    $serviceHeadingPosition = strpos($view, 'service-domain-group-{{ $appId }}');
-    $domainTablePosition = strpos($view, "'showHeader' => true");
+it('does not suggest a www counterpart for bare IP hosts', function (string $url) {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
 
-    expect($view)
-        ->not->toContain('<div class="data-table-header service-domains-overview-grid">')
-        ->and($serviceHeadingPosition)->not->toBeFalse()
-        ->and($domainTablePosition)->not->toBeFalse()
-        ->and($domainTablePosition)->toBeGreaterThan($serviceHeadingPosition);
-});
+    expect($wwwCounterpartUrl->invoke(new Domains, $url))->toBeNull()
+        ->and($wwwCounterpartUrl->invoke(new Domains, $url, true))->toBeNull();
+})->with([
+    'IPv4' => 'http://192.0.2.10:3000',
+    'IPv6' => 'http://[2a01:4f8::1]',
+    'IPv6 with port' => 'http://[2a01:4f8::1]:8080/app',
+]);
 
-it('renders each service domain group as a separate card', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+it('still suggests a www counterpart for a hostname', function () {
+    $wwwCounterpartUrl = new ReflectionMethod(Domains::class, 'wwwCounterpartUrl');
 
-    expect($view)
-        ->toContain('class="flex flex-col gap-3"')
-        ->toContain('class="application-settings-section-body is-flush overflow-visible"')
-        ->not->toContain('class="border-b border-neutral-200 last:border-b-0 dark:border-white/10"');
-});
-
-it('lays out the domain settings dropdowns in responsive columns', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-    expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
-        ->toContain('flex flex-wrap items-center justify-between gap-2');
+    expect($wwwCounterpartUrl->invoke(new Domains, 'https://example.com:8443/app'))->toBe('https://www.example.com:8443/app');
 });

@@ -17,6 +17,8 @@
                 <x-forms.input required id="metadata.base_url" label="Base URL"
                     placeholder="https://app.infisical.com"
                     helper="Use the URL of your self-hosted Infisical instance, or the Infisical cloud URL." />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @else
             <div class="grid gap-4 lg:grid-cols-2">
@@ -34,6 +36,8 @@
                     placeholder="https://vault.example.com:8200" />
                 <x-forms.input id="metadata.namespace" label="Namespace (optional)"
                     placeholder="admin/team-a" helper="Only for Vault Enterprise / HCP Vault." />
+                <x-forms.input type="number" min="1" max="300" id="metadata.timeout" label="Request timeout (optional)"
+                    placeholder="10" helper="Seconds to wait for each request. Increase it if your instance responds slowly." />
             </div>
         @endif
 
@@ -42,9 +46,14 @@
                 <legend class="text-sm font-medium text-black dark:text-fg">Capabilities</legend>
                 <div class="mt-3 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
                     <x-forms.checkbox id="dns-capability" label="DNS" domValue="dns" fullWidth
-                        wire:model.live="capabilities" />
+                        :disabled="in_array('tunnel', $capabilities, true)" wire:model.live="capabilities" />
                     <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
                         Manage Cloudflare DNS records.
+                    </p>
+                    <x-forms.checkbox id="tunnel-capability" label="Cloudflare Tunnel" domValue="tunnel" fullWidth
+                        wire:model.live="capabilities" />
+                    <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Create and manage tunnels for server SSH. Needs DNS.
                     </p>
                 </div>
                 @error('capabilities')
@@ -56,6 +65,13 @@
                     wire:model.live="automaticDns" canGate="create" :canResource="\App\Models\IntegrationToken::class" />
                 <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
                     Create DNS records automatically when a new domain has one unambiguous matching credential.
+                </p>
+            </div>
+            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                <x-forms.checkbox id="proxied-dns" label="Proxy DNS records through Cloudflare" fullWidth
+                    wire:model.live="proxiedDns" canGate="create" :canResource="\App\Models\IntegrationToken::class" />
+                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Create new DNS records with the Cloudflare proxy on (orange cloud), so the server IP is not public. Existing records keep their proxy status.
                 </p>
             </div>
         @else
@@ -72,12 +88,16 @@
                 <ul class="list-inside list-disc">
                     <li>Zone - DNS - Edit</li>
                     <li>Zone - Zone - Read</li>
+                    @if (in_array('tunnel', $capabilities, true))
+                        <li>Account - Cloudflare Tunnel - Edit</li>
+                    @endif
                 </ul>
                 <p>Limit zone resources to the zones Coolify should manage.</p>
-                <a href="https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management"
+                <a href="{{ \App\Models\IntegrationToken::cloudflareTokenTemplateUrl($capabilities) }}"
                     target="_blank" rel="noopener noreferrer"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">
-                    Create this token in Cloudflare
+                    class="button mt-2">
+                    Create token at Cloudflare
+                    <x-external-link />
                 </a>
             </div>
         @elseif ($provider === 'doppler')
@@ -85,18 +105,30 @@
                 <div class="font-medium text-black dark:text-fg">Recommended Doppler token</div>
                 <p>Use a read-only <span class="font-medium">Service Token</span> (dp.st.*). It is pinned to one
                     project and config. Create it in Doppler under Project &gt; Config &gt; Access.</p>
+                <a href="https://dashboard.doppler.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open Doppler dashboard
+                    <x-external-link />
+                </a>
             </div>
         @elseif ($provider === 'infisical')
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Infisical machine identity</div>
                 <p>Create a machine identity with Universal Auth and read access to your project. Paste the client
                     ID above and the client secret in the secret field.</p>
+                <a href="https://app.infisical.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open Infisical Cloud
+                    <x-external-link />
+                </a>
             </div>
         @elseif ($provider === 'vault')
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Vault token</div>
                 <p>Use a token with read access to your KV v2 secrets. Prefer a periodic or long-lived token —
                     deployments fail when the token expires.</p>
+                <a href="https://portal.cloud.hashicorp.com?ref=coolify.io" target="_blank" rel="noopener noreferrer" class="button mt-2">
+                    Open HCP Vault
+                    <x-external-link />
+                </a>
             </div>
         @endif
 

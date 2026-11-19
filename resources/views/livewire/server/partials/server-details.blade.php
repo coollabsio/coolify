@@ -21,3 +21,9 @@
         </div>
     @endforeach
 </dl>
+@if ($server->detectedGpus() !== [])
+    <div class="mt-5">
+        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">GPUs</p>
+        <x-server.gpu-list :server="$server" class="mt-2" />
+    </div>
+@endif

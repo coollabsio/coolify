@@ -19,6 +19,8 @@ use App\Ai\Tools\RunServerCommand;
 use App\Ai\Tools\SearchDocs;
 use App\Ai\Tools\UpsertEnvironmentVariable;
 use App\Mcp\Servers\CoolifyServer;
+use App\Models\User;
+use Illuminate\Support\Str;
 use Laravel\Ai\Attributes\CacheInstructions;
 use Laravel\Ai\Attributes\CacheToolDefinitions;
 use Laravel\Ai\Concerns\RemembersConversations;
@@ -87,16 +89,23 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
      */
     public function tools(): array
     {
-        $readTools = array_map(
-            fn (string $class) => app($class),
-            CoolifyServer::readToolClasses(),
-        );
-
         $catalogTools = [
             app(ListServiceTemplates::class),
             app(ListGithubApps::class),
             app(ListPrivateKeys::class),
         ];
+
+        // Skip MCP read tools that a native catalog tool already covers (e.g. list_github_apps).
+        $nativeNames = array_map(fn (object $tool) => Str::snake(class_basename($tool)), $catalogTools);
+        $user = auth()->user();
+        $teamId = currentTeam()?->id;
+        $readTools = $user instanceof User && $teamId !== null
+            ? collect(CoolifyServer::assistantReadToolClasses($user, (int) $teamId))
+                ->map(fn (string $class) => app($class))
+                ->reject(fn (object $tool) => in_array($tool->name(), $nativeNames, true))
+                ->values()
+                ->all()
+            : [];
 
         $writeTools = [
             app(ControlResource::class),

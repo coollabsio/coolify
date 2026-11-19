@@ -19,10 +19,31 @@ class DnsRecordConfigurationFinished implements ShouldBroadcastNow
         public bool $successful,
         public string $credential,
         public string $message,
+        /** @var array{zone_id: int, record_id: string, current: string, proposed: string}|null The record that blocked the create. */
+        public ?array $conflict = null,
     ) {}
 
     public function broadcastOn(): array
     {
         return [new PrivateChannel("team.{$this->teamId}")];
+    }
+
+    /**
+     * The team channel also reaches members without access to the resource, so only Coolify can read the data.
+     *
+     * @return array{payload: string}
+     */
+    public function broadcastWith(): array
+    {
+        return ['payload' => encrypt([
+            'teamId' => $this->teamId,
+            'resourceType' => $this->resourceType,
+            'resourceId' => $this->resourceId,
+            'hostname' => $this->hostname,
+            'successful' => $this->successful,
+            'credential' => $this->credential,
+            'message' => $this->message,
+            'conflict' => $this->conflict,
+        ])];
     }
 }

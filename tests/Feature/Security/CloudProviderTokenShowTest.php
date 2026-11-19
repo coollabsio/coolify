@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Security\CloudProviderToken\Show;
-use App\Livewire\Security\CloudProviderTokens;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\Team;
@@ -28,18 +27,6 @@ beforeEach(function () {
 
     session(['currentTeam' => $this->team]);
     $this->actingAs($this->user);
-});
-
-test('saved cloud token rows render frontend-only modal editors', function () {
-    $token = CloudProviderToken::factory()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Production Hetzner',
-    ]);
-
-    Livewire::test(CloudProviderTokens::class)
-        ->assertSee('Edit Cloud Token')
-        ->assertSee('Production Hetzner')
-        ->assertDontSee(route('security.cloud-tokens.show', ['cloud_token_uuid' => $token->uuid]), false);
 });
 
 test('cloud token detail page shows editable name and description fields', function () {
@@ -87,6 +74,21 @@ test('cloud token detail page validates the token', function () {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => 'hetzner',
+    ]);
+
+    Livewire::test(Show::class, ['cloud_token_uuid' => $token->uuid])
+        ->call('validateToken')
+        ->assertDispatched('success');
+});
+
+test('cloud token detail page validates Hostinger tokens', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([], 200),
+    ]);
+
+    $token = CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
     ]);
 
     Livewire::test(Show::class, ['cloud_token_uuid' => $token->uuid])
