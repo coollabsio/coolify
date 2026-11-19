@@ -37,6 +37,19 @@ class OauthSetting extends Model
         );
     }
 
+    /**
+     * Only OIDC exposes a provider-level user creation setting. Other providers
+     * follow the instance registration setting, as before OIDC support.
+     */
+    public function allowsUserCreation(): bool
+    {
+        if (instanceSettings()->is_registration_enabled) {
+            return true;
+        }
+
+        return $this->provider === 'oidc' && $this->allow_registration;
+    }
+
     public function couldBeEnabled(): bool
     {
         switch ($this->provider) {

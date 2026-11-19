@@ -11,7 +11,7 @@
     reminderCollapseAfter: 10000,
     isDevelopment: {{ isDev() ? 'true' : 'false' }},
     init() {
-        this.popups.sponsorship = this.shouldShowMonthlyPopup('popupSponsorship');
+        this.popups.sponsorship = !this.isDevelopment && this.shouldShowMonthlyPopup('popupSponsorship');
         this.popups.notification = this.shouldShowMonthlyPopup('popupNotification');
         this.popups.realtime = localStorage.getItem('popupRealtime');
 
@@ -86,7 +86,7 @@
         return isDifferentMonth;
         {{-- } --}}
     }
-}">
+}" x-on:show-sponsorship-reminder.window="popups.sponsorship = true; reminders.sponsorship.compact = false">
     @auth
         <span x-show="popups.realtime === true">
             @if (!isCloud())
@@ -111,11 +111,11 @@
                                     </h2>
                                     <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                         This will cause unusual problems on the UI. Open the
-                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90"
                                             href="https://coolify.io/docs/knowledge-base/server/firewall"
                                             target="_blank" rel="noopener noreferrer">required ports</a>
                                         or get help on
-                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90"
                                             href="https://coollabs.io/discord" target="_blank"
                                             rel="noopener noreferrer">Discord</a>.
                                     </p>
@@ -140,11 +140,12 @@
             @endif
         </span>
     @endauth
-    @if (instanceSettings()->is_sponsorship_popup_enabled && !isCloud())
+    @if ((isDev() || instanceSettings()->is_sponsorship_popup_enabled) && ! isCloud())
         <span x-show="popups.sponsorship">
             <x-popup>
                 <x-slot:customActions>
                     <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        x-on:show-sponsorship-reminder.window="bannerVisible = true"
                         :class="reminders.sponsorship.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
                         <button type="button" aria-label="Dismiss sponsorship reminder"
                             class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
@@ -164,7 +165,7 @@
                                 <p x-show="!reminders.sponsorship.compact" x-transition.opacity
                                     class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                     Coolify is profitable thanks to <span
-                                        class="font-semibold text-coollabs dark:text-warning">you</span>. Your support
+                                        class="font-semibold text-coollabs dark:text-brand-light">you</span>. Your support
                                     helps us build more features and keep improving the project.
                                 </p>
                             </div>
@@ -204,32 +205,26 @@
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                         clip-rule="evenodd" />
                 </svg>
-                <span><span class="font-bold text-red-500">Subscription Error.</span> Something went wrong. Please try
-                    again or <a class="underline dark:text-white"
+                <span><span class="font-bold text-red-600 dark:text-red-500">Subscription Error.</span> Something went wrong. Please try
+                    again or <a class="underline font-medium text-black dark:text-white"
                         href="{{ config('constants.urls.contact') }}" target="_blank">contact support</a>.</span>
             </div>
         </x-banner>
     @endif
     @if (request()->query->get('success'))
-        <x-banner>
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clip-rule="evenodd" />
-                </svg>
-                <span><span class="font-bold text-green-500">Welcome onboard!</span> Your subscription has been
-                    activated. It could take a few seconds before it's fully active.</span>
-            </div>
-        </x-banner>
+        <span x-init="$nextTick(() => window.toast('Welcome onboard!', {
+            type: 'success',
+            description: 'Your subscription has been activated. It could take a few seconds before it is fully active.',
+            persistent: true,
+        }))"></span>
     @endif
     @if (currentTeam()->subscriptionPastOverDue())
         <x-banner :closable=false>
-            <div><span class="font-bold text-red-500">WARNING:</span> Your subscription is in over-due. If your
+            <div><span class="font-bold text-red-600 dark:text-red-500">WARNING:</span> Your subscription is in over-due. If your
                 latest
-                payment is not paid within a week, all automations <span class="font-bold text-red-500">will
+                payment is not paid within a week, all automations <span class="font-bold text-red-600 dark:text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
-                    class="underline dark:text-white">/subscription</a> to check your subscription status or pay
+                    class="underline font-medium text-black dark:text-white">/subscription</a> to check your subscription status or pay
                 your
                 invoice (or check your email for the invoice).
             </div>
@@ -237,10 +232,10 @@
     @endif
     @if (currentTeam()->serverOverflow())
         <x-banner :closable=false>
-            <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
-                covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
+            <div><span class="font-bold text-red-600 dark:text-red-500">WARNING:</span> The number of active servers exceeds the limit
+                covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-600 dark:text-red-500">will
                     be deactivated</span>. Visit <a href="{{ route('subscription.show') }}" {{ wireNavigate() }}
-                    class="underline dark:text-white">/subscription</a> to update your subscription or remove some
+                    class="underline font-medium text-black dark:text-white">/subscription</a> to update your subscription or remove some
                 servers.
             </div>
         </x-banner>
@@ -271,7 +266,7 @@
                                     Enable at least one notification channel so you receive important alerts.
                                     Visit
                                     <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
-                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90">notifications</a>
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-brand-light dark:decoration-brand-light/30 dark:hover:text-brand-light/90">notifications</a>
                                     to get started.
                                 </p>
                             </div>

@@ -9,6 +9,7 @@ use App\Models\StandalonePostgresql;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class General extends Component
@@ -35,6 +36,7 @@ class General extends Component
 
     public ?string $postgresConf = null;
 
+    #[Locked]
     public ?array $initScripts = null;
 
     public string $image;
@@ -143,13 +145,10 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->postgresPassword = '';
-        }
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -170,23 +169,25 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->postgresUser = $this->database->postgres_user;
-            $this->postgresPassword = $this->database->postgres_password;
+            $this->postgresPassword = $canSeeCredentials ? $this->database->postgres_password : '';
             $this->postgresDb = $this->database->postgres_db;
             $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
             $this->postgresHostAuthMethod = $this->database->postgres_host_auth_method;
-            $this->postgresConf = $this->database->postgres_conf;
-            $this->initScripts = $this->database->init_scripts;
+            $this->postgresConf = $canSeeCredentials ? $this->database->postgres_conf : null;
+            $this->initScripts = $canSeeCredentials ? $this->database->init_scripts : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 
@@ -240,6 +241,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
@@ -247,16 +249,16 @@ class General extends Component
         }
     }
 
-    public function save_init_script($script)
+    public function save_init_script($script, string $originalFilename)
     {
         $this->authorize('update', $this->database);
 
         $initScripts = collect($this->initScripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
-        $oldScript = $initScripts->firstWhere('index', $script['index']);
+        $oldScript = $initScripts->firstWhere('filename', $originalFilename);
 
-        if ($existingScript && $existingScript['index'] !== $script['index']) {
+        if ($existingScript && $script['filename'] !== $originalFilename) {
             $this->dispatch('error', 'A script with this filename already exists.');
 
             return;
@@ -265,11 +267,19 @@ class General extends Component
         $container_name = $this->database->uuid;
         $configuration_dir = database_configuration_dir().'/'.$container_name;
 
+        // Only an unchanged filename of an existing script skips validation, so legacy rows stay editable.
+        if (! $oldScript || $oldScript['filename'] !== $script['filename']) {
+            try {
+                validateFilenameSafe((string) data_get($script, 'filename'), 'init script filename');
+            } catch (Exception $e) {
+                $this->dispatch('error', $e->getMessage());
+
+                return;
+            }
+        }
+
         if ($oldScript && $oldScript['filename'] !== $script['filename']) {
             try {
-                // New filename is user-supplied — must be safe before accepting the rename.
-                validateFilenameSafe($script['filename'], 'init script filename');
-
                 // Old filename may be a legacy value written before this validation existed.
                 // basename() scopes the rm to the initdb.d directory; escapeshellarg() contains
                 // any remaining shell-metachars. No validator — don't block cleanup of legacy rows.
@@ -285,11 +295,10 @@ class General extends Component
             }
         }
 
-        $index = $initScripts->search(function ($item) use ($script) {
-            return $item['index'] === $script['index'];
-        });
+        $index = $initScripts->search(fn ($item) => $item['filename'] === $originalFilename);
 
         if ($index !== false) {
+            $script['index'] = $oldScript['index'];
             $initScripts[$index] = $script;
         } else {
             $initScripts->push($script);

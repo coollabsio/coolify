@@ -7,14 +7,14 @@
                 <button type="button" x-on:click="selected = 'monthly'"
                     class="app-tab h-6! px-2.5!"
                     :class="selected === 'monthly'
-                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'
+                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25'
                         : ''">
                     Monthly
                 </button>
                 <button type="button" x-on:click="selected = 'yearly'"
                     class="app-tab h-6! px-2.5!"
                     :class="selected === 'yearly'
-                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'
+                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25'
                         : ''">
                     Yearly
                 </button>
@@ -23,7 +23,7 @@
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
             <div
-                class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Base price</p>
                 <div class="mt-2 flex items-end gap-1.5">
                     <span x-show="selected === 'monthly'" x-cloak

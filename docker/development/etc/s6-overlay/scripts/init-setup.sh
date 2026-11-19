@@ -13,6 +13,8 @@ prepare_bind_mount() {
         storage/framework/views \
         storage/logs \
         bootstrap/cache
+    # Create the shared log before root processes (migrate, scheduler) can create it root-owned.
+    touch storage/logs/laravel.log
 
     if [ "$(id -u)" = "0" ]; then
         # Top-level only: allows creating vendor/ when the mount is root-owned

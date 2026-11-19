@@ -2,7 +2,7 @@
     <x-unsaved-bar action="submit" />
 
     <x-application.settings-section title="Service details"
-        description="Manage the identity and Compose configuration for this service.">
+        description="Manage the identity, Compose configuration, and network of this service.">
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (isDev())
@@ -11,10 +11,11 @@
                 @can('update', $service)
                     <x-modal-input buttonTitle="Edit Compose file" title="Docker Compose" :closeOutside="false"
                         :isLarge="true">
-                        <x-slot:headerActions>
+                        <x-slot:footer>
                             <div x-data="{ preview: false, validating: false, saving: false }"
                                 @compose-validate-finished.window="validating = false"
-                                @compose-save-finished.window="saving = false" class="flex items-center gap-2">
+                                @compose-save-finished.window="saving = false"
+                                class="flex flex-wrap items-center justify-end gap-2">
                                 <x-forms.button
                                     @click="preview = !preview; $dispatch('compose-preview-toggle')">
                                     <x-reicon name="eye" class="size-3.5" />
@@ -33,7 +34,7 @@
                                     Save changes
                                 </x-forms.button>
                             </div>
-                        </x-slot:headerActions>
+                        </x-slot:footer>
                         <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                     </x-modal-input>
                 @endcan
@@ -48,15 +49,13 @@
                 placeholder="My WordPress site" />
             <x-forms.input canGate="update" :canResource="$service" id="description" label="Description" />
         </div>
-    </x-application.settings-section>
-
-    <x-application.settings-section title="Network"
-        description="Control whether this Compose stack joins Coolify's predefined network.">
-        <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
-            :disabled="! auth()->user()->can('update', $service)" :options="[
-                ['value' => false, 'label' => 'Use the stack network only'],
-                ['value' => true, 'label' => 'Connect to the predefined Coolify network'],
-            ]" />
+        <x-application.settings-subsection id="service-network-section" title="Network" helper="Control whether this Compose stack joins Coolify's predefined network.">
+            <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
+                :disabled="! auth()->user()->can('update', $service)" :options="[
+                    ['value' => false, 'label' => 'Use the stack network only'],
+                    ['value' => true, 'label' => 'Connect to the predefined Coolify network'],
+                ]" />
+        </x-application.settings-subsection>
     </x-application.settings-section>
 
     @if ($fields->count() > 0)
@@ -78,7 +77,9 @@
                                 <x-helper helper="Variable name: {{ $serviceName }}" />
                             @endif
                         </div>
-                        @if ($isPasswordHiddenForMember && data_get($field, 'isPassword'))
+                        @if (data_get($field, 'isLocked'))
+                            <x-forms.input disabled value="Locked (shown once)" />
+                        @elseif ($isPasswordHiddenForMember)
                             <x-forms.input disabled value="Hidden (only admins can view)" />
                         @else
                             <x-forms.input canGate="update" :canResource="$service"

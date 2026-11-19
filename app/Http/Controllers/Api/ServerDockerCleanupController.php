@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\DockerCleanupJob;
 use App\Models\Server;
@@ -11,6 +12,8 @@ use OpenApi\Attributes as OA;
 
 class ServerDockerCleanupController extends Controller
 {
+    use RequiresDeployAbility;
+
     private const ALLOWED_FIELDS = [
         'docker_cleanup_frequency',
         'docker_cleanup_threshold',
@@ -89,7 +92,7 @@ class ServerDockerCleanupController extends Controller
 
     #[OA\Patch(
         summary: 'Update Docker cleanup settings',
-        description: 'Update Docker cleanup settings for a server owned by the authenticated team.',
+        description: 'Update Docker cleanup settings for a server owned by the authenticated team. Turning on `delete_unused_volumes` needs a token with the `deploy` permission.',
         path: '/servers/{uuid}/docker-cleanup',
         operationId: 'update-server-docker-cleanup',
         security: [['bearerAuth' => []]],
@@ -129,6 +132,7 @@ class ServerDockerCleanupController extends Controller
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Turning on `delete_unused_volumes` needs the deploy permission.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -181,6 +185,11 @@ class ServerDockerCleanupController extends Controller
             ], 422);
         }
 
+        $turnsOnVolumeDeletion = $request->boolean('delete_unused_volumes') && ! $server->settings->delete_unused_volumes;
+        if ($turnsOnVolumeDeletion && ($response = $this->deployAbilityForbiddenResponse($request, 'Deleting unused volumes removes data on the server, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+
         $settings = $server->settings;
         foreach (self::ALLOWED_FIELDS as $field) {
             if ($request->has($field)) {
@@ -201,7 +210,7 @@ class ServerDockerCleanupController extends Controller
 
     #[OA\Post(
         summary: 'Run Docker cleanup',
-        description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team.',
+        description: 'Dispatch a manual Docker cleanup job for a server owned by the authenticated team. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/docker-cleanup/run',
         operationId: 'run-server-docker-cleanup',
         security: [['bearerAuth' => []]],
@@ -232,6 +241,7 @@ class ServerDockerCleanupController extends Controller
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],

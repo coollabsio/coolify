@@ -4,6 +4,7 @@ use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StopService;
 use App\Actions\Shared\MigrateResourceToDestination;
+use App\Enums\ServerRole;
 use App\Jobs\FinalizeResourceMigrationJob;
 use App\Jobs\HostPathCloneJob;
 use App\Jobs\VolumeCloneJob;
@@ -110,6 +111,7 @@ test('rejects migration to a build server destination', function () {
         'is_reachable' => true,
         'is_usable' => true,
         'is_build_server' => true,
+        'server_role' => ServerRole::BUILD,
     ]);
     $buildDestination = StandaloneDocker::where('server_id', $buildServer->id)->firstOrFail();
     $application = createMigrateTestApplication($this);
@@ -238,7 +240,7 @@ test('livewire migrateTo rejects cross-team destination', function () {
     Livewire::test(ResourceOperations::class, ['resource' => $application])
         ->set('migrateVolumeData', false)
         ->call('migrateTo', $otherDestination->uuid)
-        ->assertHasErrors('destination_id');
+        ->assertDispatched('error', 'Destination not found.');
 
     $application->refresh();
     expect($application->destination_id)->toBe($this->destination->id);
@@ -320,37 +322,72 @@ test('rejects migration to a server that is not validated and reachable', functi
     MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: false);
 })->throws(ValidationException::class);
 
-test('resource operations migrate list only includes other functional servers', function () {
-    $unreachableServer = Server::factory()->create([
-        'team_id' => $this->team->id,
-        'name' => 'Unreachable Server',
-    ]);
-    $unreachableServer->settings()->update([
-        'is_reachable' => false,
-        'is_usable' => false,
-    ]);
+test('rejects migrating an application with a domain when the target proxy is not running', function () {
+    StopApplication::shouldNotRun();
+
+    $this->targetServer->proxy->set('type', 'TRAEFIK');
+    $this->targetServer->proxy->set('status', 'exited');
+    $this->targetServer->save();
 
     $application = createMigrateTestApplication($this);
-    $application->load(['destination.server', 'environment.project']);
+    $application->update(['fqdn' => 'http://app.example.com']);
 
+    MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: false);
+})->throws(ValidationException::class, 'The proxy of the target server is not running.');
+
+test('rejects migrating a service with a domain when the target proxy is not running', function () {
+    StopService::shouldNotRun();
+
+    $service = Service::create([
+        'name' => 'svc-migrate',
+        'uuid' => new_public_id(),
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => base64_encode("services:\n  app:\n    image: nginx\n"),
+        'docker_compose' => base64_encode("services:\n  app:\n    image: nginx\n"),
+    ]);
+    $service->applications()->create(['name' => 'app', 'image' => 'nginx', 'fqdn' => 'http://svc.example.com']);
+
+    MigrateResourceToDestination::run($service, $this->targetDestination, migrateVolumes: false);
+})->throws(ValidationException::class, 'The proxy of the target server is not running.');
+
+test('livewire migrateTo shows why the migration was rejected', function () {
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
+    StopApplication::shouldNotRun();
 
-    $component = Livewire::test(ResourceOperations::class, ['resource' => $application]);
+    $this->targetServer->proxy->set('type', 'TRAEFIK');
+    $this->targetServer->proxy->set('status', 'exited');
+    $this->targetServer->save();
 
-    $servers = $component->get('servers');
-    $serverIds = collect($servers)->pluck('id')->all();
+    $application = createMigrateTestApplication($this);
+    $application->update(['fqdn' => 'http://app.example.com']);
 
-    expect($serverIds)->toContain($this->server->id)
-        ->and($serverIds)->toContain($this->targetServer->id)
-        ->and($serverIds)->toContain($unreachableServer->id);
-
-    $view = file_get_contents(resource_path('views/livewire/project/shared/resource-operations.blade.php'));
-
-    expect($view)
-        ->toContain('server.is_functional && server.id != this.currentServerId')
-        ->toContain("'is_functional' => \$server->isFunctional()");
+    Livewire::test(ResourceOperations::class, ['resource' => $application])
+        ->call('migrateTo', $this->targetDestination->uuid)
+        ->assertDispatched('error', 'The proxy of the target server is not running. Start it on the server page before you migrate a resource with domains.')
+        ->assertNoRedirect();
 });
+
+test('migrates an application with a domain when the target proxy does not block it', function (string $proxyType, string $proxyStatus) {
+    StopApplication::shouldRun()->once();
+
+    $this->targetServer->proxy->set('type', $proxyType);
+    $this->targetServer->proxy->set('status', $proxyStatus);
+    $this->targetServer->save();
+
+    $application = createMigrateTestApplication($this);
+    $application->update(['fqdn' => 'http://app.example.com']);
+
+    MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: false);
+
+    expect($application->refresh()->destination_id)->toBe($this->targetDestination->id);
+})->with([
+    'proxy running' => ['TRAEFIK', 'running'],
+    'no managed proxy' => ['NONE', 'exited'],
+]);
 
 test('migration is unavailable outside development mode', function () {
     config(['app.env' => 'production']);

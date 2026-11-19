@@ -20,7 +20,7 @@ class Show extends Component
 
     public string $section = 'general';
 
-    public function mount(): void
+    public function mount(): mixed
     {
         $project = currentTeam()->projects()->where('uuid', request()->route('project_uuid'))->firstOrFail();
         $environment = $project->environments()->where('uuid', request()->route('environment_uuid'))->firstOrFail();
@@ -37,12 +37,14 @@ class Show extends Component
             ->firstOrFail();
         $this->parameters = get_route_parameters();
         $this->section = match (request()->route()?->getName()) {
-            'project.service.volume-backups.s3' => 's3',
-            'project.service.volume-backups.retention' => 'retention',
             'project.service.volume-backups.executions' => 'executions',
             'project.service.volume-backups.danger' => 'danger',
             default => 'general',
         };
+
+        $routeParameters = collect($this->parameters)->except('backup_uuid')->all();
+
+        return redirect()->route('project.service.volume-backups.index', $routeParameters);
     }
 
     public function render(): View

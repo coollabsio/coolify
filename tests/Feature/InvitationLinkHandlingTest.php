@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Controller;
 use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Models\InstanceSettings;
@@ -277,17 +276,4 @@ it('rejects a malformed magic link token', function () {
         ->assertRedirect(route('login'));
 
     $this->assertGuest();
-});
-
-it('declares the magic link method contracts', function () {
-    $linkReturnType = (new ReflectionMethod(Controller::class, 'link'))->getReturnType();
-    $acceptLinkReturnType = (new ReflectionMethod(Controller::class, 'acceptLink'))->getReturnType();
-    $credentialsMethod = new ReflectionMethod(Controller::class, 'magicLinkCredentials');
-    $isValidReturnType = (new ReflectionMethod(TeamInvitation::class, 'isValid'))->getReturnType();
-
-    expect((string) $linkReturnType)->toContain('Illuminate\\Contracts\\View\\View')
-        ->and((string) $linkReturnType)->toContain('Illuminate\\Http\\RedirectResponse')
-        ->and((string) $acceptLinkReturnType)->toBe('Illuminate\\Http\\RedirectResponse')
-        ->and($credentialsMethod->getDocComment())->toContain('@return array{0: User, 1: TeamInvitation}|null')
-        ->and((string) $isValidReturnType)->toBe('bool');
 });

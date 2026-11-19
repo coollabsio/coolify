@@ -7,13 +7,13 @@
 
 services:
   museum:
-    image: ghcr.io/ente-io/server:latest
+    image: ghcr.io/ente/server:latest
     environment:
       - SERVICE_URL_MUSEUM_8080
 
       - ENTE_HTTP_USE_TLS=${ENTE_HTTP_USE_TLS:-false}
 
-      - ENTE_APPS_PUBLIC_ALBUMS=${SERVICE_URL_WEB_3002}
+      - ENTE_APPS_PUBLIC_ALBUMS=${SERVICE_URL_ALBUMS}
       - ENTE_APPS_CAST=${SERVICE_URL_WEB_3004}
       - ENTE_APPS_ACCOUNTS=${SERVICE_URL_WEB_3001}
       - ENTE_PHOTOS_ORIGIN=${SERVICE_URL_WEB}
@@ -27,7 +27,8 @@ services:
       - ENTE_KEY_ENCRYPTION=${SERVICE_REALBASE64_ENCRYPTION}
       - ENTE_KEY_HASH=${SERVICE_REALBASE64_64_HASH}
 
-      - ENTE_JWT_SECRET=${SERVICE_REALBASE64_JWT}
+      # Museum decodes this as URL-safe base64; letters and digits are valid, + and / are not.
+      - ENTE_JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
 
       - ENTE_INTERNAL_ADMIN=${ENTE_INTERNAL_ADMIN:-1580559962386438}
       - ENTE_INTERNAL_DISABLE_REGISTRATION=${ENTE_INTERNAL_DISABLE_REGISTRATION:-false}
@@ -61,14 +62,28 @@ services:
       retries: 10
 
   web:
-    image: ghcr.io/ente-io/web
+    image: ghcr.io/ente/web
     environment:
       - SERVICE_URL_WEB_3000
       - ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}
-      - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_WEB_3002}
+      - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_ALBUMS}
 
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Same image as web; serves the public album links on port 3002.
+  albums:
+    image: ghcr.io/ente/web
+    environment:
+      - SERVICE_URL_ALBUMS_3002
+      - ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}
+      - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_ALBUMS}
+      - ENTE_PHOTOS_ORIGIN=${SERVICE_URL_WEB}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3002"]
       interval: 5s
       timeout: 5s
       retries: 10

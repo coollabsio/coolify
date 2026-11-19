@@ -14,12 +14,15 @@
                 <livewire:project.application.general :application="$application" />
             @elseif ($currentRoute === 'project.application.domains')
                 <livewire:project.application.domains :application="$application" />
+            @elseif ($currentRoute === 'project.application.maintenance')
+                <livewire:project.shared.maintenance :resource="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />
             @elseif ($currentRoute === 'project.application.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$application" />
+                <livewire:project.shared.secret-manager-links :resource="$application" />
             @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())
@@ -28,8 +31,6 @@
                 <livewire:project.shared.destination :resource="$application" />
             @elseif ($currentRoute === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
-            @elseif ($currentRoute === 'project.application.scheduled-tasks')
-                <livewire:project.shared.scheduled-task.show />
             @elseif ($currentRoute === 'project.application.webhooks')
                 <livewire:project.shared.webhooks :resource="$application" />
             @elseif ($currentRoute === 'project.application.preview-deployments')
@@ -44,6 +45,15 @@
                 <livewire:project.shared.resource-operations :resource="$application" />
             @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
+            @elseif ($currentRoute === 'project.application.analytics')
+                <livewire:project.application.analytics :application="$application"
+                    :lazy="$application->destination?->server?->isTrafficAnalyticsEnabled()" />
+            @elseif ($currentRoute === 'project.application.vulnerabilities')
+                <div class="flex flex-col gap-6">
+                    <livewire:image-scan.vulnerabilities resource-type="application" :resource-uuid="$application->uuid" />
+                    <livewire:image-scan.packages resource-type="application" :resource-uuid="$application->uuid" />
+                    <livewire:image-scan.scan-settings scope-type="application" :scope-uuid="$application->uuid" />
+                </div>
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')

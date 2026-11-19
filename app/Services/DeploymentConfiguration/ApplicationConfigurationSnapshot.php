@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
+use App\Support\DomainPortOverrides;
 use Illuminate\Support\Arr;
 
 class ApplicationConfigurationSnapshot
@@ -100,6 +101,36 @@ class ApplicationConfigurationSnapshot
     }
 
     /**
+     * Removes the volumes of Docker Compose preview deployments from a snapshot. Older snapshots
+     * can contain them, because the parser stores preview volumes on the application.
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @return array<string, mixed>
+     */
+    public static function withoutPreviewVolumes(array $snapshot, Application $application): array
+    {
+        if (! is_array(data_get($snapshot, 'sections.storage.items'))) {
+            return $snapshot;
+        }
+
+        $snapshot['sections']['storage']['items'] = collect($snapshot['sections']['storage']['items'])
+            ->reject(fn (array $item): bool => str_starts_with((string) data_get($item, 'key'), 'volume_')
+                && self::isPreviewVolumeName((string) data_get($item, 'compare_value.source'), $application))
+            ->values()
+            ->all();
+
+        return $snapshot;
+    }
+
+    /**
+     * The compose parser names preview volumes "{uuid}_{volume}-pr-{id}" ("{uuid}-{volume}-pr-{id}" before parser version 3).
+     */
+    private static function isPreviewVolumeName(string $name, Application $application): bool
+    {
+        return preg_match('/^'.preg_quote($application->uuid, '/').'[_-].+-pr-\d+$/', $name) === 1;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function sourceItems(): array
@@ -145,6 +176,7 @@ class ApplicationConfigurationSnapshot
             $this->item('use_build_secrets', 'Use build secrets', data_get($this->application, 'settings.use_build_secrets'), 'build'),
             $this->item('inject_build_args_to_dockerfile', 'Inject build args to Dockerfile', data_get($this->application, 'settings.inject_build_args_to_dockerfile'), 'build'),
             $this->item('include_source_commit_in_build', 'Include source commit in build', data_get($this->application, 'settings.include_source_commit_in_build'), 'build'),
+            $this->item('include_network_hosts_in_build', 'Include network hosts in build', data_get($this->application, 'settings.include_network_hosts_in_build'), 'build'),
             $this->item('disable_build_cache', 'Disable build cache', data_get($this->application, 'settings.disable_build_cache'), 'build'),
             $this->item('is_build_server_enabled', 'Build server', data_get($this->application, 'settings.is_build_server_enabled'), 'build'),
         ];
@@ -169,6 +201,7 @@ class ApplicationConfigurationSnapshot
             $this->item('custom_network_aliases', 'Network aliases', $this->application->custom_network_aliases, 'redeploy'),
             $this->item('connect_to_docker_network', 'Connect to Docker network', data_get($this->application, 'settings.connect_to_docker_network'), 'redeploy'),
             $this->item('custom_internal_name', 'Custom container name', data_get($this->application, 'settings.custom_internal_name'), 'redeploy'),
+            $this->item('custom_container_name_prefix', 'Container name prefix', data_get($this->application, 'settings.custom_container_name_prefix'), 'redeploy'),
             $this->item('is_consistent_container_name_enabled', 'Consistent container name', data_get($this->application, 'settings.is_consistent_container_name_enabled'), 'redeploy'),
             $this->item('is_container_label_escape_enabled', 'Escape container labels', data_get($this->application, 'settings.is_container_label_escape_enabled'), 'redeploy'),
             $this->item('is_container_label_readonly_enabled', 'Read-only container labels', data_get($this->application, 'settings.is_container_label_readonly_enabled'), 'redeploy'),
@@ -194,6 +227,7 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('domain_port_overrides', 'Domain port overrides', DomainPortOverrides::sorted($this->application->domain_port_overrides), 'redeploy'),
             $this->item('noindex_domains', 'Search engine indexing', $this->application->noindexDomains()->all(), 'redeploy'),
             $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),
@@ -202,9 +236,14 @@ class ApplicationConfigurationSnapshot
             $this->item('is_force_https_enabled', 'Force HTTPS', data_get($this->application, 'settings.is_force_https_enabled'), 'redeploy'),
             $this->item('is_gzip_enabled', 'Gzip', data_get($this->application, 'settings.is_gzip_enabled'), 'redeploy'),
             $this->item('is_stripprefix_enabled', 'Strip prefix', data_get($this->application, 'settings.is_stripprefix_enabled'), 'redeploy'),
+            $this->item('traefik_certificate_resolver', 'Certificate resolver', data_get($this->application, 'settings.traefik_certificate_resolver'), 'redeploy'),
             $this->item('is_http_basic_auth_enabled', 'HTTP basic auth', $this->application->is_http_basic_auth_enabled, 'redeploy'),
             $this->item('http_basic_auth_username', 'HTTP basic auth username', $this->application->http_basic_auth_username, 'redeploy'),
             $this->item('http_basic_auth_password', 'HTTP basic auth password', $this->application->http_basic_auth_password, 'redeploy', sensitive: true),
+            $this->item('http_basic_auth_hash_algorithm', 'HTTP basic auth hash algorithm', $this->application->http_basic_auth_hash_algorithm?->value, 'redeploy'),
+            $this->item('http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', $this->application->http_basic_auth_bcrypt_cost, 'redeploy'),
+            $this->item('http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', $this->application->http_basic_auth_argon2id_memory_cost, 'redeploy'),
+            $this->item('http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', $this->application->http_basic_auth_argon2id_time_cost, 'redeploy'),
         ];
     }
 
@@ -229,12 +268,13 @@ class ApplicationConfigurationSnapshot
         $volumes = $this->application->persistentStorages()
             ->orderBy('id')
             ->get(['id', 'name', 'mount_path', 'host_path'])
+            ->reject(fn (LocalPersistentVolume $volume): bool => blank($volume->host_path) && self::isPreviewVolumeName($volume->name, $this->application))
             ->map(function (LocalPersistentVolume $volume): array {
                 $source = $volume->host_path ?: $volume->name;
 
                 return $this->item(
                     key: 'volume_'.$volume->id,
-                    label: 'Volume mount',
+                    label: filled($volume->host_path) ? 'Directory mount' : 'Volume mount',
                     value: ['source' => $source, 'destination' => $volume->mount_path],
                     impact: 'redeploy',
                     displayValue: "{$source} → {$volume->mount_path}",

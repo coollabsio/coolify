@@ -101,9 +101,12 @@ it('sets an application volume backup schedule through the API', function () {
             'retention_days_s3' => 7,
             'retention_max_storage_s3' => 8.5,
             'timeout' => 600,
+            'missing_backup_notification_days' => 5,
         ]);
 
-    $response->assertCreated()->assertJsonStructure(['uuid', 'message']);
+    $response->assertCreated()
+        ->assertJsonStructure(['uuid', 'message'])
+        ->assertJsonPath('missing_backup_notification_days', 5);
 
     $backup = ScheduledVolumeBackup::query()->sole();
     expect($backup->backupable->is($this->volume))->toBeTrue()
@@ -120,7 +123,20 @@ it('sets an application volume backup schedule through the API', function () {
         ->and($backup->retention_amount_s3)->toBe(6)
         ->and($backup->retention_days_s3)->toBe(7)
         ->and($backup->retention_max_storage_s3)->toBe(8.5)
-        ->and($backup->timeout)->toBe(600);
+        ->and($backup->timeout)->toBe(600)
+        ->and($backup->missing_backup_notification_days)->toBe(5);
+});
+
+it('rejects a missing backup alert period above one year through the API', function () {
+    $this->withHeaders($this->headers)
+        ->putJson("/api/v1/applications/{$this->application->uuid}/storages/{$this->volume->uuid}/backups", [
+            'frequency' => 'daily',
+            'missing_backup_notification_days' => 366,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('missing_backup_notification_days');
+
+    expect(ScheduledVolumeBackup::query()->exists())->toBeFalse();
 });
 
 it('updates the existing backup schedule instead of creating another one', function () {

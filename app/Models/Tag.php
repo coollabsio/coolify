@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
-use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -18,7 +18,7 @@ use OpenApi\Attributes as OA;
 )]
 class Tag extends BaseModel
 {
-    use HasSafeStringAttribute;
+    use Auditable, HasSafeStringAttribute;
 
     protected $fillable = [
         'name',
@@ -33,13 +33,6 @@ class Tag extends BaseModel
     public static function ownedByCurrentTeam()
     {
         return Tag::whereTeamId(currentTeam()->id)->orderBy('name');
-    }
-
-    public function deleteIfOrphaned(): void
-    {
-        if (DB::table('taggables')->where('tag_id', $this->id)->doesntExist()) {
-            $this->delete();
-        }
     }
 
     public function applications()

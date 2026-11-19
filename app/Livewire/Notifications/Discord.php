@@ -22,7 +22,7 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:discordEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $discordWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -33,6 +33,9 @@ class Discord extends Component
 
     #[Validate(['boolean'])]
     public bool $statusChangeDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedDiscordNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $backupSuccessDiscordNotifications = false;
@@ -65,7 +68,13 @@ class Discord extends Component
     public bool $serverPatchDiscordNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateDiscordNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedDiscordNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesDiscordNotifications = false;
 
     #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
@@ -82,17 +91,17 @@ class Discord extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->discord_enabled = $this->discordEnabled;
             $this->settings->discord_webhook_url = $this->discordWebhookUrl;
 
             $this->settings->deployment_success_discord_notifications = $this->deploymentSuccessDiscordNotifications;
             $this->settings->deployment_failure_discord_notifications = $this->deploymentFailureDiscordNotifications;
             $this->settings->status_change_discord_notifications = $this->statusChangeDiscordNotifications;
+            $this->settings->restart_limit_reached_discord_notifications = $this->restartLimitReachedDiscordNotifications;
             $this->settings->backup_success_discord_notifications = $this->backupSuccessDiscordNotifications;
             $this->settings->backup_failure_discord_notifications = $this->backupFailureDiscordNotifications;
             $this->settings->scheduled_task_success_discord_notifications = $this->scheduledTaskSuccessDiscordNotifications;
@@ -103,11 +112,15 @@ class Discord extends Component
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
+            $this->settings->server_auto_update_discord_notifications = $this->serverAutoUpdateDiscordNotifications;
             $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
+            $this->settings->image_vulnerabilities_discord_notifications = $this->imageVulnerabilitiesDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
@@ -118,6 +131,7 @@ class Discord extends Component
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;
             $this->statusChangeDiscordNotifications = $this->settings->status_change_discord_notifications;
+            $this->restartLimitReachedDiscordNotifications = $this->settings->restart_limit_reached_discord_notifications;
             $this->backupSuccessDiscordNotifications = $this->settings->backup_success_discord_notifications;
             $this->backupFailureDiscordNotifications = $this->settings->backup_failure_discord_notifications;
             $this->scheduledTaskSuccessDiscordNotifications = $this->settings->scheduled_task_success_discord_notifications;
@@ -128,7 +142,9 @@ class Discord extends Component
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
+            $this->serverAutoUpdateDiscordNotifications = $this->settings->server_auto_update_discord_notifications;
             $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
+            $this->imageVulnerabilitiesDiscordNotifications = $this->settings->image_vulnerabilities_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
         }
@@ -137,13 +153,12 @@ class Discord extends Component
     public function instantSaveDiscordPingEnabled()
     {
         try {
-            $original = $this->discordPingEnabled;
             $this->validate([
                 'discordPingEnabled' => 'required',
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordPingEnabled = $original;
+            $this->discordPingEnabled = (bool) $this->settings->refresh()->discord_ping_enabled;
 
             return handleError($e, $this);
         }
@@ -152,7 +167,6 @@ class Discord extends Component
     public function instantSaveDiscordEnabled()
     {
         try {
-            $original = $this->discordEnabled;
             $this->validate([
                 'discordWebhookUrl' => 'required',
             ], [
@@ -160,7 +174,7 @@ class Discord extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordEnabled = $original;
+            $this->discordEnabled = (bool) $this->settings->refresh()->discord_enabled;
 
             return handleError($e, $this);
         }
@@ -193,6 +207,7 @@ class Discord extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -203,6 +218,7 @@ class Discord extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -212,6 +228,8 @@ class Discord extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
@@ -231,5 +249,12 @@ class Discord extends Component
     public function render()
     {
         return view('livewire.notifications.discord');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.discord.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

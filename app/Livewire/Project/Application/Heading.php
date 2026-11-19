@@ -4,13 +4,22 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
+use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\SecurityCard;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Application $application;
 
@@ -26,15 +35,24 @@ class Heading extends Component
 
     public bool $docker_cleanup = true;
 
+    /**
+     * Set once when the General page opens, where the user sees the Compose file location. Other pages
+     * only show the button, and a later switch to the Compose build pack waits for the user.
+     */
+    #[Locked]
+    public bool $loadComposeOnOpen = false;
+
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             'compose_loaded' => '$refresh',
+            'configurationChanged' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => '$refresh',
+                'ApplicationStopFailed' => 'stopFailed',
+            ]),
         ];
     }
 
@@ -46,9 +64,44 @@ class Heading extends Component
             'environment_uuid' => $this->application->environment->uuid,
             'application_uuid' => $this->application->uuid,
         ];
-        $lastDeployment = $this->application->get_last_successful_deployment();
+        $lastDeployment = $this->application->get_last_successful_deployment(['commit', 'commit_message']);
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
+        $this->loadComposeOnOpen = $this->activeRouteName === 'project.application.configuration'
+            && $this->needsComposeFile()
+            && auth()->user()?->can('update', $this->application);
+    }
+
+    public function needsComposeFile(): bool
+    {
+        return $this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw);
+    }
+
+    public function loadComposeFile(bool $isInit = false)
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            if ($isInit && ! $this->needsComposeFile()) {
+                return;
+            }
+
+            $loaded = $this->application->loadComposeFile();
+            if (is_null(data_get($loaded, 'parsedServices'))) {
+                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+
+                return;
+            }
+
+            $this->dispatch('success', 'Docker compose file loaded.');
+            $this->dispatch('composeFileLoaded')->to(General::class);
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
+            $this->dispatch('refreshEnvs')->to(All::class);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->application->refresh();
+        }
     }
 
     /**
@@ -74,9 +127,75 @@ class Heading extends Component
         }
     }
 
+    /**
+     * @param  array{applicationUuid?: mixed, message?: mixed}  $event
+     */
+    public function stopFailed(array $event): void
+    {
+        $event = $this->teamChannelPayload($event);
+        if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->dispatch('error', 'Failed to stop the application.', $event['message']);
+    }
+
     public function manualCheckStatus()
     {
         $this->checkStatus();
+    }
+
+    /**
+     * Log-page URL of the deployment currently running for this application, so a
+     * "Deploying… View log" indicator can link back to it after the user navigates
+     * away. Re-evaluated on the heading's 10s poll. Null when nothing is running.
+     */
+    public function getRunningDeploymentUrlProperty(): ?string
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->application->id)
+            ->whereIn('status', ['in_progress', 'queued'])
+            ->orderByDesc('id')
+            ->value('deployment_url');
+    }
+
+    /**
+     * Gate warning for the latest deployment of the application (not a preview) when the image scan
+     * gate blocked it or could not run. Re-evaluated on the heading's existing 10s poll.
+     *
+     * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
+     */
+    #[Computed]
+    public function imageScanGate(): ?array
+    {
+        // The gate never runs without both. Scanning off on the server still shows: the gate reports it.
+        if (! ImageScanPolicyResolver::isAllowedFor($this->application)) {
+            return null;
+        }
+
+        $deployment = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', 0)
+            ->orderByDesc('id')
+            ->first(['id', 'deployment_uuid', 'status', 'scan_gate_result']);
+
+        if (! $deployment || (! $deployment->isImageScanBlocked() && ! $deployment->isImageScanSkipped())) {
+            return null;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+        ];
+
+        return [
+            'result' => $deployment->scan_gate_result,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)['sentence'] ?? null : null,
+            'vulnerabilities_url' => route('project.application.vulnerabilities', $parameters),
+            'deployment_url' => route('project.application.deployment.show', [...$parameters, 'deployment_uuid' => $deployment->deployment_uuid]),
+        ];
     }
 
     public function force_deploy_without_cache()
@@ -95,7 +214,7 @@ class Heading extends Component
         try {
             $this->authorize('deploy', $this->application);
 
-            if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
+            if ($this->needsComposeFile()) {
                 $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 
                 return;
@@ -156,6 +275,11 @@ class Heading extends Component
 
             $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
             StopApplication::dispatch($this->application, false, $this->docker_cleanup);
+            auditLog('ui.application.stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

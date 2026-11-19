@@ -2,17 +2,15 @@
 
 use App\Livewire\Storage\Form;
 use App\Models\S3Storage;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
-use Tests\TestCase;
-
-uses(TestCase::class);
 
 it('tests the S3 connection with the values currently entered in the form', function () {
     if (! defined('CURLOPT_RESOLVE')) {
         define('CURLOPT_RESOLVE', 10203);
     }
 
-    $disk = Mockery::mock();
+    $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->expects('files')->once()->andReturn([]);
     $testedConfig = null;
 
@@ -57,6 +55,8 @@ it('tests the S3 connection with the values currently entered in the form', func
     $form->region = 'eu-central-1';
     $form->key = 'new-key';
     $form->secret = 'new-secret';
+    $form->usePathStyleEndpoint = false;
+    $form->skipTlsVerification = true;
     $form->isUsable = false;
 
     $form->testConnection();
@@ -69,6 +69,8 @@ it('tests the S3 connection with the values currently entered in the form', func
             'region' => 'eu-central-1',
             'key' => 'new-key',
             'secret' => 'new-secret',
+            'use_path_style_endpoint' => false,
         ])
+        ->and($testedConfig['http']['verify'])->toBeFalse()
         ->and($form->isUsable)->toBeTrue();
 });

@@ -11,14 +11,15 @@
                 description="Deliver team alerts through your Pushover application.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$pushoverEnabled" enabledProperty="pushoverEnabled"
-                        toggleMethod="instantSavePushoverEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSavePushoverEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     @can('update', $settings)
-                        <x-forms.input type="password" required id="pushoverUserKey" label="User key"
+                        <x-forms.input type="password" :required="$pushoverEnabled" id="pushoverUserKey" label="User key"
                             helper="Find this in the Pushover dashboard." />
-                        <x-forms.input type="password" required id="pushoverApiToken" label="API token"
+                        <x-forms.input type="password" :required="$pushoverEnabled" id="pushoverApiToken" label="API token"
                             helper="Create an application in Pushover to generate this token." />
                     @else
                         <x-forms.input disabled label="User key" value="Hidden (only admins can view)" />

@@ -1,13 +1,11 @@
-<form wire:submit="submit">
+<form wire:submit="submit" class="flex flex-col gap-6">
     <x-unsaved-bar action="submit" />
 
-    <section class="application-settings-section">
-        <div class="application-settings-section-header">
-            <div>
-                <h2>Backup schedule</h2>
-                <p>Choose what to back up, when it runs, and how long it may run.</p>
-            </div>
-            <div class="flex items-center gap-2">
+    <x-application.settings-section title="Backup schedule"
+        description="Choose what to back up, when it runs, and how long it may run.">
+        <x-slot:actions>
+            {{-- Below xl the header bar is hidden, so keep the buttons here. --}}
+            <div @class(['flex items-center gap-2', 'xl:hidden' => $actionsInHeader])>
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
                         wire:target="toggleEnabled" isHighlighted>
@@ -19,16 +17,21 @@
                         Disable backup
                     </x-forms.button>
                 @endif
-                @if (str($status)->startsWith('running'))
-                    <x-forms.button type="button" wire:click="backupNow">Back up now</x-forms.button>
-                @endif
+                <x-forms.button type="button" wire:click="backupNow"
+                    :disabled="! str($status)->startsWith('running')"
+                    :tooltip="! str($status)->startsWith('running') ? 'The database must be running to start a backup.' : null">Back up now</x-forms.button>
             </div>
-        </div>
+        </x-slot:actions>
 
-        <div class="application-settings-section-body space-y-5">
+        <div class="space-y-5">
+            @php
+                $isServiceSqlDatabase = $backup->database instanceof \App\Models\ServiceDatabase
+                    && str($backup->database->databaseType())->contains(['postgres', 'mysql', 'mariadb']);
+            @endphp
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0
                     || $backup->database_type === 'App\Models\StandaloneMysql'
-                    || $backup->database_type === 'App\Models\StandaloneMariadb')
+                    || $backup->database_type === 'App\Models\StandaloneMariadb'
+                    || $isServiceSqlDatabase)
                 <div class="grid w-full gap-4">
                     <x-forms.listbox id="dumpAll" label="Database selection" onChange="instantSave" :options="[
                         ['value' => true, 'label' => 'All databases'],
@@ -36,7 +39,7 @@
                     ]" />
                     @if (! $backup->dump_all)
                         <div class="w-full" x-data="{
-                            value: @entangle('databasesToBackup').live,
+                            value: @entangle('databasesToBackup'),
                             draft: '',
                             get databases() {
                                 return (this.value || '').split(',').map(name => name.trim()).filter(Boolean);
@@ -69,7 +72,11 @@
                                     placeholder="Type a database and press Enter" />
                             </div>
                             <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">
-                                Add one or more database names. Leave empty to include the default database.
+                                @if ($isServiceSqlDatabase)
+                                    Add one or more database names. Leave empty to back up the database that the container env names.
+                                @else
+                                    Add one or more database names. Leave empty to include the default database.
+                                @endif
                             </p>
                         </div>
                     @endif
@@ -82,6 +89,14 @@
                 <x-forms.input label="Databases to back up"
                     helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneInfluxdb')
+                <x-forms.input label="Bucket to back up"
+                    helper="The InfluxDB bucket name. Leave empty to back up the default bucket."
+                    id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneSqlite')
+                <x-forms.input label="Database files to back up"
+                    helper="Comma-separated file names inside the data volume. Leave empty to back up every configured file."
+                    id="databasesToBackup" />
             @endif
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -90,8 +105,14 @@
                     helper="Uses the deployment server timezone, or the instance timezone when none is configured."
                     required />
                 <x-forms.input label="Timeout" id="timeout" type="number" min="60"
-                    helper="Maximum backup runtime in seconds." required />
+                    helper="Maximum runtime in seconds of the complete backup run: the dumps and S3 uploads of all databases." required />
+                <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
+                    min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
+                    helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
         </div>
-    </section>
+    </x-application.settings-section>
+
+    @include('livewire.project.database.backup-edit.s3')
+    @include('livewire.project.database.backup-edit.retention')
 </form>

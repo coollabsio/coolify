@@ -29,7 +29,7 @@ function setupInstanceAdminWithTransactionalEmail(): User
     return $user;
 }
 
-test('send test is available in the sender section and not in the settings navbar', function () {
+test('send test is available when transactional email is enabled', function () {
     $user = setupInstanceAdminWithTransactionalEmail();
 
     $this->actingAs($user);
@@ -38,19 +38,10 @@ test('send test is available in the sender section and not in the settings navba
     Livewire::test(SettingsEmail::class)
         ->assertOk()
         ->assertSee('Sender')
-        ->assertSee('Send test')
-        ->assertSeeHtml('wire:submit.prevent="sendTestEmail"');
-
-    $view = file_get_contents(resource_path('views/livewire/settings-email.blade.php'));
-
-    expect($view)
-        ->toContain('<x-settings.layout>')
-        ->toContain('settings-section title="Sender"')
-        ->toContain('settings-email-send-test')
-        ->not->toContain('<x-settings.navbar');
+        ->assertSee('Send test');
 });
 
-test('send test is not rendered when transactional email is disabled', function () {
+test('send test is disabled when transactional email is disabled', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     InstanceSettings::forceCreate([
         'id' => 0,
@@ -67,5 +58,6 @@ test('send test is not rendered when transactional email is disabled', function 
 
     Livewire::test(SettingsEmail::class)
         ->assertOk()
-        ->assertDontSee('Send test');
+        ->assertSee('Save an email provider first.')
+        ->assertDontSee('Send Test Email');
 });

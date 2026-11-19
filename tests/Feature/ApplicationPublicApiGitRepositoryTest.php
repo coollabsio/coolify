@@ -86,3 +86,9 @@ test('public github repositories are stored as owner and repository with the pub
         ->and($application->source_type)->toBe(GithubApp::class)
         ->and($application->source_id)->toBe(0);
 });
+
+test('a public application gets a generated domain by default', function () {
+    $application = createPublicGitApplication(['autogenerate_domain' => true]);
+
+    expect($application->fqdn)->not->toBeEmpty();
+});

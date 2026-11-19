@@ -5,8 +5,11 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Events\ServerValidated;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ValidateAndInstall extends Component
@@ -21,6 +24,7 @@ class ValidateAndInstall extends Component
 
     public bool $install = true;
 
+    #[Locked]
     public $uptime = null;
 
     public $supported_os_type = null;
@@ -53,6 +57,8 @@ class ValidateAndInstall extends Component
 
     public function init(int $data = 0)
     {
+        $this->authorize('update', $this->server);
+
         if (! $this->server->canBeValidated()) {
             $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
             $this->server->update([
@@ -110,6 +116,29 @@ class ValidateAndInstall extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
+            if ($this->server->hetzner_server_id) {
+                try {
+                    $status = $this->server->refreshHetznerState();
+                } catch (\Throwable $e) {
+                    // The provider API can be down or the token revoked; the SSH checks below still decide.
+                    Log::warning('Could not refresh the Hetzner server status before validation', ['server_id' => $this->server->id, 'error' => $e->getMessage()]);
+                    $status = null;
+                }
+                $this->server->refresh();
+
+                if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
+                    $this->error = $status === 'off'
+                        ? 'Hetzner server is off. Power it on before validating.'
+                        : "Hetzner server is {$status}. Wait until it is running, then validate.";
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
             if ($this->server->vultr_instance_id) {
                 $status = $this->server->refreshVultrState();
                 $this->server->refresh();
@@ -142,6 +171,18 @@ class ValidateAndInstall extends Component
                 }
             }
 
+            if ($this->server->hostinger_virtual_machine_id) {
+                $status = $this->server->refreshHostingerState();
+                $this->server->refresh();
+
+                if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+                    $this->error = 'Hostinger VPS is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update(['validation_logs' => $this->error]);
+
+                    return;
+                }
+            }
+
             ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $this->uptime) {
                 $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
@@ -160,6 +201,12 @@ class ValidateAndInstall extends Component
 
     public function validateOS()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
@@ -174,6 +221,12 @@ class ValidateAndInstall extends Component
 
     public function validatePrerequisites()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $validationResult = $this->server->validatePrerequisites();
         $this->prerequisites_installed = $validationResult['success'];
         if (! $validationResult['success']) {
@@ -212,6 +265,12 @@ class ValidateAndInstall extends Component
 
     public function validateDockerEngine()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
@@ -248,6 +307,12 @@ class ValidateAndInstall extends Component
 
     public function validateDockerVersion()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         if ($this->server->isSwarm()) {
             $swarmInstalled = $this->server->validateDockerSwarm();
             if ($swarmInstalled) {
@@ -265,6 +330,14 @@ class ValidateAndInstall extends Component
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
                 ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
+                if ($this->server->isSentinelEnabled()) {
+                    CheckAndStartSentinelJob::dispatch($this->server);
+                }
+                if (! $this->server->isProxyShouldRun()) {
+                    $this->dispatch('success', 'Server validated.');
+
+                    return;
+                }
                 $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if (! $proxyShouldRun) {
@@ -275,8 +348,7 @@ class ValidateAndInstall extends Component
                 instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                 StartProxy::dispatch($this->server);
             } else {
-                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $this->error = $this->server->dockerEngineVersionError();
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);

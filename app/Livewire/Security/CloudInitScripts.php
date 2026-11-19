@@ -28,6 +28,8 @@ class CloudInitScripts extends Component
 
     public function loadScripts()
     {
+        $this->authorize('viewAny', CloudInitScript::class);
+
         CloudInitScript::ownedByCurrentTeam()
             ->whereNull('uuid')
             ->get()

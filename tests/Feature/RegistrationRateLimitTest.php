@@ -1,13 +1,17 @@
 <?php
 
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
+
     InstanceSettings::query()->forceCreate([
         'id' => 0,
         'is_registration_enabled' => true,
@@ -72,6 +76,43 @@ it('rate limits dotted plus-address variants of the same email identity across i
         ->assertTooManyRequests();
 });
 
+it('keeps clients behind the same reverse proxy in separate ip rate limit buckets', function () {
+    foreach (range(1, 3) as $attempt) {
+        $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+            ->withHeaders(['X-Forwarded-For' => '203.0.113.50'])
+            ->post('/register', [
+                'name' => "Proxied User {$attempt}",
+                'email' => "proxied{$attempt}@example.com",
+                'password' => 'Password1!@',
+                'password_confirmation' => 'Password1!@',
+            ])
+            ->assertRedirect();
+
+        auth()->logout();
+        $this->flushSession();
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.50'])
+        ->post('/register', [
+            'name' => 'Blocked User',
+            'email' => 'blocked-proxied@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertTooManyRequests();
+
+    $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.51'])
+        ->post('/register', [
+            'name' => 'Other Client',
+            'email' => 'other-proxied@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertRedirect();
+});
+
 it('keeps distinct dotted and plus-addressed mailboxes in separate rate limit buckets on ordinary domains', function () {
     $registrationIpKey = 'registration:ip:'.sha1('127.0.0.1');
     $emails = [
@@ -94,4 +135,25 @@ it('keeps distinct dotted and plus-addressed mailboxes in separate rate limit bu
         $this->flushSession();
         RateLimiter::clear($registrationIpKey);
     }
+});
+
+it('queues the verification email for cloud registrations', function () {
+    config()->set('constants.coolify.self_hosted', false);
+    Queue::fake();
+
+    $this->withHeader('CF-Connecting-IP', '2001:db8::30')
+        ->post('/register', [
+            'name' => 'Cloud User',
+            'email' => 'cloud-user@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertRedirect();
+
+    $user = User::query()->where('email', 'cloud-user@example.com')->firstOrFail();
+
+    Queue::assertPushed(
+        SendVerificationEmailJob::class,
+        fn (SendVerificationEmailJob $job) => $job->user->is($user)
+    );
 });

@@ -81,3 +81,23 @@ it('does not change servers when under limit and none are force-disabled', funct
     expect($server1->fresh()->settings->force_disabled)->toBeFalsy();
     expect($server2->fresh()->settings->force_disabled)->toBeFalsy();
 });
+
+it('does not count archives of transferred servers against the limit', function () {
+    $this->team->update(['custom_server_limit' => 1]);
+
+    $live = createServerForTeam($this->team);
+    sleep(1);
+    $archive = createServerForTeam($this->team);
+    $archive->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->save();
+
+    ServerLimitCheckJob::dispatchSync($this->team);
+
+    expect($live->fresh()->settings->force_disabled)->toBeFalsy()
+        ->and(Team::serverLimitReached($this->team))->toBeTrue()
+        ->and($this->team->serverOverflow())->toBeFalse();
+    Notification::assertNothingSent();
+
+    $live->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->save();
+
+    expect(Team::serverLimitReached($this->team))->toBeFalse();
+});

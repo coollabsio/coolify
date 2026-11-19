@@ -2,20 +2,24 @@
 
 namespace App\Models;
 
-use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
+use App\Services\DockerImageParser;
+use App\Support\DomainPortOverrides;
+use App\Support\ResourceStartActivity;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
+use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
-use Spatie\Activitylog\Models\Activity;
-use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -33,6 +37,7 @@ use Symfony\Component\Yaml\Yaml;
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'is_container_label_readonly_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label readonly.'],
         'config_hash' => ['type' => 'string', 'description' => 'The hash of the service configuration.'],
         'service_type' => ['type' => 'string', 'description' => 'The type of the service.'],
@@ -43,7 +48,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -58,6 +63,7 @@ class Service extends BaseModel
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
+        'redact_all_env_values_in_logs',
         'environment_id',
         'server_id',
         'destination_id',
@@ -65,6 +71,11 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -77,26 +88,42 @@ class Service extends BaseModel
         'docker_compose_raw',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'is_maintenance_enabled' => 'boolean',
+        ];
+    }
+
     protected static function booted()
     {
         static::creating(function ($service) {
             if (blank($service->name)) {
                 $service->name = 'service-'.new_public_id();
             }
-        });
-        static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
-            $service->save();
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
         });
     }
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $applications = $this->applications()->get();
+        $domains = $applications->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
-        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $noindexDomains = $applications->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $domainPortOverrides = $applications
+            ->mapWithKeys(fn (ServiceApplication $application): array => [
+                $application->id => DomainPortOverrides::sorted($application->domain_port_overrides),
+            ])
+            ->sortKeys()
+            ->all();
 
-        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $applicationImages = $applications->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
@@ -105,7 +132,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -151,10 +178,7 @@ class Service extends BaseModel
     public function isStarting(): bool
     {
         try {
-            $activity = Activity::where('properties->type_uuid', $this->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-
-            return $status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value;
+            return ResourceStartActivity::latestRunning($this->uuid) !== null;
         } catch (\Throwable) {
             return false;
         }
@@ -236,6 +260,15 @@ class Service extends BaseModel
             return 'starting:unhealthy';
         }
 
+        return $this->containerStatus();
+    }
+
+    /**
+     * The aggregate status of the stored container statuses, without the running start check.
+     * Callers that check starting services in bulk use it to avoid a query per service.
+     */
+    public function containerStatus(): ?string
+    {
         $applications = $this->applications;
         $databases = $this->databases;
 
@@ -295,6 +328,11 @@ class Service extends BaseModel
         $resources = $applications->concat($databases);
 
         foreach ($resources as $resource) {
+            // A part that is not in the compose file has no container, so it does not count.
+            if ($resource->is_removed_from_compose ?? false) {
+                continue;
+            }
+
             $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
 
             // Filter based on excludedOnly flag
@@ -637,7 +675,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $this->isGrafanaImage($image->toString()):
+                case $this->isGrafanaServerImage($application->image):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -725,7 +763,7 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Supabase', $data->toArray());
-                case $image->contains('minio'):
+                case $image->contains(['minio', 'pgsty/silo']):
                     $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
                     $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
@@ -1148,7 +1186,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('coollabsio/openclaw'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_OPENCLAW')->first();
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
                     $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
                     if ($username) {
@@ -1397,7 +1435,10 @@ class Service extends BaseModel
                     if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
                         $searchValue = str($field['value'])->after('$')->value;
                         $newValue = $this->environment_variables()->where('key', $searchValue)->first();
-                        if ($newValue) {
+                        if ($newValue?->is_shown_once) {
+                            $field['value'] = null;
+                            $field['isLocked'] = true;
+                        } elseif ($newValue) {
                             $field['value'] = $newValue->value;
                         }
                     }
@@ -1412,8 +1453,22 @@ class Service extends BaseModel
         return $fields;
     }
 
-    private function isGrafanaImage(string $image): bool
+    /**
+     * Determine whether the given image is an actual Grafana server image
+     * (grafana/grafana, grafana/grafana-oss, grafana/grafana-enterprise),
+     * optionally prefixed by a registry host. Other Grafana-published images
+     * such as grafana/loki, grafana/promtail and grafana/tempo are excluded.
+     */
+    private function isGrafanaServerImage(string $image): bool
     {
+        $parsedImage = (new DockerImageParser)->parse($image);
+        $image = $parsedImage->getImageName();
+
+        // The parser recognizes registry hosts with dots or ports, but not bare localhost.
+        if ($parsedImage->getRegistryUrl() === '' && str_starts_with($image, 'localhost/')) {
+            $image = substr($image, strlen('localhost/'));
+        }
+
         return in_array($image, [
             'grafana/grafana',
             'grafana/grafana-oss',
@@ -1455,36 +1510,10 @@ class Service extends BaseModel
         return null;
     }
 
-    public function taskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            $route = route('project.service.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'service_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
-            ]);
-            $settings = InstanceSettings::get();
-            if (data_get($settings, 'fqdn')) {
-                $url = Url::fromString($route);
-                $url = $url->withPort(null);
-                $fqdn = data_get($settings, 'fqdn');
-                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                $url = $url->withHost($fqdn);
-
-                return $url->__toString();
-            }
-
-            return $route;
-        }
-
-        return null;
-    }
-
     public function documentation()
     {
         $services = get_service_templates();
-        $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+        $service = data_get($services, resolve_service_template_key(str($this->name)->beforeLast('-')->value, $services), []);
 
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
@@ -1496,7 +1525,10 @@ class Service extends BaseModel
     {
         try {
             $services = get_service_templates();
-            $serviceName = str($this->name)->beforeLast('-')->value();
+            if (blank($this->service_type)) {
+                return null;
+            }
+            $serviceName = resolve_service_template_key($this->service_type, $services);
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 
@@ -1517,6 +1549,29 @@ class Service extends BaseModel
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
+    }
+
+    /**
+     * Domains of every application in the service stack.
+     *
+     * @return Collection<int, array{url: string, force_https: bool}>
+     */
+    public function maintenanceDomains(): Collection
+    {
+        return $this->applications()->get()
+            ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
+                ->map(fn ($url) => trim((string) $url))
+                ->filter()
+                ->map(fn (string $url) => ['url' => $url, 'force_https' => $application->isForceHttpsEnabled()]))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function maintenanceServers(): Collection
+    {
+        return collect([$this->server])->filter()->values();
     }
 
     public function databases()
@@ -1572,6 +1627,14 @@ class Service extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
+    /**
+     * Whether logs hide every environment value, or only locked values.
+     */
+    public function redactsAllEnvValuesInLogs(): bool
+    {
+        return $this->redact_all_env_values_in_logs ?? true;
+    }
+
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
@@ -1590,27 +1653,18 @@ class Service extends BaseModel
         }
 
         $workdir = $this->workdir();
-
-        instant_remote_process([
-            "mkdir -p $workdir",
-            "cd $workdir",
-        ], $this->server);
-
-        $filename = new_public_id().'-docker-compose.yml';
-        Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
-        $path = Storage::path("tmp/{$filename}");
-        instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
-        Storage::disk('local')->delete("tmp/{$filename}");
-
-        $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        // Absolute paths and tee, no cd or scp: a non-root SSH user cannot enter /data/coolify on the Coolify host.
+        // File content goes over SSH stdin: inline in the command, a compose over ~96 KB exceeds the argument limit.
+        instant_remote_process(["mkdir -p $workdir"], $this->server);
+        instant_remote_write_file($this->server, "$workdir/docker-compose.yml", $this->docker_compose);
+        $environmentFile = "$workdir/".new_public_id().'.env.tmp';
 
         $envs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = Yaml::parse($this->docker_compose);
+                $dockerCompose = parseDockerComposeYaml($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
@@ -1631,16 +1685,22 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+                continue;
+            }
+            $envs->push($this->composeEnvironmentFileLine($env));
         }
-        if ($envs->count() === 0) {
-            $commands[] = 'touch .env';
-        } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
-        }
+        instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
+        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+    }
 
-        instant_remote_process($commands, $this->server);
+    /**
+     * Build a KEY="value" line for the service .env file, which Docker Compose reads.
+     * Only plain values allow $VAR interpolation, so $SERVICE_* references keep working.
+     */
+    public function composeEnvironmentFileLine(EnvironmentVariable $environmentVariable): string
+    {
+        return $environmentVariable->key.'='.$this->resolveSecretManagerDotenvValue($environmentVariable);
     }
 
     public function parse(bool $isNew = false): Collection

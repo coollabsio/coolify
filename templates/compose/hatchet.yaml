@@ -10,8 +10,9 @@ services:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-dashboard:latest
     command: sh ./entrypoint.sh --config /hatchet/config
     environment:
-      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-hatchet}
       - SERVICE_URL_HATCHET_80
+      - SERVER_AUTH_SET_EMAIL_VERIFIED=${SERVER_AUTH_SET_EMAIL_VERIFIED:-true}
       # Default credentials are "admin@example.com" and "Admin123!!"
     depends_on:
       postgres:
@@ -40,7 +41,7 @@ services:
       migration:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-hatchet}
       - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0}
       - SERVER_GRPC_INSECURE=${SERVER_GRPC_INSECURE:-t}
     volumes:
@@ -70,10 +71,11 @@ services:
       - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
       - PORT=${RABBITMQ_PORT:-5672}
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: rabbitmq-diagnostics -q check_port_connectivity
       interval: 5s
       timeout: 30s
-      retries: 10
+      retries: 20
+      start_period: 60s
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq/
 
@@ -83,7 +85,7 @@ services:
     restart: no
     exclude_from_hc: true
     environment:
-      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-hatchet}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,7 +95,7 @@ services:
     command: /hatchet/hatchet-admin quickstart --skip certs --generated-config-dir /hatchet/config --overwrite=false
     restart: no
     environment:
-      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-hatchet}
       - SERVER_TASKQUEUE_RABBITMQ_URL=amqp://$SERVICE_USER_RABBITMQ:$SERVICE_PASSWORD_RABBITMQ@rabbitmq:5672/
       - SERVER_AUTH_COOKIE_DOMAIN=${SERVER_AUTH_COOKIE_DOMAIN:-localhost:8080}
       - SERVER_AUTH_COOKIE_INSECURE=${SERVER_AUTH_COOKIE_INSECURE:-t}
@@ -103,8 +105,8 @@ services:
       - SERVER_DEFAULT_ENGINE_VERSION=V1
       - SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS=${SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS:-hatchet-engine:7077}
     volumes:
-      - hatchet_certs:/hatchet/certs
-      - hatchet_config:/hatchet/config
+      - hatchet-certs:/hatchet/certs
+      - hatchet-config:/hatchet/config
     depends_on:
       migration:
         condition: service_completed_successfully

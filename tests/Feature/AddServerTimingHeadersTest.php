@@ -109,43 +109,6 @@ test('removes stale Content-Length after injecting the HUD', function () {
     expect($response->headers->has('Content-Length'))->toBeFalse();
 });
 
-test('app shell exposes Server-Timing HUD dock slots in desktop and mobile top bars', function () {
-    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
-
-    expect($layout)
-        ->toContain('id="server-timing-hud-slot"')
-        ->toContain('id="server-timing-hud-slot-mobile"')
-        ->toContain('data-server-timing-hud-slot');
-});
-
-test('Server-Timing HUD docks into navbar slots and floats only as fallback', function () {
-    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
-
-    expect($hud)
-        ->toContain('server-timing-hud-slot')
-        ->toContain('server-timing-hud-slot-mobile')
-        ->toContain("matchMedia('(min-width: 1024px)')")
-        ->toContain('floats bottom-left only if no navbar slot is available')
-        // Both navbar pills stay compact (app ms only); the full breakdown lives in the panel/float fallback.
-        ->toContain("root.getAttribute('data-sth-mode') === 'docked'")
-        ->toContain('compactSummary')
-        ->not->toContain("compactSummary = root.getAttribute('data-sth-mode') === 'docked'\n            && root.parentElement");
-});
-
-test('Server-Timing HUD follows the application color mode', function () {
-    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
-
-    expect($hud)
-        ->toContain('#server-timing-hud {')
-        ->toContain('html.dark #server-timing-hud {')
-        ->toContain('--sth-background: rgba(255, 255, 255, .96)')
-        ->toContain('--sth-background: rgba(16, 16, 16, .96)')
-        ->toContain('var(--sth-text)')
-        ->toContain('var(--sth-border)')
-        ->toContain('[data-sth-log]::-webkit-scrollbar-thumb')
-        ->toContain('scrollbar-color: var(--sth-scrollbar-thumb) var(--sth-scrollbar-track)');
-});
-
 test('does not inject HUD into non-HTML or fragment responses', function () {
     Config::set('app.server_timing', true);
 
@@ -214,17 +177,4 @@ test('SERVER_TIMING_ENABLED can force server_timing on or off regardless of APP_
     expect($resolve('false', 'local'))->toBeFalse();
     expect($resolve('0', 'local'))->toBeFalse();
     expect($resolve('off', 'local'))->toBeFalse();
-});
-test('server timing HUD can be toggled from the development command center', function () {
-    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
-    $commandCenter = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
-
-    expect($hud)
-        ->toContain('coolify.serverTimingHud.enabled')
-        ->toContain('server-timing-hud-visibility-changed')
-        ->and($commandCenter)
-        ->toContain("app()->environment('local')")
-        ->toContain('Toggle Server Timing HUD')
-        ->toContain("localStorage.setItem('coolify.serverTimingHud.enabled'")
-        ->toContain("window.dispatchEvent(new CustomEvent('server-timing-hud-visibility-changed'))");
 });

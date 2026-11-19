@@ -68,11 +68,26 @@ class Create extends Component
         }
 
         try {
-            $backup = $target->scheduledBackups()->updateOrCreate([], [
-                'team_id' => currentTeam()->id,
+            $backup = $target->scheduledBackups()->firstOrNew();
+            $backup->fill([
+                'team_id' => $this->service->environment->project->team_id,
                 'frequency' => $this->frequency,
                 'enabled' => true,
             ]);
+            $changedFields = auditChangedFields($backup);
+            $backup->save();
+            if ($backup->wasRecentlyCreated || $changedFields !== []) {
+                auditLog('ui.volume_backup.schedule_set', [
+                    'team_id' => $backup->team_id,
+                    'resource_type' => 'service',
+                    'resource_uuid' => $this->service->uuid,
+                    'resource_name' => $this->service->name,
+                    'storage_uuid' => $target->uuid,
+                    'backup_uuid' => $backup->uuid,
+                    'created' => $backup->wasRecentlyCreated,
+                    ...($backup->wasRecentlyCreated ? [] : ['changed_fields' => $changedFields]),
+                ]);
+            }
             $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled storage backup created.' : 'Scheduled storage backup updated.');
             redirectRoute($this, 'project.service.volume-backups.show', [
                 'project_uuid' => $this->service->project()->uuid,
@@ -99,8 +114,8 @@ class Create extends Component
             $label = str($resource->name)->headline();
             $targets->push(...$resource->persistentStorages()->orderBy('name')->get()->map(fn (LocalPersistentVolume $volume): array => [
                 'key' => 'volume:'.$volume->id,
-                'type' => 'Volume · '.$label,
-                'name' => $volume->name,
+                'type' => $label,
+                'name' => str($volume->name)->after($this->service->uuid.'_')->value(),
             ]));
             $targets->push(...$resource->fileStorages()
                 ->where('is_directory', true)
@@ -109,8 +124,8 @@ class Create extends Component
                 ->get()
                 ->map(fn (LocalFileVolume $directory): array => [
                     'key' => 'directory:'.$directory->id,
-                    'type' => 'Directory · '.$label,
-                    'name' => $directory->fs_path,
+                    'type' => $label,
+                    'name' => $directory->fs_path.' (directory)',
                 ]));
         }
 

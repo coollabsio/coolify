@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Jobs\ConnectProxyToNetworksJob;
 use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Collection;
@@ -43,12 +42,25 @@ class StandaloneDocker extends BaseModel
             }
 
             $server = $newStandaloneDocker->server;
-            $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
-                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
+                $newStandaloneDocker->networkCreateCommand(),
+                $newStandaloneDocker->proxyConnectCommand(),
             ], $server, false);
-            ConnectProxyToNetworksJob::dispatchSync($server);
         });
+    }
+
+    public function networkCreateCommand(): string
+    {
+        $safeNetwork = escapeshellarg($this->network);
+
+        return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --attachable {$safeNetwork} >/dev/null";
+    }
+
+    public function proxyConnectCommand(): string
+    {
+        $safeNetwork = escapeshellarg($this->network);
+
+        return "docker network connect {$safeNetwork} coolify-proxy >/dev/null 2>&1 || true";
     }
 
     public function setNetworkAttribute(string $value): void
@@ -105,6 +117,16 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function influxdbs()
+    {
+        return $this->morphMany(StandaloneInfluxdb::class, 'destination');
+    }
+
+    public function sqlites()
+    {
+        return $this->morphMany(StandaloneSqlite::class, 'destination');
+    }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
@@ -157,8 +179,10 @@ class StandaloneDocker extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $influxdbs = $this->influxdbs;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($influxdbs)->concat($sqlites);
     }
 
     public function attachedTo()

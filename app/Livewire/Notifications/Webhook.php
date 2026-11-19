@@ -22,7 +22,7 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $webhookEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:webhookEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $webhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -33,6 +33,9 @@ class Webhook extends Component
 
     #[Validate(['boolean'])]
     public bool $statusChangeWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedWebhookNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $backupSuccessWebhookNotifications = false;
@@ -65,7 +68,13 @@ class Webhook extends Component
     public bool $serverPatchWebhookNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesWebhookNotifications = false;
 
     public function mount()
     {
@@ -79,17 +88,17 @@ class Webhook extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->webhook_enabled = $this->webhookEnabled;
             $this->settings->webhook_url = $this->webhookUrl;
 
             $this->settings->deployment_success_webhook_notifications = $this->deploymentSuccessWebhookNotifications;
             $this->settings->deployment_failure_webhook_notifications = $this->deploymentFailureWebhookNotifications;
             $this->settings->status_change_webhook_notifications = $this->statusChangeWebhookNotifications;
+            $this->settings->restart_limit_reached_webhook_notifications = $this->restartLimitReachedWebhookNotifications;
             $this->settings->backup_success_webhook_notifications = $this->backupSuccessWebhookNotifications;
             $this->settings->backup_failure_webhook_notifications = $this->backupFailureWebhookNotifications;
             $this->settings->scheduled_task_success_webhook_notifications = $this->scheduledTaskSuccessWebhookNotifications;
@@ -100,9 +109,13 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->server_auto_update_webhook_notifications = $this->serverAutoUpdateWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
+            $this->settings->image_vulnerabilities_webhook_notifications = $this->imageVulnerabilitiesWebhookNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
@@ -113,6 +126,7 @@ class Webhook extends Component
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
             $this->statusChangeWebhookNotifications = $this->settings->status_change_webhook_notifications;
+            $this->restartLimitReachedWebhookNotifications = $this->settings->restart_limit_reached_webhook_notifications;
             $this->backupSuccessWebhookNotifications = $this->settings->backup_success_webhook_notifications;
             $this->backupFailureWebhookNotifications = $this->settings->backup_failure_webhook_notifications;
             $this->scheduledTaskSuccessWebhookNotifications = $this->settings->scheduled_task_success_webhook_notifications;
@@ -123,14 +137,15 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->serverAutoUpdateWebhookNotifications = $this->settings->server_auto_update_webhook_notifications;
             $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
+            $this->imageVulnerabilitiesWebhookNotifications = $this->settings->image_vulnerabilities_webhook_notifications;
         }
     }
 
     public function instantSaveWebhookEnabled()
     {
         try {
-            $original = $this->webhookEnabled;
             $this->validate([
                 'webhookUrl' => 'required',
             ], [
@@ -138,7 +153,7 @@ class Webhook extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->webhookEnabled = $original;
+            $this->webhookEnabled = (bool) $this->settings->refresh()->webhook_enabled;
 
             return handleError($e, $this);
         }
@@ -171,6 +186,7 @@ class Webhook extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -181,6 +197,7 @@ class Webhook extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -190,6 +207,8 @@ class Webhook extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
 
@@ -211,5 +230,12 @@ class Webhook extends Component
     public function render()
     {
         return view('livewire.notifications.webhook');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.webhook.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }
