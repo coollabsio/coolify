@@ -1845,9 +1845,9 @@ $siteAddress {
         $containers = collect([]);
         $containerReplicates = collect([]);
         if ($this->isSwarm()) {
-            $containers = instant_remote_process_with_timeout(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker service inspect $('.remoteCommandWithTimeout('docker service ls -q', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
-            $containerReplicates = instant_remote_process_with_timeout(["docker service ls --format '{{json .}}'"], $this, false);
+            $containerReplicates = instant_remote_process_with_timeout([remoteCommandWithTimeout("docker service ls --format '{{json .}}'")], $this, false);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
                 foreach ($containerReplicates as $containerReplica) {
@@ -1871,7 +1871,7 @@ $siteAddress {
                 }
             }
         } else {
-            $containers = instant_remote_process_with_timeout(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker container inspect $('.remoteCommandWithTimeout('docker container ls -aq', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
@@ -1885,7 +1885,7 @@ $siteAddress {
     public function loadAllContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
 
             return collect($containers);
@@ -1897,7 +1897,7 @@ $siteAddress {
     public function loadUnmanagedContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
             $containers = $containers->map(function ($container) {
                 $labels = data_get($container, 'Labels');

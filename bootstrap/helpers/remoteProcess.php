@@ -194,6 +194,16 @@ function instant_remote_process_with_input(Server $server, string $remoteCommand
     );
 }
 
+/**
+ * Bound one remote command with `timeout` (GNU coreutils or BusyBox). Without a bound, a command that
+ * waits on a hung or slow dockerd keeps running on the server after the local wait ends, and each
+ * periodic check adds one more process. The local wait must be longer than $seconds plus the 5s kill-after.
+ */
+function remoteCommandWithTimeout(string $command, int $seconds = 20): string
+{
+    return "timeout -k 5s {$seconds}s {$command}";
+}
+
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -293,12 +303,9 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
     $serverTimezone = getServerTimezone(data_get($application, 'destination.server'));
 
-    // Members should never see debug logs, even if an admin enabled debug mode
-    if ($is_debug_enabled && auth()->check()) {
-        $teamId = $application?->team()?->id;
-        if (is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId)) {
-            $is_debug_enabled = false;
-        }
+    // Debug logs can hold secrets, so only users who can change the application see them
+    if ($is_debug_enabled && auth()->check() && (is_null($application) || auth()->user()->cannot('update', $application))) {
+        $is_debug_enabled = false;
     }
 
     $logs = data_get($application_deployment_queue, 'logs');

@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\AccessLevel;
+use App\Services\Access\AccessResolver;
+use App\Services\Access\Grant;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -15,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
  * the session team, so switching teams in another tab does not change an open
  * canvas. The token has the abilities an API token of that user may have:
  * admins and owners get read, write, deploy and read:sensitive, members get
- * read only. The usual API middleware (api.token.team rejects teams the user is
+ * the levels of their access grants. The usual API middleware (api.token.team rejects teams the user is
  * not a member of, api.ability, api.sensitive) and controllers then enforce
  * team scope and permissions as for a real token.
  */
@@ -34,9 +37,15 @@ class UseSessionTeamApiToken
         }
         $teamId = (int) $teamId;
 
-        $abilities = $user->isAdminOfTeam($teamId)
-            ? ['read', 'write', 'deploy', 'read:sensitive']
-            : ['read'];
+        $abilities = ['read', 'write', 'deploy', 'read:sensitive'];
+        $memberGrants = app(AccessResolver::class)->memberGrants($user, $teamId);
+        if ($memberGrants !== null) {
+            $held = collect($memberGrants)
+                ->flatMap(fn (Grant $grant) => $grant->levels)
+                ->flatMap(fn (AccessLevel $level) => $level->includes())
+                ->map(fn (AccessLevel $level) => $level->value);
+            $abilities = array_values(array_intersect($abilities, $held->all()));
+        }
 
         $token = new PersonalAccessToken;
         $token->forceFill([

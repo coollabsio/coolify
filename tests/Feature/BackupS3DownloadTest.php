@@ -162,6 +162,37 @@ it('refuses team members', function () {
     Bus::assertNotDispatched(PrepareFileDownloadJob::class);
 });
 
+it('lets the download route serve members with write access on the resource', function (string $levels, int $status) {
+    $this->user->teams()->updateExistingPivot($this->team->id, [
+        'role' => 'member',
+        'access' => json_encode([['scope' => 'team', 'uuid' => null, 'levels' => [$levels]]]),
+    ]);
+    $this->user->unsetRelation('teams');
+    $this->execution->update(['local_storage_deleted' => true]);
+    $application = Application::factory()->create([
+        'environment_id' => $this->database->environment_id,
+        'destination_id' => $this->database->destination_id,
+        'destination_type' => $this->database->destination_type,
+    ]);
+    $volume = LocalPersistentVolume::create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    $volumeExecution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $volume->scheduledBackups()->create(['team_id' => $this->team->id, 'frequency' => 'daily'])->id,
+        'status' => 'success',
+        'filename' => '',
+    ]);
+
+    $this->get(route('download.backup', $this->execution->id))->assertStatus($status);
+    $this->get(route('download.volume-backup', $volumeExecution->id))->assertStatus($status);
+})->with([
+    'read grant' => ['read', 403],
+    'write grant' => ['write', 404],
+]);
+
 it('does not download an execution of another backup', function () {
     Process::fake();
     $foreignBackup = ScheduledDatabaseBackup::create([

@@ -365,7 +365,7 @@ function collectProxyDockerNetworksByServer(Server $server)
     if (is_null($proxyType) || $proxyType === 'NONE') {
         return collect();
     }
-    $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
+    $networks = instant_remote_process([remoteCommandWithTimeout('docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy')], $server, false, timeout: 30);
 
     return collect($networks)->map(function ($network) {
         return collect(json_decode($network))->keys();
@@ -897,10 +897,10 @@ function getExactTraefikVersionFromContainer(Server $server): ?string
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Checking for exact version");
 
         // Method A: Execute traefik version command (most reliable)
-        $versionCommand = "docker exec coolify-proxy traefik version 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
+        $versionCommand = remoteCommandWithTimeout('docker exec coolify-proxy traefik version')." 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Running: {$versionCommand}");
 
-        $output = instant_remote_process([$versionCommand], $server, false);
+        $output = instant_remote_process([$versionCommand], $server, false, timeout: 30);
 
         if (! empty(trim($output))) {
             $version = trim($output);
