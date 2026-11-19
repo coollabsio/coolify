@@ -1,111 +1,214 @@
-<nav wire:poll.10000ms="checkStatus" class="pb-6">
-    <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
-    <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
-        <x-slot:title>Database Startup</x-slot:title>
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$database" :wire:key="'star-mobile-'.$database->getMorphClass().'-'.$database->uuid" />
+    @endteleport
+    @php
+        $databasePageItems = [
+            [
+                'label' => 'Settings',
+                'route' => 'project.database.configuration',
+                'active' => request()->routeIs('project.database.configuration')
+                    || request()->routeIs('project.database.environment-variables')
+                    || request()->routeIs('project.database.servers')
+                    || request()->routeIs('project.database.persistent-storage')
+                    || request()->routeIs('project.database.healthcheck')
+                    || request()->routeIs('project.database.webhooks')
+                    || request()->routeIs('project.database.resource-limits')
+                    || request()->routeIs('project.database.resource-operations')
+                    || request()->routeIs('project.database.metrics')
+                    || request()->routeIs('project.database.tags')
+                    || request()->routeIs('project.database.danger'),
+            ],
+            [
+                'label' => 'Backups',
+                'route' => 'project.database.backup.index',
+                'active' => request()->routeIs('project.database.backup.*'),
+                'visible' => $database->isBackupSolutionAvailable(),
+            ],
+            [
+                'label' => 'Runtime Logs',
+                'route' => 'project.database.logs',
+                'active' => request()->routeIs('project.database.logs'),
+                'navigate' => false,
+            ],
+            [
+                'label' => 'Terminal',
+                'route' => 'project.database.command',
+                'active' => request()->routeIs('project.database.command'),
+                'navigate' => false,
+                'visible' => auth()->user()?->can('canAccessTerminal'),
+            ],
+        ];
+
+        $databasePageItems = array_values(array_filter(
+            $databasePageItems,
+            fn (array $item): bool => $item['visible'] ?? true,
+        ));
+
+        $databaseStatus = str($database->status ?? 'exited');
+    @endphp
+
+    <livewire:project.shared.configuration-checker :resource="$database" />
+
+    <x-process-dialog @startdatabase.window="processDialogOpen = true" closeWithX>
+        <x-slot:title>Database Startup Logs</x-slot:title>
         <x-slot:content>
-            <div wire:ignore>
-                <livewire:activity-monitor header="Logs" fullHeight />
+            <div wire:ignore class="flex h-full min-h-0 min-w-0 max-w-full flex-col">
+                <livewire:activity-monitor fullHeight />
             </div>
         </x-slot:content>
-    </x-slide-over>
-    <div class="navbar-main">
-        <nav
-            class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('project.database.configuration', $parameters) }}">
-                Configuration
-            </a>
+    </x-process-dialog>
 
-            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.logs', $parameters) }}">
-                Logs
-            </a>
-            @can('canAccessTerminal')
-                <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.database.command', $parameters) }}">
-                    Terminal
-                </a>
-            @endcan
-            @if (
-                $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                    href="{{ route('project.database.backup.index', $parameters) }}">
-                    Backups
-                </a>
-            @endif
-        </nav>
-        @if ($database->destination->server->isFunctional())
-            <div class="flex flex-wrap gap-2 items-center">
-                @if (!str($database->status)->startsWith('exited'))
-                    <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart" submitAction="restart"
-                        :actions="[
-                            'This database will be unavailable during the restart.',
-                            'If the database is currently in use data could be lost.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
-                        :dispatchEvent="true" dispatchEventType="restartEvent">
-                        <x-slot:button-title>
-                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2">
-                                    <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                    <path d="M20 4v5h-5" />
-                                </g>
-                            </svg>
-                            Restart
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                    <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[
-                            'This database will be stopped.',
-                            'If the database is currently in use data could be lost.',
-                            'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Confirm">
-                        <x-slot:button-title>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                @else
-                    <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M7 4v16l13 -8z" />
-                        </svg>
-                        Start
-                    </button>
-                @endif
-                @script
-                    <script>
-                        $wire.$on('startEvent', () => {
-                            window.dispatchEvent(new CustomEvent('startdatabase'));
-                            $wire.$call('start');
-                        });
-                        $wire.$on('restartEvent', () => {
-                            $wire.$dispatch('info', 'Restarting database.');
-                            window.dispatchEvent(new CustomEvent('startdatabase'));
-                            $wire.$call('restart');
-                        });
-                    </script>
-                @endscript
+    <div x-data="{ busy: false }" @database-busy.window="busy = true"
+        @database-action-finished.window="busy = false">
+        {{-- Below xl: the title and the resource actions share one row. --}}
+        <div class="mb-3 flex w-full min-w-0 items-start gap-3 xl:hidden">
+            <div class="min-w-0 flex-1">
+                <div class="flex min-w-0 flex-col items-start gap-2">
+                    <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+                        {{ $database->name }}
+                    </h1>
+                    <div class="relative flex w-full min-w-0 items-center gap-2">
+                        <x-status-summary :status="$database->status" title="Database status"
+                            :healthcheck-url="route('project.database.healthcheck', $parameters)" />
+                        @if ($isDeploymentProgress)
+                            <x-deploying-indicator label="Working" />
+                        @endif
+                    </div>
+                    <div class="flex w-full flex-wrap gap-1">
+                        <x-application.restart-limit-warning :application="$database" />
+                    </div>
+                </div>
             </div>
-        @else
-            <div class="text-error">Underlying server is not functional.</div>
-        @endif
+
+            <div class="shrink-0">
+                @if ($database->destination->server->isFunctional())
+                    @can('manage', $database)
+                        <x-split-action id="database-mobile-actions">
+                            @if (! $databaseStatus->startsWith('exited'))
+                                <x-slot:main x-bind:disabled="busy"
+                                    @click="document.getElementById('database-restart-trigger')?.click()">
+                                    <x-loading-on-button x-show="busy" x-cloak />
+                                    <x-reicon name="restart" class="size-3.5" x-show="!busy" />
+                                    <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
+                                </x-slot:main>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
+                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                    Stop
+                                </button>
+                            @else
+                                <x-slot:main x-bind:disabled="busy" @click="busy = true; $wire.dispatch('startEvent')">
+                                    <x-loading-on-button x-show="busy" x-cloak />
+                                    <x-reicon name="play-circle" class="size-3.5" x-show="!busy" />
+                                    <span x-text="busy ? 'Starting…' : 'Start'">Start</span>
+                                </x-slot:main>
+                            @endif
+                        </x-split-action>
+                    @endcan
+                @endif
+
+            </div>
+        </div>
+
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden w-full items-center xl:flex xl:w-auto">
+            <div
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator label="Working" class="mr-1" />
+                    @endif
+                    @if ($database->destination->server->isFunctional())
+                        @can('manage', $database)
+                            <x-split-action id="database-desktop-actions">
+                                @if (! $databaseStatus->startsWith('exited'))
+                                    <x-slot:main x-bind:disabled="busy"
+                                        @click="document.getElementById('database-restart-trigger')?.click()">
+                                        <x-loading-on-button x-show="busy" x-cloak />
+                                        <x-reicon name="restart" class="size-3.5" x-show="!busy" />
+                                        <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
+                                    </x-slot:main>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
+                                        <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                        Stop
+                                    </button>
+                                @else
+                                    <x-slot:main x-bind:disabled="busy" @click="busy = true; $wire.dispatch('startEvent')">
+                                        <x-loading-on-button x-show="busy" x-cloak />
+                                        <x-reicon name="play-circle" class="size-3.5" x-show="!busy" />
+                                        <span x-text="busy ? 'Starting…' : 'Start'">Start</span>
+                                    </x-slot:main>
+                                @endif
+                            </x-split-action>
+                        @endcan
+                    @else
+                        <x-status-badge status="Server unavailable" type="error" />
+                    @endif
+                </div>
+            </div>
+        </div>
+        @endteleport
+
     </div>
+
+    @if ($database->destination->server->isFunctional())
+        <div class="hidden" aria-hidden="true">
+            <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart"
+                submitAction="restartEvent" :actions="[
+                    'This database will be unavailable during the restart.',
+                    'If the database is currently in use, data could be lost.',
+                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
+                :dispatchAction="true">
+                <x-slot:trigger>
+                    <button id="database-restart-trigger" type="button">Restart</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
+                :checkboxes="$checkboxes" :actions="[
+                    'This database will be stopped.',
+                    'If the database is currently in use, data could be lost.',
+                    'Non-persistent containers, networks, and unused images will be removed.',
+                ]" :confirmWithText="false" :confirmWithPassword="false"
+                step1ButtonText="Continue" step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="database-stop-trigger" type="button">Stop</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+        </div>
+    @endif
+
+    @script
+        <script>
+            $wire.$on('startEvent', async () => {
+                if (await $wire.$call('checkDeployments')) {
+                    // An operation is already running: reopen its live log.
+                    $wire.$call('reopenDeployment');
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                    return;
+                }
+                // start() opens the log dialog only when the start was queued.
+                try {
+                    await $wire.$call('start');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                }
+            });
+            $wire.$on('restartEvent', async () => {
+                if (await $wire.$call('checkDeployments')) {
+                    // An operation is already running: reopen its live log.
+                    $wire.$call('reopenDeployment');
+                    return;
+                }
+                window.dispatchEvent(new CustomEvent('database-busy'));
+                // restart() opens the log dialog only when the restart was queued.
+                try {
+                    await $wire.$call('restart');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                }
+            });
+        </script>
+    @endscript
 </nav>

@@ -7,12 +7,12 @@ contact_links:
 
   - name: 💡 Feature Request
     url: https://github.com/coollabsio/coolify/discussions/categories/feature-requests
-    about: Suggest a new feature for Coolify.
+    about: Suggest a new feature for Coolify. Feature code should branch from `next` and target `next`.
 
   - name: ⚙️ Service Request
     url: https://github.com/coollabsio/coolify/discussions/categories/service-requests
-    about: Request a new service integration for Coolify.
+    about: Request a new service integration for Coolify. Service code should branch from `next` and target `next`.
 
   - name: 🔧 Improvements
     url: https://github.com/coollabsio/coolify/discussions/categories/improvements
-    about: Suggest improvements to existing features for Coolify.
+    about: Suggest improvements to existing features. Small fixes should target `main`; larger changes should target `next`.

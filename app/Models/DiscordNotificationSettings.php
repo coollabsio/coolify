@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class DiscordNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -20,17 +21,25 @@ class DiscordNotificationSettings extends Model
         'deployment_success_discord_notifications',
         'deployment_failure_discord_notifications',
         'status_change_discord_notifications',
+        'restart_limit_reached_discord_notifications',
         'backup_success_discord_notifications',
         'backup_failure_discord_notifications',
         'scheduled_task_success_discord_notifications',
         'scheduled_task_failure_discord_notifications',
-        'docker_cleanup_discord_notifications',
+        'docker_cleanup_success_discord_notifications',
+        'docker_cleanup_failure_discord_notifications',
         'server_disk_usage_discord_notifications',
         'server_reachable_discord_notifications',
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
+        'server_auto_update_discord_notifications',
         'traefik_outdated_discord_notifications',
+        'image_vulnerabilities_discord_notifications',
         'discord_ping_enabled',
+    ];
+
+    protected $hidden = [
+        'discord_webhook_url',
     ];
 
     protected $casts = [
@@ -40,6 +49,7 @@ class DiscordNotificationSettings extends Model
         'deployment_success_discord_notifications' => 'boolean',
         'deployment_failure_discord_notifications' => 'boolean',
         'status_change_discord_notifications' => 'boolean',
+        'restart_limit_reached_discord_notifications' => 'boolean',
         'backup_success_discord_notifications' => 'boolean',
         'backup_failure_discord_notifications' => 'boolean',
         'scheduled_task_success_discord_notifications' => 'boolean',
@@ -49,7 +59,9 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications' => 'boolean',
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
+        'server_auto_update_discord_notifications' => 'boolean',
         'traefik_outdated_discord_notifications' => 'boolean',
+        'image_vulnerabilities_discord_notifications' => 'boolean',
         'discord_ping_enabled' => 'boolean',
     ];
 
@@ -66,5 +78,15 @@ class DiscordNotificationSettings extends Model
     public function isPingEnabled()
     {
         return $this->discord_ping_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Discord';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->discord_enabled = false;
     }
 }

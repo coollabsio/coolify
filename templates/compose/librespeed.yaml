@@ -1,0 +1,22 @@
+# documentation: https://github.com/librespeed/speedtest
+# slogan: Self-hosted lightweight Speed Test.
+# category: devtools
+# tags: speedtest, internet-speed
+# logo: svgs/librespeed.png
+# port: 82
+
+services:
+  librespeed:
+    container_name: librespeed
+    image: 'ghcr.io/librespeed/speedtest:latest'
+    environment:
+      - SERVICE_URL_LIBRESPEED_82
+      - MODE=standalone
+      - TELEMETRY=false
+      - DISTANCE=km
+      - WEBPORT=82
+    healthcheck:
+      test: 'curl 127.0.0.1:82 || exit 1'
+      timeout: 1s
+      interval: 1m0s
+      retries: 1

@@ -1,0 +1,318 @@
+<?php
+
+use App\Jobs\ServerConnectionCheckJob;
+use App\Models\CloudProviderToken;
+use App\Models\PrivateKey;
+use App\Models\Server;
+use App\Models\Team;
+use App\Services\ServerTransfer\ServerTransferClaimer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
+
+uses(RefreshDatabase::class);
+
+function createServerForConnectionIsolationTest(array $attributes = []): Server
+{
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+
+    return Server::factory()->create(array_merge([
+        'team_id' => $team->id,
+        'private_key_id' => $privateKey->id,
+    ], $attributes));
+}
+
+beforeEach(function () {
+    Storage::fake('ssh-keys');
+    Sleep::fake();
+});
+
+it('never attempts SSH to a placeholder address', function (string $placeholderIp) {
+    $server = createServerForConnectionIsolationTest(['ip' => $placeholderIp]);
+    $server->settings->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+    ]);
+
+    Process::fake();
+
+    (new ServerConnectionCheckJob($server))->handle();
+
+    Process::assertNothingRan();
+    expect($server->fresh()->unreachable_count)->toBe(0)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+})->with([
+    'reserved provisioning address' => Server::PLACEHOLDER_IP,
+    'unspecified IPv4 address' => '0.0.0.0',
+    'unspecified IPv6 address' => '::',
+]);
+
+it('does not call cloud provider APIs during an SSH connection check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $token = CloudProviderToken::create([
+        'team_id' => $server->team_id,
+        'provider' => 'vultr',
+        'token' => 'test-vultr-token',
+        'name' => 'Vultr',
+    ]);
+    $server->update([
+        'cloud_provider_token_id' => $token->id,
+        'vultr_instance_id' => 'instance-1',
+        'vultr_instance_status' => 'active',
+    ]);
+
+    Http::fake([
+        'https://api.vultr.com/*' => Http::response([
+            'instance' => ['id' => 'instance-1', 'status' => 'active'],
+        ]),
+    ]);
+    fakeRemoteProcesses([
+        '*' => Process::result(
+            output: '{"Server":{"Version":"27.0.0"}}',
+            exitCode: 0,
+        ),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    Http::assertNothingSent();
+});
+
+it('resets unreachable_count after a successful connection check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    // unreachable_count is not mass-assignable, so it must be set directly.
+    $server->unreachable_count = 5;
+    $server->save();
+
+    fakeRemoteProcesses([
+        '*' => Process::result(
+            output: '{"Server":{"Version":"27.0.0"}}',
+            exitCode: 0,
+        ),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    expect($server->fresh()->unreachable_count)->toBe(0);
+});
+
+it('logs the checking node and ssh error only when the connection state changes', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $logPath = tempnam(sys_get_temp_dir(), 'coolify-scheduled-log-');
+    config(['logging.channels.scheduled' => ['driver' => 'single', 'path' => $logPath, 'level' => 'debug']]);
+    Log::forgetChannel('scheduled');
+    fakeRemoteProcesses([
+        '*' => Process::result(errorOutput: 'ssh: connect to host 203.0.113.10 port 22: Connection refused', exitCode: 255),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $log = file_get_contents($logPath);
+    @unlink($logPath);
+
+    expect(substr_count($log, 'Server connection state changed'))->toBe(1)
+        ->and($log)->toContain('"is_reachable":false')
+        ->toContain('"was_reachable":true')
+        ->toContain('ssh exit 255: ssh: connect to host 203.0.113.10 port 22: Connection refused')
+        ->toContain('"host":"'.gethostname().'"');
+});
+
+it('keeps the server online after one failed SSH check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    expect($server->fresh()->unreachable_count)->toBe(1)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+});
+
+it('marks the server offline after consecutive failed SSH checks', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
+    ]);
+
+    for ($attempt = 0; $attempt < ServerConnectionCheckJob::UNREACHABLE_THRESHOLD; $attempt++) {
+        (new ServerConnectionCheckJob($server->fresh()))->handle();
+    }
+
+    expect($server->fresh()->unreachable_count)->toBe(ServerConnectionCheckJob::UNREACHABLE_THRESHOLD)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeFalse()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeFalse();
+});
+
+it('does not mark the server offline when the check fails for a reason other than SSH or Docker', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->unreachable_count = 1;
+    $server->save();
+    fakeRemoteProcesses([
+        '*' => Process::result(output: '{"Server":{"Version":"27.0.0"}}', exitCode: 0),
+    ]);
+    // Fails the unreachable_count reset, after SSH and Docker checks passed.
+    Server::saving(fn () => throw new RuntimeException('database connection lost'));
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    Server::flushEventListeners();
+    expect($server->fresh()->unreachable_count)->toBe(1)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+});
+
+it('retries a failed SSH attempt once within the same check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => false, 'is_usable' => false]);
+    $server->unreachable_count = 3;
+    $server->save();
+    fakeRemoteProcesses([
+        '*ls -la /*' => Process::sequence()
+            ->push(Process::result(errorOutput: 'Connection timed out', exitCode: 255))
+            ->push(Process::result(exitCode: 0)),
+        '*compose*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    Sleep::assertSleptTimes(1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'ls -la /'), 2);
+    expect($server->fresh()->unreachable_count)->toBe(0)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+});
+
+it('counts one failed check when both SSH attempts fail', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    Sleep::assertSleptTimes(1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'ls -la /'), 2);
+    expect($server->fresh()->unreachable_count)->toBe(1)
+        ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue();
+});
+
+it('does not retry the Docker check within the same check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*docker version*' => Process::result(errorOutput: 'Cannot connect to the Docker daemon', exitCode: 1),
+        '*' => Process::result(exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker version'), 1);
+    expect((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
+        ->and((bool) $server->settings->fresh()->is_usable)->toBeFalse();
+});
+
+it('keeps the server usable when only the compose version check fails', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    fakeRemoteProcesses([
+        '*compose*' => Process::result(errorOutput: 'docker: compose is not a docker command', exitCode: 1),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    expect((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+});
+
+it('gives the job enough time for every connection check step', function () {
+    $job = new ServerConnectionCheckJob(new Server);
+    $lock = collect($job->middleware())->first();
+
+    expect($job->timeout)->toBeGreaterThanOrEqual(ServerConnectionCheckJob::maximumCheckSeconds())
+        ->and($lock->expiresAfter)->toBeGreaterThan($job->timeout);
+});
+
+it('stops managing a server when its owner marker names a newer claim of another instance', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance', 'claimed_at' => '2026-01-01T00:00:00+00:00']]],
+    ]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-instance-b","instance_url":"https://8.8.8.8","claimed_at":"2026-02-01T00:00:00+00:00"}', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeTrue()
+        ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://8.8.8.8')
+        ->and((bool) $server->settings->force_disabled)->toBeTrue();
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'docker version'));
+});
+
+it('keeps managing a server when its owner marker is its own claim', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance']]],
+    ]);
+    fakeRemoteProcesses([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-this-instance"}', exitCode: 0),
+        '*compose*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeFalse()
+        ->and((bool) $server->settings->is_usable)->toBeTrue();
+});
+
+it('passes the SSH probe on a server without an owner marker', function () {
+    // The remote shell runs the probe with `set -e`, like this.
+    $result = Process::input(ServerConnectionCheckJob::probeCommand())->run(['sh', '-se']);
+
+    expect(file_exists(ServerTransferClaimer::OWNER_MARKER_PATH))->toBeFalse()
+        ->and($result->exitCode())->toBe(0);
+});
+
+it('keeps the owner marker read elevated in the SSH probe on a non-root server', function () {
+    $server = createServerForConnectionIsolationTest(['user' => 'ubuntu']);
+
+    expect(parseCommandsByLineForSudo(collect([ServerConnectionCheckJob::probeCommand()]), $server))->toBe([
+        'sudo cat '.ServerTransferClaimer::OWNER_MARKER_PATH.' 2>/dev/null || sudo true; ls -la / > /dev/null',
+    ]);
+});
+
+it('runs the Docker checks through the multiplexed connection and only the probe as a new login', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    fakeRemoteProcesses([
+        '*compose version*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $usesMux = fn (string $remoteCommand) => fn ($process) => str_contains(remoteProcessScript($process), $remoteCommand)
+        && str_contains(remoteProcessScript($process), 'ControlPath=');
+    Process::assertDidntRun($usesMux('ls -la /'));
+    Process::assertRan($usesMux('docker version --format json'));
+    Process::assertRan($usesMux('docker compose version --short'));
+    expect((bool) $server->settings->fresh()->is_usable)->toBeTrue();
+});

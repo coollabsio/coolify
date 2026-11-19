@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -20,11 +22,25 @@ use Visus\Cuid2\Cuid2;
 )]
 class Project extends BaseModel
 {
-    use ClearsGlobalSearchCache;
-    use HasFactory;
+    use Auditable, HasFactory;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'uuid',
+    ];
+
+    protected array $auditExclude = ['canvas_position'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_position' => 'array',
+        ];
+    }
 
     /**
      * Get query builder for projects owned by current team.
@@ -54,11 +70,13 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
-                'uuid' => (string) new Cuid2,
+                'uuid' => new_public_id(),
             ]);
         });
         static::deleting(function ($project) {
-            $project->environments()->delete();
+            foreach ($project->environments()->get() as $environment) {
+                $environment->delete();
+            }
             $project->settings()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {
@@ -69,7 +87,7 @@ class Project extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'project');
     }
 
     public function environments()
@@ -122,6 +140,16 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
     }
 
+    public function influxdbs()
+    {
+        return $this->hasManyThrough(StandaloneInfluxdb::class, Environment::class);
+    }
+
+    public function sqlites()
+    {
+        return $this->hasManyThrough(StandaloneSqlite::class, Environment::class);
+    }
+
     public function mongodbs()
     {
         return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
@@ -146,14 +174,25 @@ class Project extends BaseModel
             $this->keydbs()->count() == 0 &&
             $this->dragonflies()->count() == 0 &&
             $this->clickhouses()->count() == 0 &&
+            $this->influxdbs()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
+            $this->sqlites()->count() == 0 &&
             $this->services()->count() == 0;
     }
 
-    public function databases()
+    public function databases(array $with = []): Collection
     {
-        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+        return $this->postgresqls()->with($with)->get()
+            ->concat($this->redis()->with($with)->get())
+            ->concat($this->mongodbs()->with($with)->get())
+            ->concat($this->mysqls()->with($with)->get())
+            ->concat($this->mariadbs()->with($with)->get())
+            ->concat($this->keydbs()->with($with)->get())
+            ->concat($this->dragonflies()->with($with)->get())
+            ->concat($this->clickhouses()->with($with)->get())
+            ->concat($this->influxdbs()->with($with)->get())
+            ->concat($this->sqlites()->with($with)->get());
     }
 
     public function navigateTo()

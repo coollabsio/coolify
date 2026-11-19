@@ -2,33 +2,133 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\CleanupPreviewDeployment;
+use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
-use App\Actions\Service\StartService;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
-use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
+use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Services\DockerImageParser;
+use App\Support\DomainPortOverrides;
+use App\Support\ValidationPatterns;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 class ApplicationsController extends Controller
 {
+    use Concerns\HandlesTagsApi;
+    use Concerns\RequiresDeployAbility;
+    use Concerns\RequiresDeployForOutsideHostPaths;
+
+    private const APPLICATION_SETTING_FIELDS = [
+        'is_git_submodules_enabled',
+        'is_git_lfs_enabled',
+        'is_git_shallow_clone_enabled',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
+        'disable_build_cache',
+        'inject_build_args_to_dockerfile',
+        'include_source_commit_in_build',
+        'include_network_hosts_in_build',
+        'is_env_sorting_enabled',
+        'redact_all_env_values_in_logs',
+        'include_coolify_default_variables',
+        'is_pr_deployments_public_enabled',
+        'use_production_values_in_previews',
+        'stop_grace_period',
+        'rolling_update_drain_seconds',
+        'docker_images_to_keep',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'is_permanent_redirect_enabled',
+        'traefik_certificate_resolver',
+        'is_container_label_readonly_enabled',
+        'is_raw_compose_deployment_enabled',
+        'is_log_drain_enabled',
+        'is_gpu_enabled',
+        'gpu_driver',
+        'gpu_count',
+        'gpu_device_ids',
+        'gpu_options',
+        'is_consistent_container_name_enabled',
+        'custom_internal_name',
+        'custom_container_name_prefix',
+        'is_image_scan_enabled',
+    ];
+
+    private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
+        'is_git_submodules_enabled',
+        'is_git_lfs_enabled',
+        'is_git_shallow_clone_enabled',
+        'is_auto_cancel_queued_deployments_enabled',
+        'is_auto_cancel_building_deployments_enabled',
+        'disable_build_cache',
+        'inject_build_args_to_dockerfile',
+        'include_source_commit_in_build',
+        'include_network_hosts_in_build',
+        'is_env_sorting_enabled',
+        'redact_all_env_values_in_logs',
+        'include_coolify_default_variables',
+        'is_pr_deployments_public_enabled',
+        'use_production_values_in_previews',
+        'is_gzip_enabled',
+        'is_stripprefix_enabled',
+        'is_permanent_redirect_enabled',
+        'is_container_label_readonly_enabled',
+        'is_raw_compose_deployment_enabled',
+        'is_log_drain_enabled',
+        'is_gpu_enabled',
+        'is_consistent_container_name_enabled',
+        'is_image_scan_enabled',
+    ];
+
+    protected function findTaggableResource(string $uuid, int|string $teamId): mixed
+    {
+        return Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
+    }
+
+    protected function tagResourceNotFoundMessage(): string
+    {
+        return 'Application not found.';
+    }
+
+    private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
+    {
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $storage->makeVisible(['content']);
+        }
+
+        return $storage;
+    }
+
     private function removeSensitiveData($application)
     {
         $application->makeHidden([
@@ -37,8 +137,9 @@ class ApplicationsController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $application->makeHidden([
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $application->makeVisible([
+                ...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
                 'custom_labels',
                 'dockerfile',
                 'docker_compose',
@@ -47,14 +148,151 @@ class ApplicationsController extends Controller
                 'manual_webhook_secret_gitea',
                 'manual_webhook_secret_github',
                 'manual_webhook_secret_gitlab',
-                'private_key_id',
+                'http_basic_auth_password',
                 'value',
                 'real_value',
-                'http_basic_auth_password',
+            ]);
+            if (canReadServerSecretsFromApi()) {
+                $this->exposeNestedServerSecrets($application);
+            }
+        } else {
+            $application->makeHidden([
+                'private_key_id',
             ]);
         }
 
-        return serializeApiResponse($application);
+        if ($application->is_shown_once ?? false) {
+            $application->makeHidden(['value', 'real_value']);
+        }
+
+        if ($application->relationLoaded('settings')) {
+            $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
+        }
+
+        return redactLockedApiResourceValues($application, serializeApiResponse($application));
+    }
+
+    private function applicationSettingsFromRequest(Request $request): array
+    {
+        $settings = [];
+
+        foreach (self::APPLICATION_SETTING_FIELDS as $field) {
+            if (! array_key_exists($field, $request->all())) {
+                continue;
+            }
+
+            $settings[$field] = in_array($field, self::BOOLEAN_APPLICATION_SETTING_FIELDS, true)
+                ? $request->boolean($field)
+                : $request->input($field);
+        }
+
+        if (array_key_exists('custom_container_name_prefix', $settings) && is_scalar($settings['custom_container_name_prefix'] ?? '')) {
+            $settings['custom_container_name_prefix'] = str($settings['custom_container_name_prefix'])->slug()->value() ?: null;
+        }
+
+        // Container names use custom_internal_name only with consistent container naming, so a name sent alone turns it on.
+        if (filled($settings['custom_internal_name'] ?? null) && ! array_key_exists('is_consistent_container_name_enabled', $settings)) {
+            $settings['is_consistent_container_name_enabled'] = true;
+        }
+
+        return $settings;
+    }
+
+    private function containerNamePrefixValidationResponse(array $settings, Server $server, ?Application $application = null): ?JsonResponse
+    {
+        $prefix = $settings['custom_container_name_prefix'] ?? null;
+        if (! is_null($prefix) && ! is_string($prefix)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['custom_container_name_prefix' => ['The custom container name prefix field must be a string.']],
+            ], 422);
+        }
+        if (! filled($prefix) || ! ApplicationSetting::isContainerNamePrefixInUse($prefix, $server, $application?->id)) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['custom_container_name_prefix' => ['This container name prefix is already in use by another application.']],
+        ], 422);
+    }
+
+    /**
+     * Container names honor custom_internal_name only with consistent container naming, so reject a name sent while the request turns it off.
+     */
+    private function customInternalNameValidationResponse(array $settings): ?JsonResponse
+    {
+        if (! filled($settings['custom_internal_name'] ?? null) || ($settings['is_consistent_container_name_enabled'] ?? true)) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['custom_internal_name' => ['Set is_consistent_container_name_enabled to true to use custom_internal_name. Coolify ignores the custom internal name while consistent container naming is turned off.']],
+        ], 422);
+    }
+
+    private function sharedImageNameValidationResponse(Application $application): ?JsonResponse
+    {
+        $otherApplication = $application->otherApplicationBuildingSameImage();
+        if (! $otherApplication) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['docker_registry_image_name' => [$application->sharedImageNameMessage($otherApplication)]],
+        ], 422);
+    }
+
+    private function applyApplicationSettings(Application $application, array $settings): void
+    {
+        if ($settings === []) {
+            return;
+        }
+
+        $wasLabelManagementEnabled = $application->settings->is_container_label_readonly_enabled;
+
+        $application->settings->fill($settings)->save();
+
+        $regenerateLabels = ! $application->wasRecentlyCreated
+            && $application->settings->is_container_label_readonly_enabled
+            && (! $wasLabelManagementEnabled
+                || array_key_exists('is_gzip_enabled', $settings)
+                || array_key_exists('is_stripprefix_enabled', $settings)
+                || array_key_exists('is_permanent_redirect_enabled', $settings)
+                || array_key_exists('traefik_certificate_resolver', $settings));
+
+        if ($regenerateLabels) {
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+            $application->save();
+        }
+    }
+
+    private function extraApplicationFieldMessage(string $field): string
+    {
+        return $field === 'fqdn' ? 'Use the domains field to set application URLs.' : 'This field is not allowed.';
+    }
+
+    /**
+     * Expose sensitive fields on eager-loaded nested Server + ServerSetting
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
+     * Models hide these by default via $hidden; this re-exposes them per-request.
+     */
+    private function exposeNestedServerSecrets($model): void
+    {
+        $server = $model->destination?->server ?? null;
+        if (! $server) {
+            return;
+        }
+        $settings = $server->settings ?? null;
+        if ($settings) {
+            $settings->makeVisible([
+                'sentinel_token',
+                'sentinel_custom_url',
+                'logdrain_config',
+            ]);
+        }
     }
 
     #[OA\Get(
@@ -109,8 +347,12 @@ class ApplicationsController extends Controller
         }
 
         $tagName = $request->query('tag');
+        $applicationRelations = canReadServerSecretsFromApi()
+            ? ['destination.server.settings']
+            : [];
 
         $applications = Application::ownedByCurrentTeamAPI($teamId)
+            ->with($applicationRelations)
             ->when($tagName, function ($query, $tagName) {
                 $query->whereHas('tags', function ($query) use ($tagName) {
                     $query->where('name', $tagName);
@@ -141,7 +383,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -149,12 +391,15 @@ class ApplicationsController extends Controller
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host (not github.com).'],
+                            'git_https_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password or access token for HTTPS access to a private repository on a custom Git host (not github.com). It is stored encrypted and never returned.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -162,6 +407,7 @@ class ApplicationsController extends Controller
                             'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
                             'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -194,15 +440,16 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             // 'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
                             'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
+                            'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'The Docker build target (stage) in the Dockerfile.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
@@ -213,19 +460,62 @@ class ApplicationsController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
-                            'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
+                            'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -248,6 +538,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -306,7 +600,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -317,10 +611,11 @@ class ApplicationsController extends Controller
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -328,6 +623,7 @@ class ApplicationsController extends Controller
                             'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
                             'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -360,14 +656,15 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
                             'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository'],
+                            'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'The Docker build target (stage) in the Dockerfile.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
@@ -378,19 +675,62 @@ class ApplicationsController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
-                            'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
+                            'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -413,6 +753,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -455,10 +799,10 @@ class ApplicationsController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Private - Deploy Key)',
-        description: 'Create new application based on a private repository through a Deploy Key.',
-        path: '/applications/private-deploy-key',
-        operationId: 'create-private-deploy-key-application',
+        summary: 'Create (Private - Gitea App)',
+        description: 'Create new application based on a private repository through a Gitea App.',
+        path: '/applications/private-gitea-app',
+        operationId: 'create-private-gitea-app-application',
         security: [
             ['bearerAuth' => []],
         ],
@@ -471,21 +815,22 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'gitea_app_uuid', 'git_repository', 'git_branch', 'build_pack'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
                             'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
-                            'private_key_uuid' => ['type' => 'string', 'description' => 'The private key UUID.'],
-                            'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
+                            'gitea_app_uuid' => ['type' => 'string', 'description' => 'The Gitea App UUID. The source must be connected.'],
+                            'git_repository' => ['type' => 'string', 'description' => 'The repository as owner/name, or its URL on the Gitea instance.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -493,6 +838,7 @@ class ApplicationsController extends Controller
                             'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
                             'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
@@ -525,14 +871,15 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
-                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository'],
+                            'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'The Docker build target (stage) in the Dockerfile.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
@@ -543,19 +890,61 @@ class ApplicationsController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
-                            'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
+                            'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
                         ],
                     )
                 ),
@@ -578,6 +967,225 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+        ]
+    )]
+    public function create_private_gitea_app_application(Request $request)
+    {
+        return $this->create_application($request, 'private-gitea-app');
+    }
+
+    #[OA\Post(
+        summary: 'Create (Private - Deploy Key)',
+        description: 'Create new application based on a private repository through a Deploy Key.',
+        path: '/applications/private-deploy-key',
+        operationId: 'create-private-deploy-key-application',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            description: 'Application object that needs to be created.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['project_uuid', 'server_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack'],
+                        properties: [
+                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
+                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
+                            'private_key_uuid' => ['type' => 'string', 'description' => 'The private key UUID.'],
+                            'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
+                            'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
+                            'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
+                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'name' => ['type' => 'string', 'description' => 'The application name.'],
+                            'description' => ['type' => 'string', 'description' => 'The application description.'],
+                            'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
+                            'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
+                            'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
+                            'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
+                            'is_static' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is static.'],
+                            'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
+                            'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
+                            'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
+                            'static_image' => ['type' => 'string', 'enum' => ['nginx:alpine'], 'description' => 'The static image.'],
+                            'install_command' => ['type' => 'string', 'description' => 'The install command.'],
+                            'build_command' => ['type' => 'string', 'description' => 'The build command.'],
+                            'start_command' => ['type' => 'string', 'description' => 'The start command.'],
+                            'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
+                            'base_directory' => ['type' => 'string', 'description' => 'The base directory for all commands.'],
+                            'publish_directory' => ['type' => 'string', 'description' => 'The publish directory.'],
+                            'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
+                            'health_check_path' => ['type' => 'string', 'description' => 'Health check path.'],
+                            'health_check_port' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check port.'],
+                            'health_check_host' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check host.'],
+                            'health_check_method' => ['type' => 'string', 'description' => 'Health check method.'],
+                            'health_check_return_code' => ['type' => 'integer', 'description' => 'Health check return code.'],
+                            'health_check_scheme' => ['type' => 'string', 'description' => 'Health check scheme.'],
+                            'health_check_response_text' => ['type' => 'string', 'nullable' => true, 'description' => 'Health check response text.'],
+                            'health_check_interval' => ['type' => 'integer', 'description' => 'Health check interval in seconds.'],
+                            'health_check_timeout' => ['type' => 'integer', 'description' => 'Health check timeout in seconds.'],
+                            'health_check_retries' => ['type' => 'integer', 'description' => 'Health check retries count.'],
+                            'health_check_start_period' => ['type' => 'integer', 'description' => 'Health check start period in seconds.'],
+                            'limits_memory' => ['type' => 'string', 'description' => 'Memory limit.'],
+                            'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit.'],
+                            'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness.'],
+                            'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation.'],
+                            'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit.'],
+                            'limits_cpuset' => ['type' => 'string', 'nullable' => true, 'description' => 'CPU set.'],
+                            'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
+                            'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
+                            'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
+                            'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
+                            'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
+                            'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
+                            'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
+                            'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
+                            'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
+                            'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
+                            'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
+                            'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'The Docker build target (stage) in the Dockerfile.'],
+                            'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
+                            'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
+                            'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
+                            'docker_compose_domains' => [
+                                'type' => 'array',
+                                'description' => 'Array of URLs to be applied to containers of a dockercompose application.',
+                                'items' => new OA\Schema(
+                                    type: 'object',
+                                    properties: [
+                                        'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
+                                    ],
+                                ),
+                            ],
+                            'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
+                            'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
+                            'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
+                            'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
+                            'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
+                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
+                        ],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -636,19 +1244,20 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'dockerfile'],
+                        required: ['project_uuid', 'server_uuid', 'dockerfile'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
                             'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
                             'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['dockerfile'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
@@ -678,21 +1287,63 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                         ],
                     )
                 ),
@@ -715,6 +1366,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -773,7 +1428,7 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_registry_image_name', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'docker_registry_image_name'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
@@ -786,6 +1441,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
                             'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
                             'health_check_path' => ['type' => 'string', 'description' => 'Health check path.'],
@@ -812,21 +1468,63 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                         ],
                     )
                 ),
@@ -849,6 +1547,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -890,105 +1592,6 @@ class ApplicationsController extends Controller
         return $this->create_application($request, 'dockerimage');
     }
 
-    /**
-     * @deprecated Use POST /api/v1/services instead. This endpoint creates a Service, not an Application and is an unstable duplicate of POST /api/v1/services.
-     */
-    #[OA\Post(
-        summary: 'Create (Docker Compose)',
-        description: 'Deprecated: Use POST /api/v1/services instead.',
-        path: '/applications/dockercompose',
-        operationId: 'create-dockercompose-application',
-        deprecated: true,
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Applications'],
-        requestBody: new OA\RequestBody(
-            description: 'Application object that needs to be created.',
-            required: true,
-            content: [
-                new OA\MediaType(
-                    mediaType: 'application/json',
-                    schema: new OA\Schema(
-                        type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
-                        properties: [
-                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
-                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
-                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
-                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
-                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID if the server has more than one destinations.'],
-                            'name' => ['type' => 'string', 'description' => 'The application name.'],
-                            'description' => ['type' => 'string', 'description' => 'The application description.'],
-                            'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
-                            'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
-                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
-                        ],
-                    )
-                ),
-            ]
-        ),
-        responses: [
-            new OA\Response(
-                response: 201,
-                description: 'Application created successfully.',
-                content: new OA\MediaType(
-                    mediaType: 'application/json',
-                    schema: new OA\Schema(
-                        type: 'object',
-                        properties: [
-                            'uuid' => ['type' => 'string'],
-                        ]
-                    )
-                )
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-            new OA\Response(
-                response: 409,
-                description: 'Domain conflicts detected.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
-                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
-                                'conflicts' => [
-                                    'type' => 'array',
-                                    'items' => new OA\Schema(
-                                        type: 'object',
-                                        properties: [
-                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
-                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
-                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
-                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
-                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
-                                        ]
-                                    ),
-                                ],
-                            ]
-                        )
-                    ),
-                ]
-            ),
-        ]
-    )]
-    public function create_dockercompose_application(Request $request)
-    {
-        return $this->create_application($request, 'dockercompose');
-    }
-
     private function create_application(Request $request, $type)
     {
         $teamId = getTeamIdFromToken();
@@ -996,17 +1599,22 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
-        $this->authorize('create', Application::class);
+        // removeUnnecessaryFieldsFromRequest() strips force_domain_override before the docker_compose_domains checks run.
+        $forceDomainOverride = $request->boolean('force_domain_override');
+
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'gitea_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
             'environment_uuid' => 'string|nullable',
@@ -1014,16 +1622,20 @@ class ApplicationsController extends Controller
             'destination_uuid' => 'string',
             'is_http_basic_auth_enabled' => 'boolean',
             'http_basic_auth_username' => 'string|nullable',
-            'http_basic_auth_password' => 'string|nullable',
+            // bcrypt ignores everything after 72 bytes. Labels for Traefik always use bcrypt and are also generated on
+            // Caddy servers when "Labels for all supported proxies" is selected, so that the proxy can be switched easily.
+            'http_basic_auth_password' => 'string|nullable|max:72',
             'autogenerate_domain' => 'boolean',
-        ]);
+            'tags' => 'array|nullable',
+            'tags.*' => 'string|min:2',
+        ], ValidationPatterns::combinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
+                    $errors->add($field, $this->extraApplicationFieldMessage($field));
                 }
             }
 
@@ -1033,6 +1645,36 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
+        if ($type !== 'public' && $request->hasAny(['git_https_username', 'git_https_password'])) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['git_https_password' => 'HTTPS credentials can only be used with a public or custom Git host repository (POST /applications/public).'],
+            ], 422);
+        }
+
+        if ($request->filled('docker_compose_raw')) {
+            try {
+                if (! is_string($request->input('docker_compose_raw'))) {
+                    throw new \Exception('The docker_compose_raw field must be a string.');
+                }
+                validateDockerComposeForInjection($request->input('docker_compose_raw'));
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+        }
+
+        $return = $this->validateTagsParameter($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $tagNames = $request->input('tags') ?? [];
+
         $environmentUuid = $request->environment_uuid;
         $environmentName = $request->environment_name;
         if (blank($environmentUuid) && blank($environmentName)) {
@@ -1040,17 +1682,38 @@ class ApplicationsController extends Controller
         }
         $serverUuid = $request->server_uuid;
         $fqdn = $request->domains;
-        $autogenerateDomain = $request->boolean('autogenerate_domain', true);
+        if ($request->has('domains') && is_string($request->domains)) {
+            $fqdn = ValidationPatterns::normalizeApplicationDomains($request->domains);
+            $request->offsetSet('domains', $fqdn);
+        }
+        // A Docker Compose application uses per-service domains; a top-level domain is never routed.
+        $autogenerateDomain = $request->boolean('autogenerate_domain', true) && $request->build_pack !== 'dockercompose';
+        $forceDomainOverride = $request->boolean('force_domain_override');
         $instantDeploy = $request->instant_deploy;
-        $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
+        $useBuildSecrets = $request->use_build_secrets;
         $isStatic = $request->is_static;
         $isSpa = $request->is_spa;
         $isAutoDeployEnabled = $request->is_auto_deploy_enabled;
         $isForceHttpsEnabled = $request->is_force_https_enabled;
+        $isPreviewDeploymentsEnabled = $request->is_preview_deployments_enabled;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $customNginxConfiguration = $request->custom_nginx_configuration;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled', true);
+        $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled', false);
+        $applicationSettings = $this->applicationSettingsFromRequest($request);
+
+        $requestedBuildPack = in_array($type, ['public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key'], true)
+            ? $request->input('build_pack')
+            : $type;
+        if (($applicationSettings['is_raw_compose_deployment_enabled'] ?? false) && $requestedBuildPack !== 'dockercompose') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'is_raw_compose_deployment_enabled' => 'Raw compose deployment can only be enabled for Docker Compose applications.',
+                ],
+            ], 422);
+        }
 
         if (! is_null($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
@@ -1070,6 +1733,9 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->merge([
+                'custom_nginx_configuration' => $customNginxConfiguration,
+            ]);
         }
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
@@ -1083,9 +1749,17 @@ class ApplicationsController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
+        $this->authorize('create', [Application::class, $environment]);
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $this->authorize('placeResource', $server);
+        if (! $server->canHostResources()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
+            ], 422);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
@@ -1106,16 +1780,23 @@ class ApplicationsController extends Controller
                 ], 422);
             }
         }
+        if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $destination->server)) {
+            return $prefixValidation;
+        }
+        if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
+            return $internalNameValidation;
+        }
         if ($type === 'public') {
             $validationRules = [
                 'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
                 'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
-                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
-                'docker_compose_domains.*.domain' => 'string|nullable',
+                'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
             // ports_exposes is not required for dockercompose
             if ($request->build_pack === 'dockercompose') {
@@ -1124,7 +1805,7 @@ class ApplicationsController extends Controller
             }
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
@@ -1147,14 +1828,14 @@ class ApplicationsController extends Controller
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
                 $dockerComposeDomains = collect($request->docker_compose_domains);
@@ -1171,7 +1852,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -1185,7 +1866,7 @@ class ApplicationsController extends Controller
                 });
 
                 $duplicates = $urls->duplicates()->unique()->values();
-                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
                     $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed.';
                 }
 
@@ -1206,7 +1887,7 @@ class ApplicationsController extends Controller
                         ], 422);
                     }
 
-                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                    if ($result['hasConflicts'] && ! $forceDomainOverride) {
                         return response()->json([
                             'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
                             'conflicts' => $result['conflicts'],
@@ -1216,25 +1897,56 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
-                $application->docker_compose_domains = $dockerComposeDomainsJson;
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
+                $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
-            $repository_url_parsed = Url::fromString($request->git_repository);
+            $gitRepository = $application->git_repository;
+            $httpsRepository = sshGitUrlToHttps($gitRepository);
+            if (is_string($httpsRepository)) {
+                $gitRepository = $httpsRepository;
+                $application->git_repository = $httpsRepository;
+            }
+            $repository_url_parsed = Url::fromString($gitRepository);
             $git_host = $repository_url_parsed->getHost();
+            if ($request->filled('git_https_password')) {
+                if ($git_host === 'github.com') {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['git_https_password' => 'HTTPS credentials are not used for github.com. Use a GitHub App (POST /applications/private-github-app) for a private GitHub repository.'],
+                    ], 422);
+                }
+                $application->git_https_password = $request->input('git_https_password');
+            } elseif ($request->filled('git_https_username')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'The git_https_password is required with git_https_username.'],
+                ], 422);
+            }
             if ($git_host === 'github.com') {
                 $application->source_type = GithubApp::class;
                 $application->source_id = GithubApp::find(0)->id;
+                $application->git_repository = str($repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2))->trim()->toString();
             }
-            $application->git_repository = str($repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2))->trim()->toString();
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             if (isset($isStatic)) {
                 $application->settings->is_static = $isStatic;
                 $application->settings->save();
@@ -1251,6 +1963,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreviewDeploymentsEnabled)) {
+                $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
+                $application->settings->save();
+            }
             if (isset($connectToDockerNetwork)) {
                 $application->settings->connect_to_docker_network = $connectToDockerNetwork;
                 $application->settings->save();
@@ -1259,8 +1975,16 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
+                $application->settings->save();
+            }
             if (isset($isContainerLabelEscapeEnabled)) {
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
+                $application->settings->save();
+            }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
                 $application->settings->save();
             }
             $application->refresh();
@@ -1273,10 +1997,14 @@ class ApplicationsController extends Controller
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($application, $tagNames, $teamId);
+            }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1295,26 +2023,37 @@ class ApplicationsController extends Controller
                 }
             }
 
+            auditLog('api.application.created', [
+                'team_id' => $teamId,
+                'application_uuid' => data_get($application, 'uuid'),
+                'application_name' => data_get($application, 'name'),
+                'application_type' => $type,
+                'build_pack' => data_get($application, 'build_pack'),
+                'instant_deploy' => (bool) ($instantDeploy ?? false),
+            ]);
+
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'private-gh-app') {
+        } elseif (in_array($type, ['private-gh-app', 'private-gitea-app'], true)) {
+            $sourceUuidField = $type === 'private-gh-app' ? 'github_app_uuid' : 'gitea_app_uuid';
             $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
-                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
-                'github_app_uuid' => 'string|required',
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
+                $sourceUuidField => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
-                'docker_compose_domains.*.domain' => 'string|nullable',
+                'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
@@ -1342,46 +2081,22 @@ class ApplicationsController extends Controller
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
-            $githubApp = GithubApp::whereTeamId($teamId)->where('uuid', $githubAppUuid)->first();
-            if (! $githubApp) {
-                return response()->json(['message' => 'Github App not found.'], 404);
+            $this->authorize('useTeamCredentials');
+            $sourceRepository = $type === 'private-gh-app'
+                ? $this->githubAppRepository($request->github_app_uuid, $request->git_repository, $teamId)
+                : $this->giteaAppRepository($this->teamSourceByUuid(GiteaApp::class, $request->gitea_app_uuid, $teamId), $request->git_repository);
+            if ($sourceRepository instanceof JsonResponse) {
+                return $sourceRepository;
             }
-            $token = generateGithubInstallationToken($githubApp);
-            if (! $token) {
-                return response()->json(['message' => 'Failed to generate Github App token.'], 400);
-            }
-
-            $gitRepository = $request->git_repository;
-            if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
-                $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
-            }
-            $gitRepository = str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
-
-            // Use direct API call to verify repository access instead of loading all repositories
-            // This is much faster and avoids timeouts for GitHub Apps with many repositories
-            $response = Http::GitHub($githubApp->api_url, $token)
-                ->timeout(20)
-                ->retry(3, 200, throw: false)
-                ->get("/repos/{$gitRepository}");
-
-            if ($response->status() === 404 || $response->status() === 403) {
-                return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
-            }
-
-            if (! $response->successful()) {
-                return response()->json(['message' => 'Failed to verify repository access: '.($response->json()['message'] ?? 'Unknown error')], 400);
-            }
-
-            $gitRepositoryFound = $response->json();
-            $repository_project_id = data_get($gitRepositoryFound, 'id');
+            ['source' => $source, 'repository' => $gitRepository, 'repository_project_id' => $repository_project_id] = $sourceRepository;
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
@@ -1399,7 +2114,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -1413,7 +2128,7 @@ class ApplicationsController extends Controller
                 });
 
                 $duplicates = $urls->duplicates()->unique()->values();
-                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
                     $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed. ';
                 }
 
@@ -1434,7 +2149,7 @@ class ApplicationsController extends Controller
                         ], 422);
                     }
 
-                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                    if ($result['hasConflicts'] && ! $forceDomainOverride) {
                         return response()->json([
                             'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
                             'conflicts' => $result['conflicts'],
@@ -1444,23 +2159,34 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
-                $application->docker_compose_domains = $dockerComposeDomainsJson;
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
+                $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->git_repository = str($gitRepository)->trim()->toString();
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            $application->source_type = $githubApp->getMorphClass();
-            $application->source_id = $githubApp->id;
+            $application->source_type = $source->getMorphClass();
+            $application->source_id = $source->id;
             $application->repository_project_id = $repository_project_id;
 
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1483,6 +2209,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreviewDeploymentsEnabled)) {
+                $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
+                $application->settings->save();
+            }
             if (isset($connectToDockerNetwork)) {
                 $application->settings->connect_to_docker_network = $connectToDockerNetwork;
                 $application->settings->save();
@@ -1491,18 +2221,30 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
+                $application->settings->save();
+            }
             if (isset($isContainerLabelEscapeEnabled)) {
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
+                $application->settings->save();
+            }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($application, $tagNames, $teamId);
+            }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1521,6 +2263,15 @@ class ApplicationsController extends Controller
                 }
             }
 
+            auditLog('api.application.created', [
+                'team_id' => $teamId,
+                'application_uuid' => data_get($application, 'uuid'),
+                'application_name' => data_get($application, 'name'),
+                'application_type' => $type,
+                'build_pack' => data_get($application, 'build_pack'),
+                'instant_deploy' => (bool) ($instantDeploy ?? false),
+            ]);
+
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'fqdn'),
@@ -1531,18 +2282,19 @@ class ApplicationsController extends Controller
                 'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
                 'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
-                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
-                'docker_compose_domains.*.domain' => 'string|nullable',
+                'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
 
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
@@ -1570,18 +2322,19 @@ class ApplicationsController extends Controller
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             $privateKey = PrivateKey::whereTeamId($teamId)->where('uuid', $request->private_key_uuid)->first();
             if (! $privateKey) {
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
+            $this->authorize('useTeamCredentials');
 
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
@@ -1599,7 +2352,7 @@ class ApplicationsController extends Controller
 
                 $errors = [];
                 $urls = $urls->map(function ($url) use (&$errors) {
-                    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                    if (! isValidDomainUrl($url)) {
                         $errors[] = "Invalid URL: {$url}";
 
                         return $url;
@@ -1613,7 +2366,7 @@ class ApplicationsController extends Controller
                 });
 
                 $duplicates = $urls->duplicates()->unique()->values();
-                if ($duplicates->isNotEmpty() && ! $request->boolean('force_domain_override')) {
+                if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {
                     $errors[] = 'The current request contains conflicting URLs: '.implode(', ', $duplicates->toArray()).' Use force_domain_override=true to proceed.';
                 }
 
@@ -1634,7 +2387,7 @@ class ApplicationsController extends Controller
                         ], 422);
                     }
 
-                    if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                    if ($result['hasConflicts'] && ! $forceDomainOverride) {
                         return response()->json([
                             'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
                             'conflicts' => $result['conflicts'],
@@ -1644,19 +2397,30 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
-                $application->docker_compose_domains = $dockerComposeDomainsJson;
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
+                $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->private_key_id = $privateKey->id;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
@@ -1679,6 +2443,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
                 $application->settings->save();
             }
+            if (isset($isPreviewDeploymentsEnabled)) {
+                $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
+                $application->settings->save();
+            }
             if (isset($connectToDockerNetwork)) {
                 $application->settings->connect_to_docker_network = $connectToDockerNetwork;
                 $application->settings->save();
@@ -1687,18 +2455,30 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
+                $application->settings->save();
+            }
             if (isset($isContainerLabelEscapeEnabled)) {
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
+                $application->settings->save();
+            }
+            if (isset($isPreserveRepositoryEnabled)) {
+                $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
                 $application->settings->save();
             }
             if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($application, $tagNames, $teamId);
+            }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1716,6 +2496,15 @@ class ApplicationsController extends Controller
                     LoadComposeFile::dispatch($application);
                 }
             }
+
+            auditLog('api.application.created', [
+                'team_id' => $teamId,
+                'application_uuid' => data_get($application, 'uuid'),
+                'application_name' => data_get($application, 'name'),
+                'application_type' => $type,
+                'build_pack' => data_get($application, 'build_pack'),
+                'instant_deploy' => (bool) ($instantDeploy ?? false),
+            ]);
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
@@ -1735,11 +2524,11 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
+                $request->offsetSet('name', 'dockerfile-'.new_public_id());
             }
 
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! isBase64Encoded($request->dockerfile)) {
@@ -1768,7 +2557,7 @@ class ApplicationsController extends Controller
             }
 
             $application = new Application;
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $application->fqdn = $fqdn;
             $application->ports_exposes = $port;
             $application->build_pack = 'dockerfile';
@@ -1779,15 +2568,27 @@ class ApplicationsController extends Controller
 
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
+            if ($imageNameValidation = $this->sharedImageNameValidationResponse($application)) {
+                return $imageNameValidation;
+            }
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
                 $application->fqdn = generateUrl(server: $server, random: $application->uuid);
                 $application->save();
             }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
             if (isset($isForceHttpsEnabled)) {
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($isPreviewDeploymentsEnabled)) {
+                $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
                 $application->settings->save();
             }
             if (isset($connectToDockerNetwork)) {
@@ -1798,6 +2599,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
+                $application->settings->save();
+            }
             if (isset($isContainerLabelEscapeEnabled)) {
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
@@ -1806,10 +2611,14 @@ class ApplicationsController extends Controller
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($application, $tagNames, $teamId);
+            }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1824,15 +2633,24 @@ class ApplicationsController extends Controller
                 }
             }
 
+            auditLog('api.application.created', [
+                'team_id' => $teamId,
+                'application_uuid' => data_get($application, 'uuid'),
+                'application_name' => data_get($application, 'name'),
+                'application_type' => $type,
+                'build_pack' => data_get($application, 'build_pack'),
+                'instant_deploy' => (bool) ($instantDeploy ?? false),
+            ]);
+
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
-                'docker_registry_image_name' => 'string|required',
-                'docker_registry_image_tag' => 'string',
-                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
+                'docker_registry_image_name' => ['required', 'string', 'max:255', new DockerImageFormat(allowVariableTag: true)],
+                'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+                'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
@@ -1844,10 +2662,10 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2);
+                $request->offsetSet('name', 'docker-image-'.new_public_id());
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             // Process docker image name and tag using DockerImageParser
@@ -1880,7 +2698,7 @@ class ApplicationsController extends Controller
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
-            $application->fill($request->all());
+            $application->fill($request->only($allowedFields));
             $application->fqdn = $fqdn;
             $application->build_pack = 'dockerimage';
             $application->destination_id = $destination->id;
@@ -1890,14 +2708,23 @@ class ApplicationsController extends Controller
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
+            $this->applyApplicationSettings($application, $applicationSettings);
             $application->refresh();
             // Auto-generate domain if requested and no custom domain provided
             if ($autogenerateDomain && blank($fqdn)) {
                 $application->fqdn = generateUrl(server: $server, random: $application->uuid);
                 $application->save();
             }
+            if (isset($isAutoDeployEnabled)) {
+                $application->settings->is_auto_deploy_enabled = $isAutoDeployEnabled;
+                $application->settings->save();
+            }
             if (isset($isForceHttpsEnabled)) {
                 $application->settings->is_force_https_enabled = $isForceHttpsEnabled;
+                $application->settings->save();
+            }
+            if (isset($isPreviewDeploymentsEnabled)) {
+                $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
                 $application->settings->save();
             }
             if (isset($connectToDockerNetwork)) {
@@ -1908,6 +2735,10 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
+            if (isset($useBuildSecrets)) {
+                $application->settings->use_build_secrets = $useBuildSecrets;
+                $application->settings->save();
+            }
             if (isset($isContainerLabelEscapeEnabled)) {
                 $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
                 $application->settings->save();
@@ -1916,10 +2747,14 @@ class ApplicationsController extends Controller
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($application, $tagNames, $teamId);
+            }
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($application, []);
             $application->isConfigurationChanged(true);
 
             if ($instantDeploy) {
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
 
                 $result = queue_application_deployment(
                     application: $application,
@@ -1934,93 +2769,20 @@ class ApplicationsController extends Controller
                 }
             }
 
+            auditLog('api.application.created', [
+                'team_id' => $teamId,
+                'application_uuid' => data_get($application, 'uuid'),
+                'application_name' => data_get($application, 'name'),
+                'application_type' => $type,
+                'build_pack' => data_get($application, 'build_pack'),
+                'instant_deploy' => (bool) ($instantDeploy ?? false),
+            ]);
+
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'fqdn'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'dockercompose') {
-            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw', 'force_domain_override', 'is_container_label_escape_enabled'];
 
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2);
-            }
-            $validationRules = [
-                'docker_compose_raw' => 'string|required',
-            ];
-            $validationRules = array_merge(sharedDataApplications(), $validationRules);
-            $validator = customApiValidator($request->all(), $validationRules);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-            $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
-                return $return;
-            }
-            if (! isBase64Encoded($request->docker_compose_raw)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-
-            $service = new Service;
-            removeUnnecessaryFieldsFromRequest($request);
-            $service->fill($request->all());
-
-            $service->docker_compose_raw = $dockerComposeRaw;
-            $service->environment_id = $environment->id;
-            $service->server_id = $server->id;
-            $service->destination_id = $destination->id;
-            $service->destination_type = $destination->getMorphClass();
-            if (isset($isContainerLabelEscapeEnabled)) {
-                $service->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
-            }
-            $service->save();
-
-            $service->parse(isNew: true);
-
-            // Apply service-specific application prerequisites
-            applyServiceApplicationPrerequisites($service);
-
-            if ($instantDeploy) {
-                StartService::dispatch($service);
-            }
-
-            return response()->json(serializeApiResponse([
-                'uuid' => data_get($service, 'uuid'),
-                'domains' => data_get($service, 'domains'),
-            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
@@ -2083,7 +2845,7 @@ class ApplicationsController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->with('settings')->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -2095,7 +2857,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get application logs.',
-        description: 'Get application logs by UUID.',
+        description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.',
         path: '/applications/{uuid}/logs',
         operationId: 'get-application-logs-by-uuid',
         security: [
@@ -2115,13 +2877,26 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
+            ),
+            new OA\Parameter(
+                name: 'show_timestamps',
+                in: 'query',
+                description: 'Show timestamps in the logs.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
             ),
         ],
         responses: [
@@ -2154,6 +2929,66 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Get(
+        summary: 'Get preview application logs.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/logs',
+        operationId: 'get-preview-application-logs-by-pull-request-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'path',
+                description: 'Pull request ID of the preview deployment.',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
+            ),
+            new OA\Parameter(
+                name: 'show_timestamps',
+                in: 'query',
+                description: 'Show timestamps in the logs.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no container matches. Stopped containers are included.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [new OA\Property(property: 'logs', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
     public function logs_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -2164,12 +2999,30 @@ class ApplicationsController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+        $this->authorize('view', $application);
+
+        $pullRequestId = null;
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if ($pullRequestIdRaw !== null) {
+            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
+                return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+            }
+            $pullRequestId = (int) $pullRequestIdRaw;
+
+            $previewExists = ApplicationPreview::where('application_id', $application->id)
+                ->where('pull_request_id', $pullRequestId)
+                ->exists();
+            if (! $previewExists) {
+                return response()->json(['message' => 'Preview not found.'], 404);
+            }
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -2177,26 +3030,293 @@ class ApplicationsController extends Controller
             ], 400);
         }
 
-        $container = $containers->first();
+        $serviceName = $request->query('service_name');
+        if (filled($serviceName)) {
+            $matchingContainer = $containers->first(function ($container) use ($serviceName) {
+                $labels = data_get($container, 'Labels');
 
-        $status = getContainerStatus($application->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
+                return filled($labels) && format_docker_labels_to_json($labels)->get('com.docker.compose.service') === $serviceName;
+            });
+
+            if (! $matchingContainer) {
+                return response()->json([
+                    'message' => "No container found for service_name '{$serviceName}'.",
+                ], 404);
+            }
+
+            $container = $matchingContainer;
+        } else {
+            $container = $containers->firstWhere('State', 'running') ?? $containers->first();
         }
 
-        $lines = $request->query->get('lines', 100) ?: 100;
-        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines);
+        $lines = normalizeLogLines($request->query('lines'));
+        $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps),
+            EnvironmentVariable::logRedactionSecretsFor($application, includePreview: $pullRequestId !== null),
+        );
 
         return response()->json([
             'logs' => $logs,
         ]);
     }
 
+    #[OA\Patch(
+        summary: 'Update Preview Domains',
+        description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.',
+        path: '/applications/{uuid}/previews/{pull_request_id}',
+        operationId: 'update-preview-domains-by-pull-request-id',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'pull_request_id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'domains', type: 'string', nullable: true, example: 'https://pr.example.com:3000'),
+                new OA\Property(
+                    property: 'docker_compose_domains',
+                    type: 'array',
+                    nullable: true,
+                    items: new OA\Items(properties: [
+                        new OA\Property(property: 'name', type: 'string'),
+                        new OA\Property(property: 'domain', type: 'string', nullable: true),
+                        new OA\Property(property: 'redirect', type: 'string', nullable: true, enum: ['www', 'non-www', 'both']),
+                    ], type: 'object'),
+                ),
+                new OA\Property(property: 'force_domain_override', type: 'boolean', default: false),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'Preview domains updated.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, ref: '#/components/responses/403'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Domain conflict.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update_preview_by_pull_request_id(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
+            return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+        }
+
+        $preview = ApplicationPreview::where('application_id', $application->id)
+            ->where('pull_request_id', (int) $pullRequestIdRaw)
+            ->first();
+        if (! $preview) {
+            return response()->json(['message' => 'Preview not found.'], 404);
+        }
+
+        $isCompose = $application->build_pack === BuildPackTypes::DOCKERCOMPOSE->value;
+        $validationRules = ['force_domain_override' => 'boolean'];
+        if ($isCompose) {
+            $validationRules = array_merge($validationRules, [
+                'domains' => 'missing',
+                'docker_compose_domains' => 'present|array',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
+                'docker_compose_domains.*.name' => 'required|string|distinct',
+                'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
+            ]);
+        } else {
+            $validationRules['domains'] = ['present', ...ValidationPatterns::applicationDomainRules()];
+            $validationRules['docker_compose_domains'] = 'missing';
+        }
+
+        $validator = Validator::make($request->all(), $validationRules);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        $dockerComposeDomains = null;
+        $dockerComposeDomainsResponse = null;
+        if ($isCompose) {
+            try {
+                $compose = parseDockerComposeYaml($application->docker_compose_raw ?? '');
+            } catch (\Throwable) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'The Docker Compose configuration could not be parsed.'],
+                ], 422);
+            }
+
+            $services = data_get($compose, 'services');
+            if (! is_array($services) || $services === []) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'The Docker Compose configuration must define at least one service.'],
+                ], 422);
+            }
+
+            $composeServices = collect($services)
+                ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
+                ->keys()
+                ->map(fn (mixed $name): string => (string) $name)
+                ->values();
+            $requestedServices = collect($request->input('docker_compose_domains'))->pluck('name');
+            if ($requestedServices->diff($composeServices)->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'One or more Docker Compose services are invalid.'],
+                ], 422);
+            }
+
+            $existingComposeDomains = json_decode($preview->docker_compose_domains ?? '[]', true) ?: [];
+            $dockerComposeDomains = $composeServices
+                ->mapWithKeys(function (string $service) use ($existingComposeDomains): array {
+                    $entry = ['domain' => ''];
+                    $redirect = $existingComposeDomains[$service]['redirect'] ?? null;
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+
+                    return [$service => $entry];
+                })
+                ->all();
+            foreach ($request->input('docker_compose_domains') as $item) {
+                $entry = ['domain' => ValidationPatterns::normalizeApplicationDomains(data_get($item, 'domain')) ?? ''];
+                $redirect = array_key_exists('redirect', $item)
+                    ? data_get($item, 'redirect')
+                    : ($existingComposeDomains[data_get($item, 'name')]['redirect'] ?? null);
+                if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                    $entry['redirect'] = $redirect;
+                }
+                $dockerComposeDomains[data_get($item, 'name')] = $entry;
+            }
+            $domains = collect($dockerComposeDomains)
+                ->pluck('domain')
+                ->filter()
+                ->implode(',') ?: null;
+        } else {
+            $domains = ValidationPatterns::normalizeApplicationDomains($request->input('domains'));
+        }
+
+        $submittedUrls = collect(ValidationPatterns::applicationDomainList($domains))
+            ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain));
+        if ($submittedUrls->duplicates()->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    $isCompose ? 'docker_compose_domains' : 'domains' => 'The same domain cannot be configured more than once.',
+                ],
+            ], 422);
+        }
+
+        $normalized = DomainPortOverrides::normalize($domains, null);
+        $portlessDomains = $normalized['fqdn'];
+        if ($isCompose) {
+            foreach ($dockerComposeDomains as $service => $entry) {
+                $dockerComposeDomains[$service]['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain']))
+                    ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                    ->implode(',');
+            }
+            $dockerComposeDomainsResponse = collect($dockerComposeDomains)
+                ->map(fn (array $entry, string $name): array => ['name' => $name, ...$entry])
+                ->values()
+                ->all();
+        }
+        $urls = collect(ValidationPatterns::applicationDomainList($portlessDomains));
+        $conflicts = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId);
+        if (isset($conflicts['error'])) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [$isCompose ? 'docker_compose_domains' : 'domains' => $conflicts['error']],
+            ], 422);
+        }
+        if ($conflicts['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+            return response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => $conflicts['conflicts'],
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ], 409);
+        }
+
+        $hostCandidates = $urls
+            ->map(fn (string $url): string => (string) parse_url($url, PHP_URL_HOST))
+            ->filter();
+        $conflictingPreview = null;
+        if ($hostCandidates->isNotEmpty()) {
+            $conflictingPreview = ApplicationPreview::query()
+                ->whereIn('application_id', Application::ownedByCurrentTeamAPI($teamId)
+                    ->withoutGlobalScope('withRelations')
+                    ->reorder()
+                    ->select('applications.id'))
+                ->whereKeyNot($preview->id)
+                ->whereNotNull('fqdn')
+                ->where(function ($query) use ($hostCandidates): void {
+                    foreach ($hostCandidates as $host) {
+                        $query->orWhere('fqdn', 'like', '%'.$host.'%');
+                    }
+                })
+                ->get(['uuid', 'pull_request_id', 'fqdn'])
+                ->first(fn (ApplicationPreview $otherPreview): bool => collect(ValidationPatterns::applicationDomainList($otherPreview->fqdn))
+                    ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                    ->intersect($urls)
+                    ->isNotEmpty());
+        }
+
+        if ($conflictingPreview && ! $request->boolean('force_domain_override')) {
+            return response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => [[
+                    'domain' => collect(ValidationPatterns::applicationDomainList($conflictingPreview->fqdn))
+                        ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                        ->intersect($urls)
+                        ->first(),
+                    'resource_name' => 'Preview deployment #'.$conflictingPreview->pull_request_id,
+                    'resource_uuid' => $conflictingPreview->uuid,
+                    'resource_type' => 'application',
+                    'message' => 'Domain is already in use by another preview deployment.',
+                ]],
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ], 409);
+        }
+
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($preview->fresh() ?? $preview);
+        $preview->domain_port_overrides = $normalized['overrides'];
+        $preview->fqdn = $portlessDomains;
+        if ($isCompose) {
+            $preview->docker_compose_domains = json_encode($dockerComposeDomains);
+        }
+        $preview->save();
+        $dnsCleanup->queueReleaseOfRemovedHostnames($preview, $previousDnsHostnames, (int) $teamId);
+
+        auditLog('api.application.preview_updated', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'pull_request_id' => $preview->pull_request_id,
+            'changed_fields' => [$isCompose ? 'docker_compose_domains' : 'domains'],
+        ]);
+
+        return response()->json([
+            'uuid' => $preview->uuid,
+            'pull_request_id' => $preview->pull_request_id,
+            'domains' => $preview->fqdn,
+            'docker_compose_domains' => $dockerComposeDomainsResponse,
+            'domain_port_overrides' => $preview->domain_port_overrides,
+        ]);
+    }
+
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete application by UUID.',
+        description: 'Delete application by UUID. Needs a token with the write and deploy permissions.',
         path: '/applications/{uuid}',
         operationId: 'delete-application-by-uuid',
         security: [
@@ -2215,7 +3335,7 @@ class ApplicationsController extends Controller
             ),
             new OA\Parameter(name: 'delete_configurations', in: 'query', required: false, description: 'Delete configurations.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
-            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
         ],
         responses: [
@@ -2246,6 +3366,7 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
         ]
     )]
     public function delete_by_uuid(Request $request)
@@ -2257,7 +3378,7 @@ class ApplicationsController extends Controller
         if (! $request->uuid) {
             return response()->json(['message' => 'UUID is required.'], 404);
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
 
         if (! $application) {
             return response()->json([
@@ -2267,6 +3388,8 @@ class ApplicationsController extends Controller
 
         $this->authorize('delete', $application);
 
+        $application->delete();
+
         DeleteResourceJob::dispatch(
             resource: $application,
             deleteVolumes: $request->boolean('delete_volumes', true),
@@ -2274,6 +3397,12 @@ class ApplicationsController extends Controller
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true)
         );
+
+        auditLog('api.application.deleted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+        ]);
 
         return response()->json([
             'message' => 'Application deletion request queued.',
@@ -2309,18 +3438,18 @@ class ApplicationsController extends Controller
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
-                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
                             'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
+                            'gitea_app_uuid' => ['type' => 'string', 'description' => 'The Gitea App UUID. The source must be connected. Do not send it together with github_app_uuid.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
+                            'git_https_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTPS access to a private repository on a custom Git host. Send null to remove it.'],
+                            'git_https_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password or access token for HTTPS access to a private repository on a custom Git host. It is stored encrypted and never returned. Send null or an empty string to remove the credentials.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
-                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
-                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
+                            'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -2328,6 +3457,7 @@ class ApplicationsController extends Controller
                             'is_spa' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application is a single-page application (SPA). Only relevant when is_static is true.'],
                             'is_auto_deploy_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if auto-deploy is enabled on git push. Defaults to true.'],
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
+                            'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'install_command' => ['type' => 'string', 'description' => 'The install command.'],
                             'build_command' => ['type' => 'string', 'description' => 'The build command.'],
                             'start_command' => ['type' => 'string', 'description' => 'The start command.'],
@@ -2359,14 +3489,15 @@ class ApplicationsController extends Controller
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],
                             'pre_deployment_command' => ['type' => 'string', 'description' => 'Pre deployment command.'],
                             'pre_deployment_command_container' => ['type' => 'string', 'description' => 'Pre deployment command container.'],
-                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github.'],
-                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab.'],
-                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket.'],
-                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea.'],
+                            'manual_webhook_secret_github' => ['type' => 'string', 'description' => 'Manual webhook secret for Github. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitlab' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitlab. Needs the deploy ability.'],
+                            'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
+                            'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
                             'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
+                            'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'The Docker build target (stage) in the Dockerfile.'],
                             'docker_compose_location' => ['type' => 'string', 'description' => 'The Docker Compose location.'],
                             'docker_compose_custom_start_command' => ['type' => 'string', 'description' => 'The Docker Compose custom start command.'],
                             'docker_compose_custom_build_command' => ['type' => 'string', 'description' => 'The Docker Compose custom build command.'],
@@ -2377,15 +3508,57 @@ class ApplicationsController extends Controller
                                     type: 'object',
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
-                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "http://app.coolify.io,https://app2.coolify.io")'],
+                                        'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
-                            'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
+                            'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
+                            'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
+                            'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
+                            'is_auto_cancel_queued_deployments_enabled' => ['type' => 'boolean', 'description' => 'Cancel older queued webhook deployments when a newer push arrives. Default: true.'],
+                            'is_auto_cancel_building_deployments_enabled' => ['type' => 'boolean', 'description' => 'Also stop an older webhook deployment that is still building when a newer push arrives. A deployment that already started to replace containers always finishes. This also cancels queued webhook deployments. Default: false.'],
+                            'disable_build_cache' => ['type' => 'boolean', 'description' => 'Disable the build cache.'],
+                            'inject_build_args_to_dockerfile' => ['type' => 'boolean', 'description' => 'Inject build arguments into the Dockerfile build.'],
+                            'include_source_commit_in_build' => ['type' => 'boolean', 'description' => 'Include the source commit in the build.'],
+                            'include_network_hosts_in_build' => ['type' => 'boolean', 'description' => 'Add the containers of the destination network as build hosts.'],
+                            'is_env_sorting_enabled' => ['type' => 'boolean', 'description' => 'Sort environment variables.'],
+                            'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
+                            'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
+                            'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
+                            'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
+                            'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
+                            'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
+                            'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
+                            'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_permanent_redirect_enabled' => ['type' => 'boolean', 'description' => 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'],
+                            'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for this application. Null uses the server setting, "none" uses no resolver.'],
+                            'is_container_label_readonly_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Let Coolify manage the container labels. True regenerates custom_labels from domains, redirect, and proxy settings. False keeps custom_labels as you set them: domains, redirect, and basic auth changes then do not change the labels.'],
+                            'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
+                            'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
+                            'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
+                            'gpu_driver' => ['type' => 'string', 'nullable' => true, 'description' => 'GPU driver name.'],
+                            'gpu_count' => ['type' => 'string', 'nullable' => true, 'description' => 'Number of GPUs to allocate.'],
+                            'gpu_device_ids' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated GPU device IDs.'],
+                            'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
+                            'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
+                            'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
+                            'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
+                            'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
+                            'max_restart_count' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Maximum container restart count before stopping.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
+                            'is_preserve_repository_enabled' => ['type' => 'boolean', 'description' => 'Preserve git repository during application update. If false, the existing repository will be removed and replaced with the new one. If true, the existing repository will be kept and the new one will be ignored. Default is false.'],
                         ],
                     )
                 ),
@@ -2410,6 +3583,10 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy ability to set a manual webhook secret.',
             ),
             new OA\Response(
                 response: 400,
@@ -2457,11 +3634,11 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json([
                 'message' => 'Application not found',
@@ -2469,37 +3646,60 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        $settingsBefore = $application->settings->getAttributes();
 
+        if ($request->has('redact_all_env_values_in_logs') || $request->has('include_coolify_default_variables')) {
+            $this->authorize('manageEnvironment', $application);
+        }
+
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('deploy', $application);
+        }
+
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled'];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'github_app_uuid', 'gitea_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
-            'static_image' => 'string',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'github_app_uuid' => 'string',
+            'gitea_app_uuid' => 'string',
+            'dockerfile' => 'string',
+            'description' => ValidationPatterns::descriptionRules(),
             'watch_paths' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
-            'docker_compose_domains.*' => 'array:name,domain',
+            'docker_compose_domains.*' => 'array:name,domain,redirect',
             'docker_compose_domains.*.name' => 'string|required',
-            'docker_compose_domains.*.domain' => 'string|nullable',
-            'docker_compose_custom_start_command' => 'string|nullable',
-            'docker_compose_custom_build_command' => 'string|nullable',
+            'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+            'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             'custom_nginx_configuration' => 'string|nullable',
             'is_http_basic_auth_enabled' => 'boolean|nullable',
+            'is_preview_deployments_enabled' => 'boolean|nullable',
             'http_basic_auth_username' => 'string',
-            'http_basic_auth_password' => 'string',
+            // bcrypt ignores everything after 72 bytes. Labels for Traefik always use bcrypt and are also generated on
+            // Caddy servers when "Labels for all supported proxies" is selected, so that the proxy can be switched easily.
+            'http_basic_auth_password' => 'string|max:72',
+            'include_source_commit_in_build' => 'boolean',
+            'ports_exposes' => 'nullable|string|regex:/^(\d+)(,\d+)*$/',
         ];
-        $validationRules = array_merge(sharedDataApplications(), $validationRules);
+        $validationRules = array_merge(sharedDataApplications($application), $validationRules);
+        // A change of Gitea source checks the repository against the Gitea instance below.
+        if ($request->input('git_repository') !== $application->git_repository && ! $request->has('gitea_app_uuid')) {
+            $validationRules['git_repository'] = ['string', new ValidGitRepositoryUrl(allowRepositoryPath: true)];
+        }
         $validationMessages = [
-            'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+            ...ValidationPatterns::combinedMessages(),
+            'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
         ];
         $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         // Validate ports_exposes
-        if ($request->has('ports_exposes')) {
+        if ($request->filled('ports_exposes')) {
             $ports = explode(',', $request->ports_exposes);
             foreach ($ports as $port) {
-                if (! is_numeric($port)) {
+                if (! is_numeric($port) || (int) $port < 1 || (int) $port > 65535) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -2509,7 +3709,7 @@ class ApplicationsController extends Controller
                 }
             }
         }
-        if ($request->has('custom_nginx_configuration')) {
+        if ($request->has('custom_nginx_configuration') && ! is_null($request->custom_nginx_configuration)) {
             if (! isBase64Encoded($request->custom_nginx_configuration)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -2527,9 +3727,34 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->merge([
+                'custom_nginx_configuration' => $customNginxConfiguration,
+            ]);
+        }
+        if ($request->has('dockerfile')) {
+            if (blank($application->dockerfile)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'dockerfile' => 'The dockerfile can only be updated for applications created from a Dockerfile.',
+                    ],
+                ], 422);
+            }
+            $dockerfile = is_string($request->dockerfile) && isBase64Encoded($request->dockerfile) ? base64_decode($request->dockerfile) : false;
+            if ($dockerfile === false || blank($dockerfile) || mb_detect_encoding($dockerfile, 'UTF-8', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'dockerfile' => 'The dockerfile should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->merge([
+                'dockerfile' => $dockerfile,
+            ]);
         }
         $return = $this->validateDataApplications($request, $server);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -2537,7 +3762,7 @@ class ApplicationsController extends Controller
             $errors = $validator->errors();
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
+                    $errors->add($field, $this->extraApplicationFieldMessage($field));
                 }
             }
 
@@ -2546,6 +3771,87 @@ class ApplicationsController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        $newSource = null;
+        if ($request->has('github_app_uuid') && $request->has('gitea_app_uuid')) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['gitea_app_uuid' => 'Send only one of github_app_uuid or gitea_app_uuid.'],
+            ], 422);
+        }
+        foreach (['github_app_uuid' => GithubApp::class, 'gitea_app_uuid' => GiteaApp::class] as $sourceUuidField => $sourceClass) {
+            if (! $request->has($sourceUuidField)) {
+                continue;
+            }
+            if ($application->build_pack === 'dockerimage' || filled($application->dockerfile) || $application->deploymentType() === 'deploy_key') {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        $sourceUuidField => "The {$sourceUuidField} can only be changed for applications deployed from a Git source or public repository.",
+                    ],
+                ], 422);
+            }
+            $newSource = $this->teamSourceByUuid($sourceClass, $request->input($sourceUuidField), $teamId);
+            if (! $newSource?->isConnected()) {
+                return response()->json(['message' => $sourceClass === GithubApp::class ? 'Github App not found.' : 'Gitea App not found.'], 404);
+            }
+            if (! $application->source?->is($newSource)) {
+                $this->authorize('useTeamCredentials', $application);
+            }
+        }
+        $giteaRepository = null;
+        if ($newSource instanceof GiteaApp) {
+            // Gitea clones and webhooks need owner/name and the repository ID of the new source.
+            $giteaRepository = $this->giteaAppRepository($newSource, (string) $request->input('git_repository', $application->git_repository));
+            if ($giteaRepository instanceof JsonResponse) {
+                return $giteaRepository;
+            }
+        }
+
+        if ($request->hasAny(['git_https_username', 'git_https_password'])) {
+            if ($application->deploymentType() !== 'other') {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'HTTPS credentials can only be used by applications that clone a repository without a Git source or deploy key.'],
+                ], 422);
+            }
+            if ($request->filled('git_https_username') && ! $request->filled('git_https_password') && blank($application->git_https_password)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['git_https_password' => 'The git_https_password is required with git_https_username.'],
+                ], 422);
+            }
+        }
+
+        $applicationSettings = $this->applicationSettingsFromRequest($request);
+        if ($prefixValidation = $this->containerNamePrefixValidationResponse($applicationSettings, $application->destination->server, $application)) {
+            return $prefixValidation;
+        }
+        $requestedImage = (clone $application)->fill($request->only(['docker_registry_image_name', 'build_pack']));
+        if ($requestedImage->isDirty(['docker_registry_image_name', 'build_pack']) && $imageNameValidation = $this->sharedImageNameValidationResponse($requestedImage)) {
+            return $imageNameValidation;
+        }
+        if ($internalNameValidation = $this->customInternalNameValidationResponse($applicationSettings)) {
+            return $internalNameValidation;
+        }
+        $requestedBuildPack = $request->input('build_pack', $application->build_pack);
+        if (($applicationSettings['is_raw_compose_deployment_enabled'] ?? false) && $requestedBuildPack !== 'dockercompose') {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'is_raw_compose_deployment_enabled' => 'Raw compose deployment can only be enabled for Docker Compose applications.',
+                ],
+            ], 422);
+        }
+
+        $requestHasHttpBasicAuth = $request->hasAny([
+            'is_http_basic_auth_enabled',
+            'http_basic_auth_username',
+            'http_basic_auth_password',
+            'http_basic_auth_hash_algorithm',
+            'http_basic_auth_bcrypt_cost',
+            'http_basic_auth_argon2id_memory_cost',
+            'http_basic_auth_argon2id_time_cost',
+        ]);
 
         if ($request->has('is_http_basic_auth_enabled') && $request->is_http_basic_auth_enabled === true) {
             if (blank($application->http_basic_auth_username) || blank($application->http_basic_auth_password)) {
@@ -2564,10 +3870,6 @@ class ApplicationsController extends Controller
                 }
             }
         }
-        if ($request->has('is_http_basic_auth_enabled') && $application->is_container_label_readonly_enabled === false) {
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
-        }
 
         // For dockercompose applications, domains (fqdn) field should not be used
         // Only docker_compose_domains should be used to set domains for individual services
@@ -2584,29 +3886,7 @@ class ApplicationsController extends Controller
         $requestHasDomains = $request->has('domains');
         if ($requestHasDomains && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
-            $urls = $request->domains;
-            $urls = str($urls)->replaceStart(',', '')->replaceEnd(',', '')->trim();
-            $errors = [];
-            $urls = str($urls)->trim()->explode(',')->map(function ($url) use (&$errors) {
-                $url = trim($url);
-
-                // If "domains" is empty clear all URLs from the fqdn column
-                if (blank($url)) {
-                    return null;
-                }
-
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
-                    $errors[] = 'Invalid URL: '.$url;
-
-                    return $url;
-                }
-                $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
-                if (! in_array(strtolower($scheme), ['http', 'https'])) {
-                    $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
-                }
-
-                return str($url)->lower();
-            });
+            $errors = ValidationPatterns::validateApplicationDomains($request->domains);
 
             if (count($errors) > 0) {
                 return response()->json([
@@ -2614,6 +3894,9 @@ class ApplicationsController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
+            $domains = ValidationPatterns::normalizeApplicationDomains($request->domains);
+            $request->offsetSet('domains', $domains);
+            $urls = collect(ValidationPatterns::applicationDomainList($domains));
             // Check for domain conflicts
             $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId, $uuid);
             if (isset($result['error'])) {
@@ -2658,7 +3941,7 @@ class ApplicationsController extends Controller
 
             $errors = [];
             $urls = $urls->map(function ($url) use (&$errors) {
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
+                if (! isValidDomainUrl($url)) {
                     $errors[] = "Invalid URL: {$url}";
 
                     return $url;
@@ -2702,12 +3985,20 @@ class ApplicationsController extends Controller
                 }
             }
 
-            $yaml = Yaml::parse($application->docker_compose_raw);
+            $yaml = parseDockerComposeYaml($application->docker_compose_raw);
             $services = data_get($yaml, 'services', []);
-            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson) {
+            $existingDockerComposeDomains = json_decode($application->docker_compose_domains ?? '[]', true) ?? [];
+            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson, $existingDockerComposeDomains) {
                 $name = data_get($domain, 'name');
                 if ($name && is_array($services) && isset($services[$name])) {
-                    $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = array_key_exists('redirect', $domain)
+                        ? data_get($domain, 'redirect')
+                        : data_get($existingDockerComposeDomains[$name] ?? [], 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put($name, $entry);
                 }
             });
             $request->offsetUnset('docker_compose_domains');
@@ -2717,12 +4008,19 @@ class ApplicationsController extends Controller
         $isSpa = $request->is_spa;
         $isAutoDeployEnabled = $request->is_auto_deploy_enabled;
         $isForceHttpsEnabled = $request->is_force_https_enabled;
+        $isPreviewDeploymentsEnabled = $request->is_preview_deployments_enabled;
         $connectToDockerNetwork = $request->connect_to_docker_network;
         $useBuildServer = $request->use_build_server;
+        $useBuildSecrets = $request->use_build_secrets;
         $isContainerLabelEscapeEnabled = $request->boolean('is_container_label_escape_enabled');
-
+        $isPreserveRepositoryEnabled = $request->boolean('is_preserve_repository_enabled');
+        $includeSourceCommitInBuild = $request->boolean('include_source_commit_in_build');
         if (isset($useBuildServer)) {
             $application->settings->is_build_server_enabled = $useBuildServer;
+            $application->settings->save();
+        }
+        if (isset($useBuildSecrets)) {
+            $application->settings->use_build_secrets = $useBuildSecrets;
             $application->settings->save();
         }
 
@@ -2746,6 +4044,11 @@ class ApplicationsController extends Controller
             $application->settings->save();
         }
 
+        if (isset($isPreviewDeploymentsEnabled)) {
+            $application->settings->is_preview_deployments_enabled = $isPreviewDeploymentsEnabled;
+            $application->settings->save();
+        }
+
         if (isset($connectToDockerNetwork)) {
             $application->settings->connect_to_docker_network = $connectToDockerNetwork;
             $application->settings->save();
@@ -2755,25 +4058,78 @@ class ApplicationsController extends Controller
             $application->settings->is_container_label_escape_enabled = $isContainerLabelEscapeEnabled;
             $application->settings->save();
         }
-
+        if ($request->has('is_preserve_repository_enabled')) {
+            $application->settings->is_preserve_repository_enabled = $isPreserveRepositoryEnabled;
+            $application->settings->save();
+        }
+        if ($request->has('include_source_commit_in_build')) {
+            $application->settings->include_source_commit_in_build = $includeSourceCommitInBuild;
+            $application->settings->save();
+        }
+        $this->applyApplicationSettings($application, $applicationSettings);
         removeUnnecessaryFieldsFromRequest($request);
 
-        $data = $request->all();
+        $data = $request->only($allowedFields);
         if ($requestHasDomains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
 
         if ($dockerComposeDomainsJson->count() > 0) {
+            [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts(
+                $dockerComposeDomainsJson,
+                $application->domain_port_overrides,
+            );
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
+            data_set($data, 'domain_port_overrides', $domainPortOverrides);
         }
+        $requestHasNoindexDomains = $request->has('noindex_domains');
+        data_forget($data, 'noindex_domains');
         $application->fill($data);
-        if ($application->settings->is_container_label_readonly_enabled && $requestHasDomains && $server->isProxyShouldRun()) {
+        if ($request->exists('git_https_password')) {
+            $application->git_https_password = $request->filled('git_https_password') ? $request->input('git_https_password') : null;
+            if (blank($application->git_https_password)) {
+                $application->git_https_username = null;
+            }
+        }
+        if ($newSource && ($application->source_id !== $newSource->id || $application->source_type !== $newSource->getMorphClass())) {
+            $application->source_id = $newSource->id;
+            $application->source_type = $newSource->getMorphClass();
+            // The next deployment fetches the repository ID from a GitHub App.
+            $application->repository_project_id = null;
+        }
+        if ($giteaRepository) {
+            $application->git_repository = $giteaRepository['repository'];
+            $application->repository_project_id = $giteaRepository['repository_project_id'];
+        }
+        if ($requestHasNoindexDomains) {
+            // Must run after fqdn is filled: flags are kept only for domains the app still has.
+            $application->setNoindexDomains($request->input('noindex_domains') ?? []);
+        }
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth || $application->isDirty('ports_exposes')) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
-        $application->save();
+        $application->withoutAuditLogging(fn () => $application->save());
+        if ($application->wasChanged('dockerfile')) {
+            $application->parseHealthcheckFromDockerfile($application->dockerfile);
+        }
+        $dnsCleanup->queueReleaseOfRemovedHostnames($application, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($application, $previousDnsHostnames);
+
+        $changedSettings = collect($application->settings->getAttributes())
+            ->reject(fn (mixed $value, string $field): bool => $field === 'updated_at' || ($settingsBefore[$field] ?? null) == $value)
+            ->keys();
+        $changedFields = [...auditSavedFields($application), ...$changedSettings];
+        if ($changedFields !== []) {
+            auditLog('api.application.updated', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'application_name' => $application->name,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         if ($instantDeploy) {
-            $deployment_uuid = new Cuid2;
+            $deployment_uuid = new_public_id();
 
             $result = queue_application_deployment(
                 application: $application,
@@ -2912,7 +4268,7 @@ class ApplicationsController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -2955,10 +4311,10 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
 
         if (! $application) {
             return response()->json([
@@ -2968,8 +4324,12 @@ class ApplicationsController extends Controller
 
         $this->authorize('manageEnvironment', $application);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
             'is_literal' => 'boolean',
@@ -2995,79 +4355,35 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
-        $is_literal = $request->is_literal ?? false;
         $key = str($request->key)->trim()->replace(' ', '_')->value;
-        if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $key)->first();
-            if ($env) {
-                $env->value = $request->value;
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
-                }
-                if ($env->is_preview != $is_preview) {
-                    $env->is_preview = $is_preview;
-                }
-                if ($env->is_multiline != $request->is_multiline) {
-                    $env->is_multiline = $request->is_multiline;
-                }
-                if ($env->is_shown_once != $request->is_shown_once) {
-                    $env->is_shown_once = $request->is_shown_once;
-                }
-                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
-                    $env->is_runtime = $request->is_runtime;
-                }
-                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
-                    $env->is_buildtime = $request->is_buildtime;
-                }
-                if ($request->has('comment') && $env->comment != $request->comment) {
-                    $env->comment = $request->comment;
-                }
-                $env->save();
-
-                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
-            } else {
-                return response()->json([
-                    'message' => 'Environment variable not found.',
-                ], 404);
-            }
-        } else {
-            $env = $application->environment_variables->where('key', $key)->first();
-            if ($env) {
-                $env->value = $request->value;
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
-                }
-                if ($env->is_preview != $is_preview) {
-                    $env->is_preview = $is_preview;
-                }
-                if ($env->is_multiline != $request->is_multiline) {
-                    $env->is_multiline = $request->is_multiline;
-                }
-                if ($env->is_shown_once != $request->is_shown_once) {
-                    $env->is_shown_once = $request->is_shown_once;
-                }
-                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
-                    $env->is_runtime = $request->is_runtime;
-                }
-                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
-                    $env->is_buildtime = $request->is_buildtime;
-                }
-                if ($request->has('comment') && $env->comment != $request->comment) {
-                    $env->comment = $request->comment;
-                }
-                $env->save();
-
-                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
-            } else {
-                return response()->json([
-                    'message' => 'Environment variable not found.',
-                ], 404);
-            }
+        $environmentVariables = $is_preview ? $application->environment_variables_preview : $application->environment_variables;
+        $env = $environmentVariables->where('key', $key)->first();
+        if (! $env) {
+            return response()->json([
+                'message' => 'Environment variable not found.',
+            ], 404);
         }
 
-        return response()->json([
-            'message' => 'Something is not okay. Are you okay?',
-        ], 500);
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
+        $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']));
+        // One audit row with the application context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
+
+        if ($changedFields !== []) {
+            auditLog('api.application.env_updated', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'is_preview' => (bool) $is_preview,
+                'changed_fields' => $changedFields,
+            ]);
+        }
+
+        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
 
     #[OA\Patch(
@@ -3110,7 +4426,8 @@ class ApplicationsController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                                        'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
                                     ],
                                 ),
                             ],
@@ -3156,10 +4473,10 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
 
         if (! $application) {
             return response()->json([
@@ -3176,12 +4493,18 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            return collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime']);
+            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview']);
+
+            if ($item->has('key')) {
+                $item->put('key', ValidationPatterns::normalizeEnvironmentVariableKey((string) $item->get('key')));
+            }
+
+            return $item;
         });
         $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
-                'key' => 'string|required',
+                'key' => ValidationPatterns::environmentVariableKeyRules(),
                 'value' => 'string|nullable',
                 'is_preview' => 'boolean',
                 'is_literal' => 'boolean',
@@ -3189,6 +4512,8 @@ class ApplicationsController extends Controller
                 'is_shown_once' => 'boolean',
                 'is_runtime' => 'boolean',
                 'is_buildtime' => 'boolean',
+                'comment' => 'string|nullable|max:256',
+                'copy_value_to_preview' => 'boolean|nullable',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -3202,25 +4527,12 @@ class ApplicationsController extends Controller
             $is_shown_once = $item->get('is_shown_once') ?? false;
             $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $key)->first();
+                $env = $application->environment_variables_preview()->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
-
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
                     }
-                    if ($env->is_multiline != $item->get('is_multiline')) {
-                        $env->is_multiline = $item->get('is_multiline');
-                    }
-                    if ($env->is_shown_once != $item->get('is_shown_once')) {
-                        $env->is_shown_once = $item->get('is_shown_once');
-                    }
-                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
-                        $env->is_runtime = $item->get('is_runtime');
-                    }
-                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
-                        $env->is_buildtime = $item->get('is_buildtime');
-                    }
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -3232,32 +4544,21 @@ class ApplicationsController extends Controller
                         'is_shown_once' => $is_shown_once,
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
+                        'comment' => $item->get('comment'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $key)->first();
+                $env = $application->environment_variables()->where('key', $key)->first();
                 if ($env) {
-                    $env->value = $item->get('value');
-                    if ($env->is_literal != $is_literal) {
-                        $env->is_literal = $is_literal;
+                    if ($item->has('value')) {
+                        $env->value = $item->get('value');
                     }
-                    if ($env->is_multiline != $item->get('is_multiline')) {
-                        $env->is_multiline = $item->get('is_multiline');
-                    }
-                    if ($env->is_shown_once != $item->get('is_shown_once')) {
-                        $env->is_shown_once = $item->get('is_shown_once');
-                    }
-                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
-                        $env->is_runtime = $item->get('is_runtime');
-                    }
-                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
-                        $env->is_buildtime = $item->get('is_buildtime');
-                    }
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
                     $env->save();
                 } else {
-                    $env = $application->environment_variables()->create([
+                    $env = $application->environment_variables()->make([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
@@ -3266,13 +4567,24 @@ class ApplicationsController extends Controller
                         'is_shown_once' => $is_shown_once,
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
+                        'comment' => $item->get('comment'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
+                    $env->copyValueToPreview = is_null($item->get('copy_value_to_preview'))
+                        ? null
+                        : (bool) $item->get('copy_value_to_preview');
+                    $env->save();
                 }
             }
             $returnedEnvs->push($this->removeSensitiveData($env));
         }
+
+        auditLog('api.application.env_bulk_upserted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'env_count' => $returnedEnvs->count(),
+        ]);
 
         return response()->json($returnedEnvs)->setStatusCode(201);
     }
@@ -3310,7 +4622,8 @@ class ApplicationsController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                        'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
                     ],
                 ),
             ),
@@ -3347,13 +4660,13 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
 
         if (! $application) {
             return response()->json([
@@ -3363,8 +4676,12 @@ class ApplicationsController extends Controller
 
         $this->authorize('manageEnvironment', $application);
 
+        if ($request->has('key')) {
+            $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
+        }
+
         $validator = customApiValidator($request->all(), [
-            'key' => 'string|required',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
             'is_literal' => 'boolean',
@@ -3373,6 +4690,7 @@ class ApplicationsController extends Controller
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            'copy_value_to_preview' => 'boolean|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -3413,6 +4731,14 @@ class ApplicationsController extends Controller
                     'resourceable_id' => $application->id,
                 ]);
 
+                auditLog('api.application.env_created', [
+                    'team_id' => $teamId,
+                    'application_uuid' => $application->uuid,
+                    'env_uuid' => $env->uuid,
+                    'env_key' => $env->key,
+                    'is_preview' => (bool) $is_preview,
+                ]);
+
                 return response()->json([
                     'uuid' => $env->uuid,
                 ])->setStatusCode(201);
@@ -3424,7 +4750,7 @@ class ApplicationsController extends Controller
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
             } else {
-                $env = $application->environment_variables()->create([
+                $env = $application->environment_variables()->make([
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
@@ -3436,6 +4762,18 @@ class ApplicationsController extends Controller
                     'comment' => $request->comment ?? null,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
+                ]);
+                $env->copyValueToPreview = is_null($request->input('copy_value_to_preview'))
+                    ? null
+                    : $request->boolean('copy_value_to_preview');
+                $env->save();
+
+                auditLog('api.application.env_created', [
+                    'team_id' => $teamId,
+                    'application_uuid' => $application->uuid,
+                    'env_uuid' => $env->uuid,
+                    'env_key' => $env->key,
+                    'is_preview' => (bool) $is_preview,
                 ]);
 
                 return response()->json([
@@ -3510,7 +4848,7 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
 
         if (! $application) {
             return response()->json([
@@ -3520,7 +4858,7 @@ class ApplicationsController extends Controller
 
         $this->authorize('manageEnvironment', $application);
 
-        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
+        $found_env = EnvironmentVariable::where('uuid', $request->route('env_uuid'))
             ->where('resourceable_type', Application::class)
             ->where('resourceable_id', $application->id)
             ->first();
@@ -3529,16 +4867,25 @@ class ApplicationsController extends Controller
                 'message' => 'Environment variable not found.',
             ], 404);
         }
+        $envKey = $found_env->key;
+        $envUuid = $found_env->uuid;
         $found_env->forceDelete();
+
+        auditLog('api.application.env_deleted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'env_uuid' => $envUuid,
+            'env_key' => $envKey,
+        ]);
 
         return response()->json([
             'message' => 'Environment variable deleted.',
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start application. `Post` request is also accepted.',
+        description: 'Start application.',
         path: '/applications/{uuid}/start',
         operationId: 'start-application-by-uuid',
         security: [
@@ -3624,7 +4971,7 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
 
         $result = queue_application_deployment(
             application: $application,
@@ -3642,18 +4989,27 @@ class ApplicationsController extends Controller
             );
         }
 
+        auditLog('api.application.deployed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'deployment_uuid' => $deployment_uuid,
+            'force_rebuild' => $force,
+            'instant_deploy' => $instant_deploy,
+        ]);
+
         return response()->json(
             [
                 'message' => 'Deployment request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $deployment_uuid,
             ],
             200
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop application. `Post` request is also accepted.',
+        description: 'Stop application.',
         path: '/applications/{uuid}/stop',
         operationId: 'stop-application-by-uuid',
         security: [
@@ -3668,6 +5024,15 @@ class ApplicationsController extends Controller
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'docker_cleanup',
+                in: 'query',
+                description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: true,
                 )
             ),
         ],
@@ -3718,7 +5083,15 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
-        StopApplication::dispatch($application);
+        $dockerCleanup = $request->boolean('docker_cleanup', true);
+        StopApplication::dispatch($application, false, $dockerCleanup);
+
+        auditLog('api.application.stopped', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'docker_cleanup' => $dockerCleanup,
+        ]);
 
         return response()->json(
             [
@@ -3727,9 +5100,9 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart application. `Post` request is also accepted.',
+        description: 'Restart application.',
         path: '/applications/{uuid}/restart',
         operationId: 'restart-application-by-uuid',
         security: [
@@ -3796,7 +5169,7 @@ class ApplicationsController extends Controller
 
         $this->authorize('deploy', $application);
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
 
         $result = queue_application_deployment(
             application: $application,
@@ -3810,32 +5183,308 @@ class ApplicationsController extends Controller
             ], 200);
         }
 
+        auditLog('api.application.restarted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'deployment_uuid' => $deployment_uuid,
+        ]);
+
         return response()->json(
             [
                 'message' => 'Restart request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $deployment_uuid,
             ],
         );
+    }
+
+    #[OA\Post(
+        summary: 'Move',
+        description: 'Move application to another project/environment. This is a purely organizational change — running containers are not affected. Note: after moving, the application will pick up shared environment variables from the new environment on the next deployment.',
+        path: '/applications/{uuid}/move',
+        operationId: 'move-application-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Target environment to move the application to.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the target environment.'],
+                        ],
+                        required: ['environment_uuid'],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Application moved successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Application moved successfully.'],
+                                'uuid' => ['type' => 'string'],
+                                'project_uuid' => ['type' => 'string'],
+                                'environment_uuid' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function move_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        return moveResourceToEnvironment($request, $application, 'Application', $teamId);
+    }
+
+    #[OA\Post(
+        summary: 'Migrate to Server',
+        description: 'Migrate an application to another destination/server owned by the authenticated team. Stops the application, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.',
+        path: '/applications/{uuid}/migrate',
+        operationId: 'migrate-application-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the target destination.'),
+                    new OA\Property(property: 'migrate_volumes', type: 'boolean', default: true, description: 'Whether to transfer persistent volume data when migrating across servers.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Application migration started or completed.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function migrate_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        return migrateResourceToDestination($request, $application, 'Application', $teamId);
+    }
+
+    /**
+     * Find a Git source of the team, or a system-wide one, by UUID.
+     *
+     * @template TSource of GithubApp|GiteaApp
+     *
+     * @param  class-string<TSource>  $sourceClass
+     * @return TSource|null
+     */
+    private function teamSourceByUuid(string $sourceClass, string $uuid, int|string $teamId): GithubApp|GiteaApp|null
+    {
+        return $sourceClass::where('uuid', $uuid)
+            ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
+            ->first();
+    }
+
+    /**
+     * Find a GitHub App of the team and check that it can read the repository.
+     *
+     * @return array{source: GithubApp, repository: string, repository_project_id: mixed}|JsonResponse
+     */
+    private function githubAppRepository(string $githubAppUuid, string $gitRepository, int|string $teamId): array|JsonResponse
+    {
+        $githubApp = $this->teamSourceByUuid(GithubApp::class, $githubAppUuid, $teamId);
+        if (! $githubApp) {
+            return response()->json(['message' => 'Github App not found.'], 404);
+        }
+        $token = generateGithubInstallationToken($githubApp);
+        if (! $token) {
+            return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+        }
+
+        $gitRepository = gitRepositorySlug($gitRepository);
+
+        // Use direct API call to verify repository access instead of loading all repositories
+        // This is much faster and avoids timeouts for GitHub Apps with many repositories
+        $response = Http::GitHub($githubApp->api_url, $token)
+            ->timeout(20)
+            ->retry(3, 200, throw: false)
+            ->get("/repos/{$gitRepository}");
+
+        if ($response->status() === 404 || $response->status() === 403) {
+            return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
+        }
+
+        if (! $response->successful()) {
+            return response()->json(['message' => 'Failed to verify repository access: '.($response->json()['message'] ?? 'Unknown error')], 400);
+        }
+
+        return ['source' => $githubApp, 'repository' => $gitRepository, 'repository_project_id' => data_get($response->json(), 'id')];
+    }
+
+    /**
+     * Check that a connected Gitea App can read the repository.
+     *
+     * @return array{source: GiteaApp, repository: string, repository_project_id: mixed}|JsonResponse
+     */
+    private function giteaAppRepository(?GiteaApp $giteaApp, string $gitRepository): array|JsonResponse
+    {
+        if (! $giteaApp?->isConnected()) {
+            return response()->json(['message' => 'Gitea App not found.'], 404);
+        }
+
+        $repositoryPath = $this->giteaRepositoryPath($giteaApp, $gitRepository);
+        if ($repositoryPath === null) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['git_repository' => 'The git_repository must be owner/name or a repository URL on the Gitea instance of the source.'],
+            ], 422);
+        }
+
+        try {
+            refreshGiteaToken($giteaApp);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+
+        $response = Http::Gitea($giteaApp->apiUrlBase(), $giteaApp->access_token)
+            ->timeout(20)
+            ->retry(3, 200, throw: false)
+            ->get('/repos/'.collect(explode('/', $repositoryPath))->map(fn (string $part) => rawurlencode($part))->implode('/'));
+
+        if ($response->status() === 404 || $response->status() === 403
+            || ($response->successful() && ! $giteaApp->allowsRepositoryOwner(data_get($response->json(), 'owner.login')))) {
+            return response()->json(['message' => 'Repository not found or not accessible by the Gitea App.'], 404);
+        }
+
+        if (! $response->successful()) {
+            return response()->json(['message' => 'Failed to verify repository access: '.data_get($response->json(), 'message', 'Unknown error')], 400);
+        }
+
+        return ['source' => $giteaApp, 'repository' => $repositoryPath, 'repository_project_id' => data_get($response->json(), 'id')];
+    }
+
+    /**
+     * Get owner/name from owner/name, or from an HTTPS or SSH URL on the Gitea instance of the source.
+     */
+    private function giteaRepositoryPath(GiteaApp $giteaApp, string $gitRepository): ?string
+    {
+        $repository = sshGitUrlToHttps($gitRepository) ?? $gitRepository;
+        if (str_contains($repository, '://')) {
+            if (strtolower((string) parse_url($repository, PHP_URL_HOST)) !== strtolower((string) parse_url($giteaApp->html_url, PHP_URL_HOST))) {
+                return null;
+            }
+            $repository = Str::chopStart((string) parse_url($repository, PHP_URL_PATH), rtrim((string) parse_url($giteaApp->html_url, PHP_URL_PATH), '/'));
+        }
+        $repository = str($repository)->trim('/')->replaceEnd('.git', '')->toString();
+
+        if (! preg_match('#^[\w.-]+/[\w.-]+$#', $repository) || array_intersect(explode('/', $repository), ['.', '..']) !== []) {
+            return null;
+        }
+
+        return $repository;
     }
 
     private function validateDataApplications(Request $request, Server $server)
     {
         $teamId = getTeamIdFromToken();
 
-        // Validate ports_mappings
-        if ($request->has('ports_mappings')) {
-            $ports = [];
+        if ($request->input('http_basic_auth_hash_algorithm') === HttpBasicAuthHashAlgorithm::ARGON2ID->value && ! $server->caddySupportsArgon2idBasicAuth()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'http_basic_auth_hash_algorithm' => 'Argon2id needs a server that runs the Caddy proxy, version 2.11 or newer.',
+                ],
+            ], 422);
+        }
+
+        // Validate that each host binding (IP, port, protocol) of ports_mappings is unique
+        if (is_string($request->ports_mappings)) {
+            $hostBindings = [];
             foreach (explode(',', $request->ports_mappings) as $portMapping) {
-                $port = explode(':', $portMapping);
-                if (in_array($port[0], $ports)) {
+                // The container port is after the last ":", an empty host port makes Docker pick a free port
+                $hostBinding = preg_replace('#/(tcp|udp|sctp)#', '', substr($portMapping, 0, (int) strrpos($portMapping, ':')));
+                if ($hostBinding === '' || str_ends_with($hostBinding, ':')) {
+                    continue;
+                }
+                $protocol = preg_match('#/(udp|sctp)#', $portMapping, $matches) === 1 ? $matches[1] : 'tcp';
+                if (in_array("{$hostBinding}/{$protocol}", $hostBindings, true)) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
-                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                            'ports_mappings' => 'Each host IP, port, and protocol can only be used once.',
                         ],
                     ], 422);
                 }
-                $ports[] = $port[0];
+                $hostBindings[] = "{$hostBinding}/{$protocol}";
             }
         }
         // Validate custom_labels
@@ -3848,8 +5497,8 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
-            $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
+            $customLabels = decodeBase64EncodedLabels($request->custom_labels);
+            if ($customLabels === null) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -3857,39 +5506,20 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->offsetSet('custom_labels', base64_encode($customLabels));
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
-            $urls = $request->domains;
-            $urls = str($urls)->replaceEnd(',', '')->trim();
-            $urls = str($urls)->replaceStart(',', '')->trim();
-            $errors = [];
-            $urls = str($urls)->trim()->explode(',')->map(function ($url) use (&$errors) {
-                $url = trim($url);
-
-                // If "domains" is empty clear all URLs from the fqdn column
-                if (blank($url)) {
-                    return null;
-                }
-
-                if (! filter_var($url, FILTER_VALIDATE_URL)) {
-                    $errors[] = 'Invalid URL: '.$url;
-
-                    return str($url)->lower();
-                }
-                $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
-                if (! in_array(strtolower($scheme), ['http', 'https'])) {
-                    $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
-                }
-
-                return str($url)->lower();
-            });
+            $errors = ValidationPatterns::validateApplicationDomains($request->domains);
             if (count($errors) > 0) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $errors,
                 ], 422);
             }
+            $normalizedDomains = ValidationPatterns::normalizeApplicationDomains($request->domains);
+            $request->offsetSet('domains', $normalizedDomains);
+            $urls = collect(ValidationPatterns::applicationDomainList($normalizedDomains));
             // Check for domain conflicts
             $result = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId, $uuid);
             if (isset($result['error'])) {
@@ -3908,5 +5538,1408 @@ class ApplicationsController extends Controller
                 ], 409);
             }
         }
+    }
+
+    #[OA\Get(
+        summary: 'List Storages',
+        description: 'List all persistent storages and file storages by application UUID.',
+        path: '/applications/{uuid}/storages',
+        operationId: 'list-storages-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All storages by application UUID.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'persistent_storages', type: 'array', items: new OA\Items(type: 'object')),
+                        new OA\Property(property: 'file_storages', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function storages(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        $persistentStorages = $application->persistentStorages->sortBy('id')->values();
+        $fileStorages = $application->fileStorages->sortBy('id')->values();
+        $fileStorages->each(fn (LocalFileVolume $storage) => $this->exposeFileStorageContentIfAllowed($storage));
+
+        return response()->json([
+            'persistent_storages' => $persistentStorages,
+            'file_storages' => $fileStorages,
+        ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Storage',
+        description: 'Update a persistent storage or file storage by application UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
+        path: '/applications/{uuid}/storages',
+        operationId: 'update-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Storage updated. For read-only storages (from docker-compose or services), only is_preview_suffix_enabled can be updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type'],
+                        properties: [
+                            'uuid' => ['type' => 'string', 'description' => 'The UUID of the storage (preferred).'],
+                            'id' => ['type' => 'integer', 'description' => 'The ID of the storage (deprecated, use uuid instead).'],
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage: persistent or file.'],
+                            'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
+                            'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages). Changing the content needs the deploy permission.'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Storage updated.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'The token needs the deploy permission to change the content of a file outside the resource directory.',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function update_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+
+        if (! $application) {
+            return response()->json([
+                'message' => 'Application not found',
+            ], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $validator = customApiValidator($request->all(), [
+            'uuid' => 'string',
+            'id' => 'integer',
+            'type' => 'required|string|in:persistent,file',
+            'is_preview_suffix_enabled' => 'boolean',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'string',
+            'content' => 'string|nullable',
+        ]);
+
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $storageUuid = $request->input('uuid');
+        $storageId = $request->input('id');
+
+        if (! $storageUuid && ! $storageId) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['uuid' => 'Either uuid or id is required.'],
+            ], 422);
+        }
+
+        $lookupField = $storageUuid ? 'uuid' : 'id';
+        $lookupValue = $storageUuid ?? $storageId;
+
+        if ($request->type === 'persistent') {
+            $storage = $application->persistentStorages->where($lookupField, $lookupValue)->first();
+        } else {
+            $storage = $application->fileStorages->where($lookupField, $lookupValue)->first();
+        }
+
+        if (! $storage) {
+            return response()->json([
+                'message' => 'Storage not found.',
+            ], 404);
+        }
+
+        $isReadOnly = $storage->shouldBeReadOnlyInUI();
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
+        $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
+
+        if ($isReadOnly && ! empty($requestedEditableFields)) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition). Only is_preview_suffix_enabled can be updated.',
+                'read_only_fields' => array_values($requestedEditableFields),
+            ], 422);
+        }
+
+        // Reject fields that don't apply to the given storage type
+        if (! $isReadOnly) {
+            $typeSpecificInvalidFields = $request->type === 'persistent'
+                ? array_intersect(['content'], array_keys($request->all()))
+                : array_intersect(['name', 'host_path'], array_keys($request->all()));
+
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type '{$request->type}'."]),
+                ], 422);
+            }
+        }
+
+        if (! $isReadOnly && ($forbidden = $this->contentChangeForbiddenResponse($request, $storage))) {
+            return $forbidden;
+        }
+
+        // Always allowed
+        if ($request->has('is_preview_suffix_enabled')) {
+            $storage->is_preview_suffix_enabled = $request->is_preview_suffix_enabled;
+        }
+
+        // Only for editable storages
+        if (! $isReadOnly) {
+            if ($request->type === 'persistent') {
+                if ($request->has('name')) {
+                    $storage->name = $request->name;
+                }
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+            } else {
+                if ($request->has('mount_path')) {
+                    $storage->mount_path = $request->mount_path;
+                }
+                if ($request->has('content')) {
+                    $storage->content = $request->content;
+                }
+            }
+        }
+
+        $storage->save();
+
+        if ($storage instanceof LocalFileVolume && $storage->wasChanged('content')) {
+            ServerStorageSaveJob::dispatch($storage);
+        }
+
+        auditLog('api.application.storage_updated', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path ?? null,
+        ]);
+
+        return response()->json($this->exposeFileStorageContentIfAllowed($storage));
+    }
+
+    #[OA\Post(
+        summary: 'Create Storage',
+        description: 'Create a persistent storage or file storage for an application.',
+        path: '/applications/{uuid}/storages',
+        operationId: 'create-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['type', 'mount_path'],
+                        properties: [
+                            'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
+                            'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
+                            'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
+                            'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional). Needs the deploy ability when set.'],
+                            'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
+                            'fs_path' => ['type' => 'string', 'description' => 'Host path. Required for directory mounts and host file mounts. Optional for file mounts with content (default: inside the resource directory). An absolute path can be anywhere on the host; a relative path is inside the resource directory. A directory or file mount outside the resource directory needs a token with the deploy permission. Coolify never deletes a path outside the resource directory.'],
+                        ],
+                        additionalProperties: false,
+                    ),
+                ),
+            ],
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Storage created.',
+                content: new OA\JsonContent(type: 'object'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a mount outside the resource directory or for a file storage with content.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $validator = customApiValidator($request->all(), [
+            'type' => 'required|string|in:persistent,file',
+            'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
+            'mount_path' => 'required|string',
+            'content' => 'string|nullable',
+            'is_directory' => 'boolean',
+            'is_host_file' => 'boolean',
+            'fs_path' => 'string',
+        ]);
+
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        if ($request->type === 'persistent') {
+            if (! $request->name) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['name' => 'The name field is required for persistent storages.'],
+                ], 422);
+            }
+
+            $typeSpecificInvalidFields = array_intersect(['content', 'is_directory', 'is_host_file', 'fs_path'], array_keys($request->all()));
+            if (! empty($typeSpecificInvalidFields)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => collect($typeSpecificInvalidFields)
+                        ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'persistent'."]),
+                ], 422);
+            }
+
+            if ($reason = $application->persistentStorageUnavailableReason()) {
+                return response()->json(['message' => $reason], 422);
+            }
+
+            $storage = LocalPersistentVolume::create([
+                'name' => $application->uuid.'-'.$request->name,
+                'mount_path' => $request->mount_path,
+                'resource_id' => $application->id,
+                'resource_type' => $application->getMorphClass(),
+            ]);
+
+            return response()->json($storage, 201);
+        }
+
+        // File storage
+        $typeSpecificInvalidFields = array_intersect(['name', 'host_path'], array_keys($request->all()));
+        if (! empty($typeSpecificInvalidFields)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => collect($typeSpecificInvalidFields)
+                    ->mapWithKeys(fn ($field) => [$field => "Field '{$field}' is not valid for type 'file'."]),
+            ], 422);
+        }
+
+        $isDirectory = $request->boolean('is_directory', false);
+        $isHostFile = $request->boolean('is_host_file', false);
+
+        if ($isDirectory && $isHostFile) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_host_file' => 'Host file mounts cannot also be directory mounts.'],
+            ], 422);
+        }
+
+        if ($isDirectory) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for directory mounts.'],
+                ], 422);
+            }
+
+            try {
+                $fsPath = LocalFileVolume::resolveHostPath(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'storage source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
+                $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                    'fs_path' => $fsPath,
+                    'is_directory' => true,
+                    'resource_id' => $application->id,
+                    'resource_type' => get_class($application),
+                ]));
+                if ($forbidden) {
+                    return $forbidden;
+                }
+                LocalFileVolume::assertHostPathOnServer(application_configuration_dir().'/'.$application->uuid, $fsPath, $application->destination->server, isDirectory: true);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'is_directory' => true,
+                'resource_id' => $application->id,
+                'resource_type' => get_class($application),
+            ]);
+        } elseif ($isHostFile) {
+            if (! $request->fs_path) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => 'The fs_path field is required for host file mounts.'],
+                ], 422);
+            }
+
+            if ($request->filled('content')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['content' => 'Content is not valid for host file mounts.'],
+                ], 422);
+            }
+
+            try {
+                $fsPath = validateHostFileMountPath($request->fs_path, 'host file source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'host file destination path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => null,
+                'is_directory' => false,
+                'is_host_file' => true,
+                'resource_id' => $application->id,
+                'resource_type' => get_class($application),
+            ]);
+        } else {
+            try {
+                $mountPath = validateFileMountPath($request->mount_path, 'file storage path');
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            try {
+                if ($request->filled('fs_path')) {
+                    $fsPath = LocalFileVolume::resolveHostPath(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'file storage source path');
+                    $forbidden = $this->outsideHostPathForbiddenResponse($request, new LocalFileVolume([
+                        'fs_path' => $fsPath,
+                        'resource_id' => $application->id,
+                        'resource_type' => get_class($application),
+                    ]));
+                    if ($forbidden) {
+                        return $forbidden;
+                    }
+                    LocalFileVolume::assertHostPathOnServer(application_configuration_dir().'/'.$application->uuid, $fsPath, $application->destination->server, isDirectory: false);
+                } else {
+                    $fsPath = confineFileMountPath(application_configuration_dir().'/'.$application->uuid, $mountPath, 'file storage path');
+                }
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [$request->filled('fs_path') ? 'fs_path' : 'mount_path' => $e->getMessage()],
+                ], 422);
+            }
+
+            if ($request->filled('content')) {
+                $forbidden = $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
+                if ($forbidden) {
+                    return $forbidden;
+                }
+            }
+
+            $storage = LocalFileVolume::create([
+                'fs_path' => $fsPath,
+                'mount_path' => $mountPath,
+                'content' => $request->content,
+                'is_directory' => false,
+                'resource_id' => $application->id,
+                'resource_type' => get_class($application),
+            ]);
+        }
+
+        auditLog('api.application.storage_created', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'storage_uuid' => $storage->uuid ?? null,
+            'storage_id' => $storage->id,
+            'storage_type' => $request->type,
+            'mount_path' => $storage->mount_path,
+        ]);
+
+        return response()->json($this->exposeFileStorageContentIfAllowed($storage), 201);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Storage',
+        description: 'Delete a persistent storage or file storage by application UUID.',
+        path: '/applications/{uuid}/storages/{storage_uuid}',
+        operationId: 'delete-storage-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'storage_uuid',
+                in: 'path',
+                description: 'UUID of the storage.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage deleted.', content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'message', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function delete_storage(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('delete', $application);
+
+        $storageUuid = $request->route('storage_uuid');
+
+        $storage = $application->persistentStorages->where('uuid', $storageUuid)->first();
+        if (! $storage) {
+            $storage = $application->fileStorages->where('uuid', $storageUuid)->first();
+        }
+
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        if ($storage->shouldBeReadOnlyInUI()) {
+            return response()->json([
+                'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
+            ], 422);
+        }
+
+        $storage->abortIfScheduledBackupsExist();
+
+        if ($storage instanceof LocalFileVolume) {
+            $storage->deleteStorageOnServer();
+        }
+
+        $storageType = $storage instanceof LocalFileVolume ? 'file' : 'persistent';
+        $storageMountPath = $storage->mount_path ?? null;
+        $storage->delete();
+
+        auditLog('api.application.storage_deleted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'storage_uuid' => $storageUuid,
+            'storage_type' => $storageType,
+            'mount_path' => $storageMountPath,
+        ]);
+
+        return response()->json(['message' => 'Storage deleted.']);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Preview Deployment',
+        description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record. Needs a token with the write and deploy permissions.',
+        path: '/applications/{uuid}/previews/{pull_request_id}',
+        operationId: 'delete-preview-deployment-by-pull-request-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'path',
+                description: 'Pull request ID of the preview to delete.',
+                required: true,
+                schema: new OA\Schema(type: 'integer')
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Preview deletion queued.', content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'message', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
+        ]
+    )]
+    public function delete_preview_by_pull_request_id(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('delete', $application);
+
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
+            return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+        }
+        $pullRequestId = (int) $pullRequestIdRaw;
+
+        $preview = ApplicationPreview::where('application_id', $application->id)
+            ->where('pull_request_id', $pullRequestId)
+            ->first();
+
+        if (! $preview) {
+            return response()->json(['message' => 'Preview not found.'], 404);
+        }
+
+        $preview->delete();
+        CleanupPreviewDeployment::run($application, $pullRequestId, $preview);
+
+        auditLog('api.application.preview_deleted', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'pull_request_id' => $pullRequestId,
+        ]);
+
+        return response()->json(['message' => 'Preview deletion request queued.']);
+    }
+
+    #[OA\Get(
+        summary: 'List Tags',
+        description: 'List tags for an application by UUID.',
+        path: '/applications/{uuid}/tags',
+        operationId: 'list-tags-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of tags.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Tag')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function tags(Request $request): JsonResponse
+    {
+        return $this->listTags($request);
+    }
+
+    #[OA\Post(
+        summary: 'Create Tag',
+        description: 'Add tag(s) to an application by UUID.',
+        path: '/applications/{uuid}/tags',
+        operationId: 'create-tag-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'tag_name' => ['type' => 'string', 'description' => 'The tag name (min 2 characters). Required if tag_names is not provided.'],
+                            'tag_names' => [
+                                'type' => 'array',
+                                'items' => new OA\Items(type: 'string'),
+                                'description' => 'Array of tag names (each min 2 characters). Required if tag_name is not provided.',
+                            ],
+                        ],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Tags added successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Tag')
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_tag(Request $request): JsonResponse
+    {
+        return $this->createTag($request);
+    }
+
+    #[OA\Delete(
+        summary: 'Delete Tag',
+        description: 'Remove a tag from an application by UUID.',
+        path: '/applications/{uuid}/tags/{tag_uuid}',
+        operationId: 'delete-tag-by-application-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'tag_uuid',
+                in: 'path',
+                description: 'UUID of the tag.',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tag removed.',
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function delete_tag(Request $request): JsonResponse
+    {
+        return $this->deleteTag($request);
+    }
+
+    #[OA\Post(
+        summary: 'Clone',
+        description: 'Clone an application to a destination owned by the authenticated team.',
+        path: '/applications/{uuid}/clone',
+        operationId: 'clone-application-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the destination to clone into.'),
+                    new OA\Property(property: 'name', type: 'string', nullable: true, description: 'Optional name for the cloned application.'),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false, description: 'Whether to clone volume data. Needs the deploy ability.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Application cloned.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'uuid', type: 'string'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Application cloned.'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability to clone volume data.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function clone_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'destination_uuid' => 'required|string',
+            'name' => ValidationPatterns::nameRules(required: false),
+            'clone_volumes' => 'boolean',
+        ], ValidationPatterns::combinedMessages());
+        $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+        $this->authorize('create', [Application::class, $application->environment]);
+
+        if ($request->boolean('clone_volumes') && $response = $this->deployAbilityForbiddenResponse($request, 'Cloning volume data stops and starts the source resource, so it needs a token with the deploy permission.')) {
+            return $response;
+        }
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+            ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+        if (! $destination || ! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+        $this->authorize('placeResource', $destination->server);
+
+        $overrides = ['uuid' => new_public_id()];
+        if ($request->filled('name')) {
+            $overrides['name'] = $request->string('name')->toString();
+        }
+
+        $newApplication = clone_application(
+            $application,
+            $destination,
+            $overrides,
+            $request->boolean('clone_volumes', false),
+        );
+
+        auditLog('api.application.cloned', [
+            'team_id' => $teamId,
+            'source_uuid' => $application->uuid,
+            'application_uuid' => $newApplication->uuid,
+            'application_name' => $newApplication->name,
+            'destination_uuid' => $destination->uuid,
+            'clone_volumes' => $request->boolean('clone_volumes', false),
+        ]);
+
+        return response()->json([
+            'uuid' => $newApplication->uuid,
+            'message' => 'Application cloned.',
+        ], 201);
+    }
+
+    #[OA\Get(
+        summary: 'List Rollback Images',
+        description: 'List available Docker images for rolling back an application: images on the server (`local`) and, when a Docker registry image name is set, images of recent successful deployments in the registry (`registry`). Returns an empty list when the server is unavailable or remote inspection is not possible.',
+        path: '/applications/{uuid}/rollback-images',
+        operationId: 'list-application-rollback-images',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Rollback images.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'current', type: 'string', nullable: true),
+                        new OA\Property(
+                            property: 'images',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'tag', type: 'string'),
+                                    new OA\Property(property: 'created_at', type: 'string'),
+                                    new OA\Property(property: 'is_current', type: 'boolean'),
+                                    new OA\Property(property: 'source', type: 'string', enum: ['local', 'registry']),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function rollback_images(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        try {
+            return response()->json(GetRollbackImages::run($application));
+        } catch (\Throwable) {
+            return response()->json(['current' => null, 'images' => []]);
+        }
+    }
+
+    #[OA\Post(
+        summary: 'Rollback',
+        description: 'Queue a rollback deployment for an application to a previous image commit/tag.',
+        path: '/applications/{uuid}/rollback',
+        operationId: 'rollback-application-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['commit'],
+                properties: [
+                    new OA\Property(property: 'commit', type: 'string', description: 'Image tag / commit to roll back to. Must be a tag from the rollback images list or the commit of a successful production deployment.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Rollback deployment queued.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'deployment_uuid', type: 'string'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function rollback_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'commit' => 'required|string',
+        ]);
+        $allowedFields = ['commit'];
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('deploy', $application);
+
+        try {
+            $commit = validateGitRef($request->string('commit')->toString(), 'rollback commit');
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['commit' => [$e->getMessage()]],
+            ], 422);
+        }
+
+        if (! GetRollbackImages::allows($application, $commit)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['commit' => ['The commit is not a rollback image or a successful deployment of this application.']],
+            ], 422);
+        }
+
+        $deployment_uuid = new_public_id();
+        $result = queue_application_deployment(
+            application: $application,
+            deployment_uuid: $deployment_uuid,
+            commit: $commit,
+            rollback: true,
+            force_rebuild: false,
+            is_api: true,
+        );
+
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message'] ?? 'Deployment queue full.'], 400);
+        }
+
+        if ($result['status'] === 'skipped') {
+            return response()->json(['message' => $result['message']], 200);
+        }
+
+        return response()->json([
+            'message' => 'Rollback deployment queued.',
+            'deployment_uuid' => $deployment_uuid,
+        ]);
+    }
+
+    #[OA\Get(
+        summary: 'List Destinations',
+        description: 'List primary and additional destinations for a standalone application.',
+        path: '/applications/{uuid}/destinations',
+        operationId: 'list-application-destinations',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Application destinations.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function destinations(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('view', $application);
+
+        $destinations = collect();
+        $primary = $application->destination;
+        if ($primary) {
+            $destinations->push([
+                'uuid' => $primary->uuid,
+                'name' => $primary->name,
+                'network' => $primary->network ?? null,
+                'server_uuid' => $primary->server?->uuid,
+                'server_id' => $primary->server_id,
+                'is_primary' => true,
+            ]);
+        }
+
+        foreach ($application->additional_networks as $network) {
+            $destinations->push([
+                'uuid' => $network->uuid,
+                'name' => $network->name,
+                'network' => $network->network ?? null,
+                'server_uuid' => $network->server?->uuid,
+                'server_id' => $network->pivot->server_id ?? $network->server_id,
+                'is_primary' => false,
+            ]);
+        }
+
+        return response()->json($destinations->values());
+    }
+
+    #[OA\Post(
+        summary: 'Add Destination',
+        description: 'Attach an additional standalone Docker destination to an application.',
+        path: '/applications/{uuid}/destinations',
+        operationId: 'add-application-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Destination attached.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function add_destination(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'destination_uuid' => 'required|string',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), ['destination_uuid']);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+        if (! $destination || ! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+        $this->authorize('placeResource', $destination->server);
+
+        if ($application->destination_id === $destination->id && $application->destination_type === $destination->getMorphClass()) {
+            return response()->json(['message' => 'Destination is already the primary destination.'], 422);
+        }
+
+        if ($application->additional_networks()->where('standalone_dockers.id', $destination->id)->exists()) {
+            return response()->json(['message' => 'Destination is already attached.'], 422);
+        }
+
+        if ($application->destination?->server_id === $destination->server_id) {
+            return response()->json(['message' => 'Cannot attach a destination on the same server as the primary destination.'], 422);
+        }
+
+        if ($application->additional_servers?->pluck('id')->contains($destination->server_id)) {
+            return response()->json(['message' => 'A destination on this server is already attached.'], 422);
+        }
+
+        if ($reason = $application->additionalServersUnavailableReason($destination->server)) {
+            return response()->json(['message' => $reason], 422);
+        }
+
+        $application->additional_networks()->attach($destination->id, ['server_id' => $destination->server_id]);
+
+        auditLog('api.application.destination_added', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'destination_uuid' => $destination->uuid,
+        ]);
+
+        return response()->json([
+            'message' => 'Destination attached.',
+            'uuid' => $destination->uuid,
+        ], 201);
+    }
+
+    #[OA\Delete(
+        summary: 'Remove Destination',
+        description: 'Detach an additional destination from an application.',
+        path: '/applications/{uuid}/destinations/{destination_uuid}',
+        operationId: 'remove-application-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'destination_uuid', in: 'path', required: true, description: 'UUID of the destination.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Destination detached.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function remove_destination(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $destinationUuid = $request->route('destination_uuid');
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $destinationUuid)->first();
+        if (! $destination) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        if ($application->destination_id === $destination->id && $application->destination_type === $destination->getMorphClass()) {
+            return response()->json(['message' => 'Cannot remove the primary destination.'], 422);
+        }
+
+        $attached = $application->additional_networks()->where('standalone_dockers.id', $destination->id)->first();
+        if (! $attached) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $application->additional_networks()
+            ->wherePivot('server_id', $attached->pivot->server_id)
+            ->detach($destination->id);
+
+        auditLog('api.application.destination_removed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'destination_uuid' => $destination->uuid,
+        ]);
+
+        return response()->json(['message' => 'Destination detached.']);
+    }
+
+    /**
+     * @param  Collection<string, array{domain: ?string, redirect?: string}>  $domains
+     * @param  array<string, int|string>|null  $existingOverrides
+     * @return array{Collection<string, array{domain: ?string, redirect?: string}>, ?array<string, int>}
+     */
+    private function normalizeDockerComposeDomainPorts(Collection $domains, ?array $existingOverrides = null): array
+    {
+        $allDomains = $domains
+            ->pluck('domain')
+            ->filter()
+            ->implode(',');
+        $normalized = DomainPortOverrides::normalize($allDomains, $existingOverrides);
+
+        $domains = $domains->map(function (array $entry): array {
+            $entry['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain'] ?? null))
+                ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                ->implode(',');
+
+            return $entry;
+        });
+
+        return [$domains, $normalized['overrides']];
     }
 }

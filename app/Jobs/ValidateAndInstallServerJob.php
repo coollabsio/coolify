@@ -33,6 +33,19 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            if (! $this->server->canBeValidated()) {
+                $message = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+                $this->server->update([
+                    'validation_logs' => $message,
+                    'is_validating' => false,
+                ]);
+                Log::warning('ValidateAndInstallServer: blocked for transferred server', [
+                    'server_id' => $this->server->id,
+                ]);
+
+                return;
+            }
+
             // Mark validation as in progress
             $this->server->update(['is_validating' => true]);
 
@@ -45,7 +58,8 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Validate connection
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $uptime) {
-                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error;
+                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$sanitizedError;
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,
@@ -146,14 +160,14 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Validate Docker version
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if (! $dockerVersion) {
-                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $errorMessage = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $errorMessage = $this->server->dockerEngineVersionError();
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,
                 ]);
                 Log::error('ValidateAndInstallServer: Docker version not sufficient', [
                     'server_id' => $this->server->id,
+                    'docker_version' => $this->server->dockerVersion(),
                 ]);
 
                 return;
@@ -166,7 +180,7 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             // Start proxy if needed
-            if (! $this->server->isBuildServer()) {
+            if ($this->server->isProxyShouldRun()) {
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if ($proxyShouldRun) {
                     // Ensure networks exist BEFORE dispatching async proxy startup
@@ -179,12 +193,18 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Mark validation as complete
             $this->server->update(['is_validating' => false]);
 
+            // Auto-fetch server details now that validation passed
+            $this->server->gatherServerMetadata();
+
             // Refresh server to get latest state
             $this->server->refresh();
 
             // Broadcast events to update UI
             ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
             ServerReachabilityChanged::dispatch($this->server);
+            if ($this->server->isSentinelEnabled()) {
+                CheckAndStartSentinelJob::dispatch($this->server);
+            }
 
         } catch (\Throwable $e) {
             Log::error('ValidateAndInstallServer: Exception occurred', [
@@ -194,7 +214,7 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             $this->server->update([
-                'validation_logs' => 'An error occurred during validation: '.$e->getMessage(),
+                'validation_logs' => 'An error occurred during validation: '.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'),
                 'is_validating' => false,
             ]);
         }

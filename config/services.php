@@ -60,11 +60,32 @@ return [
         'tenant' => env('GOOGLE_TENANT'),
     ],
 
+    'oidc' => [
+        'client_id' => env('OIDC_CLIENT_ID'),
+        'client_secret' => env('OIDC_CLIENT_SECRET'),
+        'redirect' => env('OIDC_REDIRECT_URI'),
+        'base_url' => env('OIDC_BASE_URL'),
+        'custom_label' => env('OIDC_LOGIN_LABEL'),
+    ],
+
     'zitadel' => [
         'client_id' => env('ZITADEL_CLIENT_ID'),
         'client_secret' => env('ZITADEL_CLIENT_SECRET'),
         'redirect' => env('ZITADEL_REDIRECT_URI'),
         'base_url' => env('ZITADEL_BASE_URL'),
+    ],
+
+    /*
+    | Domain Connect (Cloudflare automatic DNS).
+    | Template: resources/domain-connect/coolify.io.hosting.json
+    | Publish public key TXT at {key_id}.{syncPubKeyDomain} and onboard with Cloudflare.
+    | @see https://developers.cloudflare.com/dns/reference/domain-connect/
+    */
+    'domain_connect' => [
+        'provider_id' => env('DOMAIN_CONNECT_PROVIDER_ID', 'coolify.io'),
+        'service_id' => env('DOMAIN_CONNECT_SERVICE_ID', 'hosting'),
+        'key_id' => env('DOMAIN_CONNECT_KEY_ID', '_dcpubkeyv1'),
+        'private_key' => env('DOMAIN_CONNECT_PRIVATE_KEY'),
     ],
 
 ];

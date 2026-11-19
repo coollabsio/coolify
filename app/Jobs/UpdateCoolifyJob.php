@@ -3,7 +3,10 @@
 namespace App\Jobs;
 
 use App\Actions\Server\UpdateCoolify;
+use App\Exceptions\UpgradeAlreadyRunningException;
 use App\Models\Server;
+use App\Services\AutoUpdateNotifier;
+use App\Services\CoolifyUpgradeStatus;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -44,11 +47,18 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
             Log::info('Starting Coolify update process...');
             UpdateCoolify::run(false); // false means it's not a manual update
 
-            $settings->update(['new_version_available' => false]);
-            Log::info('Coolify update completed successfully.');
+            Log::info('Coolify upgrade script started. Result: /data/coolify/source/.upgrade-status, log: /data/coolify/source/upgrade-*.log.');
+        } catch (UpgradeAlreadyRunningException $e) {
+            // The running upgrade keeps its saved attempt, so its result is still reported.
+            Log::warning('Automatic update skipped: '.$e->getMessage());
         } catch (\Throwable $e) {
             Log::error('UpdateCoolifyJob failed: '.$e->getMessage());
-            // Consider implementing a notification to administrators
+            try {
+                CoolifyUpgradeStatus::writeError(Server::findOrFail(0), $e->getMessage());
+            } catch (\Throwable $statusException) {
+                report($statusException);
+            }
+            AutoUpdateNotifier::failed($e->getMessage());
         }
     }
 }

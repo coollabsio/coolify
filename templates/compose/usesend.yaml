@@ -1,6 +1,6 @@
 # documentation: https://docs.usesend.com/self-hosting/overview
 # slogan: Usesend is an open-source alternative to Resend, Sendgrid, Mailgun and Postmark etc.
-# category: messaging
+# category: email
 # tags: resend, mailer, marketing emails, transaction emails, self-hosting, postmark
 # logo: svgs/usesend.svg
 # port: 3000
@@ -35,7 +35,7 @@ services:
       retries: 20
 
   usesend:
-    image: usesend/usesend:latest
+    image: usesend/usesend:v1.10.0
     expose:
       - 3000
     environment:

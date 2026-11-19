@@ -1,0 +1,902 @@
+<?php
+
+use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\Environment;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use phpseclib3\Crypt\EC;
+use Symfony\Component\Yaml\Yaml;
+
+uses(RefreshDatabase::class);
+
+function disableExactProxyLabels(Application $application): Application
+{
+    $settings = $application->destination->server->settings;
+    $settings->generate_exact_labels = false;
+    $settings->save();
+
+    return $application;
+}
+
+beforeEach(function () {
+    Server::flushIdentityMap();
+    $this->user = User::factory()->create();
+    $this->team = Team::factory()->create();
+    $this->user->teams()->attach($this->team);
+
+    $this->project = Project::factory()->create(['team_id' => $this->team->id]);
+    $this->environment = Environment::factory()->create([
+        'project_id' => $this->project->id,
+    ]);
+
+    $ecKey = EC::createKey('Ed25519');
+    $privateKeyContent = $ecKey->toString('OpenSSH');
+
+    $privateKey = PrivateKey::create([
+        'name' => 'test-key',
+        'private_key' => $privateKeyContent,
+        'team_id' => $this->team->id,
+    ]);
+
+    $this->server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $privateKey->id,
+    ]);
+
+    ServerSetting::create([
+        'server_id' => $this->server->id,
+        'wildcard_domain' => 'http://127.0.0.1.sslip.io',
+    ]);
+
+    $this->destination = StandaloneDocker::factory()->create([
+        'server_id' => $this->server->id,
+        'network' => 'test-network-'.fake()->uuid(),
+    ]);
+});
+
+test('applicationParser creates an editable variable for bare Compose passthrough syntax', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      - API_TOKEN
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    applicationParser($application);
+
+    expect($application->environment_variables()->where('key', 'API_TOKEN')->exists())->toBeTrue()
+        ->and(Yaml::parse($application->fresh()->docker_compose_raw))
+        ->toBe(Yaml::parse($dockerCompose));
+});
+
+test('applicationParser creates derived inputs and preserves required Compose expressions', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      API_URL: https://${API_HOST}/v1
+      API_TOKEN: ${API_TOKEN:?API_TOKEN must be set}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $requiredVariable = $application->environment_variables()->where('key', 'API_TOKEN')->firstOrFail();
+
+    expect($application->environment_variables()->where('key', 'API_HOST')->exists())->toBeTrue()
+        ->and($requiredVariable->value)->toBeNull()
+        ->and((bool) $requiredVariable->is_required)->toBeTrue()
+        ->and(data_get($parsedCompose, 'services.app.environment.API_URL'))->toBe('https://${API_HOST}/v1')
+        ->and(data_get($parsedCompose, 'services.app.environment.API_TOKEN'))->toBe('${API_TOKEN:?API_TOKEN must be set}')
+        ->and(Yaml::parse($application->fresh()->docker_compose_raw))->toBe(Yaml::parse($dockerCompose));
+});
+
+test('applicationParser populates docker_compose_domains for KEY-based SERVICE_FQDN variables', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  backend:
+    image: myapp/backend:latest
+    environment:
+      - SERVICE_FQDN_BACKEND_8000=${BACKEND_URL}
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      - SERVICE_FQDN_FRONTEND=${FRONTEND_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->not->toBeNull()
+        ->and($domains)->toBeArray()
+        ->and($domains)->toHaveKey('backend')
+        ->and($domains['backend'])->toHaveKey('domain')
+        ->and($domains['backend']['domain'])->toStartWith('http://')
+        ->and($domains['backend']['domain'])->not->toBeEmpty();
+});
+
+test('applicationParser populates docker_compose_domains for KEY-based SERVICE_FQDN without port', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      - SERVICE_FQDN_FRONTEND=${FRONTEND_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->not->toBeNull()
+        ->and($domains)->toHaveKey('frontend')
+        ->and($domains['frontend'])->toHaveKey('domain');
+});
+
+test('applicationParser does not populate docker_compose_domains for non-dockercompose build_pack', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  backend:
+    image: myapp/backend:latest
+    environment:
+      - SERVICE_FQDN_BACKEND_8000=${BACKEND_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockerfile',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+
+    // For non-dockercompose, docker_compose_domains should remain empty
+    $domains = json_decode($application->docker_compose_domains, true);
+    expect($domains)->toBeNull();
+});
+
+test('applicationParser populates docker_compose_domains for KEY-based SERVICE_URL variables', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      - SERVICE_URL_FRONTEND=/ui
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->not->toBeNull()
+        ->and($domains)->toHaveKey('frontend')
+        ->and($domains['frontend']['domain'])->toStartWith('http://')
+        ->and($domains['frontend']['domain'])->toEndWith('/ui');
+});
+
+test('applicationParser preserves existing docker_compose_domains entries', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  backend:
+    image: myapp/backend:latest
+    environment:
+      - SERVICE_FQDN_BACKEND_8000=${BACKEND_URL}
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      - SERVICE_URL_FRONTEND=/ui
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://existing.example.com'],
+        ]),
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains['frontend']['domain'])->toBe('https://existing.example.com')
+        ->and($domains)->toHaveKey('backend')
+        ->and($domains['backend']['domain'])->toStartWith('http://');
+});
+
+test('applicationParser stores domains under original hyphenated compose service names', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+  analytics:
+    image: myapp/analytics:latest
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->toBeArray()
+        ->and($domains)->toHaveKey('another-service')
+        ->and($domains)->not->toHaveKey('another_service')
+        ->and($domains['another-service']['domain'])->toStartWith('http://');
+});
+
+test('applicationParser preserves legacy underscore domain keys by matching hyphenated services', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'another_service' => ['domain' => 'https://legacy.example.com'],
+        ]),
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    // Existing domain is preserved (not overwritten) even when stored under legacy underscore key.
+    expect(getComposeServiceDomainString($domains, 'another-service'))->toBe('https://legacy.example.com');
+});
+
+test('applicationParser reads redirect settings from the compose service domain', function () {
+    $this->server->proxy->set('type', 'TRAEFIK');
+    $this->server->save();
+    ServerSetting::query()
+        ->where('server_id', $this->server->id)
+        ->update(['generate_exact_labels' => true]);
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => [
+                'domain' => 'https://example.com,https://www.example.com',
+                'redirect' => 'www',
+            ],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=$${1}://www.$${2}')))->toBeTrue();
+});
+
+test('compose domain reconciliation preserves stored domains when parsing returns no services', function () {
+    $storedDomains = json_encode([
+        'frontend' => ['domain' => 'https://frontend.example.com'],
+    ]);
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => $storedDomains,
+    ]);
+
+    $method = new ReflectionMethod($application, 'reconcileDockerComposeDomains');
+    $method->invoke($application, ['services' => []]);
+
+    expect($application->fresh()->docker_compose_domains)->toBe($storedDomains);
+});
+
+test('applicationParser handles other docker compose domain shapes without regressions', function () {
+    $createApplication = function (string $dockerCompose, ?string $dockerComposeDomains = null): Application {
+        return Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => StandaloneDocker::class,
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => $dockerCompose,
+            'fqdn' => null,
+            'docker_compose_domains' => $dockerComposeDomains,
+        ]);
+    };
+
+    $valueBasedCompose = <<<'YAML'
+services:
+  backend:
+    image: myapp/backend:latest
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      API_URL: ${SERVICE_URL_BACKEND}
+YAML;
+
+    $valueBasedApplication = $createApplication($valueBasedCompose);
+    applicationParser($valueBasedApplication);
+    $valueBasedApplication->refresh();
+    $valueBasedDomains = json_decode($valueBasedApplication->docker_compose_domains, true);
+
+    expect($valueBasedDomains)->toHaveKey('backend')
+        ->and($valueBasedDomains['backend']['domain'])->toStartWith('http://')
+        ->and($valueBasedDomains)->not->toHaveKey('frontend');
+
+    $mapStyleCompose = <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      SERVICE_URL_FRONTEND: /ui
+YAML;
+
+    $mapStyleApplication = $createApplication($mapStyleCompose);
+    applicationParser($mapStyleApplication);
+    $mapStyleApplication->refresh();
+    $mapStyleDomains = json_decode($mapStyleApplication->docker_compose_domains, true);
+
+    expect($mapStyleDomains)->toHaveKey('frontend')
+        ->and($mapStyleDomains['frontend']['domain'])->toEndWith('/ui');
+
+    $missingServiceCompose = <<<'YAML'
+services:
+  worker:
+    image: myapp/worker:latest
+    environment:
+      SERVICE_URL_API: /api
+YAML;
+
+    $missingServiceApplication = $createApplication($missingServiceCompose);
+    applicationParser($missingServiceApplication);
+    $missingServiceApplication->refresh();
+
+    expect(json_decode($missingServiceApplication->docker_compose_domains, true))->toBeNull();
+
+    $plainCompose = <<<'YAML'
+services:
+  worker:
+    image: myapp/worker:latest
+    environment:
+      FOO: bar
+YAML;
+
+    $plainApplication = $createApplication($plainCompose);
+    applicationParser($plainApplication);
+    $plainApplication->refresh();
+
+    expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
+});
+
+test('applicationParser selects the resource network for Traefik routed compose services', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('applicationParser preserves a user-selected Traefik network', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    labels:
+      traefik.docker.network: custom-network
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())
+        ->toContain('traefik.docker.network=custom-network')
+        ->not->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('generateLabelsApplication routes portless domains to saved internal port overrides for Traefik and Caddy', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`one.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=3000')
+        ->toContain('traefik.http.routers.https-1-'.$application->uuid.'.rule=Host(`two.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-1-'.$application->uuid.'.loadbalancer.server.port=8080')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}')
+        ->toContain('caddy_1.handle_path.1_reverse_proxy={{upstreams 8080}}')
+        ->not->toContain('Host(`one.example.com:3000`)')
+        ->not->toContain('Host(`two.example.com:8080`)');
+});
+
+test('generateLabelsApplication uses the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '4000,5000',
+        'fqdn' => 'https://plain.example.com',
+        'domain_port_overrides' => null,
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=4000')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 4000}}');
+});
+
+test('generateLabelsApplication keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://legacy.example.com',
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    DB::table('applications')->where('id', $application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+        'domain_port_overrides' => null,
+    ]);
+
+    $labels = collect(generateLabelsApplication($application->fresh()));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`legacy.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=9090')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
+});
+
+test('applicationParser compose labels receive the application domain port override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://frontend.example.com' => 8080,
+        ],
+    ]);
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8080}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+});
+
+test('single-service compose leaves undeclared ports to proxy discovery', function (int $parserVersion, string $extraService, bool $isPreview) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => $parserVersion,
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => <<<YAML
+services:
+  frontend:
+    image: httpd:2.4-alpine
+{$extraService}
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $preview = $isPreview ? ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 1,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/1',
+        'docker_compose_domains' => $application->docker_compose_domains,
+    ]) : null;
+
+    $parsedCompose = $application->fresh()->parse(
+        pull_request_id: $preview?->pull_request_id ?? 0,
+        preview_id: $preview?->id,
+    );
+    $labels = collect(data_get($parsedCompose, 'services'))->flatMap(fn ($service) => data_get($service, 'labels', []));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+})->with([2, 3])->with([
+    'web only' => '',
+    'web and database' => "  database:\n    image: postgres:16-alpine",
+])->with([false, true]);
+
+test('compose preview labels split multiple domains for one service', function (int $parserVersion) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => $parserVersion,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: httpd:2.4-alpine
+YAML,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com,https://api.example.com'],
+        ]),
+    ]));
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7915,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/7915',
+        'fqdn' => 'https://7915.app.example.com,https://7915.api.example.com',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://7915.app.example.com,https://7915.api.example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = $application->fresh()->parse(
+        pull_request_id: $preview->pull_request_id,
+        preview_id: $preview->id,
+    );
+    $labels = collect(data_get($parsedCompose, 'services'))
+        ->flatMap(fn ($service) => data_get($service, 'labels', []));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, 'rule=Host(`7915.app.example.com`) && PathPrefix(`/`)')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_ends_with($label, 'rule=Host(`7915.api.example.com`) && PathPrefix(`/`)')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'PathPrefix(`//')))
+        ->toBeFalse();
+})->with([2, 3]);
+
+test('applicationParser compose labels prefer the service exposed port over application ports_exposes', function (string $portConfiguration) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<YAML
+services:
+  frontend:
+    image: myapp/frontend:latest
+{$portConfiguration}
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $labels = collect(data_get(applicationParser($application->fresh()), 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8069')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8069}}')))
+        ->toBeTrue();
+})->with([
+    'expose' => "    expose:\n      - '8069'",
+    'short port syntax' => "    ports:\n      - '18069:8069'",
+    'long port syntax' => "    ports:\n      - target: 8069\n        published: 18069",
+]);
+
+test('applicationParser does not apply an application port to compose services without a declared port', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  postgres:
+    image: postgres:16-alpine
+  backend:
+    build: ./backend
+  frontend:
+    build: ./frontend
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'backend' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+    ]));
+
+    $services = data_get(applicationParser($application->fresh()), 'services');
+    $backendLabels = collect(data_get($services, 'backend.labels'));
+    $frontendLabels = collect(data_get($services, 'frontend.labels'));
+
+    expect($backendLabels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse()
+        ->and($frontendLabels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse();
+});
+
+test('applicationParser preserves an existing required value matching the Compose message', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      TOKEN: \${TOKEN:?configured}\n",
+    ]);
+    $variable = $application->environment_variables()->create(['key' => 'TOKEN', 'value' => 'configured']);
+
+    applicationParser($application);
+
+    expect($variable->fresh()->value)->toBe('configured');
+});
+
+it('preserves migrated null assignments separately for production and previews', function (int $pullRequestId) {
+    $compose = "services:\n  app:\n    image: nginx\n    environment:\n      LEGACY: \${LEGACY:-default}\n";
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+    ]);
+    $env = $application->environment_variables()->create(['key' => 'LEGACY', 'value' => null]);
+    $env->forceFill(['preserve_compose_null' => true])->save();
+    $previewEnv = $application->environment_variables_preview()->where('key', 'LEGACY')->firstOrFail();
+    $previewEnv->update(['value' => 'preview-value']);
+    $previewId = $pullRequestId ? ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => $pullRequestId,
+        'pull_request_html_url' => 'https://example.invalid/pull/42',
+    ])->id : null;
+
+    $parsed = applicationParser($application, $pullRequestId, $previewId);
+
+    expect(data_get($parsed, 'services.'.($pullRequestId ? 'app-pr-42' : 'app').'.environment.LEGACY'))
+        ->toBe($pullRequestId ? '${LEGACY:-default}' : '')
+        ->and($application->fresh()->docker_compose_raw)->toBe($compose);
+})->with([0, 42]);
+
+test('applicationParser keeps port-suffixed SERVICE_URL and SERVICE_FQDN variables in sync with a changed domain', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  api:
+    image: nginx
+    environment:
+      - PUBLIC_API_URL=${SERVICE_URL_API_8000}
+  api2:
+    image: nginx
+    environment:
+      - PUBLIC_API2_URL=${SERVICE_URL_API2_9000}
+YAML,
+    ]);
+
+    applicationParser($application);
+    $application->refresh();
+
+    $application->docker_compose_domains = json_encode([
+        'api' => ['domain' => 'https://frontend.example.com:8000'],
+        'api2' => ['domain' => 'https://api2.example.com:9000'],
+    ]);
+    $application->save();
+
+    applicationParser($application);
+
+    $variables = $application->environment_variables()->pluck('value', 'key');
+
+    expect($variables['SERVICE_URL_API'])->toBe('https://frontend.example.com')
+        ->and($variables['SERVICE_FQDN_API'])->toBe('frontend.example.com')
+        ->and($variables['SERVICE_URL_API_8000'])->toBe('https://frontend.example.com:8000')
+        ->and($variables['SERVICE_FQDN_API_8000'])->toBe('frontend.example.com:8000')
+        ->and($variables['SERVICE_URL_API2'])->toBe('https://api2.example.com')
+        ->and($variables['SERVICE_URL_API2_9000'])->toBe('https://api2.example.com:9000')
+        ->and($variables['SERVICE_FQDN_API2_9000'])->toBe('api2.example.com:9000');
+});
+
+test('applicationParser clears magic URL variables only for the service whose domain is removed', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  api:
+    image: nginx
+    environment:
+      - PUBLIC_API_URL=${SERVICE_URL_API_8000}
+  api2:
+    image: nginx
+    environment:
+      - PUBLIC_API2_URL=${SERVICE_URL_API2_9000}
+YAML,
+    ]);
+
+    applicationParser($application);
+    $application->refresh();
+
+    $application->docker_compose_domains = json_encode([
+        'api' => ['domain' => ''],
+        'api2' => ['domain' => 'https://api2.example.com:9000'],
+    ]);
+    $application->save();
+
+    applicationParser($application);
+
+    $variables = $application->environment_variables()->pluck('value', 'key');
+
+    expect($variables['SERVICE_URL_API'])->toBeNull()
+        ->and($variables['SERVICE_URL_API_8000'])->toBeNull()
+        ->and($variables['SERVICE_FQDN_API_8000'])->toBeNull()
+        ->and($variables['SERVICE_URL_API2'])->toBe('https://api2.example.com')
+        ->and($variables['SERVICE_URL_API2_9000'])->toBe('https://api2.example.com:9000');
+});

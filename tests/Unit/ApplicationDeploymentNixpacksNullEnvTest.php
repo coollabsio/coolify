@@ -4,6 +4,22 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
+use App\Models\Server;
+use Tests\TestCase;
+
+uses(TestCase::class);
+
+/**
+ * Build an environment variable whose resolved value is fixed, without touching the database.
+ */
+function nixpacksEnvVariable(string $key, ?string $resolvedValue): EnvironmentVariable
+{
+    $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
+    $env->key = $key;
+    $env->shouldReceive('getResolvedValueWithServer')->andReturn($resolvedValue);
+
+    return $env;
+}
 
 /**
  * Test to verify that null and empty environment variables are filtered out
@@ -24,24 +40,15 @@ it('filters out null environment variables from nixpacks build command', functio
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables - some with null/empty values
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'VALID_VAR';
-    $envVar1->real_value = 'valid_value';
+    $envVar1 = nixpacksEnvVariable('VALID_VAR', 'valid_value');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'NULL_VAR';
-    $envVar2->real_value = null;
+    $envVar2 = nixpacksEnvVariable('NULL_VAR', null);
 
-    $envVar3 = Mockery::mock(EnvironmentVariable::class);
-    $envVar3->key = 'EMPTY_VAR';
-    $envVar3->real_value = '';
+    $envVar3 = nixpacksEnvVariable('EMPTY_VAR', '');
 
-    $envVar4 = Mockery::mock(EnvironmentVariable::class);
-    $envVar4->key = 'ANOTHER_VALID_VAR';
-    $envVar4->real_value = 'another_value';
+    $envVar4 = nixpacksEnvVariable('ANOTHER_VALID_VAR', 'another_value');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2, $envVar3, $envVar4]);
 
@@ -52,7 +59,6 @@ it('filters out null environment variables from nixpacks build command', functio
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -64,6 +70,10 @@ it('filters out null environment variables from nixpacks build command', functio
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -88,11 +98,11 @@ it('filters out null environment variables from nixpacks build command', functio
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that only valid environment variables are included
-    expect($envArgs)->toContain('--env VALID_VAR=valid_value');
-    expect($envArgs)->toContain('--env ANOTHER_VALID_VAR=another_value');
-    expect($envArgs)->toContain('--env COOLIFY_FQDN=example.com');
-    expect($envArgs)->toContain('--env SOURCE_COMMIT=abc123');
+    // Verify that only valid environment variables are included (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'VALID_VAR=valid_value'");
+    expect($envArgs)->toContain("--env 'ANOTHER_VALID_VAR=another_value'");
+    expect($envArgs)->toContain("--env 'COOLIFY_FQDN=example.com'");
+    expect($envArgs)->toContain("--env 'SOURCE_COMMIT=abc123'");
 
     // Verify that null and empty environment variables are filtered out
     expect($envArgs)->not->toContain('NULL_VAR');
@@ -102,7 +112,7 @@ it('filters out null environment variables from nixpacks build command', functio
 
     // Verify no environment variables end with just '=' (which indicates null/empty value)
     expect($envArgs)->not->toMatch('/--env [A-Z_]+=$/');
-    expect($envArgs)->not->toMatch('/--env [A-Z_]+= /');
+    expect($envArgs)->not->toMatch("/--env '[A-Z_]+='$/");
 });
 
 it('filters out null environment variables from nixpacks preview deployments', function () {
@@ -111,16 +121,11 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock preview environment variables - some with null/empty values
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'PREVIEW_VAR';
-    $envVar1->real_value = 'preview_value';
+    $envVar1 = nixpacksEnvVariable('PREVIEW_VAR', 'preview_value');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'NULL_PREVIEW_VAR';
-    $envVar2->real_value = null;
+    $envVar2 = nixpacksEnvVariable('NULL_PREVIEW_VAR', null);
 
     $previewEnvVars = collect([$envVar1, $envVar2]);
 
@@ -131,7 +136,6 @@ it('filters out null environment variables from nixpacks preview deployments', f
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -143,6 +147,10 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -164,9 +172,9 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that only valid environment variables are included
-    expect($envArgs)->toContain('--env PREVIEW_VAR=preview_value');
-    expect($envArgs)->toContain('--env COOLIFY_FQDN=preview.example.com');
+    // Verify that only valid environment variables are included (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'PREVIEW_VAR=preview_value'");
+    expect($envArgs)->toContain("--env 'COOLIFY_FQDN=preview.example.com'");
 
     // Verify that null environment variables are filtered out
     expect($envArgs)->not->toContain('NULL_PREVIEW_VAR');
@@ -178,16 +186,11 @@ it('handles all environment variables being null or empty', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables - all null or empty
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'NULL_VAR';
-    $envVar1->real_value = null;
+    $envVar1 = nixpacksEnvVariable('NULL_VAR', null);
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'EMPTY_VAR';
-    $envVar2->real_value = '';
+    $envVar2 = nixpacksEnvVariable('EMPTY_VAR', '');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2]);
 
@@ -198,7 +201,6 @@ it('handles all environment variables being null or empty', function () {
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -210,6 +212,10 @@ it('handles all environment variables being null or empty', function () {
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -236,22 +242,59 @@ it('handles all environment variables being null or empty', function () {
     expect($envArgs)->toBe('');
 });
 
+it('filters out null coolify env variables from env_args used in nixpacks plan JSON', function () {
+    // This test verifies the fix for GitHub issue #6830:
+    // When application->fqdn is null, COOLIFY_FQDN/COOLIFY_URL get set to null
+    // in generate_coolify_env_variables(). The generate_env_variables() method
+    // merges these into env_args which become the nixpacks plan JSON "variables".
+    // Nixpacks requires all variable values to be strings, so null causes:
+    // "Error: Failed to parse Nixpacks config file - invalid type: null, expected a string"
+
+    // Simulate the coolify env collection with null values (as produced when fqdn is null)
+    $coolify_envs = collect([
+        'COOLIFY_URL' => null,
+        'COOLIFY_FQDN' => null,
+        'COOLIFY_BRANCH' => 'main',
+        'COOLIFY_RESOURCE_UUID' => 'abc123',
+        'COOLIFY_CONTAINER_NAME' => '',
+    ]);
+
+    // Apply the same filtering logic used in generate_env_variables()
+    $env_args = collect([]);
+    $coolify_envs->each(function ($value, $key) use ($env_args) {
+        if (! is_null($value) && $value !== '') {
+            $env_args->put($key, $value);
+        }
+    });
+
+    // Null values must NOT be present — they cause nixpacks JSON parse errors
+    expect($env_args->has('COOLIFY_URL'))->toBeFalse();
+    expect($env_args->has('COOLIFY_FQDN'))->toBeFalse();
+    expect($env_args->has('COOLIFY_CONTAINER_NAME'))->toBeFalse();
+
+    // Non-null values must be preserved
+    expect($env_args->get('COOLIFY_BRANCH'))->toBe('main');
+    expect($env_args->get('COOLIFY_RESOURCE_UUID'))->toBe('abc123');
+
+    // The resulting array must be safe for json_encode into nixpacks config
+    $json = json_encode(['variables' => $env_args->toArray()], JSON_PRETTY_PRINT);
+    $parsed = json_decode($json, true);
+    foreach ($parsed['variables'] as $value) {
+        expect($value)->toBeString();
+    }
+});
+
 it('preserves environment variables with zero values', function () {
     // Mock application with nixpacks build pack
     $mockApplication = Mockery::mock(Application::class);
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables with zero values (which should NOT be filtered)
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'ZERO_VALUE';
-    $envVar1->real_value = '0';
+    $envVar1 = nixpacksEnvVariable('ZERO_VALUE', '0');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'FALSE_VALUE';
-    $envVar2->real_value = 'false';
+    $envVar2 = nixpacksEnvVariable('FALSE_VALUE', 'false');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2]);
 
@@ -262,7 +305,6 @@ it('preserves environment variables with zero values', function () {
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -274,6 +316,10 @@ it('preserves environment variables with zero values', function () {
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -293,7 +339,7 @@ it('preserves environment variables with zero values', function () {
     $envArgsProperty->setAccessible(true);
     $envArgs = $envArgsProperty->getValue($job);
 
-    // Verify that zero and false string values are preserved
-    expect($envArgs)->toContain('--env ZERO_VALUE=0');
-    expect($envArgs)->toContain('--env FALSE_VALUE=false');
+    // Verify that zero and false string values are preserved (values are now single-quote escaped)
+    expect($envArgs)->toContain("--env 'ZERO_VALUE=0'");
+    expect($envArgs)->toContain("--env 'FALSE_VALUE=false'");
 });

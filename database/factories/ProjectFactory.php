@@ -9,7 +9,7 @@ class ProjectFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->company(),
+            'name' => fake()->unique()->words(2, true),
             'team_id' => 1,
         ];
     }

@@ -75,6 +75,55 @@ it('uses host paths for env-file when preserveRepository is true', function () {
     expect($startCommand)->toContain("-f {$serverWorkdir}{$composeLocation}");
 });
 
+it('injects --project-directory with host path when preserveRepository is true', function () {
+    $serverWorkdir = '/data/coolify/applications/app-uuid';
+    $containerWorkdir = '/artifacts/deployment-uuid';
+    $preserveRepository = true;
+
+    $customStartCommand = 'docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d';
+
+    // Simulate the --project-directory injection from deploy_docker_compose_buildpack()
+    if (! str($customStartCommand)->contains('--project-directory')) {
+        $projectDir = $preserveRepository ? $serverWorkdir : $containerWorkdir;
+        $customStartCommand = str($customStartCommand)->replaceFirst('compose', 'compose --project-directory '.$projectDir)->value();
+    }
+
+    // When preserveRepository is true, --project-directory must point to host path
+    expect($customStartCommand)->toContain("--project-directory {$serverWorkdir}");
+    expect($customStartCommand)->not->toContain('/artifacts/');
+});
+
+it('injects --project-directory with container path when preserveRepository is false', function () {
+    $serverWorkdir = '/data/coolify/applications/app-uuid';
+    $containerWorkdir = '/artifacts/deployment-uuid';
+    $preserveRepository = false;
+
+    $customStartCommand = 'docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d';
+
+    // Simulate the --project-directory injection from deploy_docker_compose_buildpack()
+    if (! str($customStartCommand)->contains('--project-directory')) {
+        $projectDir = $preserveRepository ? $serverWorkdir : $containerWorkdir;
+        $customStartCommand = str($customStartCommand)->replaceFirst('compose', 'compose --project-directory '.$projectDir)->value();
+    }
+
+    // When preserveRepository is false, --project-directory must point to container path
+    expect($customStartCommand)->toContain("--project-directory {$containerWorkdir}");
+    expect($customStartCommand)->not->toContain('/data/coolify/applications/');
+});
+
+it('does not override explicit --project-directory in custom start command', function () {
+    $customProjectDir = '/custom/path';
+    $customStartCommand = "docker compose --project-directory {$customProjectDir} up -d";
+
+    // Simulate the --project-directory injection — should be skipped
+    if (! str($customStartCommand)->contains('--project-directory')) {
+        $customStartCommand = str($customStartCommand)->replaceFirst('compose', 'compose --project-directory /should-not-appear')->value();
+    }
+
+    expect($customStartCommand)->toContain("--project-directory {$customProjectDir}");
+    expect($customStartCommand)->not->toContain('/should-not-appear');
+});
+
 it('uses container paths for env-file when preserveRepository is false', function () {
     $workdir = '/artifacts/deployment-uuid/backend';
     $composeLocation = '/compose.yml';

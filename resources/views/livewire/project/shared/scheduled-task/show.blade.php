@@ -1,56 +1,90 @@
-<div>
-    <x-slot:title>
-        {{ data_get_str($resource, 'name')->limit(10) }} > Scheduled Tasks | Coolify
-    </x-slot>
-    @if ($type === 'application')
-        <h1>Scheduled Task</h1>
-        <livewire:project.application.heading :application="$resource" />
-    @elseif ($type === 'service')
-        <livewire:project.service.heading :service="$resource" :parameters="$parameters" />
+<div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
+    <nav aria-label="Scheduled task sections"
+        class="flex min-w-0 flex-wrap gap-1 border-b border-neutral-200 pb-2 dark:border-white/[0.08]">
+        @foreach (['general' => 'General', 'executions' => 'Executions', ...(auth()->user()->can('update', $resource) ? ['danger' => 'Danger Zone'] : [])] as $sectionKey => $sectionLabel)
+            <button type="button" @click="activeSection = '{{ $sectionKey }}'"
+                :class="activeSection === '{{ $sectionKey }}'
+                    ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25'
+                    : 'text-neutral-500 hover:bg-black/5 hover:text-neutral-900 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md px-3 text-[13px] font-medium transition-colors">
+                {{ $sectionLabel }}
+            </button>
+        @endforeach
+    </nav>
+
+    @if (! $isEnabled && $task->disabled_reason)
+        <x-callout type="danger" title="Disabled because it keeps failing">
+            {{ $task->disabled_reason }} Fix the task, then click Enable.
+        </x-callout>
     @endif
 
-    <form wire:submit="submit" class="w-full">
-        <div class="flex flex-col gap-2 pb-2">
-            <div class="flex gap-2 items-end">
-                <h2>Scheduled Task</h2>
-                <x-forms.button type="submit">
-                    Save
-                </x-forms.button>
+    <form x-show="activeSection === 'general'" wire:submit="submit" class="application-settings-form flex flex-col">
+        <x-unsaved-bar action="submit" />
+        <x-application.settings-section id="task-configuration-section" title="Task configuration"
+            helper="Configure when this task runs and which command Coolify executes.">
+            <x-slot:actions>
                 @if ($resource->isRunning())
-                    <x-forms.button type="button" wire:click="executeNow">
-                        Execute Now
+                    @can('update', $resource)
+                        <x-forms.button type="button" wire:click="executeNow">
+                            Execute now
+                        </x-forms.button>
+                    @endcan
+                @endif
+                @can('update', $resource)
+                    <x-forms.button type="button" wire:click="toggleEnabled" :isHighlighted="!$isEnabled">
+                        {{ $isEnabled ? 'Disable' : 'Enable' }}
                     </x-forms.button>
-                @endif
-                <x-modal-confirmation title="Confirm Scheduled Task Deletion?" isErrorButton buttonTitle="Delete"
-                    submitAction="delete({{ $task->id }})" :actions="['The selected scheduled task will be permanently deleted.']" confirmationText="{{ $task->name }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Scheduled Task Name below"
-                    shortConfirmationLabel="Scheduled Task Name" :confirmWithPassword="false"
-                    step2ButtonText="Permanently Delete" />
+                @endcan
+            </x-slot:actions>
 
+            <div class="grid gap-4 md:grid-cols-2">
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="Name" id="name"
+                    label="Name" required />
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
+                    placeholder="0 0 * * * or daily" id="frequency" label="Schedule"
+                    helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression. Runs in the server timezone ({{ $serverTimezone }}). Change it in the server settings."
+                    required />
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" type="number"
+                    placeholder="300" id="timeout" helper="Maximum execution time from 60 to 36,000 seconds."
+                    label="Timeout (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="php"
+                    helper="Leave empty when the resource only has one container." id="container"
+                    label="{{ $type === 'service' ? 'Service' : 'Container' }}" />
             </div>
-            <div class="w-48">
-                <x-forms.checkbox instantSave id="isEnabled" label="Enabled" />
+            <div class="mt-4">
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
+                    placeholder="php artisan schedule:run" id="command" label="Command" required />
             </div>
-            <div class="flex gap-2 w-full">
-                <x-forms.input placeholder="Name" id="name" label="Name" required />
-                <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" required />
-                <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
-                <x-forms.input type="number" placeholder="300" id="timeout"
-                    helper="Maximum execution time in seconds (60-36000)." label="Timeout (seconds)" required />
-                @if ($type === 'application')
-                    <x-forms.input placeholder="php"
-                        helper="You can leave this empty if your resource only has one container." id="container"
-                        label="Container name" />
-                @elseif ($type === 'service')
-                    <x-forms.input placeholder="php"
-                        helper="You can leave this empty if your resource only has one service in your stack. Otherwise use the stack name, without the random generated ID. So if you have a mysql service in your stack, use mysql."
-                        id="container" label="Service name" />
-                @endif
+            <div class="mt-2 md:w-1/2">
+                <x-forms.checkbox canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
+                    id="useShell" label="Run in a shell"
+                    helper="Run the command with <span class='font-mono'>sh -c</span>, so you can use variables, pipes, and redirects. Turn it off for containers without a shell (distroless or scratch images): Coolify then splits the command into arguments and runs it directly." />
             </div>
+        </x-application.settings-section>
     </form>
 
-    <div class="pt-4">
-        <h3 class="py-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
+    <x-application.settings-section x-show="activeSection === 'executions'" x-cloak id="task-executions-section" title="Recent executions"
+        helper="Execution history refreshes automatically while a task is running." flush>
         <livewire:project.shared.scheduled-task.executions :taskId="$task->id" />
-    </div>
+    </x-application.settings-section>
+
+    @can('update', $resource)
+        <div x-show="activeSection === 'danger'" x-cloak class="application-settings-form">
+            <x-application.settings-section title="Delete scheduled task"
+                description="Permanently remove this task and its execution history.">
+                <x-danger-zone title="This action cannot be undone.">
+                    <p>The task stops running and cannot be restored.</p>
+                    <x-slot:action>
+                        <x-modal-confirmation title="Delete scheduled task?" isErrorButton buttonTitle="Delete task"
+                            submitAction="delete({{ $task->id }})"
+                            :actions="['The selected scheduled task will be permanently deleted.']"
+                            confirmationText="{{ $task->name }}"
+                            confirmationLabel="Enter the scheduled task name to confirm deletion"
+                            shortConfirmationLabel="Task name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently delete" />
+                    </x-slot:action>
+                </x-danger-zone>
+            </x-application.settings-section>
+        </div>
+    @endcan
 </div>

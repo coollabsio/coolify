@@ -2,18 +2,38 @@
 
 namespace App\Livewire;
 
+use App\Events\ServiceStatusChanged;
+use App\Models\Server;
+use App\Models\Service;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
 class ActivityMonitor extends Component
 {
+    /**
+     * Events that may be dispatched when an activity finishes. The event name comes from the
+     * client, so application events must be listed here explicitly.
+     */
+    private const ALLOWED_EVENTS = [
+        'activityFinished',
+        'init',
+        'prerequisitesInstalled',
+        'sysboxInstalled',
+        ServiceStatusChanged::class,
+    ];
+
     public ?string $header = null;
 
+    #[Locked]
     public $activityId = null;
 
+    #[Locked]
     public $eventToDispatch = 'activityFinished';
 
+    #[Locked]
     public $eventData = null;
 
     public $isPollingActive = false;
@@ -26,7 +46,10 @@ class ActivityMonitor extends Component
 
     public static $eventDispatched = false;
 
-    protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
+    protected $listeners = [
+        'activityMonitor' => 'newMonitorActivity',
+        'processDialogClosed' => 'clearActivity',
+    ];
 
     public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null, $header = null)
     {
@@ -34,7 +57,7 @@ class ActivityMonitor extends Component
         self::$eventDispatched = false;
 
         $this->activityId = $activityId;
-        $this->eventToDispatch = $eventToDispatch;
+        $this->eventToDispatch = in_array($eventToDispatch, self::ALLOWED_EVENTS, true) ? $eventToDispatch : null;
         $this->eventData = $eventData;
 
         // Update header if provided
@@ -47,6 +70,16 @@ class ActivityMonitor extends Component
         $this->isPollingActive = true;
     }
 
+    public function clearActivity(): void
+    {
+        $this->activityId = null;
+        $this->activity = null;
+        $this->isPollingActive = false;
+        $this->eventToDispatch = 'activityFinished';
+        $this->eventData = null;
+        self::$eventDispatched = false;
+    }
+
     public function hydrateActivity()
     {
         if ($this->activityId === null) {
@@ -55,16 +88,45 @@ class ActivityMonitor extends Component
             return;
         }
 
-        $this->activity = Activity::find($this->activityId);
+        $activity = Activity::find($this->activityId);
+
+        if (! $activity) {
+            $this->activity = null;
+
+            return;
+        }
+
+        $this->activity = $this->canReadActivity($activity) ? $activity : null;
     }
 
-    public function updatedActivityId($value)
+    /**
+     * Activity output can contain secrets, so only users who can edit the resource that the
+     * activity ran for (or its server) may read it. The policy uses the team of that resource,
+     * not the session team.
+     */
+    private function canReadActivity(Activity $activity): bool
     {
-        if ($value) {
-            $this->hydrateActivity();
-            $this->isPollingActive = true;
-            self::$eventDispatched = false;
+        $user = auth()->user();
+        if (! $user) {
+            return false;
         }
+
+        $subject = $activity->subject;
+        if ($subject instanceof Model) {
+            return $user->can('update', $subject);
+        }
+
+        // Service starts store the service uuid instead of a subject.
+        $typeUuid = data_get($activity, 'properties.type_uuid');
+        if (filled($typeUuid) && ($service = Service::where('uuid', $typeUuid)->first())) {
+            return $user->can('update', $service);
+        }
+
+        $serverUuid = data_get($activity, 'properties.server_uuid');
+        $server = filled($serverUuid) ? Server::where('uuid', $serverUuid)->first() : null;
+
+        // Fail closed: an activity without a resource or server cannot be authorized.
+        return $server !== null && $user->can('update', $server);
     }
 
     public function polling()
@@ -83,11 +145,7 @@ class ActivityMonitor extends Component
                                 ?? $user->currentTeam()?->id
                                 ?? $user->teams->first()?->id;
                             if ($teamId && ! self::$eventDispatched) {
-                                if (filled($this->eventData)) {
-                                    $this->eventToDispatch::dispatch($teamId, $this->eventData);
-                                } else {
-                                    $this->eventToDispatch::dispatch($teamId);
-                                }
+                                $this->eventToDispatch::dispatch($teamId);
                                 self::$eventDispatched = true;
                             }
                         }

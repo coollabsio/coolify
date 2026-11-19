@@ -1,0 +1,81 @@
+<?php
+
+use App\Livewire\Settings\Index;
+use App\Models\InstanceSettings;
+use App\Models\Server;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Model::unguarded(function () {
+        $this->rootTeam = Team::find(0) ?? Team::create(['id' => 0, 'name' => 'Root Team', 'personal_team' => false]);
+        if (! Server::find(0)) {
+            Server::factory()->create(['id' => 0, 'team_id' => $this->rootTeam->id]);
+        }
+        if (! InstanceSettings::find(0)) {
+            InstanceSettings::create(['id' => 0]);
+        }
+    });
+    Once::flush();
+
+    $this->user = User::factory()->create();
+    $this->rootTeam->members()->attach($this->user->id, ['role' => 'admin']);
+
+    $this->actingAs($this->user);
+    session(['currentTeam' => ['id' => $this->rootTeam->id]]);
+});
+
+test('dev_helper_version rejects values outside Docker tag grammar on save', function () {
+    $invalid = [
+        'latest with spaces',
+        'a$b',
+        'a`b',
+        'a|b',
+        'a;b',
+        'a&b',
+        'a>b',
+        'a<b',
+        "a\nb",
+        '.bad',
+        '-rm',
+    ];
+
+    foreach ($invalid as $payload) {
+        Livewire::test(Index::class)
+            ->set('dev_helper_version', $payload)
+            ->call('instantSave')
+            ->assertHasErrors(['dev_helper_version']);
+    }
+
+    expect(InstanceSettings::find(0)->dev_helper_version)->toBeNull();
+});
+
+test('dev_helper_version accepts valid docker tag formats', function () {
+    $valid = ['1.0.12', 'latest', 'dev', 'dev-branch_2', 'v1.2.3-rc1', '1_0_0'];
+
+    foreach ($valid as $tag) {
+        Livewire::test(Index::class)
+            ->set('dev_helper_version', $tag)
+            ->call('instantSave')
+            ->assertHasNoErrors(['dev_helper_version']);
+
+        expect(InstanceSettings::find(0)->fresh()->dev_helper_version)->toBe($tag);
+    }
+});
+
+test('development helper version is read fresh for queue workers', function () {
+    config(['app.env' => 'local']);
+
+    InstanceSettings::findOrFail(0)->update(['dev_helper_version' => 'first']);
+    expect(getHelperVersion())->toBe('first');
+
+    InstanceSettings::query()->whereKey(0)->update(['dev_helper_version' => 'second']);
+
+    expect(getHelperVersion())->toBe('second');
+});

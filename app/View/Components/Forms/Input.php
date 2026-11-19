@@ -5,8 +5,8 @@ namespace App\View\Components\Forms;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\View\Component;
-use Visus\Cuid2\Cuid2;
 
 class Input extends Component
 {
@@ -25,6 +25,7 @@ class Input extends Component
         public bool $readonly = false,
         public ?string $helper = null,
         public bool $allowToPeak = true,
+        public ?bool $copyable = null,
         public bool $isMultiline = false,
         public string $defaultClass = 'input',
         public string $autocomplete = 'off',
@@ -34,6 +35,10 @@ class Input extends Component
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
+        public bool $loading = false,
+        public string $loadingText = 'Loading...',
+        // Alpine expression that makes the field required while it is true, for rules that depend on other unsaved fields.
+        public ?string $requiredWhen = null,
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {
@@ -51,7 +56,7 @@ class Input extends Component
         $this->modelBinding = $this->id;
 
         if (is_null($this->id)) {
-            $this->id = new Cuid2;
+            $this->id = new_public_id();
             // Don't create wire:model binding for auto-generated IDs
             $this->modelBinding = 'null';
         }
@@ -59,7 +64,7 @@ class Input extends Component
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
-            $uniqueSuffix = new Cuid2;
+            $uniqueSuffix = new_public_id();
             $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;
@@ -68,8 +73,22 @@ class Input extends Component
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
-        if ($this->type === 'password') {
-            $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
+        // Password fields get a copy button unless the caller opts out (account password forms).
+        $this->copyable ??= $this->type === 'password';
+
+        // Durable class (not type-attr based): Alpine may toggle type to "text" when revealing,
+        // and settings-workspace CSS otherwise overrides utility padding-right.
+        $hasPeek = $this->type === 'password' && $this->allowToPeak;
+        if ($hasPeek) {
+            $this->defaultClass = $this->defaultClass.' input-with-password-toggle';
+        }
+        if ($this->type === 'number') {
+            $this->defaultClass = $this->defaultClass.' input-with-stepper';
+        }
+        if ($this->copyable) {
+            // Reserve clearance for a single copy button, or for both the peek eye
+            // and the copy button when the field is a maskable password.
+            $this->defaultClass = $this->defaultClass.($hasPeek ? ' input-with-copy-and-peek' : ' input-with-copy-button');
         }
 
         // $this->label = Str::title($this->label);

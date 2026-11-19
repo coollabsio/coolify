@@ -3,11 +3,15 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Traits\AuditsApplicationSettings;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Swarm extends Component
 {
+    use AuditsApplicationSettings, AuthorizesRequests;
+
     public Application $application;
 
     #[Validate('required')]
@@ -28,7 +32,7 @@ class Swarm extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -36,7 +40,7 @@ class Swarm extends Component
             $this->application->swarm_placement_constraints = $this->swarmPlacementConstraints ? base64_encode($this->swarmPlacementConstraints) : null;
             $this->application->settings->is_swarm_only_worker_nodes = $this->isSwarmOnlyWorkerNodes;
             $this->application->save();
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
         } else {
             $this->swarmReplicas = $this->application->swarm_replicas;
             if ($this->application->swarm_placement_constraints) {
@@ -51,8 +55,10 @@ class Swarm extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -61,8 +67,10 @@ class Swarm extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

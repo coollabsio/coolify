@@ -3,7 +3,7 @@
 # category: productivity
 # tags: form, builder, forms, survey, quiz, open source, self-hosted, docker
 # logo: svgs/heyform.svg
-# port: 8000
+# port: 9157
 
 services:
   heyform:
@@ -16,7 +16,7 @@ services:
       keydb:
         condition: service_healthy
     environment:
-      - SERVICE_URL_HEYFORM_8000
+      - SERVICE_URL_HEYFORM_9157
       - APP_HOMEPAGE_URL=${SERVICE_URL_HEYFORM}
       - SESSION_KEY=${SERVICE_BASE64_64_SESSION}
       - FORM_ENCRYPTION_KEY=${SERVICE_BASE64_64_FORM}
@@ -25,7 +25,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${SERVICE_PASSWORD_KEYDB}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9157 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 3

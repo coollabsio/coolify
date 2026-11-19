@@ -1,0 +1,34 @@
+# documentation: https://capjs.js.org/guide/
+# slogan: The self-hosted CAPTCHA for the modern web.
+# category: security
+# tags: captcha,security,privacy,proof-of-work
+# logo: svgs/cap-captcha.png
+# port: 3000
+
+services:
+  cap:
+    image: tiago2/cap:3.0.4 # Released on 22nd April 2026
+    environment:
+      - SERVICE_URL_CAP_3000
+      - ADMIN_KEY=$SERVICE_PASSWORD_ADMIN
+      - REDIS_URL=redis://valkey:6379
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      valkey:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - valkey-data:/data
+    command: valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

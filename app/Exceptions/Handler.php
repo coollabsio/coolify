@@ -2,13 +2,12 @@
 
 namespace App\Exceptions;
 
-use App\Models\InstanceSettings;
-use App\Models\User;
+use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use RuntimeException;
-use Sentry\Laravel\Integration;
-use Sentry\State\Scope;
+use Illuminate\Session\TokenMismatchException;
+use Psr\Log\LogLevel;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -16,7 +15,7 @@ class Handler extends ExceptionHandler
     /**
      * A list of exception types with their corresponding custom log levels.
      *
-     * @var array<class-string<\Throwable>, \Psr\Log\LogLevel::*>
+     * @var array<class-string<Throwable>, LogLevel::*>
      */
     protected $levels = [
         //
@@ -25,12 +24,13 @@ class Handler extends ExceptionHandler
     /**
      * A list of the exception types that are not reported.
      *
-     * @var array<int, class-string<\Throwable>>
+     * @var array<int, class-string<Throwable>>
      */
     protected $dontReport = [
         ProcessException::class,
         NonReportableException::class,
         DeploymentException::class,
+        DatabaseStartException::class,
     ];
 
     /**
@@ -44,11 +44,16 @@ class Handler extends ExceptionHandler
         'password_confirmation',
     ];
 
-    private InstanceSettings $settings;
-
     protected function unauthenticated($request, AuthenticationException $exception)
     {
         if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $exception)) {
+            if ($request->is('api/*')) {
+                auditLog('api.auth.unauthenticated', [
+                    'reason' => $exception->getMessage(),
+                    'guards' => $exception->guards(),
+                ], 'warning');
+            }
+
             return response()->json(['message' => $exception->getMessage()], 401);
         }
 
@@ -60,9 +65,22 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $e)
     {
-        // Handle authorization exceptions for API routes
-        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+        // A duplicate login or 2FA submission carries a stale token on an already authenticated session, see https://github.com/coollabsio/coolify/issues/10670
+        if ($e instanceof TokenMismatchException && $request->routeIs('login.store', 'two-factor.login.store') && $request->user()) {
+            return redirect()->intended(RouteServiceProvider::HOME);
+        }
+
+        // Handle authorization exceptions for API routes. Exceptions carrying
+        // an explicit status (e.g. denyAsNotFound) keep it via parent::render.
+        if ($e instanceof AuthorizationException && ! $e->hasStatus()) {
             if ($request->is('api/*') || $request->expectsJson()) {
+                if ($request->is('api/*')) {
+                    auditLog('api.auth.policy_denied', [
+                        'reason' => $e->getMessage(),
+                        'route' => $request->route()?->getName() ?? $request->path(),
+                    ], 'warning');
+                }
+
                 // Get the custom message from the policy if available
                 $message = $e->getMessage();
 
@@ -82,45 +100,5 @@ class Handler extends ExceptionHandler
         }
 
         return parent::render($request, $e);
-    }
-
-    /**
-     * Register the exception handling callbacks for the application.
-     */
-    public function register(): void
-    {
-        $this->reportable(function (Throwable $e) {
-            if (isDev()) {
-                return;
-            }
-            if ($e instanceof RuntimeException) {
-                return;
-            }
-            $this->settings = instanceSettings();
-            if ($this->settings->do_not_track) {
-                return;
-            }
-            app('sentry')->configureScope(
-                function (Scope $scope) {
-                    $email = auth()?->user() ? auth()->user()->email : 'guest';
-                    $instanceAdmin = User::find(0)->email ?? 'admin@localhost';
-                    $scope->setUser(
-                        [
-                            'email' => $email,
-                            'instanceAdmin' => $instanceAdmin,
-                        ]
-                    );
-                }
-            );
-            // Check for errors that should not be reported to Sentry
-            if (str($e->getMessage())->contains('No space left on device')) {
-                // Log locally but don't send to Sentry
-                logger()->warning('Disk space error: '.$e->getMessage());
-
-                return;
-            }
-
-            Integration::captureUnhandledException($e);
-        });
     }
 }

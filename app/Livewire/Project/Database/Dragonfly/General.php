@@ -4,19 +4,18 @@ namespace App\Livewire\Project\Database\Dragonfly;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\StandaloneDragonfly;
 use App\Support\ValidationPatterns;
-use Carbon\Carbon;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?Server $server = null;
 
@@ -34,31 +33,21 @@ class General extends Component
 
     public ?bool $isPublic = null;
 
-    public ?int $publicPort = null;
+    public mixed $publicPort = null;
 
-    public ?int $publicPortTimeout = 3600;
+    public mixed $publicPortTimeout = 3600;
 
     public ?string $customDockerRunOptions = null;
 
-    public ?string $dbUrl = null;
-
-    public ?string $dbUrlPublic = null;
-
     public bool $isLogDrainEnabled = false;
 
-    public ?Carbon $certificateValidUntil = null;
+    public bool $isPasswordHiddenForMember = false;
 
-    public bool $enable_ssl = false;
-
-    public function getListeners()
+    public function getListeners(): array
     {
-        $userId = Auth::id();
-        $teamId = Auth::user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
-            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-        ];
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
     }
 
     public function mount()
@@ -72,15 +61,11 @@ class General extends Component
 
                 return;
             }
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if ($existingCert) {
-                $this->certificateValidUntil = $existingCert->valid_until;
-            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     protected function rules(): array
@@ -88,17 +73,16 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'dragonflyPassword' => 'required|string',
+            'dragonflyPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->dragonflyPassword !== $this->database->dragonfly_password,
+            ),
             'image' => 'required|string',
-            'portsMappings' => 'nullable|string',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'isPublic' => 'nullable|boolean',
-            'publicPort' => 'nullable|integer',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
             'publicPortTimeout' => 'nullable|integer|min:1',
             'customDockerRunOptions' => 'nullable|string',
-            'dbUrl' => 'nullable|string',
-            'dbUrlPublic' => 'nullable|string',
             'isLogDrainEnabled' => 'nullable|boolean',
-            'enable_ssl' => 'nullable|boolean',
         ];
     }
 
@@ -106,51 +90,51 @@ class General extends Component
     {
         return array_merge(
             ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
             [
-                'dragonflyPassword.required' => 'The Dragonfly Password field is required.',
-                'dragonflyPassword.string' => 'The Dragonfly Password must be a string.',
+                ...ValidationPatterns::databasePasswordMessages('dragonflyPassword', 'Dragonfly Password'),
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
                 'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
                 'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
             ]
         );
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->dragonfly_password = $this->dragonflyPassword;
+            // After the first start the password is read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->dragonfly_password = $this->dragonflyPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
-            $this->database->public_port = $this->publicPort;
-            $this->database->public_port_timeout = $this->publicPortTimeout;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
-            $this->database->enable_ssl = $this->enable_ssl;
             $this->database->save();
-
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->dragonflyPassword = $this->database->dragonfly_password;
+            $this->dragonflyPassword = $canSeeCredentials ? $this->database->dragonfly_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->enable_ssl = $this->database->enable_ssl;
-            $this->dbUrl = $this->database->internal_db_url;
-            $this->dbUrlPublic = $this->database->external_db_url;
         }
     }
 
@@ -199,7 +183,9 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
@@ -207,9 +193,13 @@ class General extends Component
         }
     }
 
-    public function databaseProxyStopped()
+    public function databaseProxyStopped(): void
     {
-        $this->syncData();
+        $this->database->refresh();
+        $this->isPublic = $this->database->is_public;
+        $this->publicPort = $this->database->public_port;
+        $this->publicPortTimeout = $this->database->public_port_timeout;
+        $this->dispatch('databaseUpdated');
     }
 
     public function submit()
@@ -217,11 +207,15 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
@@ -233,64 +227,9 @@ class General extends Component
         }
     }
 
-    public function instantSaveSSL()
+    public function refresh(): void
     {
-        try {
-            $this->authorize('update', $this->database);
-
-            $this->syncData(true);
-            $this->dispatch('success', 'SSL configuration updated.');
-        } catch (Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function regenerateSslCertificate()
-    {
-        try {
-            $this->authorize('update', $this->database);
-
-            $existingCert = $this->database->sslCertificates()->first();
-
-            if (! $existingCert) {
-                $this->dispatch('error', 'No existing SSL certificate found for this database.');
-
-                return;
-            }
-
-            $server = $this->database->destination->server;
-
-            $caCert = $server->sslCertificates()
-                ->where('is_ca_certificate', true)
-                ->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
-
-            SslHelper::generateSslCertificate(
-                commonName: $existingCert->commonName,
-                subjectAlternativeNames: $existingCert->subjectAlternativeNames ?? [],
-                resourceType: $existingCert->resource_type,
-                resourceId: $existingCert->resource_id,
-                serverId: $existingCert->server_id,
-                caCert: $caCert->ssl_certificate,
-                caKey: $caCert->ssl_private_key,
-                configurationDir: $existingCert->configuration_dir,
-                mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
-            );
-
-            $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
-        } catch (Exception $e) {
-            handleError($e, $this);
-        }
+        $this->database->refresh();
+        $this->syncData();
     }
 }

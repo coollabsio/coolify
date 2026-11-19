@@ -28,8 +28,8 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
-      interval: 2s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/status.php"]
+      interval: 30s
       timeout: 10s
       retries: 15
 

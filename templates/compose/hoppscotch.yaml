@@ -7,7 +7,7 @@
 
 services:
   backend:
-    image: hoppscotch/hoppscotch:latest
+    image: hoppscotch/hoppscotch:2026.2.1
     environment:
       - SERVICE_URL_HOPPSCOTCH_80
       - VITE_ALLOWED_AUTH_PROVIDERS=${VITE_ALLOWED_AUTH_PROVIDERS:-GOOGLE,GITHUB,MICROSOFT,EMAIL}
@@ -34,7 +34,7 @@ services:
       retries: 10
 
   hoppscotch-db:
-    image: postgres:latest
+    image: postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -51,7 +51,7 @@ services:
 
   db-migration:
     exclude_from_hc: true
-    image: hoppscotch/hoppscotch:latest
+    image: hoppscotch/hoppscotch:2026.2.1
     depends_on:
       hoppscotch-db:
         condition: service_healthy
