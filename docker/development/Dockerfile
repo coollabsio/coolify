@@ -1,6 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.4
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.11.1
 # https://www.postgresql.org/support/versioning/
