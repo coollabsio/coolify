@@ -1,15 +1,32 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\Environment;
+use App\Models\GithubApp;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -19,6 +36,35 @@ beforeEach(function () {
 
     // Fake notifications to ensure none are sent
     Notification::fake();
+    // app:init pulls the service templates and writes the real repository file,
+    // so answer with its current content instead of an empty body.
+    Http::fake([
+        config('constants.services.official') => Http::response(file_get_contents(service_templates_path())),
+        '*' => Http::response(),
+    ]);
+    Process::fake();
+    Queue::fake();
+
+    InstanceSettings::forceCreate(['id' => 0, 'do_not_track' => true]);
+
+    // app:init runs `optimize`, which boots a fresh application with a new in-memory
+    // database and caches config into bootstrap/cache. Replace both with no-ops here.
+    foreach (['optimize', 'optimize:clear'] as $commandName) {
+        app(Kernel::class)->registerCommand(new class($commandName) extends Command
+        {
+            public function __construct(string $commandName)
+            {
+                $this->signature = $commandName;
+
+                parent::__construct();
+            }
+
+            public function handle(): int
+            {
+                return self::SUCCESS;
+            }
+        });
+    }
 });
 
 afterEach(function () {
@@ -86,15 +132,30 @@ test('app:init marks stuck database backup executions as failed', function () {
     $team = Team::factory()->create();
 
     // Create a database
-    $database = StandalonePostgresql::factory()->create([
-        'team_id' => $team->id,
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::firstOrCreate(
+        ['server_id' => $server->id, 'network' => 'coolify'],
+        ['uuid' => (string) Str::uuid(), 'name' => 'docker']
+    );
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandalonePostgresql::create([
+        'name' => 'db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'db',
+        'image' => 'postgres:17',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ]);
 
     // Create a scheduled backup
-    $scheduledBackup = ScheduledDatabaseBackup::factory()->create([
+    $scheduledBackup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
         'team_id' => $team->id,
         'database_id' => $database->id,
-        'database_type' => StandalonePostgresql::class,
+        'database_type' => $database->getMorphClass(),
     ]);
 
     // Create multiple backup executions with 'running' status
@@ -185,7 +246,8 @@ test('app:init handles cleanup when no stuck executions exist', function () {
 
 test('cleanup does not send notifications even when team has notification settings', function () {
     // Create a team with notification settings enabled
-    $team = Team::factory()->create([
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings->update([
         'smtp_enabled' => true,
         'smtp_from_address' => 'test@example.com',
     ]);
@@ -213,4 +275,50 @@ test('cleanup does not send notifications even when team has notification settin
 
     // Assert NO notifications were sent despite team having notification settings
     Notification::assertNothingSent();
+});
+
+test('app:init queues a GitHub deployment sync for each interrupted deployment', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $githubApp = GithubApp::create([
+        'name' => 'Private GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'app_id' => 12345,
+        'installation_id' => 67890,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+        'is_public' => false,
+        'deployments' => 'write',
+        'team_id' => $team->id,
+    ]);
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => $project->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'source_type' => GithubApp::class,
+        'source_id' => $githubApp->id,
+    ]);
+    $deploy = fn (ApplicationDeploymentStatus $status): ApplicationDeploymentQueue => ApplicationDeploymentQueue::create([
+        'application_id' => $application->id,
+        'deployment_uuid' => (string) Str::uuid(),
+        'pull_request_id' => 0,
+        'commit' => 'HEAD',
+        'status' => $status->value,
+        'server_id' => $server->id,
+    ]);
+    $inProgress = $deploy(ApplicationDeploymentStatus::IN_PROGRESS);
+    $queued = $deploy(ApplicationDeploymentStatus::QUEUED);
+    $finished = $deploy(ApplicationDeploymentStatus::FINISHED);
+
+    Artisan::call('app:init');
+
+    expect($inProgress->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::FAILED->value)
+        ->and($finished->fresh()->status)->toBe(ApplicationDeploymentStatus::FINISHED->value);
+    Queue::assertPushed(SyncGithubDeploymentJob::class, 2);
+    foreach ([$inProgress, $queued] as $failed) {
+        Queue::assertPushed(SyncGithubDeploymentJob::class, fn (SyncGithubDeploymentJob $job): bool => $job->deploymentQueueId === $failed->id);
+    }
 });

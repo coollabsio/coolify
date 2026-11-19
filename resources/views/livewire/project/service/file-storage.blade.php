@@ -11,9 +11,9 @@
         @elseif ($isReadOnly)
             <x-callout type="info" title="Read-only mount">
                 @if ($fileStorage->is_directory)
-                    This directory is mounted as read-only and cannot be modified from the UI.
+                    This directory is mounted as read-only. You can convert it to a file, but you cannot delete it from the UI.
                 @else
-                    This file is mounted as read-only and cannot be modified from the UI.
+                    This file is mounted as read-only. You cannot edit or delete it from the UI.
                 @endif
             </x-callout>
         @endif
@@ -31,6 +31,23 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
+        @if (filled($fileStorage->variable_fs_path))
+            <x-callout type="warning" title="Saved host path">
+                This storage keeps its saved host path, so its data does not move. The variable in the Compose file
+                gives <span class="font-mono">{{ $fileStorage->variable_fs_path }}</span>.
+                @can('update', $resource)
+                    <div class="pt-2">
+                        <x-modal-confirmation title="Use the Variable Path?" buttonTitle="Use the variable path"
+                            submitAction="useVariablePath" :confirmWithText="false" :confirmWithPassword="false"
+                            warningMessage="The data stays at the saved host path. Coolify does not copy or delete it."
+                            :actions="[
+                                'From the next deployment, the storage mounts ' . $fileStorage->variable_fs_path . '.',
+                                'Coolify does not move the data from ' . $fileStorage->fs_path . '. Copy it yourself if you need it.',
+                            ]" step2ButtonText="Use the variable path" />
+                    </div>
+                @endcan
+            </x-callout>
+        @endif
         @if ($resource instanceof \App\Models\Application && $resource->git_based())
             @can('update', $resource)
                 <div class="w-full sm:w-96">
@@ -45,60 +62,64 @@
         @endif
         <form wire:submit='submit' class="flex flex-col gap-4">
             <x-unsaved-bar action="submit" />
-            @if (!$isReadOnly)
-                @can('update', $resource)
-                    <div class="flex flex-wrap items-center gap-2">
-                        @if ($fileStorage->is_host_file)
+            @can('update', $resource)
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($fileStorage->is_host_file)
+                        @if (!$isReadOnly)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
-                                buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"
-                                :actions="['Only the mount configuration will be removed. The host file will not be deleted.']"
-                                confirmationText="{{ $fs_path }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" />
-                        @elseif ($fileStorage->is_directory)
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
-                                buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
-                                    'All files in this directory will be permanently deleted and an empty file will be created in its place.',
-                                ]"
-                                confirmationText="{{ $fs_path }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
-                            @if ($resource instanceof \App\Models\Application)
-                                <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup"
-                                    :wireIgnore="false">
-                                    <livewire:project.application.backup.create :application="$resource"
-                                        :selected-target-key="'directory:' . $fileStorage->id"
-                                        wire:key="configure-directory-backup-{{ $fileStorage->id }}" />
-                                </x-modal-input>
-                            @endif
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
-                                isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
-                                    'The selected directory and all its contents will be permanently deleted from the container.',
-                                ]"
-                                confirmationText="{{ $fs_path }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                shortConfirmationLabel="Filepath" />
-                        @else
-                            @if (!$fileStorage->is_binary && !$fileStorage->is_too_large)
-                                <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
-                                    buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
-                                        'The selected file will be permanently deleted and an empty directory will be created in its place.',
-                                    ]"
-                                    confirmationText="{{ $fs_path }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                                    shortConfirmationLabel="Filepath" :confirmWithPassword="false"
-                                    step2ButtonText="Convert to directory" />
-                            @endif
-                            <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
-                                server</x-forms.button>
-                            <x-modal-confirmation :ignoreWire="false" title="Confirm File Deletion?" buttonTitle="Delete"
-                                isErrorButton submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']"
+                                buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$deletionCheckboxes"
+                                :actions="$deletionActions"
                                 confirmationText="{{ $fs_path }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                                 shortConfirmationLabel="Filepath" />
                         @endif
-                    </div>
-                @endcan
+                    @elseif ($fileStorage->is_directory)
+                        <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
+                            buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
+                                'All files in this directory will be permanently deleted and an empty file will be created in its place.',
+                            ]"
+                            confirmationText="{{ $fs_path }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                            shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
+                        @if ($resource instanceof \App\Models\Application && !$isReadOnly)
+                            <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup"
+                                :wireIgnore="false">
+                                <livewire:project.application.backup.create :application="$resource"
+                                    :selected-target-key="'directory:' . $fileStorage->id"
+                                    wire:key="configure-directory-backup-{{ $fileStorage->id }}" />
+                            </x-modal-input>
+                        @endif
+                        @if (!$isReadOnly)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
+                                isErrorButton submitAction="delete" :checkboxes="$deletionCheckboxes" :actions="$deletionActions"
+                                confirmationText="{{ $fs_path }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                                shortConfirmationLabel="Filepath" />
+                        @endif
+                    @else
+                        @if (!$fileStorage->is_binary && !$fileStorage->is_too_large)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
+                                buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
+                                    'The selected file will be permanently deleted and an empty directory will be created in its place.',
+                                ]"
+                                confirmationText="{{ $fs_path }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                                shortConfirmationLabel="Filepath" :confirmWithPassword="false"
+                                step2ButtonText="Convert to directory" />
+                        @endif
+                        <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
+                            server</x-forms.button>
+                        @if (!$isReadOnly)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm File Deletion?" buttonTitle="Delete"
+                                isErrorButton submitAction="delete" :checkboxes="$deletionCheckboxes" :actions="$deletionActions"
+                                confirmationText="{{ $fs_path }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                                shortConfirmationLabel="Filepath" />
+                        @endif
+                    @endif
+                </div>
+            @endcan
+            @if (!$isReadOnly)
                 @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
                     @can('update', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
@@ -110,7 +131,7 @@
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                            rows="20" id="content"
+                            rows="20" id="content" :useMonacoEditor="$isYamlFile" monacoEditorLanguage="yaml"
                             readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
                     @else
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
@@ -119,31 +140,30 @@
                                     id="isBasedOnGit"></x-forms.checkbox>
                             </div>
                         @endif
-                        <x-forms.textarea
-                            label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                            helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                            rows="20" id="content" disabled></x-forms.textarea>
+                        <x-callout type="info" title="Hidden (only admins can view)">
+                            The file content can contain secrets.
+                        </x-callout>
                     @endcan
                 @endif
             @else
                 {{-- Read-only view --}}
                 @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
-                    @can('update', $resource)
-                        <div class="flex gap-2">
-                            <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
-                                server</x-forms.button>
-                        </div>
-                    @endcan
                     @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                         <div class="w-full sm:w-96">
                             <x-forms.checkbox disabled label="Is this based on the Git repository?"
                                 id="isBasedOnGit"></x-forms.checkbox>
                         </div>
                     @endif
-                    <x-forms.textarea
-                        label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                        helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
-                        rows="20" id="content" disabled></x-forms.textarea>
+                    @can('update', $resource)
+                        <x-forms.textarea
+                            label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
+                            helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
+                            rows="20" id="content" :useMonacoEditor="$isYamlFile" monacoEditorLanguage="yaml" disabled></x-forms.textarea>
+                    @else
+                        <x-callout type="info" title="Hidden (only admins can view)">
+                            The file content can contain secrets.
+                        </x-callout>
+                    @endcan
                 @endif
             @endif
         </form>

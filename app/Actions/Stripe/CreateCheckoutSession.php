@@ -157,6 +157,12 @@ class CreateCheckoutSession
             'payment_method_collection' => 'if_required',
             'mode' => 'subscription',
             'expires_at' => now()->addMinutes(35)->timestamp,
+            'after_expiration' => [
+                'recovery' => [
+                    'enabled' => true,
+                    'allow_promotion_codes' => false,
+                ],
+            ],
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ]);

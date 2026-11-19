@@ -27,6 +27,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -73,4 +74,5 @@ it('keeps required mass-assignment attributes fillable for internal create flows
     [StandaloneKeydb::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
     [StandaloneDragonfly::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
     [StandaloneClickhouse::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
+    [StandaloneSqlite::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
 ]);

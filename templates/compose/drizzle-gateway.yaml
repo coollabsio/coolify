@@ -7,7 +7,7 @@
 
 services:
   drizzle-gateway:
-    image: ghcr.io/drizzle-team/gateway:latest
+    image: ghcr.io/drizzle-team/gateway:1.7.0
     environment:
       - SERVICE_URL_DRIZZLE_4983
       - STORE_PATH=/app

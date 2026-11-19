@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -38,6 +38,8 @@ it('validates without installing by default', function () {
 });
 
 it('validates and installs when explicitly requested', function () {
+    $this->token = $this->user->createToken('server-validation-install', ['write', 'deploy'])->plainTextToken;
+
     $response = $this->withHeaders(serverValidationHeaders())
         ->postJson("/api/v1/servers/{$this->server->uuid}/validate", ['install' => true]);
 
@@ -55,3 +57,19 @@ it('rejects an invalid install option', function () {
 
     $response->assertUnprocessable()->assertJsonValidationErrors('install');
 });
+
+it('rejects non-string SSH host keys with 422', function (string $endpoint) {
+    $settingsBefore = $this->server->settings->getAttributes();
+    $serverCount = Server::count();
+
+    $this->withHeaders(serverValidationHeaders())
+        ->postJson($endpoint === 'create' ? '/api/v1/servers' : "/api/v1/servers/{$this->server->uuid}/host-key/reset", [
+            'ssh_host_key' => ['x'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ssh_host_key');
+
+    expect(Server::count())->toBe($serverCount);
+    expect($this->server->settings->fresh()->getAttributes())->toBe($settingsBefore);
+    Queue::assertNothingPushed();
+})->with(['create', 'reset']);

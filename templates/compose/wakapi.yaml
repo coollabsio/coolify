@@ -7,7 +7,7 @@
 
 services:
   wakapi:
-    image: ghcr.io/muety/wakapi:latest
+    image: ghcr.io/muety/wakapi:2.18.2
     environment:
       - SERVICE_URL_WAKAPI_3000
       - TZ=${TIMEZONE:-Europe/Berlin}
@@ -47,13 +47,13 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/"]
+      test: ["CMD", "/app/healthcheck"]
       interval: 2s
       timeout: 10s
       retries: 15
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     volumes:
       - wakapi-postgres-data:/var/lib/postgresql/data
     environment:

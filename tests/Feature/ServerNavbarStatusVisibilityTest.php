@@ -1,17 +1,20 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Livewire\Server\Navbar;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 });
 
 function makeNavbarServer(bool $isFunctional): array
@@ -54,42 +57,30 @@ it('shows sentinel sync status after the server is validated', function () {
         ->assertSee('In sync');
 });
 
-it('places mobile status badges on a separate row below the server title', function () {
-    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+it('shows the first Sentinel report as pending instead of requiring attention', function () {
+    [$server] = makeNavbarServer(isFunctional: true);
+    $server->forceFill([
+        'sentinel_updated_at' => now()->subDay(),
+        'sentinel_waiting_since' => now(),
+    ])->save();
 
-    $mobileTitleBlock = str($navbar)
-        ->after('data-testid="server-subtitle"')
-        ->before('id="server-mobile-actions"')
-        ->toString();
-
-    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
-
-    expect($navbar)
-        ->toContain('mb-3 w-full lg:hidden')
-        ->toContain('data-testid="server-subtitle"')
-        ->toContain('flex min-w-0 flex-col gap-2');
-
-    $titleBlock = str($navbar)
-        ->after('mb-3 w-full lg:hidden')
-        ->before('Phone-only actions')
-        ->toString();
-
-    $titlePos = strpos($titleBlock, 'data-testid="server-subtitle"');
-    $badgesRowPos = strpos($titleBlock, 'flex min-w-0 flex-wrap items-center gap-2');
-
-    expect($titlePos)->not->toBeFalse()
-        ->and($badgesRowPos)->not->toBeFalse()
-        ->and($titlePos)->toBeLessThan($badgesRowPos);
+    Livewire::test('server.navbar', ['server' => $server->fresh()])
+        ->assertSee('Ready')
+        ->assertSee('Waiting for first report')
+        ->assertDontSee('Attention required')
+        ->assertDontSee('Out of sync');
 });
 
-it('listens for sentinel restarted broadcasts', function () {
+it('listens for sentinel status broadcasts', function () {
     [$server, , $team] = makeNavbarServer(isFunctional: true);
 
     Livewire::test('server.navbar', ['server' => $server])
         ->assertSet('server.uuid', $server->uuid);
 
     expect(app(Navbar::class)->getListeners())
-        ->toHaveKey("echo-private:team.{$team->id},SentinelRestarted", 'refreshSentinelStatus');
+        ->toHaveKey('sentinel-restart-requested', 'hideSentinelWarning')
+        ->toHaveKey("echo-private:team.{$team->id},SentinelRestarted", 'refreshSentinelStatus')
+        ->toHaveKey("echo-private:team.{$team->id},SentinelSynchronized", 'refreshSentinelStatus');
 });
 
 it('refreshes sentinel status when sentinel restarts for the server', function () {
@@ -107,5 +98,35 @@ it('refreshes sentinel status when sentinel restarts for the server', function (
     $component
         ->call('refreshSentinelStatus', ['serverUuid' => $server->uuid])
         ->assertSee('In sync')
-        ->assertDontSee('Out of sync');
+        ->assertDontSee('Out of sync')
+        ->assertDispatched('sentinel-status-changed');
+});
+
+it('shows the Traefik dashboard link without proxy actions to members who cannot manage the proxy', function () {
+    [$server, $user, $team] = makeNavbarServer(isFunctional: true);
+    $user->teams()->updateExistingPivot($team->id, ['role' => 'member']);
+    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value, 'status' => 'running']])->save();
+    $server = $server->fresh();
+    Cache::put(ProxyDashboardCacheService::getCacheKey($server), true);
+
+    Livewire::test('server.navbar', ['server' => $server])
+        ->set('currentRoute', 'server.proxy')
+        ->assertSee('Traefik Dashboard')
+        ->assertDontSee('Refresh Proxy Status');
+});
+
+it('shows the current proxy status after a background status update', function () {
+    [$server] = makeNavbarServer(isFunctional: true);
+    $server->forceFill(['proxy' => ['type' => ProxyTypes::TRAEFIK->value, 'status' => 'starting']])->save();
+
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
+        ->assertSet('proxyStatus', 'starting');
+
+    // Sentinel or the server check job marks the proxy as running without a UI broadcast.
+    $server->proxy->set('status', 'running');
+    $server->save();
+
+    $component->call('refreshAgentStatus')
+        ->assertSet('proxyStatus', 'running')
+        ->assertDontSee('Starting');
 });

@@ -30,6 +30,12 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
 
     public $timeout = 600; // 10 minutes max
 
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), instead of after the queue
+     * retry_after, so the next daily run is not blocked.
+     */
+    public int $uniqueFor = 600;
+
     public function __construct() {}
 
     public function middleware(): array
@@ -141,16 +147,11 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     }
 
     /**
-     * Extract application ID from container labels.
+     * Id of the application that owns the container (see resolveContainerApplicationId()).
      */
     private function extractApplicationId($container): ?int
     {
-        $labels = data_get($container, 'Labels', '');
-        if (preg_match('/coolify\.applicationId=(\d+)/', $labels, $matches)) {
-            return (int) $matches[1];
-        }
-
-        return null;
+        return resolveContainerApplicationId(collect(), (string) data_get($container, 'Labels', ''));
     }
 
     /**

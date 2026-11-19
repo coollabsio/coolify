@@ -1,20 +1,63 @@
 <?php
 
 use App\Enums\ProxyTypes;
-use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\RemoteSecretReferences;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+
+/**
+ * Parses Docker Compose YAML with a higher collection alias limit than the Symfony default (128),
+ * because large Compose files (for example Sentry self-hosted) reuse YAML anchors many times.
+ *
+ * @throws ParseException If the YAML is invalid or exceeds the alias limit
+ */
+function parseDockerComposeYaml(string $compose): mixed
+{
+    // Editors on Windows can save files with a UTF-8 BOM, which Symfony YAML keeps in the first key.
+    $compose = preg_replace('/^\xEF\xBB\xBF/', '', $compose);
+
+    try {
+        return Yaml::parse($compose, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+    } catch (ParseException $e) {
+        $joined = joinComposeAnchorsToTheirKeys($compose);
+        if ($joined === $compose) {
+            throw $e;
+        }
+        try {
+            return Yaml::parse($joined, maxAliasesForCollections: Application::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES);
+        } catch (ParseException) {
+            throw $e;
+        }
+    }
+}
+
+/**
+ * Moves an anchor that is on its own line below a key to the line of the key ("key:\n  &name" becomes "key: &name").
+ * Docker Compose accepts both forms (the Airflow Compose file uses the first), but Symfony YAML only reads the second.
+ * Only used after a failed parse, so a valid file (for example a block scalar with such lines) stays unchanged.
+ */
+function joinComposeAnchorsToTheirKeys(string $compose): string
+{
+    return preg_replace_callback(
+        '/^([ \t]*)((?:- )?[^\s#][^\n]*?:)[ \t]*(?:#[^\n]*)?\r?\n([ \t]+)(&[^\s#]+)[ \t]*(?:#[^\n]*)?\r?$/m',
+        fn (array $match) => strlen($match[3]) > strlen($match[1]) ? "{$match[1]}{$match[2]} {$match[4]}" : $match[0],
+        $compose
+    );
+}
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
@@ -27,7 +70,7 @@ use Symfony\Component\Yaml\Yaml;
 function validateDockerComposeForInjection(string $composeYaml): void
 {
     try {
-        $parsed = Yaml::parse($composeYaml);
+        $parsed = parseDockerComposeYaml($composeYaml);
     } catch (Exception $e) {
         throw new Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
     }
@@ -47,6 +90,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                 $e
             );
         }
+        validateComposeServiceName((string) $serviceName);
 
         // Validate volumes in this service (both string and array formats)
         if (isset($serviceConfig['volumes']) && is_array($serviceConfig['volumes'])) {
@@ -59,29 +103,13 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
-                            // Allow env vars and env vars with defaults (validated in parseDockerVolumeString)
-                            // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
-                            $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
-                            $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
-                            $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $source);
-
-                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                                try {
-                                    validateShellSafePath($source, 'volume source');
-                                } catch (Exception $e) {
-                                    throw new Exception(
-                                        'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.',
-                                        0,
-                                        $e
-                                    );
-                                }
-                            }
+                            validateComposeArrayVolumeSource($source);
                         }
                     }
                     if (isset($volume['target'])) {
                         $target = $volume['target'];
                         if (is_string($target)) {
+                            rejectComposeVolumeTargetVariable($target, 'Invalid Docker volume definition (array syntax)');
                             try {
                                 validateShellSafePath($target, 'volume target');
                             } catch (Exception $e) {
@@ -94,10 +122,899 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             }
                         }
                     }
+                    validateComposeContentVolumeSource($volume);
+                }
+            }
+        }
+
+        if (is_array($serviceConfig) && isset($serviceConfig['networks']) && is_array($serviceConfig['networks'])) {
+            foreach ($serviceConfig['networks'] as $networkKey => $networkDetails) {
+                if (is_int($networkKey) && (is_string($networkDetails) || is_int($networkDetails))) {
+                    validateComposeNetworkNameWithVariables((string) $networkDetails, 'service network', (string) $serviceName);
+                } elseif (is_string($networkKey) || is_int($networkKey)) {
+                    // Compose does not interpolate keys, so a key must be a plain network name.
+                    validateComposeNetworkName((string) $networkKey, 'service network', (string) $serviceName);
                 }
             }
         }
     }
+
+    if (isset($parsed['networks']) && is_array($parsed['networks'])) {
+        foreach ($parsed['networks'] as $networkName => $networkConfig) {
+            if (is_string($networkName) || is_int($networkName)) {
+                validateComposeNetworkName((string) $networkName);
+            }
+            if (is_array($networkConfig) && isset($networkConfig['name']) && is_string($networkConfig['name'])) {
+                validateComposeNetworkNameField($networkConfig['name']);
+            }
+        }
+    }
+
+    if (isset($parsed['volumes']) && is_array($parsed['volumes'])) {
+        foreach ($parsed['volumes'] as $volumeName => $volumeConfig) {
+            if (isComposeExternalVolume($volumeConfig)) {
+                validateComposeExternalVolume($volumeName, $volumeConfig);
+            }
+        }
+    }
+}
+
+/**
+ * The directory that the Compose parsers resolve `./` bind sources in. Services that use parser
+ * version 3 resolve them in the applications directory.
+ */
+function composeResourceDirectory(Application|Service $resource): string
+{
+    if ($resource instanceof Service && (int) $resource->compose_parsing_version === 3) {
+        return application_configuration_dir().'/'.$resource->uuid;
+    }
+
+    return $resource->workdir();
+}
+
+/**
+ * The entries of a Compose `env_file` value: paths, or long-syntax maps with a `path` key.
+ *
+ * @return list<string|array<string, mixed>>
+ */
+function composeEnvFileEntries(mixed $envFile): array
+{
+    return array_values(is_null($envFile) ? [] : (is_array($envFile) ? $envFile : [$envFile]));
+}
+
+/**
+ * The path of a Compose `env_file` entry.
+ */
+function composeEnvFileEntryPath(mixed $entry): string
+{
+    return (string) (is_array($entry) ? ($entry['path'] ?? '') : $entry);
+}
+
+/**
+ * Whether a Compose `env_file` entry is Coolify's .env file, which Coolify writes in the project directory.
+ */
+function isCoolifyComposeEnvFile(mixed $entry): bool
+{
+    return in_array(composeEnvFileEntryPath($entry), ['.env', './.env'], true);
+}
+
+/**
+ * The `env_file` list of a Compose service with Coolify's .env file at the end. The env files of the
+ * user stay in front of it, so Coolify variables override the values in them.
+ *
+ * @return list<string|array<string, mixed>>
+ */
+function composeEnvFilesWithCoolifyEnv(mixed $envFile): array
+{
+    return collect(composeEnvFileEntries($envFile))
+        ->reject(fn (mixed $entry): bool => isCoolifyComposeEnvFile($entry))
+        ->push('.env')
+        ->unique()
+        ->values()
+        ->all();
+}
+
+/**
+ * The path of a Compose `env_file` from the project directory, which is the repository directory
+ * of the deployment. Docker Compose on a local machine reads a relative path from the directory of
+ * the Compose file, so $composeDirectory is that directory, relative to the project directory.
+ * Null when the path is absolute or leaves the project directory.
+ */
+function composeEnvFileProjectPath(string $path, string $composeDirectory): ?string
+{
+    if ($path === '' || str_starts_with($path, '/')) {
+        return null;
+    }
+    $segments = [];
+    foreach (explode('/', trim($composeDirectory, '/').'/'.$path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            if ($segments === []) {
+                return null;
+            }
+            array_pop($segments);
+
+            continue;
+        }
+        $segments[] = $segment;
+    }
+
+    return $segments === [] ? null : implode('/', $segments);
+}
+
+/**
+ * Renders a long-syntax bind with its resolved source. It keeps the options that Docker Compose
+ * accepts, such as read_only and bind, and removes other keys, which Compose rejects. Without
+ * `bind.create_host_path`, a missing source is created, as with short syntax: Docker Compose
+ * before v2.30 does not do that for long syntax. A short-syntax mode in the target
+ * (`/data/users.yml:ro`) becomes `read_only`, because Docker rejects it in long syntax.
+ *
+ * @param  array<string, mixed>  $volume
+ * @return array<string, mixed>
+ */
+function composeLongBindVolume(array $volume, string $source): array
+{
+    $volume = array_filter(
+        $volume,
+        fn ($key) => in_array($key, ['type', 'source', 'target', 'read_only', 'consistency', 'bind'], true) || str_starts_with((string) $key, 'x-'),
+        ARRAY_FILTER_USE_KEY
+    );
+    if (preg_match('/^(.+):(ro|rw)$/', (string) ($volume['target'] ?? ''), $matches)) {
+        $volume['target'] = $matches[1];
+        $volume['read_only'] ??= $matches[2] === 'ro';
+    }
+    $volume['source'] = $source;
+    $volume['bind'] = is_array($volume['bind'] ?? null) ? $volume['bind'] : [];
+    $volume['bind']['create_host_path'] ??= true;
+
+    return $volume;
+}
+
+/**
+ * A long-syntax bind with `bind.create_host_path: false` must fail when its host path is missing.
+ * Coolify must not create that path, so it does not add a file storage for it. A volume with
+ * `content:` is still written by Coolify.
+ */
+function composeBindKeepsMissingHostPath(mixed $volume): bool
+{
+    return is_array($volume)
+        && data_get($volume, 'bind.create_host_path') === false
+        && ! array_key_exists('content', $volume);
+}
+
+/**
+ * Removes the file storage that an earlier save created for a bind that now keeps its missing host
+ * path. Otherwise, the storage jobs still create that path. The files on the server stay. A storage
+ * with a backup schedule stays, because it cannot be deleted before its schedule.
+ */
+function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase $resource, string $mountPath): void
+{
+    $resource->fileStorages()
+        ->where('mount_path', $mountPath)
+        ->where('is_host_file', false)
+        ->whereDoesntHave('scheduledBackups')
+        ->get()
+        ->each->delete();
+}
+
+/**
+ * Coolify writes the `content:` of a Compose bind volume to the source path on the host. Only
+ * administrators can edit a Compose file, and they can mount any host path, so the source can be
+ * any path, also outside the resource directory. It must exist and be safe to
+ * use in a shell command; Coolify escapes it in every remote command.
+ *
+ * @param  array<string, mixed>  $volume  A long-syntax Compose volume
+ *
+ * @throws Exception If the source is missing or contains shell metacharacters
+ */
+/**
+ * Coolify names each container "<service name>-<suffix>". Docker allows only container names
+ * that match [a-zA-Z0-9][a-zA-Z0-9_.-]+, and Docker Compose allows only service names that
+ * match [a-zA-Z0-9._-]+. Compose accepts a service name that starts with ".", "-", or "_",
+ * but Docker then refuses to create its container.
+ *
+ * @throws Exception If Docker cannot use the service name at the start of a container name
+ */
+function validateComposeServiceName(string $serviceName): void
+{
+    if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $serviceName) !== 1) {
+        throw new Exception(
+            "Service name \"{$serviceName}\" must start with a letter or a digit and contain only letters, digits, \".\", \"-\", and \"_\". ".
+            'Docker uses the same rule for container names, and Coolify uses the service name at the start of the container name.'
+        );
+    }
+}
+
+/**
+ * Coolify sets container_name on every Compose service, and Docker Compose does not start more
+ * than one container of a service that has a fixed container_name.
+ *
+ * @throws Exception If the service sets scale or deploy.replicas to more than 1
+ */
+function validateComposeServiceScale(string $serviceName, mixed $service): void
+{
+    foreach (['scale', 'deploy.replicas'] as $key) {
+        $value = data_get($service, $key);
+        if (is_numeric($value) && (int) $value > 1) {
+            throw new Exception(
+                "Service \"{$serviceName}\" sets {$key} to {$value}. Coolify sets a container_name for each service, ".
+                'and Docker Compose cannot run more than one container with the same container_name. '.
+                "Remove {$key}, or define each instance as a separate service."
+            );
+        }
+    }
+}
+
+function validateComposeContentVolumeSource(array $volume): void
+{
+    if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
+        return;
+    }
+
+    $source = $volume['source'] ?? null;
+    if (! is_string($source) || trim($source) === '') {
+        throw new Exception('Invalid Docker volume definition (array syntax): A bind volume with content needs a source path.');
+    }
+
+    validateComposeArrayVolumeSource($source);
+}
+
+/**
+ * Resolves the Compose variables in a volume source as Docker Compose does: `${VAR}` is the value of VAR,
+ * and `${VAR:-default}` or `${VAR-default}` is the value of VAR or else the default. Only non-empty values count.
+ *
+ * Without $variables, or when the result with them is not a host path, a variable with a default becomes the
+ * default and a variable without one stays as written. So a named volume keeps the name that it always had,
+ * and an empty default gives `${VAR}`.
+ *
+ * @param  array<string, string>|null  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ */
+function resolveComposeVolumeSourceVariables(string $source, ?array $variables = null): string
+{
+    $resolve = fn (array $values): string => preg_replace_callback(
+        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}/',
+        function (array $match) use ($values): string {
+            $value = $values[$match[1]] ?? '';
+            if ($value !== '') {
+                return $value;
+            }
+
+            return ($match[2] ?? '') !== '' ? $match[2] : '${'.$match[1].'}';
+        },
+        $source
+    );
+
+    $withoutValues = $resolve([]);
+    if ($variables === null) {
+        return $withoutValues;
+    }
+    $withValues = $resolve($variables);
+
+    return sourceIsLocal(str($withValues)) ? $withValues : $withoutValues;
+}
+
+/**
+ * Before v4.7.6, a short-syntax host path such as `${DATA:-./data}` always used the default, also when the resource
+ * set DATA. A storage that Coolify saved with that path keeps it, so its data does not move after the upgrade. The
+ * storage keeps the path of the variable in `variable_fs_path`, and the user switches to it on the storage.
+ *
+ * @return array{0: Stringable, 1: ?string} The host path, and the path of the variable while the saved path is kept
+ */
+function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringable $mainDirectory, ?LocalFileVolume $savedStorage, Application|Service $resource): array
+{
+    if ($volume === null || $savedStorage === null || ! str_contains($volume, '${')) {
+        return [$source, null];
+    }
+    try {
+        $defaultSource = parseDockerVolumeString($volume)['source'];
+    } catch (Exception) {
+        return [$source, null];
+    }
+    if ($defaultSource === null || ! sourceIsLocal($defaultSource)) {
+        return [$source, null];
+    }
+    $defaultSource = resolveComposeBindSource($defaultSource, $mainDirectory, $savedStorage->fs_path);
+    if ($defaultSource->value() === $source->value() || $savedStorage->fs_path !== $defaultSource->value()) {
+        return [$source, null];
+    }
+    $resource->addComposeVolumeWarning("The storage {$savedStorage->mount_path} keeps its saved host path {$defaultSource}. Its variable gives {$source}. To use that path, open the storage and click Use the variable path.");
+
+    return [$defaultSource, $source->value()];
+}
+
+/**
+ * The environment variables that Coolify writes to the `.env` file, where Docker Compose reads the variables of the Compose file.
+ */
+function composeEnvironmentVariablesQuery(Application|Service $resource, bool $isPreview = false): mixed
+{
+    return match (true) {
+        $resource instanceof Service => $resource->environment_variables(),
+        $isPreview => $resource->runtime_environment_variables_preview()->where('is_runtime', true),
+        default => $resource->runtime_environment_variables()->where('is_runtime', true),
+    };
+}
+
+/**
+ * The values for resolveComposeVolumeSourceVariables(). A value with a variable or vault reference is left out,
+ * because only Docker Compose can resolve it.
+ *
+ * @return array<string, string>
+ */
+function composeVolumeSourceVariables(Application|Service $resource, bool $isPreview = false): array
+{
+    return composeEnvironmentVariablesQuery($resource, $isPreview)->get()
+        ->mapWithKeys(fn ($variable) => [$variable->key => (string) $variable->real_value])
+        ->reject(fn (string $value) => $value === '' || str_contains($value, '$') || RemoteSecretReferences::containsReference($value))
+        ->all();
+}
+
+/**
+ * Resolves a long-syntax bind source as Docker Compose does with the `.env` file that Coolify writes:
+ * `${VAR:-default}` is the value of VAR when the resource sets it to a non-empty value, else the default.
+ * A value with a variable or vault reference stays for Docker Compose to resolve.
+ *
+ * @throws Exception If the value of the variable is not a shell-safe path
+ */
+function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
+{
+    if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
+        return resolveComposeVolumeSourceVariables($source);
+    }
+
+    $value = composeEnvironmentVariablesQuery($resource, $isPreview)->where('key', $matches[1])->first()?->real_value;
+    if (blank($value)) {
+        return resolveComposeVolumeSourceVariables($source);
+    }
+    // Docker Compose expands variable references in the `.env` file, and Coolify writes vault secrets to it.
+    if (str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
+        return $source;
+    }
+
+    try {
+        validateShellSafePath($value, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception("Invalid Docker volume definition (array syntax): the value of {$matches[1]} is not a safe path. ".$e->getMessage(), 0, $e);
+    }
+
+    return $value;
+}
+
+/**
+ * Keep the existing array-source forms, but inspect the default that was previously skipped.
+ */
+function validateComposeArrayVolumeSource(string $source): void
+{
+    try {
+        if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
+            throw new Exception('Invalid volume source: contains a control character.');
+        }
+
+        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*\}[\/\w.\-]*$/', $source)) {
+            return;
+        }
+
+        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}$/', $source, $matches)) {
+            validateShellSafePath($matches[1], 'volume source');
+
+            return;
+        }
+
+        validateShellSafePath($source, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception(
+            'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+            ' Please use safe path names without shell metacharacters.',
+            0,
+            $e
+        );
+    }
+}
+
+/**
+ * Matches one braced Compose variable: `${VAR}`, `${VAR:-default}`, `${VAR-default}`,
+ * `${VAR:?error}`, `${VAR?error}`, `${VAR:+value}` or `${VAR+value}`.
+ */
+const COMPOSE_NETWORK_VARIABLE_PATTERN = '\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?([-?+])([^}]*))?\}';
+
+/**
+ * Splits a top-level network `name:` that is one whole Compose variable (see
+ * COMPOSE_NETWORK_VARIABLE_PATTERN), such as an external network that differs per server. Only the
+ * `-` operators give a default; the text after `?` is an error message and after `+` a value that
+ * Compose uses only when the variable is set.
+ *
+ * @return array{variable: string, default: ?string}|null
+ */
+function composeNetworkNameVariable(string $name): ?array
+{
+    if (preg_match('/\A'.COMPOSE_NETWORK_VARIABLE_PATTERN.'\z/', $name, $matches) !== 1) {
+        return null;
+    }
+
+    return ['variable' => $matches[1], 'default' => ($matches[2] ?? '') === '-' ? $matches[3] : null];
+}
+
+/**
+ * Tells if the text after the operator of a Compose variable is safe. A default or alternative value
+ * becomes part of the network name; an error message only shows in the Compose error, so it can
+ * also contain spaces and simple punctuation.
+ */
+function isSafeComposeNetworkVariableOperand(string $operator, string $operand): bool
+{
+    $pattern = $operator === '?' ? '/\A[A-Za-z0-9 _.,:!-]*\z/' : '/\A[A-Za-z0-9_.-]*\z/';
+
+    return preg_match($pattern, $operand) === 1;
+}
+
+/**
+ * Tells if Coolify sets this variable itself. A reference to it in the compose file must not create a
+ * resource variable, because a resource variable with the same key replaces the value of Coolify.
+ */
+function isCoolifyProvidedComposeVariable(string $key): bool
+{
+    return in_array($key, [
+        'COOLIFY_RESOURCE_UUID',
+        'COOLIFY_CONTAINER_NAME',
+        'COOLIFY_BRANCH',
+        'COOLIFY_URL',
+        'COOLIFY_FQDN',
+        'COOLIFY_APP_NAME',
+        'COOLIFY_PROJECT_NAME',
+        'COOLIFY_ENVIRONMENT_NAME',
+        'COOLIFY_SERVER_IP',
+    ], true);
+}
+
+/**
+ * Tells if a compose value starts with a reference to a variable that Coolify sets, for example `${COOLIFY_RESOURCE_UUID:-x}`.
+ */
+function composeValueReferencesCoolifyProvidedVariable(string $value): bool
+{
+    return preg_match('/\A\$\{?([A-Za-z_][A-Za-z0-9_]*)/', $value, $matches) === 1
+        && isCoolifyProvidedComposeVariable($matches[1]);
+}
+
+/**
+ * Creates a resource environment variable for each top-level network `name:` that is one Compose
+ * variable, like variables in `environment:`, so users can see and change it. The compose file keeps
+ * the variable and Compose resolves it from the deployment `.env`. The default from the compose file
+ * (or an empty value) is only the first value: a value that the user changed is kept. A variable with
+ * a default that is not a valid network name is not created.
+ *
+ * For applications, the EnvironmentVariable `created` hook adds the preview copy.
+ */
+function ensureComposeNetworkNameVariables(Application|Service $resource, iterable $networks): void
+{
+    foreach ($networks as $network) {
+        $name = data_get($network, 'name');
+        $variable = is_string($name) ? composeNetworkNameVariable($name) : null;
+        if ($variable === null || isCoolifyProvidedComposeVariable($variable['variable'])) {
+            continue;
+        }
+        if ($variable['default'] !== null && ! ValidationPatterns::isValidDockerNetwork($variable['default'])) {
+            continue;
+        }
+
+        $resource->environment_variables()->firstOrCreate([
+            'key' => $variable['variable'],
+            'resourceable_type' => get_class($resource),
+            'resourceable_id' => $resource->id,
+        ], [
+            'value' => $variable['default'] ?? '',
+            'is_preview' => false,
+        ]);
+    }
+}
+
+/**
+ * A network `name:` may contain variables: only Docker Compose reads this value and it never runs a
+ * shell; Coolify's own network commands use the network keys.
+ *
+ * @throws Exception If the value is not a valid network name with safe variables
+ */
+function validateComposeNetworkNameField(string $name): void
+{
+    validateComposeNetworkNameWithVariables($name, 'network name field');
+}
+
+/**
+ * Allows $VAR and the braced variables of COMPOSE_NETWORK_VARIABLE_PATTERN with safe operands in a network value that Compose interpolates.
+ */
+function validateComposeNetworkNameWithVariables(string $name, string $context, ?string $serviceName = null): void
+{
+    $variable = composeNetworkNameVariable($name);
+    if ($variable !== null && $variable['default'] !== null) {
+        $isValid = ValidationPatterns::isValidDockerNetwork($variable['default']);
+    } else {
+        $hasSafeDefaults = true;
+        $withoutVariables = preg_replace_callback(
+            '/'.COMPOSE_NETWORK_VARIABLE_PATTERN.'|\$[A-Za-z_][A-Za-z0-9_]*/',
+            function (array $matches) use (&$hasSafeDefaults): string {
+                if (! isSafeComposeNetworkVariableOperand($matches[2] ?? '', $matches[3] ?? '')) {
+                    $hasSafeDefaults = false;
+                }
+
+                return 'x';
+            },
+            $name,
+        );
+        $isValid = $hasSafeDefaults && $withoutVariables !== null && ValidationPatterns::isValidDockerNetwork($withoutVariables);
+    }
+
+    if (! $isValid) {
+        throw invalidComposeNetworkNameException($name, $context, $serviceName, allowsVariables: true);
+    }
+}
+
+/**
+ * Reject Docker Compose network names that are not valid Docker identifiers.
+ *
+ * @throws Exception If the network name is not a valid Docker network identifier
+ */
+function validateComposeNetworkName(string $networkName, string $context = 'network name', ?string $serviceName = null): void
+{
+    if ($networkName === '' || ! ValidationPatterns::isValidDockerNetwork($networkName)) {
+        throw invalidComposeNetworkNameException($networkName, $context, $serviceName);
+    }
+}
+
+function invalidComposeNetworkNameException(string $name, string $context, ?string $serviceName, bool $allowsVariables = false): Exception
+{
+    $location = $serviceName === null ? '' : " in service {$serviceName}";
+
+    return new Exception(
+        "Invalid Docker Compose {$context} \"{$name}\"{$location}. Network names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores"
+        .($allowsVariables ? ', and can use variables such as ${NETWORK:-default}.' : '.')
+    );
+}
+
+/**
+ * Tells if a top-level Compose volume declaration is external: `external: true` or the old
+ * `external: {name: x}` syntax. Docker Compose does not create or remove an external volume.
+ */
+function isComposeExternalVolume(mixed $declaration): bool
+{
+    if (! is_array($declaration) || ! array_key_exists('external', $declaration)) {
+        return false;
+    }
+    $external = $declaration['external'];
+    if (is_array($external)) {
+        return true;
+    }
+
+    return filter_var($external, FILTER_VALIDATE_BOOLEAN);
+}
+
+/**
+ * Returns the top-level declaration of a volume source when the Compose file declares it as
+ * external, and null for all other sources. The parsers use an external volume as written: no
+ * "{uuid}_" prefix and no LocalPersistentVolume row, so that Coolify never removes a volume that it
+ * does not own. A preview deployment never uses an external volume; it gets its own volume
+ * "{uuid}_{volume}-pr-{id}" like any other named volume.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes
+ * @return array<string, mixed>|null
+ *
+ * @throws Exception If the external volume has a name that is not safe (see validateComposeExternalVolume())
+ */
+function composeExternalVolumeDeclaration(iterable $topLevelVolumes, string $source): ?array
+{
+    $declaration = collect($topLevelVolumes)->get($source);
+    if (! isComposeExternalVolume($declaration)) {
+        return null;
+    }
+    validateComposeExternalVolume($source, $declaration);
+
+    return $declaration;
+}
+
+/**
+ * Tells if a parser uses the volume source as written because it is an external volume.
+ *
+ * Only for production deployments: a preview deployment always gets its own volume.
+ *
+ * Before Coolify used external volumes as written, the parsers renamed them like all other
+ * volumes (the old name, for example "{uuid}_{volume}"), so the resource wrote its data into the
+ * renamed volume. When the owner still has the storage entry
+ * with the old name, the parser must keep the old name, or the resource loses its data. Then
+ * this function records a warning on the resource and returns false. When the user deletes that
+ * storage entry, the next parse uses the external volume.
+ *
+ * Returns false also for a source that is not external. Then the parser continues as usual.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes
+ * @param  string  $legacyName  the name that the parser gave the volume before it used external volumes as written
+ *
+ * @throws Exception If the external volume has a name that is not safe (see validateComposeExternalVolume())
+ */
+function useComposeExternalVolumeAsWritten(Application|Service $resource, Application|ServiceApplication|ServiceDatabase $owner, iterable $topLevelVolumes, string $source, string $legacyName): bool
+{
+    $declaration = composeExternalVolumeDeclaration($topLevelVolumes, $source);
+    if ($declaration === null) {
+        return false;
+    }
+    if ($legacyName === $source) {
+        return true;
+    }
+
+    $hasLegacyStorage = LocalPersistentVolume::query()
+        ->where('resource_type', get_class($owner))
+        ->where('resource_id', $owner->getKey())
+        ->where('name', $legacyName)
+        ->exists();
+    if (! $hasLegacyStorage) {
+        return true;
+    }
+
+    $resource->addComposeVolumeWarning(composeLegacyExternalVolumeWarning($source, $declaration, $legacyName));
+
+    return false;
+}
+
+/**
+ * The name that the legacy application parsers (compose_parsing_version 1 and 2) gave a volume
+ * before they used external volumes as written: parser version 1 kept the name and added only the
+ * preview suffix, parser version 2 added the "{uuid}-" prefix too.
+ */
+function legacyApplicationComposeVolumeName(Application $resource, string $source, int $pull_request_id): string
+{
+    $name = addPreviewDeploymentSuffix($source, $pull_request_id);
+
+    return $resource->compose_parsing_version === '2' ? "{$resource->uuid}-{$name}" : $name;
+}
+
+/**
+ * The top-level declaration of a volume that a legacy application parser (compose_parsing_version 1
+ * and 2) renamed. Only applications from before Coolify kept driver options use these parsers, and
+ * they have no storage entries, so their volumes keep the old name-only declaration. Docker created
+ * them without the options, and Docker Compose would otherwise ask to recreate them.
+ *
+ * @return array{name: string}
+ */
+function legacyApplicationRenamedVolumeDeclaration(string $name): array
+{
+    return ['name' => $name];
+}
+
+/**
+ * Records a warning when a legacy Compose application (parser version 1 or 2) does not use an
+ * external volume as written. These parsers keep the old volume name (see
+ * legacyApplicationComposeVolumeName()), so the resource keeps its data. The parser version 1 keeps
+ * the name of a production volume, so it uses the external volume and gets no warning. A preview
+ * always uses its own volume, so it gets no warning either.
+ *
+ * The volume names are not validated here, so that the legacy parsers keep their old behavior. The
+ * warning shows the Docker volume name only when it is a literal, valid Docker volume name.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes  the top-level volumes as declared in the Compose file
+ */
+function warnLegacyApplicationComposeExternalVolume(Application $resource, iterable $topLevelVolumes, string $source, int $pull_request_id): void
+{
+    if ($pull_request_id !== 0) {
+        return;
+    }
+    $declaration = collect($topLevelVolumes)->get($source);
+    if (! isComposeExternalVolume($declaration)) {
+        return;
+    }
+    $keptName = legacyApplicationComposeVolumeName($resource, $source, $pull_request_id);
+    if ($keptName === $source) {
+        return;
+    }
+
+    $dockerVolume = data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $source;
+    $external = ! is_string($dockerVolume) || $dockerVolume === $source || preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $dockerVolume) !== 1
+        ? 'external'
+        : "external (Docker volume '{$dockerVolume}')";
+
+    $resource->addComposeVolumeWarning("Volume '{$source}' is declared as {$external}, but this application uses an old Compose parser, so Coolify uses '{$keptName}'. To use the external volume, copy your data into it, then clone this application or create it again.");
+}
+
+/**
+ * The warning for an external volume that the resource does not use yet (see useComposeExternalVolumeAsWritten()).
+ * The volume names are validated and contain no secrets.
+ *
+ * @param  array<string, mixed>  $declaration
+ */
+function composeLegacyExternalVolumeWarning(string $source, array $declaration, string $legacyName): string
+{
+    $dockerVolume = composeExternalVolumeDockerName($source, $declaration);
+    $external = $dockerVolume === $source ? 'external' : "external (Docker volume '{$dockerVolume}')";
+
+    return "Volume '{$source}' is declared as {$external}, but Coolify still uses '{$legacyName}' because this resource used it before. To use the external volume, copy your data into it and delete the storage entry '{$legacyName}', then redeploy.";
+}
+
+/**
+ * The Docker volume that an external Compose volume declaration refers to: `name:`, the old
+ * `external: {name: x}` syntax, or else the key.
+ *
+ * @param  array<string, mixed>  $declaration
+ */
+function composeExternalVolumeDockerName(string $key, array $declaration): string
+{
+    return (string) (data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $key);
+}
+
+/**
+ * The top-level declaration of a volume that a parser renamed (for example `data` to `{uuid}_data`).
+ * It keeps the options of the original declaration, such as `driver`, `driver_opts` and `labels`, so a
+ * local volume that binds a host folder still binds it. Variables in the options stay as written;
+ * Docker Compose resolves them from `.env`. The parser renamed the volume, so the declaration gets the
+ * new name, and it is not external: Docker Compose creates the renamed volume.
+ *
+ * @return array<string, mixed>
+ */
+function composeRenamedVolumeDeclaration(mixed $declaration, string $name): array
+{
+    $renamed = is_array($declaration) ? $declaration : [];
+    unset($renamed['external'], $renamed['name']);
+    $renamed['name'] = $name;
+
+    return $renamed;
+}
+
+/**
+ * The top-level declaration of a renamed volume with its storage entry. A volume that existed before
+ * Coolify kept the driver options (see the `ignores_compose_driver_options` flag) keeps its old
+ * name-only declaration: Docker created it without the options, and Docker Compose would otherwise
+ * ask to recreate it on every deployment.
+ *
+ * A preview volume does not get `driver_opts` that name a host device (for example a bind mount of a
+ * host folder): the preview would otherwise mount the same folder or disk as the production volume.
+ *
+ * @return array<string, mixed>
+ */
+function composeRenamedVolumeDeclarationFor(mixed $declaration, string $name, ?LocalPersistentVolume $volume, bool $isPreview = false): array
+{
+    if ($volume?->ignores_compose_driver_options) {
+        return ['name' => $name];
+    }
+
+    $renamed = composeRenamedVolumeDeclaration($declaration, $name);
+    if ($isPreview && filled(data_get($renamed, 'driver_opts.device')) && data_get($renamed, 'driver_opts.type') !== 'tmpfs') {
+        unset($renamed['driver_opts']);
+    }
+
+    return $renamed;
+}
+
+/**
+ * The Docker volumes that a Compose file declares as external. Returns an empty list for a
+ * Compose file that is empty or not valid YAML.
+ *
+ * @return list<string>
+ */
+function composeExternalVolumeDockerNames(?string $compose): array
+{
+    if (blank($compose)) {
+        return [];
+    }
+    try {
+        $volumes = data_get(parseDockerComposeYaml($compose), 'volumes');
+    } catch (Throwable) {
+        return [];
+    }
+    if (! is_array($volumes)) {
+        return [];
+    }
+
+    return collect($volumes)
+        ->filter(fn (mixed $declaration): bool => isComposeExternalVolume($declaration))
+        ->map(fn (array $declaration, int|string $key): string => composeExternalVolumeDockerName((string) $key, $declaration))
+        ->values()
+        ->all();
+}
+
+/**
+ * The external volumes that the services of a Compose file mount, one entry for each volume and
+ * service. Returns an empty list for a Compose file that is empty or not valid YAML.
+ *
+ * @return list<array{key: string, dockerName: string, service: string, mountPaths: list<string>}>
+ */
+function composeExternalVolumeMounts(?string $compose): array
+{
+    if (blank($compose)) {
+        return [];
+    }
+    try {
+        $yaml = parseDockerComposeYaml($compose);
+    } catch (Throwable) {
+        return [];
+    }
+    $topLevelVolumes = data_get($yaml, 'volumes');
+    $services = data_get($yaml, 'services');
+    if (! is_array($topLevelVolumes) || ! is_array($services)) {
+        return [];
+    }
+
+    $mounts = [];
+    foreach ($services as $serviceName => $service) {
+        $serviceVolumes = data_get($service, 'volumes');
+        if (! is_array($serviceVolumes)) {
+            continue;
+        }
+        foreach ($serviceVolumes as $volume) {
+            $parsed = match (true) {
+                is_string($volume) => parseDockerVolumeString($volume),
+                is_array($volume) => $volume,
+                default => [],
+            };
+            // parseDockerVolumeString() returns Stringable values.
+            $source = data_get($parsed, 'source');
+            $target = data_get($parsed, 'target');
+            if (! (is_scalar($source) || $source instanceof Stringable) || ! (is_scalar($target) || $target instanceof Stringable)) {
+                continue;
+            }
+            $source = (string) $source;
+            $target = (string) $target;
+            $declaration = $topLevelVolumes[$source] ?? null;
+            if (! isComposeExternalVolume($declaration)) {
+                continue;
+            }
+
+            $dockerName = data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $source;
+            $mountKey = $source."\0".$serviceName;
+            $mounts[$mountKey] ??= [
+                'key' => $source,
+                'dockerName' => is_scalar($dockerName) ? (string) $dockerName : $source,
+                'service' => (string) $serviceName,
+                'mountPaths' => [],
+            ];
+            if (! in_array($target, $mounts[$mountKey]['mountPaths'], true)) {
+                $mounts[$mountKey]['mountPaths'][] = $target;
+            }
+        }
+    }
+
+    return array_values($mounts);
+}
+
+/**
+ * The key of an external volume must be a literal Docker volume name, because Docker Compose does not
+ * resolve variables in keys. The name (`name:` or the old `external: {name: x}`) may also contain
+ * variables (see isComposeVolumeNameWithVariables()): Docker Compose resolves them from the deployment
+ * `.env` when it starts the resource. Coolify never removes an external volume, because it gets no
+ * storage entry, so Coolify does not need the resolved name.
+ *
+ * @param  array<string, mixed>  $declaration
+ *
+ * @throws Exception If the key or the name is not a valid Docker volume name
+ */
+function validateComposeExternalVolume(int|string $key, array $declaration): void
+{
+    $key = (string) $key;
+    if (preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key) !== 1) {
+        throw new Exception(
+            'Invalid external Docker Compose volume. Volume names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores.'
+        );
+    }
+    $names = [];
+    if (array_key_exists('name', $declaration)) {
+        $names[] = $declaration['name'];
+    }
+    if (is_array($declaration['external'] ?? null) && array_key_exists('name', $declaration['external'])) {
+        $names[] = $declaration['external']['name'];
+    }
+
+    foreach ($names as $name) {
+        if (! is_string($name) || (preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $name) !== 1 && ! isComposeVolumeNameWithVariables($name))) {
+            throw new Exception(
+                "Invalid external Docker Compose volume {$key}. The name must be a Docker volume name (alphanumeric characters, dots, hyphens, and underscores) and can contain variables such as \${NAME} or \${NAME:-default}."
+            );
+        }
+    }
+}
+
+/**
+ * Tells if a volume name contains Compose variables and otherwise only Docker volume name characters.
+ * The variables are `$NAME`, `${NAME}`, `${NAME-default}` and `${NAME:-default}`, with a default
+ * that contains only Docker volume name characters.
+ */
+function isComposeVolumeNameWithVariables(string $name): bool
+{
+    return str_contains($name, '$')
+        && preg_match('/^(?:[A-Za-z0-9._-]|\$[A-Za-z_][A-Za-z0-9_]*|\$\{[A-Za-z_][A-Za-z0-9_]*(?::?-[A-Za-z0-9._-]*)?\})+$/', $name) === 1;
 }
 
 /**
@@ -113,33 +1030,42 @@ function validateVolumeStringForInjection(string $volumeString): void
     parseDockerVolumeString($volumeString);
 }
 
-function parseDockerVolumeString(string $volumeString): array
+/**
+ * Rejects a Compose variable in the container path of a volume with a message that tells the user what to do.
+ * Coolify stores the container path and uses it in backups, file storages, and transfers, so it must be a literal path.
+ *
+ * @throws Exception If the target contains a variable
+ */
+function rejectComposeVolumeTargetVariable(string $target, string $prefix): void
+{
+    if (str_contains($target, '${')) {
+        throw new Exception(
+            "{$prefix}: the container path {$target} contains a variable. Coolify does not support variables in the container path of a volume. Write the path without variables, for example /app/data."
+        );
+    }
+}
+
+function parseDockerVolumeString(string $volumeString, ?array $variables = null): array
 {
     $volumeString = trim($volumeString);
     $source = null;
     $target = null;
     $mode = null;
 
-    // First, check if the source contains an environment variable with default value
-    // This needs to be done before counting colons because ${VAR:-value} contains a colon
-    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
-    $hasEnvVarWithDefault = false;
-    $envVarEndPos = 0;
+    // A Compose variable such as ${VAR:-/data} can contain a colon, so the split does not look inside variables.
+    $variableTexts = [];
+    $volumeString = preg_replace_callback('/\$\{[^}]*\}/', function (array $match) use (&$variableTexts): string {
+        $variableTexts[] = $match[0];
 
-    if (preg_match($envVarPattern, $volumeString, $matches)) {
-        $hasEnvVarWithDefault = true;
-        $envVarEndPos = strlen($matches[0]);
-    }
+        return "\0".(count($variableTexts) - 1)."\0";
+    }, $volumeString);
+    $restoreVariables = fn (?string $part): ?string => $part === null ? null : preg_replace_callback(
+        '/\0(\d+)\0/',
+        fn (array $match): string => $variableTexts[(int) $match[1]] ?? $match[0],
+        $part
+    );
 
-    // Count colons, but exclude those inside environment variables
-    $effectiveVolumeString = $volumeString;
-    if ($hasEnvVarWithDefault) {
-        // Temporarily replace the env var to count colons correctly
-        $effectiveVolumeString = substr($volumeString, $envVarEndPos);
-        $colonCount = substr_count($effectiveVolumeString, ':');
-    } else {
-        $colonCount = substr_count($volumeString, ':');
-    }
+    $colonCount = substr_count($volumeString, ':');
 
     if ($colonCount === 0) {
         // Named volume without target (unusual but valid)
@@ -149,46 +1075,12 @@ function parseDockerVolumeString(string $volumeString): array
     } elseif ($colonCount === 1) {
         // Simple volume mapping
         // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
-        if ($hasEnvVarWithDefault) {
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $target = substr($remaining, 1);
-            } else {
-                $target = $remaining;
-            }
-        } else {
-            $parts = explode(':', $volumeString);
-            $source = $parts[0];
-            $target = $parts[1];
-        }
+        $parts = explode(':', $volumeString);
+        $source = $parts[0];
+        $target = $parts[1];
     } elseif ($colonCount === 2) {
-        // Volume with mode OR Windows path OR env var with mode
-        // Handle env var with mode first
-        if ($hasEnvVarWithDefault) {
-            // ${VAR:-default}:/path:mode
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
-
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $remaining = substr($remaining, 1);
-                $lastColon = strrpos($remaining, ':');
-
-                if ($lastColon !== false) {
-                    $possibleMode = substr($remaining, $lastColon + 1);
-                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                    if (in_array($possibleMode, $validModes)) {
-                        $mode = $possibleMode;
-                        $target = substr($remaining, 0, $lastColon);
-                    } else {
-                        $target = $remaining;
-                    }
-                } else {
-                    $target = $remaining;
-                }
-            }
-        } elseif (preg_match('/^[A-Za-z]:/', $volumeString)) {
+        // Volume with mode OR Windows path
+        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
             // Windows path as source (C:/, D:/, etc.)
             // Find the second colon which is the real separator
             $secondColon = strpos($volumeString, ':', 2);
@@ -287,51 +1179,34 @@ function parseDockerVolumeString(string $volumeString): array
         }
     }
 
-    // Handle environment variable expansion in source
-    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
-    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
-        $varContent = $matches[1];
+    $source = $restoreVariables($source);
+    $target = $restoreVariables($target);
+    $mode = $restoreVariables($mode);
 
-        // Check if there's a default value with :-
-        if (strpos($varContent, ':-') !== false) {
-            $parts = explode(':-', $varContent, 2);
-            $varName = $parts[0];
-            $defaultValue = isset($parts[1]) ? $parts[1] : '';
-
-            // If there's a non-empty default value, use it for source
-            if ($defaultValue !== '') {
-                $source = $defaultValue;
-            } else {
-                // Empty default value, keep the variable reference for env resolution
-                $source = '${'.$varName.'}';
-            }
-        }
-        // Otherwise keep the variable as-is for later expansion (no default value)
+    if ($source) {
+        $source = resolveComposeVolumeSourceVariables((string) $source, $variables);
     }
 
     // Validate source path for command injection attempts
     // We validate the final source value after environment variable processing
     if ($source !== null) {
-        // Allow environment variables like ${VAR_NAME} or ${VAR}
-        // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
-        $sourceStr = is_string($source) ? $source : $source;
+        // A ${VAR} that is left is resolved by Docker Compose, not by a shell. The text around it must be safe.
+        try {
+            validateShellSafePath(preg_replace('/\$\{[A-Za-z_][A-Za-z0-9_]*\}/', '', $source), 'volume source');
+        } catch (Exception $e) {
+            // Re-throw with more context about the volume string
+            throw new Exception(
+                'Invalid Docker volume definition: '.$e->getMessage().
+                ' Please use safe path names without shell metacharacters.'
+            );
+        }
 
-        // Skip validation for simple environment variable references
-        // Pattern 1: ${WORD_CHARS} with no special characters inside
-        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
-        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
-        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
-
-        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
-            try {
-                validateShellSafePath($sourceStr, 'volume source');
-            } catch (Exception $e) {
-                // Re-throw with more context about the volume string
-                throw new Exception(
-                    'Invalid Docker volume definition: '.$e->getMessage().
-                    ' Please use safe path names without shell metacharacters.'
-                );
-            }
+        // Coolify creates and manages the host path, so it must know the value of each variable in it.
+        if ($variables !== null && sourceIsLocal(str($source)) && preg_match('/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/', $source, $matches)) {
+            throw new Exception(
+                "Invalid Docker volume definition: the host path {$source} uses the variable {$matches[1]}, which has no value. ".
+                "Set {$matches[1]} in the environment variables of the resource, or add a default, for example \${{$matches[1]}:-/data}."
+            );
         }
     }
 
@@ -341,6 +1216,7 @@ function parseDockerVolumeString(string $volumeString): array
         // Target paths in containers are typically absolute paths, so we validate them too
         // but they're less likely to be dangerous since they're not used in host commands
         // Still, defense in depth is important
+        rejectComposeVolumeTargetVariable($targetStr, 'Invalid Docker volume definition');
         try {
             validateShellSafePath($targetStr, 'volume target');
         } catch (Exception $e) {
@@ -371,8 +1247,92 @@ function addTraefikDockerNetworkLabel(Collection $labels, string $network): Coll
     return $labels;
 }
 
+/**
+ * Remove one-time fields from long-form volume entries without reformatting the rest of the source.
+ * Fall back to a YAML dump when the source uses a form that the line edit cannot handle safely.
+ *
+ * @param  array<string, mixed>  $cleanedYaml
+ * @param  array<int, string>  $fields
+ */
+function removeComposeVolumeFieldsPreservingComments(string $source, array $cleanedYaml, array $fields): string
+{
+    $context = [];
+    $removeIndent = null;
+    $blockIndent = null;
+    $result = [];
+
+    foreach (preg_split('/(?<=\n)/', $source) as $line) {
+        $text = rtrim($line, "\r\n");
+        $indent = strspn($text, ' ');
+
+        if ($removeIndent !== null) {
+            if (trim($text) === '' || $indent > $removeIndent) {
+                continue;
+            }
+            $removeIndent = null;
+        }
+
+        if ($blockIndent !== null) {
+            if (trim($text) === '' || $indent > $blockIndent) {
+                $result[] = $line;
+
+                continue;
+            }
+            $blockIndent = null;
+        }
+
+        if (trim($text) === '' || str_starts_with(ltrim($text), '#')) {
+            $result[] = $line;
+
+            continue;
+        }
+
+        while ($context && end($context)['indent'] >= $indent) {
+            array_pop($context);
+        }
+
+        $body = substr($text, $indent);
+        $isListItem = preg_match('/^-\s+/', $body) === 1;
+        if ($isListItem) {
+            $context[] = ['indent' => $indent, 'key' => '[]'];
+            $body = preg_replace('/^-\s+/', '', $body);
+        }
+
+        if (preg_match('/^([\w.-]+|"[^"]+"|\x27[^\x27]+\x27)\s*:(.*)$/', $body, $matches)) {
+            $key = trim($matches[1], "\"'");
+            $path = array_column($context, 'key');
+            if (! $isListItem && count($path) === 4 && $path[0] === 'services' && $path[2] === 'volumes' && $path[3] === '[]' && in_array($key, $fields, true)) {
+                $removeIndent = $indent;
+
+                continue;
+            }
+
+            $value = trim($matches[2]);
+            if ($value === '' || str_starts_with($value, '#')) {
+                $context[] = ['indent' => $indent, 'key' => $key];
+            } elseif (preg_match('/^[|>][+-]?(?:\s+#.*)?$/', $value)) {
+                $blockIndent = $indent;
+            }
+        }
+
+        $result[] = $line;
+    }
+
+    $candidate = implode('', $result);
+    try {
+        if (parseDockerComposeYaml($candidate) === $cleanedYaml) {
+            return $candidate;
+        }
+    } catch (Exception) {
+        // Use the validated parsed result if the line edit is not valid YAML.
+    }
+
+    return Yaml::dump($cleanedYaml, 10, 2);
+}
+
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
+    $resource->resetComposeVolumeWarnings();
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
     // Store original compose for later use to update docker_compose_raw with content removed
@@ -383,19 +1343,33 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
+    $renamesServices = $isPullRequest && $resource->renamesPreviewComposeServices();
+    $pullRequestPreview = $isPullRequest
+        ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+        : null;
+    // A public preview can run the compose file of a fork pull request. A preview from before v4.5.1 keeps the production values.
+    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled') && ! $pullRequestPreview?->keeps_production_values;
+    // The Compose file of a pull request deploys only that preview: it reads the rows of the application, but does not add or change them.
+    $keepsApplicationRows = $isPullRequest && $resource->usesPullRequestComposeFile;
     $server = data_get($resource, 'destination.server');
     try {
-        $yaml = Yaml::parse($compose);
+        $yaml = parseDockerComposeYaml($compose);
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
         'configs' => collect(data_get($yaml, 'configs', [])),
         'secrets' => collect(data_get($yaml, 'secrets', [])),
     ]);
+    if (! $keepsApplicationRows) {
+        ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
+    }
     // If there are predefined volumes, make sure they are not null
     if ($topLevel->get('volumes')->count() > 0) {
         $temp = collect([]);
@@ -413,6 +1387,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $baseNetwork = collect(["{$uuid}-{$pullRequestId}"]);
     }
 
+    $legacyNullEnvironmentVariables = $resource->environment_variables()->get();
+    if ($isPullRequest) {
+        $legacyNullEnvironmentVariables = $resource->environment_variables_preview()->get()
+            ->concat($legacyNullEnvironmentVariables)->unique('key');
+    }
+
     $parsedServices = collect([]);
 
     $allMagicEnvironments = collect([]);
@@ -426,6 +1406,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
         $image = data_get_str($service, 'image');
@@ -440,12 +1422,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // convert environment variables to one format
         $environment = convertToKeyValueCollection($environment);
 
-        // Add Coolify defined environments
-        $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
-
-        $allEnvironments = $allEnvironments->mapWithKeys(function ($item) {
-            return [$item['key'] => $item['value']];
-        });
         // filter and add magic environments
         foreach ($environment as $key => $value) {
             // Get all SERVICE_ variables from keys and values
@@ -486,14 +1462,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 if ($port) {
                     $fqdnWithPort = "$fqdn:$port";
                 }
-                if (is_null($resource->fqdn)) {
+                if (is_null($resource->fqdn) && ! $keepsApplicationRows) {
                     data_forget($resource, 'environment_variables');
                     data_forget($resource, 'environment_variables_preview');
                     $resource->fqdn = $fqdnWithPort;
                     $resource->save();
                 }
 
-                if (! $parsed['has_port']) {
+                // The stored variables belong to the main application; a preview deployment gets its own domains.
+                if (! $parsed['has_port'] && ! $isPullRequest) {
                     $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -503,7 +1480,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 }
-                if ($parsed['has_port']) {
+                if ($parsed['has_port'] && ! $isPullRequest) {
 
                     $newKey = str($key)->beforeLast('_');
                     $resource->environment_variables()->updateOrCreate([
@@ -525,7 +1502,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $originalServiceName = findComposeServiceName($normalizedServiceName, array_keys($services));
                 if ($originalServiceName !== null) {
                     $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
-                    if (! hasComposeServiceDomainEntry($domains, $originalServiceName)) {
+                    if (! $keepsApplicationRows && ! hasComposeServiceDomainEntry($domains, $originalServiceName)) {
                         $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
                         $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
                         if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
@@ -599,45 +1576,48 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
                     }
 
-                    // ALWAYS create base SERVICE_FQDN variable (host only, no scheme)
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceNamePreserved}",
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $fqdnValueForEnv,
-                        'is_preview' => false,
-                    ]);
-
-                    // ALWAYS create base SERVICE_URL variable (with scheme)
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => "SERVICE_URL_{$serviceNamePreserved}",
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $url,
-                        'is_preview' => false,
-                    ]);
-
-                    // If port-specific, ALSO create port-specific pairs
-                    if ($parsed['has_port'] && $port) {
+                    // The stored variables belong to the main application; a preview deployment gets its own domains.
+                    if (! $isPullRequest) {
+                        // ALWAYS create base SERVICE_FQDN variable (host only, no scheme)
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => "SERVICE_FQDN_{$serviceNamePreserved}_{$port}",
+                            'key' => "SERVICE_FQDN_{$serviceNamePreserved}",
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'value' => $fqdnValueForEnvWithPort,
+                            'value' => $fqdnValueForEnv,
                             'is_preview' => false,
                         ]);
 
+                        // ALWAYS create base SERVICE_URL variable (with scheme)
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => "SERVICE_URL_{$serviceNamePreserved}_{$port}",
+                            'key' => "SERVICE_URL_{$serviceNamePreserved}",
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'value' => $urlWithPort,
+                            'value' => $url,
                             'is_preview' => false,
                         ]);
+
+                        // If port-specific, ALSO create port-specific pairs
+                        if ($parsed['has_port'] && $port) {
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => "SERVICE_FQDN_{$serviceNamePreserved}_{$port}",
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $fqdnValueForEnvWithPort,
+                                'is_preview' => false,
+                            ]);
+
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => "SERVICE_URL_{$serviceNamePreserved}_{$port}",
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $urlWithPort,
+                                'is_preview' => false,
+                            ]);
+                        }
                     }
 
                     if ($resource->build_pack === 'dockercompose') {
@@ -661,6 +1641,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             }
                         }
                     }
+                } elseif ($isPullRequest) {
+                    // A preview deployment reads its preview variables, so a pull request parse generates the value there.
+                    $previewVariable = $resource->environment_variables_preview()->firstOrCreate([
+                        'key' => $key->value(),
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => generateEnvValue($command, $resource),
+                        'is_preview' => true,
+                    ]);
+                    // A public preview does not get the production secret; it gets its own value.
+                    if ($isPublicPullRequest && ! $previewVariable->wasRecentlyCreated
+                        && $previewVariable->value === $resource->environment_variables()->where('key', $key->value())->first()?->value) {
+                        $previewVariable->update(['value' => generateEnvValue($command, $resource)]);
+                    }
                 } else {
                     $value = generateEnvValue($command, $resource);
                     $resource->environment_variables()->firstOrCreate([
@@ -676,13 +1671,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
     }
 
+    // A pull request parse keeps its magic variables in the preview variables (see above), not in the production variables.
+    $isPullRequestMagicVariable = fn (string $key): bool => $isPullRequest && $allMagicEnvironments->has($key);
+
     // generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = collect([]);
     if ($resource->build_pack === 'dockercompose') {
-        $serviceNameEnvironments = generateDockerComposeServiceName($services, $pullRequestId);
+        $serviceNameEnvironments = generateDockerComposeServiceName($services, $renamesServices ? $pullRequestId : 0);
     }
 
     // Parse the rest of the services
+    $previewOwnVolumes = collect([]);
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
         $restart = data_get_str($service, 'restart', RESTART_MODE);
@@ -690,7 +1689,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         if ($server->isLogDrainEnabled()) {
             if ($resource->isLogDrainEnabled()) {
-                $logging = generate_fluentd_configuration();
+                $logging = generate_log_drain_configuration($server);
             }
         }
         $volumes = collect(data_get($service, 'volumes', []));
@@ -735,7 +1734,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource, $isPullRequest)
+                        : null);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
@@ -757,27 +1758,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = data_get_str($volume, 'source');
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
-                    $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                    $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
-
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                            try {
-                                validateShellSafePath($sourceValue, 'volume source');
-                            } catch (Exception $e) {
-                                throw new Exception(
-                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
-                                );
-                            }
+                        validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
                         }
                     }
+                    validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
@@ -794,22 +1785,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
-                        // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                        if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
-                            $isDirectory = true;
-                        }
+                        // Without is_directory, a bind without content is a directory. An explicit `is_directory: false` stays a file.
+                        $isDirectory = is_null($isDirectory) ? is_null($content) : (bool) $isDirectory;
                     }
                 }
                 if ($type->value() === 'bind') {
-                    if ($source->value() === '/var/run/docker.sock') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
-                        }
-                    } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (in_array($source->value(), ['/var/run/docker.sock', '/tmp', '/tmp/'], true)) {
+                        if (is_string($volume)) {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } else {
+                            $volume = composeLongBindVolume($volume, $source->value());
                         }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
@@ -817,49 +1805,73 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
-                        $source = replaceLocalSource($source, $mainDirectory);
+                        $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
+                        $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
                             ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
                             : true;
                         if ($isPullRequest && $isPreviewSuffixEnabled) {
-                            $source = addPreviewDeploymentSuffix($source, $pull_request_id);
+                            $source = str(addPreviewDeploymentSuffix($source, $pull_request_id));
                         }
-                        LocalFileVolume::updateOrCreate(
-                            [
-                                'mount_path' => $target,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ],
-                            [
-                                'fs_path' => $source,
-                                'mount_path' => $target,
-                                'content' => $content,
-                                'is_directory' => $isDirectory,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ]
-                        );
-                        if (isDev()) {
-                            if ((int) $resource->compose_parsing_version >= 4) {
-                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
-                            } else {
-                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                        // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
+                        // A preview with the Compose file of its pull request writes the file storages of the application and does not change them.
+                        $keepsMissingHostPath = composeBindKeepsMissingHostPath($volume);
+                        if (! $keepsApplicationRows && ! $keepsMissingHostPath) {
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ],
+                                [
+                                    'fs_path' => $storedSource,
+                                    'variable_fs_path' => $variableSource,
+                                    'mount_path' => $target,
+                                    'content' => $content,
+                                    'is_directory' => $isDirectory,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ]
+                            );
+                        } elseif (! $keepsApplicationRows) {
+                            forgetComposeBindStorage($originalResource, $target->value());
+                        }
+                        // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
+                        $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));
+                        if (is_array($volume)) {
+                            $volume = composeLongBindVolume($volume, $source->value());
+                        } else {
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
                             }
-                        }
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    if ($topLevel->get('volumes')->has($source->value())) {
-                        $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
-                            continue;
-                        }
+                    // A preview never mounts an external or network (NFS, CIFS) volume: two deployments
+                    // that write into the same data directory (for example two databases) can corrupt it.
+                    // The preview gets its own volume with the name that older Coolify versions gave
+                    // it, so it keeps its data, and the preview cleanup removes it.
+                    $declaration = $topLevel->get('volumes')->get($source->value());
+                    $isNetworkVolume = in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true);
+                    $isPreviewOwnVolume = $isPullRequest
+                        && ($isNetworkVolume || composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null);
+                    if (! $isPullRequest && useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
+                        // The external volume gets no row, so Coolify never removes it.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
+                    }
+                    if (! $isPullRequest && $isNetworkVolume) {
+                        // Network volumes are used as written.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
+                    }
+                    if ($isPreviewOwnVolume) {
+                        $previewOwnVolumes->put($source->value(), true);
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
@@ -879,10 +1891,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     } elseif (is_array($volume)) {
                         data_set($volume, 'source', $name);
                     }
-                    $topLevel->get('volumes')->put($name, [
-                        'name' => $name,
-                    ]);
-                    LocalPersistentVolume::updateOrCreate(
+                    $persistentVolume = LocalPersistentVolume::updateOrCreate(
                         [
                             'name' => $name,
                             'resource_id' => $originalResource->id,
@@ -895,28 +1904,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             'resource_type' => get_class($originalResource),
                         ]
                     );
+                    $topLevel->get('volumes')->put($name, $isPreviewOwnVolume
+                        ? ['name' => $name]
+                        : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }
 
-        if ($depends_on?->count() > 0) {
-            if ($isPullRequest) {
-                $newDependsOn = collect([]);
-                $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
-                    if (is_numeric($condition)) {
-                        $dependency = addPreviewDeploymentSuffix($dependency, $pullRequestId);
-
-                        $newDependsOn->put($condition, $dependency);
-                    } else {
-                        $condition = addPreviewDeploymentSuffix($condition, $pullRequestId);
-                        $newDependsOn->put($condition, $dependency);
-                    }
-                });
-                $depends_on = $newDependsOn;
-            }
-        }
         if (! $use_network_mode) {
             if ($topLevel->get('networks')?->count() > 0) {
                 foreach ($topLevel->get('networks') as $networkName => $network) {
@@ -979,8 +1974,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
+            // On the preview network, a preview service also answers to its other name: the Compose name
+            // when the preview renames its services, otherwise the "<name>-pr-<id>" name of older versions.
+            $previewAlias = $renamesServices ? (string) $serviceName : addPreviewDeploymentSuffix((string) $serviceName, $pullRequestId);
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [$previewAlias]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
@@ -993,6 +1991,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
 
+        /**
+         * Finds or adds a variable of the application. With the Compose file of a pull request it only finds one.
+         *
+         * @param  array{key: mixed, resourceable_type: string, resourceable_id: int}  $attributes
+         * @param  array<string, mixed>  $values
+         */
+        $applicationVariable = function (array $attributes, array $values) use ($resource, $keepsApplicationRows): ?EnvironmentVariable {
+            if ($keepsApplicationRows) {
+                return $resource->environment_variables()->where('key', (string) $attributes['key'])->first();
+            }
+
+            return $resource->environment_variables()->firstOrCreate($attributes, $values);
+        };
+        $passthroughEnvironmentKeys = extractDockerComposePassthroughKeys(data_get($service, 'environment', []));
         $normalEnvironments = $environment->diffKeys($allMagicEnvironments);
         $normalEnvironments = $normalEnvironments->filter(function ($value, $key) {
             return ! str($value)->startsWith('SERVICE_');
@@ -1002,8 +2014,37 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value()) && ! isCoolifyProvidedComposeVariable($key->value())) {
+                $applicationVariable([
+                    'key' => $key,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'is_preview' => false,
+                ]);
+
+                continue;
+            }
+            extractDockerComposeEnvironmentVariableReferences($value->value())
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_') || isCoolifyProvidedComposeVariable($reference))
+                ->each(function (string $reference) use ($resource, $applicationVariable, $keepsApplicationRows): void {
+                    $environmentVariable = $applicationVariable([
+                        'key' => $reference,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'is_preview' => false,
+                    ]);
+                    $isRequired = dockerComposeEnvironmentVariableIsRequired(
+                        $resource->docker_compose_raw ?? $resource->docker_compose,
+                        $reference
+                    );
+                    if (! $keepsApplicationRows && (bool) $environmentVariable->is_required !== $isRequired) {
+                        $environmentVariable->update(['is_required' => $isRequired]);
+                    }
+                });
             if ($value->startsWith('$SERVICE_')) {
-                $resource->environment_variables()->firstOrCreate([
+                $applicationVariable([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
@@ -1014,13 +2055,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                 continue;
             }
-            if (! $value->startsWith('$')) {
+            if (! $value->startsWith('$') || composeValueReferencesCoolifyProvidedVariable($value->value())) {
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
                 // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
                 // Ensure the variable exists in DB for .env generation and UI display
-                $resource->environment_variables()->firstOrCreate([
+                $applicationVariable([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
@@ -1049,18 +2090,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $isRequired = str_contains($operator, '?');
 
                             // Create the primary variable with its default (only if it doesn't exist)
-                            $envVar = $resource->environment_variables()->firstOrCreate([
-                                'key' => $varName,
-                                'resourceable_type' => get_class($resource),
-                                'resourceable_id' => $resource->id,
-                            ], [
-                                'value' => $defaultValue,
-                                'is_preview' => false,
-                                'is_required' => $isRequired,
-                            ]);
-
-                            // Add the variable to the environment so it will be shown in the deployable compose file
-                            $environment[$varName] = $envVar->value;
+                            if (! $isPullRequestMagicVariable($varName)) {
+                                $envVar = $applicationVariable([
+                                    'key' => $varName,
+                                    'resourceable_type' => get_class($resource),
+                                    'resourceable_id' => $resource->id,
+                                ], [
+                                    'value' => $isRequired ? null : $defaultValue,
+                                    'is_preview' => false,
+                                    'is_required' => $isRequired,
+                                ]);
+                            }
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
@@ -1076,9 +2116,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                     // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
                                     $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
 
-                                    if (! $isMagicVariable) {
+                                    if (! $isMagicVariable && ! $isPullRequestMagicVariable($nestedVarName)) {
                                         if ($nestedSplit !== null) {
-                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                            $nestedEnvVar = $applicationVariable([
                                                 'key' => $nestedSplit['variable'],
                                                 'resourceable_type' => get_class($resource),
                                                 'resourceable_id' => $resource->id,
@@ -1086,16 +2126,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                                 'value' => $nestedSplit['default'],
                                                 'is_preview' => false,
                                             ]);
-                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
                                         } else {
-                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                            $nestedEnvVar = $applicationVariable([
                                                 'key' => $nestedContent,
                                                 'resourceable_type' => get_class($resource),
                                                 'resourceable_id' => $resource->id,
                                             ], [
                                                 'is_preview' => false,
                                             ]);
-                                            $environment[$nestedContent] = $nestedEnvVar->value;
                                         }
                                     }
 
@@ -1109,16 +2147,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             // Simple variable reference without default
                             $parsedKeyValue = replaceVariables($value);
-                            $envVar = $resource->environment_variables()->firstOrCreate([
-                                'key' => $content,
-                                'resourceable_type' => get_class($resource),
-                                'resourceable_id' => $resource->id,
-                            ], [
-                                'is_preview' => false,
-                                'is_required' => $isRequired,
-                            ]);
-                            // Add the variable to the environment using the saved DB value
-                            $environment[$content] = $envVar->value;
+                            if (! $isPullRequestMagicVariable($content)) {
+                                $envVar = $applicationVariable([
+                                    'key' => $content,
+                                    'resourceable_type' => get_class($resource),
+                                    'resourceable_id' => $resource->id,
+                                ], [
+                                    'is_preview' => false,
+                                    'is_required' => $isRequired,
+                                ]);
+                            }
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -1144,7 +2182,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         if ($originalValue->value() === $value->value()) {
                             // This means the variable does not have a default value
                             $parsedKeyValue = replaceVariables($value);
-                            $envVar = $resource->environment_variables()->firstOrCreate([
+                            $envVar = $applicationVariable([
                                 'key' => $parsedKeyValue,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
@@ -1153,11 +2191,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'is_required' => $isRequired,
                             ]);
                             // Add the variable to the environment using the saved DB value
-                            $environment[$parsedKeyValue->value()] = $envVar->value;
+                            $environment[$parsedKeyValue->value()] = $envVar?->value;
 
                             continue;
                         }
-                        $resource->environment_variables()->firstOrCreate([
+                        $applicationVariable([
                             'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
@@ -1170,10 +2208,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $branch = $originalResource->git_branch;
-        if ($pullRequestId !== 0) {
-            $branch = "pull/{$pullRequestId}/head";
-        }
+        $branch = $originalResource->coolifyBranch($pullRequestId);
         if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
             $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
         }
@@ -1205,7 +2240,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
                 $parsedDomain = composeDomainEntryString($domain);
-                $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
+                $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper()->value();
 
                 if (filled($parsedDomain)) {
                     $parsedDomain = str($parsedDomain)->explode(',')->first();
@@ -1213,38 +2248,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
                     $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
                     $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyUrl->__toString(),
-                        'is_preview' => false,
-                    ]);
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyFqdn,
-                        'is_preview' => false,
-                    ]);
-                } else {
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
+                    // A preview uses its own domains; the stored variables belong to the main application.
+                    if ($isPullRequest) {
+                        continue;
+                    }
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, $coolifyUrl->__toString(), $coolifyFqdn);
+                } elseif (! $isPullRequest) {
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, null, null);
                 }
             }
         }
@@ -1257,7 +2269,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 if ($docker_compose_domains->count() > 0) {
                     $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                     if ($found_fqdn) {
-                        $fqdns = collect($found_fqdn);
+                        $fqdns = str($found_fqdn)->explode(',')->map(fn ($fqdn) => trim($fqdn))->filter();
                     } else {
                         $fqdns = collect([]);
                     }
@@ -1276,7 +2288,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $defaultLabels = defaultLabels(
-            id: $resource->id,
+            uuid: $resource->uuid,
             name: $containerName,
             projectName: $resource->project()->name,
             resourceName: $resource->name,
@@ -1291,11 +2303,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
-            })->map(function ($value, $key) use ($resource) {
+            })->map(function ($value, $key) use ($resource, $isPullRequest, $isPublicPullRequest) {
+                $isValueFromDatabase = false;
                 // Preserve empty strings and null values with correct Docker Compose semantics:
                 // - Empty string: Variable is set to "" (e.g., HTTP_PROXY="" means "no proxy")
                 // - Null: Variable is unset/removed from container environment (may inherit from host)
@@ -1303,12 +2318,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // User explicitly wants variable unset - respect that
                     // NEVER override from database - null means "inherit from environment"
                     // Keep as null (will be excluded from container environment)
-                } elseif ($value === '') {
-                    // Empty string - allow database override for backward compatibility
-                    $dbEnv = $resource->environment_variables()->where('key', $key)->first();
+                } elseif ($value === '' && ! ($isPullRequest && str($key)->startsWith('SERVICE_URL_'))) {
+                    // Empty string - allow database override for backward compatibility.
+                    // The stored service URLs belong to the main application, so a preview does not use them.
+                    // A preview uses its preview variables, like ApplicationDeploymentJob does.
+                    $dbEnv = $isPullRequest
+                        ? $resource->environment_variables_preview()->where('key', $key)->first()
+                        : $resource->environment_variables()->where('key', $key)->first();
+                    // A public preview does not get preview variables that still have the production value.
+                    if ($dbEnv && $isPublicPullRequest && $resource->environment_variables()->where('key', $key)->first()?->value === $dbEnv->value) {
+                        $dbEnv = null;
+                    }
                     // Only use database override if it exists AND has a non-empty value
                     if ($dbEnv && str($dbEnv->value)->isNotEmpty()) {
                         $value = $dbEnv->value;
+                        $isValueFromDatabase = true;
                     }
                     // Otherwise keep empty string as-is
                 }
@@ -1316,7 +2340,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
                 // Without this, literal {{...}} strings end up in the compose environment: section,
                 // which takes precedence over the resolved values in the .env file (env_file:)
-                if (is_string($value) && str_contains($value, '{{')) {
+                // A public preview resolves them only in its own variables, not in the compose file of the pull request.
+                if (is_string($value) && str_contains($value, '{{') && ($isValueFromDatabase || ! $isPublicPullRequest)) {
                     $value = resolveSharedEnvironmentVariables($value, $resource);
                 }
 
@@ -1355,6 +2380,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
             $onlyPort = firstDockerComposeServicePort($service);
+            $isTrafficAnalyticsEnabled = (bool) $server?->isTrafficAnalyticsEnabled();
+            $supportsLogAppend = (bool) $server?->caddySupportsLogAppend();
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1365,6 +2392,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -1374,6 +2402,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection,
                             domainPortOverrides: $domainPortOverrides,
+                            certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1382,6 +2411,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             uuid: $labelUuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -1392,6 +2422,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection,
                             domainPortOverrides: $domainPortOverrides,
+                            is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                            supports_log_append: $supportsLogAppend,
                         ));
                         break;
                 }
@@ -1400,6 +2432,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -1409,12 +2442,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection,
                     domainPortOverrides: $domainPortOverrides,
+                    certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
                     uuid: $labelUuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -1425,6 +2460,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection,
                     domainPortOverrides: $domainPortOverrides,
+                    is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                    supports_log_append: $supportsLogAppend,
                 ));
             }
         }
@@ -1446,6 +2483,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
+        // A security update of this service, while the compose file still names the image it replaced.
+        if (($imageOverride = $resource->composeImageOverride((string) $serviceName, $image->isEmpty() ? null : $image->value())) !== null) {
+            $payload['image'] = $imageOverride;
+        }
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
@@ -1456,23 +2497,23 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $payload['volumes'] = $volumesParsed;
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
+            $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
             $payload['environment'] = $environment->merge($coolifyEnvironments)->merge($serviceNameEnvironments);
         }
         if ($logging) {
             $payload['logging'] = $logging;
+        }
+        if ($renamesServices) {
+            $depends_on = $depends_on->mapWithKeys(fn ($dependency, $condition) => is_numeric($condition)
+                ? [$condition => addPreviewDeploymentSuffix($dependency, $pullRequestId)]
+                : [addPreviewDeploymentSuffix($condition, $pullRequestId) => $dependency]);
         }
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
         // Auto-inject .env file so Coolify environment variables are available inside containers
         // This makes Applications behave consistently with manual .env file usage
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -1487,12 +2528,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $payload['image'] = "{$imageRepo}:{$imageTag}";
         }
 
-        if ($isPullRequest) {
+        // A preview keeps the Compose service names, which other Compose files and start commands use:
+        // its own project and network isolate it. See Application::renamesPreviewComposeServices().
+        if ($renamesServices) {
             $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
-
         $parsedServices->put($serviceName, $payload);
     }
+    // The preview mounts its own volumes instead of these external and network volumes (see above), so it does not declare them.
+    $topLevel->put('volumes', $topLevel->get('volumes')->except($previewOwnVolumes->keys()->all()));
     $topLevel->put('services', $parsedServices);
 
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];
@@ -1514,13 +2558,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     });
 
     $cleanedCompose = Yaml::dump(convertToArray($topLevel), 10, 2);
-    $resource->docker_compose = $cleanedCompose;
+    // A preview parse keeps the Compose fields of the application: a preview can use the Compose file of its pull request.
+    if (! $isPullRequest) {
+        $resource->docker_compose = $cleanedCompose;
+    }
 
     // Update docker_compose_raw to remove content: from volumes only
     // This keeps the original user input clean while preventing content reapplication
     // Parse the original compose again to create a clean version without Coolify additions
     try {
-        $originalYaml = Yaml::parse($originalCompose);
+        $originalYaml = parseDockerComposeYaml($originalCompose);
+        $originalYamlBeforeCleanup = $originalYaml;
         // Remove content, isDirectory, and is_directory from all volume definitions
         if (isset($originalYaml['services'])) {
             foreach ($originalYaml['services'] as $serviceName => &$service) {
@@ -1535,7 +2583,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+        if (! $isPullRequest && $originalYaml !== $originalYamlBeforeCleanup) {
+            $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($originalCompose, $originalYaml, ['content', 'isDirectory', 'is_directory']);
+        }
     } catch (Exception) {
         // If parsing fails, keep the original docker_compose_raw unchanged
     }
@@ -1544,11 +2594,61 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
 
+    if (! $keepsApplicationRows) {
+        syncDockerComposeEnvironmentVariableRequiredState($resource);
+    }
+
     return $topLevel;
+}
+
+/**
+ * The service application or database that a Compose service uses, created when it does not exist.
+ *
+ * A part that the user converted wins. Then the part type that the image detection gives, and then the
+ * other part type. An image change does not replace an existing part, so its settings and backups stay.
+ */
+function resolveServicePart(Service $resource, string $serviceName, bool $isDatabaseImage): ServiceApplication|ServiceDatabase
+{
+    $application = fn () => $resource->applications()->where('name', $serviceName);
+    $database = fn () => $resource->databases()->where('name', $serviceName);
+
+    $migrated = $application()->where('is_migrated', true)->first() ?? $database()->where('is_migrated', true)->first();
+    if ($migrated) {
+        return $migrated;
+    }
+    if ($isDatabaseImage) {
+        return $database()->first() ?? $application()->first() ?? $resource->databases()->create(['name' => $serviceName]);
+    }
+
+    return $application()->first() ?? $database()->first() ?? $resource->applications()->create(['name' => $serviceName]);
+}
+
+/**
+ * Marks the applications and databases of a service that its compose file no longer uses: parts whose names are
+ * not in the file, and a duplicate part that another part with the same name replaces.
+ * They keep their settings, so a part that comes back under the same name is used again.
+ * The service status ignores marked parts, and the user can delete them.
+ *
+ * @param  Collection<int, ServiceApplication|ServiceDatabase>  $usedParts
+ */
+function markServicePartsRemovedFromCompose(Service $resource, Collection $usedParts): void
+{
+    if ($usedParts->isEmpty()) {
+        return;
+    }
+
+    foreach ([[$resource->applications(), ServiceApplication::class], [$resource->databases(), ServiceDatabase::class]] as [$parts, $class]) {
+        $usedIds = $usedParts->filter(fn ($part) => $part instanceof $class)->pluck('id')->all();
+        (clone $parts)->whereIn('id', $usedIds)->where('is_removed_from_compose', true)
+            ->update(['is_removed_from_compose' => false]);
+        (clone $parts)->whereNotIn('id', $usedIds)->where('is_removed_from_compose', false)
+            ->update(['is_removed_from_compose' => true]);
+    }
 }
 
 function serviceParser(Service $resource): Collection
 {
+    $resource->resetComposeVolumeWarnings();
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
     // Store original compose for later use to update docker_compose_raw with content removed
@@ -1563,11 +2663,14 @@ function serviceParser(Service $resource): Collection
     $server = data_get($resource, 'server');
 
     try {
-        $yaml = Yaml::parse($compose);
+        $yaml = parseDockerComposeYaml($compose);
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
 
     // Clean up corrupted environment variables from previous parser bugs
     // (keys starting with $ or ending with } should not exist as env var names)
@@ -1579,6 +2682,7 @@ function serviceParser(Service $resource): Collection
                 ->orWhere('key', 'LIKE', '%}');
         })
         ->delete();
+    $existingEnvironmentVariableKeys = $resource->environment_variables()->pluck('key');
 
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
@@ -1586,6 +2690,7 @@ function serviceParser(Service $resource): Collection
         'configs' => collect(data_get($yaml, 'configs', [])),
         'secrets' => collect(data_get($yaml, 'secrets', [])),
     ]);
+    ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
     // If there are predefined volumes, make sure they are not null
     if ($topLevel->get('volumes')->count() > 0) {
         $temp = collect([]);
@@ -1600,12 +2705,15 @@ function serviceParser(Service $resource): Collection
     // Get the base docker network
     $baseNetwork = collect([$uuid]);
 
+    $legacyNullEnvironmentVariables = $resource->environment_variables()->where('preserve_compose_null', true)->whereNull('value')->get();
+
     $parsedServices = collect([]);
 
     // Generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = generateDockerComposeServiceName($services);
 
     $allMagicEnvironments = collect([]);
+    $usedServiceParts = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
         // Validate service name for command injection
@@ -1617,54 +2725,19 @@ function serviceParser(Service $resource): Collection
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
+        validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
-
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-            $savedService = $migratedApp ?: $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-            if ($isDatabase) {
-                $databaseFound = ServiceDatabase::where('name', $serviceName)->where('service_id', $resource->id)->first();
-                if ($databaseFound) {
-                    $savedService = $databaseFound;
-                } else {
-                    $savedService = ServiceDatabase::create([
-                        'name' => $serviceName,
-                        'service_id' => $resource->id,
-                    ]);
-                }
-            } else {
-                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-                if ($applicationFound) {
-                    $savedService = $applicationFound;
-                } else {
-                    $savedService = ServiceApplication::create([
-                        'name' => $serviceName,
-                        'service_id' => $resource->id,
-                    ]);
-                }
-            }
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
         // Update image if it changed
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
         }
+        $usedServiceParts->push($savedService);
     }
+    markServicePartsRemovedFromCompose($resource, $usedServiceParts);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);
@@ -1673,49 +2746,14 @@ function serviceParser(Service $resource): Collection
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
 
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
+        // A part that the user converted keeps its type, ignoring image detection.
+        $isDatabase = $savedService->is_migrated ? $savedService instanceof ServiceDatabase : isDatabaseImage($image, $service);
 
         $containerName = "$serviceName-{$resource->uuid}";
 
         $predefinedPort = $resource->getRequiredPort();
 
-        if ($migratedApp || $migratedDb) {
-            // Use the already determined migrated service
-            $savedService = $migratedApp ?: $migratedDb;
-        } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
-        } else {
-            $savedService = ServiceApplication::firstOrCreate([
-                'name' => $serviceName,
-                'service_id' => $resource->id,
-            ], [
-                'is_gzip_enabled' => true,
-            ]);
-        }
         // Check if image changed
         if ($savedService->image !== $image) {
             $savedService->image = $image;
@@ -1786,6 +2824,10 @@ function serviceParser(Service $resource): Collection
 
                 $port = $parsed['port'];
                 $fqdnFor = $parsed['service_name'];
+
+                if (isCopiedServiceUrlDeclaration($resource, $services, $savedService, $key->value())) {
+                    continue;
+                }
 
                 // Only ServiceApplication has fqdn column, ServiceDatabase does not
                 $isServiceApplication = $savedService instanceof ServiceApplication;
@@ -1907,8 +2949,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_FQDN_UMAMI_3000)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -1952,8 +2994,8 @@ function serviceParser(Service $resource): Collection
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
                     $portSuffixedExists = $resource->environment_variables()
                         ->where('key', 'LIKE', $key->value().'_%')
-                        ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
-                        ->exists();
+                        ->pluck('key')
+                        ->contains(fn ($envKey) => preg_match('/^'.preg_quote($key->value(), '/').'_[0-9]+$/', $envKey) === 1);
                     $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
@@ -2015,7 +3057,7 @@ function serviceParser(Service $resource): Collection
 
         if ($server->isLogDrainEnabled()) {
             if ($serviceAppsLogDrainEnabledMap->get($serviceName)) {
-                $logging = generate_fluentd_configuration();
+                $logging = generate_log_drain_configuration($server);
             }
         }
         $volumes = collect(data_get($service, 'volumes', []));
@@ -2040,24 +3082,9 @@ function serviceParser(Service $resource): Collection
         $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
-        // Check for manually migrated services first (respects user's conversion choice)
-        $migratedApp = ServiceApplication::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-        $migratedDb = ServiceDatabase::where('name', $serviceName)
-            ->where('service_id', $resource->id)
-            ->where('is_migrated', true)
-            ->first();
-
-        if ($migratedApp || $migratedDb) {
-            // Use the migrated service type, ignoring image detection
-            $isDatabase = (bool) $migratedDb;
-            $savedService = $migratedApp ?: $migratedDb;
-        } else {
-            // Use image detection for non-migrated services
-            $isDatabase = isDatabaseImage($image, $service);
-        }
+        $savedService = resolveServicePart($resource, (string) $serviceName, isDatabaseImage($image, $service));
+        // A part that the user converted keeps its type, ignoring image detection.
+        $isDatabase = $savedService->is_migrated ? $savedService instanceof ServiceDatabase : isDatabaseImage($image, $service);
 
         $volumesParsed = collect([]);
 
@@ -2065,25 +3092,6 @@ function serviceParser(Service $resource): Collection
 
         $predefinedPort = $resource->getRequiredPort();
 
-        if ($migratedApp || $migratedDb) {
-            // Use the already determined migrated service
-            $savedService = $migratedApp ?: $migratedDb;
-        } elseif ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-            if ($applicationFound) {
-                $savedService = $applicationFound;
-            } else {
-                $savedService = ServiceDatabase::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
-            }
-        } else {
-            $savedService = ServiceApplication::firstOrCreate([
-                'name' => $serviceName,
-                'service_id' => $resource->id,
-            ]);
-        }
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -2099,7 +3107,9 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume);
+                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource)
+                        : null);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
@@ -2121,27 +3131,17 @@ function serviceParser(Service $resource): Collection
                     $source = data_get_str($volume, 'source');
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
-                    $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                    $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
-
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                            try {
-                                validateShellSafePath($sourceValue, 'volume source');
-                            } catch (Exception $e) {
-                                throw new Exception(
-                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
-                                );
-                            }
+                        validateComposeArrayVolumeSource($source->value());
+                        // A named volume keeps its source as written, so its volume name does not change.
+                        if ($type->value() === 'bind') {
+                            $source = str(resolveComposeLongBindSource($source->value(), $resource));
                         }
                     }
+                    validateComposeContentVolumeSource($volume);
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
@@ -2158,22 +3158,19 @@ function serviceParser(Service $resource): Collection
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
-                        // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                        if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
-                            $isDirectory = true;
-                        }
+                        // Without is_directory, a bind without content is a directory. An explicit `is_directory: false` stays a file.
+                        $isDirectory = is_null($isDirectory) ? is_null($content) : (bool) $isDirectory;
                     }
                 }
                 if ($type->value() === 'bind') {
-                    if ($source->value() === '/var/run/docker.sock') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
-                        }
-                    } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                    if (in_array($source->value(), ['/var/run/docker.sock', '/tmp', '/tmp/'], true)) {
+                        if (is_string($volume)) {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
+                        } else {
+                            $volume = composeLongBindVolume($volume, $source->value());
                         }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
@@ -2181,43 +3178,53 @@ function serviceParser(Service $resource): Collection
                         } else {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
-                        $source = replaceLocalSource($source, $mainDirectory);
-                        LocalFileVolume::updateOrCreate(
-                            [
-                                'mount_path' => $target,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ],
-                            [
-                                'fs_path' => $source,
-                                'mount_path' => $target,
-                                'content' => $content,
-                                'is_directory' => $isDirectory,
-                                'resource_id' => $originalResource->id,
-                                'resource_type' => get_class($originalResource),
-                            ]
-                        );
-                        if (isDev()) {
-                            if ((int) $resource->compose_parsing_version >= 4) {
-                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/services/'.$uuid);
-                            } else {
-                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
-                            }
+                        $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
+                        if (! composeBindKeepsMissingHostPath($volume)) {
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ],
+                                [
+                                    'fs_path' => $source,
+                                    'variable_fs_path' => $variableSource,
+                                    'mount_path' => $target,
+                                    'content' => $content,
+                                    'is_directory' => $isDirectory,
+                                    'resource_id' => $originalResource->id,
+                                    'resource_type' => get_class($originalResource),
+                                ]
+                            );
+                        } else {
+                            forgetComposeBindStorage($originalResource, $target->value());
                         }
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
+                        $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));
+                        if (is_array($volume)) {
+                            $volume = composeLongBindVolume($volume, $source->value());
+                        } else {
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    if ($topLevel->get('volumes')->has($source->value())) {
-                        $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
-                            continue;
-                        }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
-                            continue;
-                        }
+                    if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
+                        // The external volume gets no row, so Coolify never removes it.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
+                    }
+                    $declaration = $topLevel->get('volumes')->get($source->value());
+                    if (in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+                        // Network volumes are used as written.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
@@ -2234,10 +3241,7 @@ function serviceParser(Service $resource): Collection
                     } elseif (is_array($volume)) {
                         data_set($volume, 'source', $name);
                     }
-                    $topLevel->get('volumes')->put($name, [
-                        'name' => $name,
-                    ]);
-                    LocalPersistentVolume::updateOrCreate(
+                    $persistentVolume = LocalPersistentVolume::updateOrCreate(
                         [
                             'name' => $name,
                             'resource_id' => $originalResource->id,
@@ -2250,8 +3254,8 @@ function serviceParser(Service $resource): Collection
                             'resource_type' => get_class($originalResource),
                         ]
                     );
+                    $topLevel->get('volumes')->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }
@@ -2325,6 +3329,7 @@ function serviceParser(Service $resource): Collection
             }
         }
 
+        $passthroughEnvironmentKeys = extractDockerComposePassthroughKeys(data_get($service, 'environment', []));
         $normalEnvironments = $environment->diffKeys($allMagicEnvironments);
         $normalEnvironments = $normalEnvironments->filter(function ($value, $key) {
             return ! str($value)->startsWith('SERVICE_');
@@ -2335,6 +3340,39 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value()) && ! isCoolifyProvidedComposeVariable($key->value())) {
+                $resource->environment_variables()->firstOrCreate([
+                    'key' => $key,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
+                ]);
+
+                continue;
+            }
+            $referenceContent = extractBalancedBraceContent($value->value());
+            $primaryReference = $referenceContent === null ? null : splitOnOperatorOutsideNested($referenceContent['content']);
+            extractDockerComposeEnvironmentVariableReferences($value->value())
+                ->reject(fn (string $reference): bool => $value->startsWith('$') && $reference === ($primaryReference['variable'] ?? null) && str_contains($primaryReference['operator'], '?'))
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_') || isCoolifyProvidedComposeVariable($reference))
+                ->each(function (string $reference) use ($resource): void {
+                    $environmentVariable = $resource->environment_variables()->firstOrCreate([
+                        'key' => $reference,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'is_preview' => false,
+                    ]);
+                    $isRequired = dockerComposeEnvironmentVariableIsRequired(
+                        $resource->docker_compose_raw ?? $resource->docker_compose,
+                        $reference
+                    );
+                    if ((bool) $environmentVariable->is_required !== $isRequired) {
+                        $environmentVariable->update(['is_required' => $isRequired]);
+                    }
+                });
             if ($parsedValue->startsWith('SERVICE_')) {
                 $resource->environment_variables()->updateOrCreate([
                     'key' => $key,
@@ -2348,7 +3386,7 @@ function serviceParser(Service $resource): Collection
 
                 continue;
             }
-            if (! $value->startsWith('$')) {
+            if (! $value->startsWith('$') || composeValueReferencesCoolifyProvidedVariable($value->value())) {
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
@@ -2390,14 +3428,11 @@ function serviceParser(Service $resource): Collection
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                             ], [
-                                'value' => $defaultValue,
+                                'value' => $isRequired ? $defaultValue : null,
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
-
-                            // Add the variable to the environment so it will be shown in the deployable compose file
-                            $environment[$varName] = $envVar->value;
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
@@ -2425,8 +3460,6 @@ function serviceParser(Service $resource): Collection
                                                 'value' => $nestedSplit['default'],
                                                 'is_preview' => false,
                                             ]);
-                                            // Add nested variable to environment
-                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
                                         } else {
                                             // Simple nested variable without default (only if it doesn't exist)
                                             $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
@@ -2436,8 +3469,6 @@ function serviceParser(Service $resource): Collection
                                             ], [
                                                 'is_preview' => false,
                                             ]);
-                                            // Add nested variable to environment
-                                            $environment[$nestedContent] = $nestedEnvVar->value;
                                         }
                                     }
 
@@ -2461,8 +3492,6 @@ function serviceParser(Service $resource): Collection
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
-                            // Add the variable to the environment using the saved DB value
-                            $environment[$content] = $envVar->value;
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -2541,13 +3570,13 @@ function serviceParser(Service $resource): Collection
             : collect([]);
 
         $defaultLabels = defaultLabels(
-            id: $resource->id,
+            uuid: $resource->uuid,
             name: $containerName,
             projectName: $resource->project()->name,
             resourceName: $resource->name,
             type: 'service',
-            subType: $isDatabase ? 'database' : 'application',
-            subId: $savedService->id,
+            subType: $savedService instanceof ServiceDatabase ? 'database' : 'application',
+            subUuid: $savedService->uuid,
             subName: $savedService->human_name ?? $savedService->name,
             environment: $resource->environment->name,
         );
@@ -2557,7 +3586,9 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
             $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
-        add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
+        $userDefinedKeys = $resource->environment_variables->pluck('key')->merge($environment->keys());
+        coolifyDefaultEnvironmentVariables($resource, $userDefinedKeys)
+            ->each(fn ($value, $key) => $coolifyEnvironments->put($key, escapeDollarSign($value)));
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
@@ -2608,6 +3639,8 @@ function serviceParser(Service $resource): Collection
             $onlyPort = $originalResource instanceof ServiceApplication
                 ? $originalResource->getRequiredPort()
                 : $predefinedPort;
+            $isTrafficAnalyticsEnabled = (bool) $server?->isTrafficAnalyticsEnabled();
+            $supportsLogAppend = (bool) $server?->caddySupportsLogAppend();
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2618,6 +3651,7 @@ function serviceParser(Service $resource): Collection
                             uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2626,7 +3660,8 @@ function serviceParser(Service $resource): Collection
                             onlyPort: $onlyPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            certificate_resolver: $server->traefikCertificateResolver(data_get($originalResource, 'traefik_certificate_resolver')),
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2635,6 +3670,7 @@ function serviceParser(Service $resource): Collection
                             uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2644,7 +3680,9 @@ function serviceParser(Service $resource): Collection
                             predefinedPort: $onlyPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                            supports_log_append: $supportsLogAppend,
                         ));
                         break;
                 }
@@ -2653,6 +3691,7 @@ function serviceParser(Service $resource): Collection
                     uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2661,13 +3700,15 @@ function serviceParser(Service $resource): Collection
                     onlyPort: $onlyPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    certificate_resolver: $server->traefikCertificateResolver(data_get($originalResource, 'traefik_certificate_resolver')),
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
                     uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    is_permanent_redirect_enabled: $originalResource->isPermanentRedirectEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
@@ -2677,7 +3718,9 @@ function serviceParser(Service $resource): Collection
                     predefinedPort: $onlyPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                    supports_log_append: $supportsLogAppend,
                 ));
             }
         }
@@ -2712,6 +3755,7 @@ function serviceParser(Service $resource): Collection
             $payload['volumes'] = $volumesParsed;
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
+            $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
             $payload['environment'] = $environment->merge($coolifyEnvironments)->merge($serviceNameEnvironments);
         }
         if ($logging) {
@@ -2722,13 +3766,7 @@ function serviceParser(Service $resource): Collection
         }
         // Auto-inject .env file so Coolify environment variables are available inside containers
         // This makes Services behave consistently with Applications
-        $existingEnvFiles = data_get($service, 'env_file');
-        $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
-            ->unique()
-            ->values();
-
-        $payload['env_file'] = $envFiles;
+        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
 
         $parsedServices->put($serviceName, $payload);
     }
@@ -2759,7 +3797,8 @@ function serviceParser(Service $resource): Collection
     // This keeps the original user input clean while preventing content reapplication
     // Parse the original compose again to create a clean version without Coolify additions
     try {
-        $originalYaml = Yaml::parse($originalCompose);
+        $originalYaml = parseDockerComposeYaml($originalCompose);
+        $originalYamlBeforeCleanup = $originalYaml;
         // Remove content, isDirectory, and is_directory from all volume definitions
         if (isset($originalYaml['services'])) {
             foreach ($originalYaml['services'] as $serviceName => &$service) {
@@ -2774,7 +3813,9 @@ function serviceParser(Service $resource): Collection
                 }
             }
         }
-        $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
+        if ($originalYaml !== $originalYamlBeforeCleanup) {
+            $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($originalCompose, $originalYaml, ['content', 'isDirectory', 'is_directory']);
+        }
     } catch (Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
     }
@@ -2782,6 +3823,9 @@ function serviceParser(Service $resource): Collection
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
+
+    fillDockerComposeDefaultsForBareReferences($resource, $existingEnvironmentVariableKeys);
+    syncDockerComposeEnvironmentVariableRequiredState($resource);
 
     return $topLevel;
 }

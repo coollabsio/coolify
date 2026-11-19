@@ -7,7 +7,7 @@
 
 services:
   changedetection:
-    image: ghcr.io/dgtlmoon/changedetection.io
+    image: ghcr.io/dgtlmoon/changedetection.io:0.70.3
     volumes:
       - changedetection-data:/datastore
     environment:
@@ -34,7 +34,7 @@ services:
 
   browser-sockpuppet-chrome:
     hostname: browser-sockpuppet-chrome
-    image: dgtlmoon/sockpuppetbrowser:latest
+    image: dgtlmoon/sockpuppetbrowser:0.0.5
     cap_add:
       - SYS_ADMIN
     environment:

@@ -7,10 +7,10 @@
 
 services:
   homarr:
-    image: ghcr.io/homarr-labs/homarr:v1.74.0
+    image: ghcr.io/homarr-labs/homarr:v2.13.1
     environment:
-      - SECRET_ENCRYPTION_KEY=$SERVICE_HEX_64_ENCRYPTION
       - SERVICE_URL_HOMARR_7575
+      - BASE_URL=${SERVICE_URL_HOMARR}
       - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_64_HOMARR}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

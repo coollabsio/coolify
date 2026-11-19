@@ -1,10 +1,12 @@
 <?php
 
+use App\Actions\Stripe\CancelSubscription;
 use App\Actions\Stripe\CancelSubscriptionAtPeriodEnd;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\Service\SubscriptionService;
 use Stripe\StripeClient;
 
@@ -85,7 +87,7 @@ describe('CancelSubscriptionAtPeriodEnd', function () {
     test('handles stripe API error gracefully', function () {
         $this->mockSubscriptions
             ->shouldReceive('update')
-            ->andThrow(new \Stripe\Exception\InvalidRequestException('Subscription not found'));
+            ->andThrow(new InvalidRequestException('Subscription not found'));
 
         $action = new CancelSubscriptionAtPeriodEnd($this->mockStripe);
         $result = $action->execute($this->team);
@@ -93,4 +95,50 @@ describe('CancelSubscriptionAtPeriodEnd', function () {
         expect($result['success'])->toBeFalse();
         expect($result['error'])->toContain('Stripe error');
     });
+});
+
+describe('CancelSubscription::cancelById', function () {
+    test('cancels an active subscription and ends the local row', function () {
+        $this->mockSubscriptions->shouldReceive('retrieve')->with('sub_test_456')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_test_456', 'status' => 'active']));
+        $this->mockSubscriptions->shouldReceive('cancel')->once()->with('sub_test_456', []);
+        app()->instance(StripeClient::class, $this->mockStripe);
+
+        expect(CancelSubscription::cancelById('sub_test_456'))->toBeTrue()
+            ->and($this->subscription->fresh()->stripe_subscription_id)->toBeNull()
+            ->and($this->subscription->fresh()->ended_at)->not->toBeNull();
+    });
+
+    test('ends the local row without cancelling when Stripe already ended the subscription', function (string $status) {
+        $this->mockSubscriptions->shouldReceive('retrieve')->with('sub_test_456')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_test_456', 'status' => $status]));
+        $this->mockSubscriptions->shouldNotReceive('cancel');
+        app()->instance(StripeClient::class, $this->mockStripe);
+
+        expect(CancelSubscription::cancelById('sub_test_456'))->toBeTrue()
+            ->and($this->subscription->fresh()->stripe_subscription_id)->toBeNull()
+            ->and($this->subscription->fresh()->ended_at)->not->toBeNull();
+    })->with(['canceled', 'incomplete_expired']);
+
+    test('ends the local row when Stripe no longer has the subscription', function () {
+        $this->mockSubscriptions->shouldReceive('retrieve')->with('sub_test_456')->andThrow(
+            InvalidRequestException::factory('No such subscription', 404, null, null, null, 'resource_missing')
+        );
+        $this->mockSubscriptions->shouldNotReceive('cancel');
+        app()->instance(StripeClient::class, $this->mockStripe);
+
+        expect(CancelSubscription::cancelById('sub_test_456'))->toBeTrue()
+            ->and($this->subscription->fresh()->stripe_subscription_id)->toBeNull()
+            ->and($this->subscription->fresh()->ended_at)->not->toBeNull();
+    });
+
+    test('keeps the local row when Stripe fails for another reason', function (Throwable $error) {
+        $this->mockSubscriptions->shouldReceive('retrieve')->with('sub_test_456')->andThrow($error);
+        app()->instance(StripeClient::class, $this->mockStripe);
+
+        expect(CancelSubscription::cancelById('sub_test_456'))->toBeFalse()
+            ->and($this->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_456')
+            ->and($this->subscription->fresh()->stripe_invoice_paid)->toBeTruthy();
+    })->with([
+        'invalid request' => fn () => InvalidRequestException::factory('Invalid API key', 400, null, null, null, 'api_key_expired'),
+        'connection' => fn () => new RuntimeException('Stripe unavailable'),
+    ]);
 });

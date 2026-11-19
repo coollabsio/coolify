@@ -7,7 +7,7 @@
 
 services:
   executor:
-    image: 'ghcr.io/rhyssullivan/executor-selfhost:${EXECUTOR_VERSION:-latest}'
+    image: 'ghcr.io/rhyssullivan/executor-selfhost:${EXECUTOR_VERSION:-1.6.10}'
     environment:
       - SERVICE_URL_EXECUTOR_4788
       - EXECUTOR_WEB_BASE_URL=${SERVICE_URL_EXECUTOR_4788}

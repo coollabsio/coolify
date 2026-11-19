@@ -55,6 +55,10 @@ test('cross-team user cannot view destination', function () {
     $this->actingAs($this->userB);
     session(['currentTeam' => $this->teamB]);
 
+    // Lookups are scoped to the current team, so another team's destination is
+    // treated as missing: the user is redirected and no destination data is loaded.
     Livewire::test(Show::class, ['destination_uuid' => $this->destination->uuid])
-        ->assertStatus(403);
+        ->assertRedirect(route('destination.index'))
+        ->assertSet('destination', null)
+        ->assertDontSee($this->server->ip);
 });

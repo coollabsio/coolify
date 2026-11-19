@@ -8,6 +8,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,86 @@ use OpenApi\Attributes as OA;
 
 class ServiceDatabasesController extends Controller
 {
+    use Concerns\HandlesDatabaseImportsApi;
+
+    #[OA\Post(
+        path: '/services/{uuid}/databases/{database_uuid}/imports/uploads',
+        operationId: 'upload-service-database-import',
+        summary: 'Upload service database import',
+        security: [['bearerAuth' => []]],
+        tags: ['Service databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'Service UUID.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'database_uuid', in: 'path', description: 'Service database UUID.', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 201, description: 'Upload completed'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function upload_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->uploadDatabaseImport($request, $database, $teamId));
+    }
+
+    #[OA\Post(
+        path: '/services/{uuid}/databases/{database_uuid}/imports',
+        operationId: 'create-service-database-import',
+        summary: 'Import service database backup',
+        description: 'Restore a backup into the service database. Every import source requires the deploy ability.',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')),
+        security: [['bearerAuth' => []]],
+        tags: ['Service databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'Service UUID.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'database_uuid', in: 'path', description: 'Service database UUID.', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 202, description: 'Import queued'),
+            new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
+            new OA\Response(response: 409, description: 'Another start, restart or import of this database is already in progress.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->startDatabaseImport($request, $database, $teamId, 'api.service-databases.imports.show', ['uuid' => $request->route('uuid'), 'database_uuid' => $database->uuid]));
+    }
+
+    #[OA\Get(
+        path: '/services/{uuid}/databases/{database_uuid}/imports/{activity_id}',
+        operationId: 'get-service-database-import',
+        summary: 'Get service database import status',
+        security: [['bearerAuth' => []]],
+        tags: ['Service databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'Service UUID.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'database_uuid', in: 'path', description: 'Service database UUID.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'activity_id', in: 'path', description: 'Import activity ID.', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Import status', content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportStatus')),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function show_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->showDatabaseImport($database, $teamId, (int) $request->route('activity_id')));
+    }
+
+    private function withImportDatabase(Request $request, callable $callback): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = $this->resolveService($request, $teamId);
+        $database = $service ? $this->resolveServiceDatabase($request, $service) : null;
+
+        return $database ? $callback($database, $teamId) : response()->json(['message' => 'Service database not found.'], 404);
+    }
+
     private function removeSensitiveData(ServiceDatabase $serviceDatabase): array
     {
         $serviceDatabase->makeHidden([
@@ -156,7 +237,7 @@ class ServiceDatabasesController extends Controller
                     new OA\Property(property: 'image', type: 'string'),
                     new OA\Property(property: 'exclude_from_status', type: 'boolean'),
                     new OA\Property(property: 'is_log_drain_enabled', type: 'boolean'),
-                    new OA\Property(property: 'is_public', type: 'boolean'),
+                    new OA\Property(property: 'is_public', type: 'boolean', description: 'Changing it starts or stops the database proxy, so it needs a token with the deploy permission.'),
                     new OA\Property(property: 'public_port', type: 'integer', nullable: true, minimum: 1, maximum: 65535),
                     new OA\Property(property: 'public_port_timeout', type: 'integer', nullable: true, minimum: 1),
                 ],
@@ -167,6 +248,7 @@ class ServiceDatabasesController extends Controller
             new OA\Response(response: 200, description: 'Updated service database.', content: new OA\JsonContent(type: 'object')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change is_public.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
@@ -234,6 +316,13 @@ class ServiceDatabasesController extends Controller
             ], 422);
         }
 
+        if (array_key_exists('is_public', $payload) && (bool) $payload['is_public'] !== (bool) $serviceDatabase->is_public) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Making a database public or private starts or stops its proxy on the server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         $server = $serviceDatabase->service->destination->server;
         if (($payload['is_log_drain_enabled'] ?? false) && ! $server->isLogDrainEnabled()) {
             return response()->json([
@@ -280,7 +369,7 @@ class ServiceDatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get service database logs',
-        description: 'Get Docker logs for a compose database container.',
+        description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/databases/{database_uuid}/logs',
         operationId: 'get-service-database-logs-by-service-and-database-uuid',
         security: [['bearerAuth' => []]],
@@ -288,7 +377,16 @@ class ServiceDatabasesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'database_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'lines', in: 'query', required: false, schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ]),
+            ),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Logs.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'logs', type: 'string')])),
@@ -307,14 +405,17 @@ class ServiceDatabasesController extends Controller
 
         [$serviceDatabase, $server] = $resolved;
         $containerName = $serviceDatabase->name.'-'.$serviceDatabase->service->uuid;
-        if (getContainerStatus($server, $containerName) !== 'running') {
+        if (! is_array(getContainerStatus($server, $containerName, all_data: true))) {
             return response()->json(['message' => 'Service database container is not running.'], 400);
         }
 
         $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
-            'logs' => getContainerLogs($server, $containerName, $lines),
+            'logs' => sanitizeLogsForExport(
+                getContainerLogs($server, $containerName, $lines),
+                EnvironmentVariable::logRedactionSecretsFor($serviceDatabase->service),
+            ),
         ]);
     }
 

@@ -8,11 +8,13 @@ use App\Models\Team;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
@@ -29,6 +31,17 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private string $instanceTimezone;
 
     private string $checkFrequency = '* * * * *';
+
+    /**
+     * Provider state seldom changes, and each check is one API call per server.
+     * Hetzner allows 3600 requests per hour for each token.
+     */
+    private const CLOUD_PROVIDER_STATUS_CHECK_CRON = '*/5 * * * *';
+
+    /**
+     * Number of servers loaded and processed at a time.
+     */
+    public const SERVER_BATCH_SIZE = 500;
 
     /**
      * Create a new job instance.
@@ -52,49 +65,89 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             $this->instanceTimezone = config('app.timezone');
         }
 
-        // Get all servers to process
-        $servers = $this->getServers();
+        // Decide once per run: these cron keys are global, so a second call in the same run returns false.
+        $runCloudProviderStatusChecks = shouldRunCronNow(self::CLOUD_PROVIDER_STATUS_CHECK_CRON, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime);
+        $runConnectionChecks = shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime);
 
-        // Provider state checks run independently so slow APIs cannot block SSH checks.
-        $this->dispatchCloudProviderStatusChecks($servers);
+        $relations = ['settings' => fn (HasOne $query) => $query->withoutPatchCheckResult(), 'cloudProviderToken'];
 
-        $servers = $servers
-            ->reject(fn (Server $server) => $server->hasPlaceholderIp())
-            ->values();
+        foreach ($this->getServerIds()->chunk(self::SERVER_BATCH_SIZE) as $serverIds) {
+            $servers = Server::with($relations)->whereKey($serverIds)->orderBy('id')->get();
 
-        // Dispatch ServerConnectionCheck for all servers efficiently
-        $this->dispatchConnectionChecks($servers);
+            // Provider state checks run independently so slow APIs cannot block SSH checks.
+            if ($runCloudProviderStatusChecks) {
+                $this->dispatchCloudProviderStatusChecks($servers);
+            }
 
-        // Process server-specific scheduled tasks
-        $this->processScheduledTasks($servers);
+            $servers = $servers
+                ->reject(fn (Server $server) => $server->hasPlaceholderIp())
+                ->values();
+
+            if ($runConnectionChecks) {
+                $this->dispatchConnectionChecks($servers);
+            }
+
+            // Process server-specific scheduled tasks
+            $this->processScheduledTasks($servers);
+
+            $this->dispatchImageScanDigests($servers);
+        }
     }
 
-    private function getServers(): Collection
+    /**
+     * One image vulnerability digest per team and day, for teams with a server that scans images (spec 8).
+     */
+    private function dispatchImageScanDigests(Collection $servers): void
     {
-        $allServers = Server::with(['settings', 'cloudProviderToken']);
+        $servers->filter(fn (Server $server): bool => (bool) $server->settings?->is_image_scan_enabled && ! $server->isTransferredAway())
+            ->pluck('team_id')
+            ->unique()
+            ->each(function ($teamId): void {
+                try {
+                    if (shouldRunCronNow(self::imageScanDigestCron((int) $teamId), $this->instanceTimezone, "image-scan-digest:{$teamId}", $this->executionTime)) {
+                        $team = Team::find($teamId);
+                        if ($team instanceof Team) {
+                            ImageScanDigestJob::dispatch($team);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::channel('scheduled-errors')->error('Failed to dispatch ImageScanDigestJob', [
+                        'team_id' => $teamId,
+                        'error' => get_class($e).': '.$e->getMessage(),
+                    ]);
+                }
+            });
+    }
 
-        if (isCloud()) {
-            $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers()->with(['settings', 'cloudProviderToken'])->get();
-
-            return $servers->merge($own)->unique('id')->values();
-        } else {
-            return $allServers->get();
+    /**
+     * Selects only the IDs, so the paid-subscription filter runs once and the full server rows are loaded
+     * in batches by primary key. Loading every server in one query kept all of them in worker memory.
+     * toBase() skips model hydration, which an Eloquent pluck of the cast id column would do for every row.
+     *
+     * @return Collection<int, int>
+     */
+    private function getServerIds(): Collection
+    {
+        if (! isCloud()) {
+            return Server::query()->orderBy('id')->toBase()->pluck('id');
         }
+
+        return Server::query()->whereRelation('team.subscription', 'stripe_invoice_paid', true)->toBase()->pluck('id')
+            ->merge(Server::query()->where('team_id', 0)->toBase()->pluck('id'))
+            ->unique()
+            ->sort()
+            ->values();
     }
 
     private function dispatchCloudProviderStatusChecks(Collection $servers): void
     {
-        if (! shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
-            return;
-        }
-
         $servers->each(function (Server $server) {
             $hasCloudResource = $server->hetzner_server_id
                 || $server->vultr_instance_id
-                || $server->digitalocean_droplet_id;
+                || $server->digitalocean_droplet_id
+                || $server->hostinger_virtual_machine_id;
 
-            if ($hasCloudResource && $server->cloudProviderToken) {
+            if ($hasCloudResource && $server->cloudProviderToken && ! $server->isTransferredAway()) {
                 ServerCloudProviderStatusCheckJob::dispatch($server);
             }
         });
@@ -102,31 +155,31 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function dispatchConnectionChecks(Collection $servers): void
     {
-
-        if (shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime)) {
-            $servers->each(function (Server $server) {
-                try {
-                    if ($server->hasPlaceholderIp()) {
-                        return;
-                    }
-
-                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
-                    if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
-                        return;
-                    }
-                    if ($this->shouldSkipDueToBackoff($server)) {
-                        return;
-                    }
-                    ServerConnectionCheckJob::dispatch($server);
-                } catch (\Exception $e) {
-                    Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
-                        'server_id' => $server->id,
-                        'server_name' => $server->name,
-                        'error' => get_class($e).': '.$e->getMessage(),
-                    ]);
+        $servers->each(function (Server $server) {
+            try {
+                if ($server->hasPlaceholderIp()) {
+                    return;
                 }
-            });
-        }
+
+                // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity.
+                // Never skip while the server is marked unreachable or unusable: the heartbeat does not
+                // restore these flags, so deployments would fail with "Server is not functional" forever.
+                if ($server->isSentinelEnabled() && $server->isSentinelLive()
+                    && $server->settings->is_reachable && $server->settings->is_usable) {
+                    return;
+                }
+                if ($this->shouldSkipDueToBackoff($server)) {
+                    return;
+                }
+                ServerConnectionCheckJob::dispatch($server);
+            } catch (\Exception $e) {
+                Log::channel('scheduled-errors')->error('Failed to dispatch ServerConnectionCheck', [
+                    'server_id' => $server->id,
+                    'server_name' => $server->name,
+                    'error' => get_class($e).': '.$e->getMessage(),
+                ]);
+            }
+        });
     }
 
     private function processScheduledTasks(Collection $servers): void
@@ -157,7 +210,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $waitTime = $server->waitBeforeDoingSshCheck();
         $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
-        if ($sentinelOutOfSync) {
+        // Build servers and Swarm workers have no containers to sync, and ServerConnectionCheckJob
+        // already checks their connection.
+        $hasContainersToSync = ! $server->isBuildServer() && ! $server->isSwarmWorker();
+
+        if ($sentinelOutOfSync && $hasContainersToSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
             if (shouldRunCronNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}", $this->executionTime)) {
                 if (! $this->shouldSkipDueToBackoff($server)) {
@@ -166,11 +223,13 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && shouldRunCronNow('0 0 * * *', $serverTimezone, "sentinel-restart:{$server->id}", $this->executionTime);
-        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
-
-        if ($shouldRestartSentinel) {
+        // Sentinel versions that report their version on push are updated by SentinelController.
+        // Unreachable servers are skipped: the SSH check would only fail. The connection check recovers them.
+        if ($server->isSentinelEnabled()
+            && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
+            && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check-v2:{$server->id}", $this->executionTime)
+            && $server->isFunctional()
+        ) {
             CheckAndStartSentinelJob::dispatch($server);
         }
 
@@ -188,15 +247,71 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
+        // Dispatch ServerPatchCheckJob if due (by default weekly, staggered per server on Sunday).
+        // The "-v2" keys start fresh: v4.3.23 stored its old run times under the unversioned keys, which
+        // would make every server run these checks at once on the first run after the upgrade.
+        $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check-v2:{$server->id}", $this->executionTime);
 
-        if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
+        if ($shouldRunPatchCheck) {
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
+        // Daily image rescan, staggered per server. The cron is read only for servers that can be scanned, so a
+        // server that comes back catches up a missed day.
+        if ($server->settings?->is_image_scan_enabled
+            && ImageRescanJob::canRunOn($server)
+            && shouldRunCronNow(self::imageRescanCron($server), $serverTimezone, "image-rescan:{$server->id}", $this->executionTime)
+        ) {
+            ImageRescanJob::dispatch($server);
+        }
+
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
+    }
+
+    /**
+     * Hourly Sentinel version check at a stable per-server minute, so servers do not all SSH at minute 0.
+     *
+     * ServerManagerJob evaluates this every minute and shouldRunCronNow() catches up a missed minute
+     * on the next run, so every minute of the hour is a safe slot.
+     */
+    public static function sentinelVersionCheckCron(Server $server): string
+    {
+        return sprintf('%d * * * *', $server->id % 60);
+    }
+
+    /**
+     * The patch check frequency of the server. The default is weekly, at a stable per-server time on Sunday
+     * between 04:00 and 23:59. The early hours are skipped because most daylight saving transitions happen there.
+     */
+    public static function patchCheckCron(Server $server): string
+    {
+        $frequency = data_get($server->settings, 'patch_check_frequency');
+        if (filled($frequency)) {
+            return VALID_CRON_STRINGS[$frequency] ?? $frequency;
+        }
+
+        $slot = $server->id % (20 * 60);
+
+        return sprintf('%d %d * * 0', $slot % 60, 4 + intdiv($slot, 60));
+    }
+
+    /**
+     * Daily image rescan at a stable per-server time between 02:00 and 04:59 (spec 4.5).
+     */
+    public static function imageRescanCron(Server $server): string
+    {
+        return sprintf('%d %d * * *', $server->id % 60, 2 + intdiv($server->id % 180, 60));
+    }
+
+    /**
+     * Daily image vulnerability digest at a stable per-team time between 06:00 and 07:59, after the rescans of
+     * 02:00 to 04:59 (spec 8).
+     */
+    public static function imageScanDigestCron(int $teamId): string
+    {
+        $slot = $teamId % 120;
+
+        return sprintf('%d %d * * *', $slot % 60, 6 + intdiv($slot, 60));
     }
 
     /**

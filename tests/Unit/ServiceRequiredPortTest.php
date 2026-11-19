@@ -3,58 +3,6 @@
 use App\Models\Service;
 use App\Models\ServiceApplication;
 
-it('returns required port from service template', function () {
-    // Mock get_service_templates() function
-    $mockTemplates = collect([
-        'supabase' => [
-            'name' => 'Supabase',
-            'port' => '8000',
-        ],
-        'umami' => [
-            'name' => 'Umami',
-            'port' => '3000',
-        ],
-    ]);
-
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'supabase-xyz123';
-
-    // Mock the get_service_templates function to return our mock data
-    $service->shouldReceive('getRequiredPort')->andReturn(8000);
-
-    expect($service->getRequiredPort())->toBe(8000);
-});
-
-it('returns null for service without required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'cloudflared-xyz123';
-
-    // Mock to return null for services without port
-    $service->shouldReceive('getRequiredPort')->andReturn(null);
-
-    expect($service->getRequiredPort())->toBeNull();
-});
-
-it('requiresPort returns true when service has required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('getRequiredPort')->andReturn(8000);
-    $service->shouldReceive('requiresPort')->andReturnUsing(function () use ($service) {
-        return $service->getRequiredPort() !== null;
-    });
-
-    expect($service->requiresPort())->toBeTrue();
-});
-
-it('requiresPort returns false when service has no required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('getRequiredPort')->andReturn(null);
-    $service->shouldReceive('requiresPort')->andReturnUsing(function () use ($service) {
-        return $service->getRequiredPort() !== null;
-    });
-
-    expect($service->requiresPort())->toBeFalse();
-});
-
 it('extracts port from URL with http scheme', function () {
     $url = 'http://example.com:3000';
     $port = ServiceApplication::extractPortFromUrl($url);

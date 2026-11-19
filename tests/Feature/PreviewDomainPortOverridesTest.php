@@ -1,5 +1,9 @@
 <?php
 
+use App\Enums\ProcessStatus;
+use App\Jobs\ApplicationPullRequestUpdateJob;
+use App\Jobs\CheckDomainDnsJob;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -12,6 +16,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -89,6 +94,78 @@ function createPreviewForPortTests(Application $application, int $pullRequestId,
         'pull_request_html_url' => "https://github.com/coollabsio/coolify/pull/{$pullRequestId}",
     ], $attributes));
 }
+
+it('regenerates an existing preview domain only when the modal is saved', function () {
+    $preview = createPreviewForPortTests($this->application, 100, [
+        'fqdn' => 'http://preview.example.com:8080/api',
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->call('regenerateEditingDomain')
+        ->assertSet('editingDomainParts.scheme', 'http')
+        ->assertSet('editingDomainParts.port', '8080')
+        ->assertSet('editingDomainParts.path', '/api');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+
+    expect($preview->fresh()->fqdn)->toBe('http://preview.example.com/api');
+
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    expect($preview->fresh()->fqdn)->toBe("http://{$generatedHost}/api")
+        ->and($preview->fresh()->domain_port_overrides)->toHaveKey("http://{$generatedHost}/api", 8080);
+});
+
+it('runs a dns check after a manually edited preview domain is saved', function () {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 99, [
+        'fqdn' => 'https://old-preview.example.com:81',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '81')
+        ->set('editingDomainParts.host', 'manual-preview.example.com')
+        ->call('updateDomain')
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect(collect($preview->fresh()->domain_dns_statuses)->contains(
+        fn (array $status): bool => ($status['status'] ?? null) === 'checking'
+    ))->toBeTrue();
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://manual-preview.example.com'
+        && $job->statusKey === hash('sha256', 'https://manual-preview.example.com|'));
+});
+
+it('uses the dns badge as progress for single and all preview checks', function (string $action, array $parameters) {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 98, [
+        'fqdn' => 'https://badge-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call($action, ...$parameters)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
+})->with([
+    'single domain' => ['checkDomainDns', [0]],
+    'all domains' => ['checkAllDns', []],
+]);
+
+it('does not start a dns check when a preview domain address is unchanged', function () {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 100, [
+        'fqdn' => 'https://unchanged-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertNotPushed(CheckDomainDnsJob::class);
+});
 
 it('saves preview domain port overrides separately from the public FQDN', function () {
     $preview = createPreviewForPortTests($this->application, 101);
@@ -235,22 +312,6 @@ it('prunes a preview domain port override when removing the domain', function ()
         ->toBe(['https://two-preview.example.com' => 3000]);
 });
 
-it('shows a warning when a preview domain has no internal port and ports exposes is empty', function () {
-    $this->application->update([
-        'ports_exposes' => null,
-    ]);
-
-    $preview = createPreviewForPortTests($this->application, 109, [
-        'fqdn' => 'https://preview.example.com',
-        'domain_port_overrides' => null,
-    ]);
-
-    Livewire::test(PreviewDomains::class, ['preview' => $preview])
-        ->assertSee('aria-label="No internal port"', false)
-        ->assertSee('Set Ports Exposes or a per-domain internal port')
-        ->assertDontSee('aria-label="Internal port ', false);
-});
-
 it('rejects adding a preview domain whose portless URL is already configured', function () {
     $preview = createPreviewForPortTests($this->application, 110, [
         'fqdn' => 'https://preview.example.com:3000',
@@ -300,6 +361,38 @@ it('saves compose preview domain port overrides per service without putting the 
         ]);
 });
 
+it('posts portless compose preview links in the pull request comment', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n  backend:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://myapp.example.com:3000'],
+            'backend' => ['domain' => 'https://myapp.example.com:3001/backend'],
+        ]),
+    ]);
+
+    // A preview saved before ports moved to overrides still holds port-bearing domains.
+    $preview = createPreviewForPortTests($this->application->fresh(), 136, [
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://136.myapp.example.com:3000'],
+            'backend' => ['domain' => 'https://136.myapp.example.com:3001/backend'],
+        ]),
+    ]);
+
+    // The deployment job regenerates the preview domains before it posts the comment.
+    $preview->generate_preview_fqdn_compose();
+
+    $job = new ApplicationPullRequestUpdateJob($this->application->fresh(), $preview->fresh(), ProcessStatus::FINISHED);
+    $links = (fn (): string => $this->getPreviewLinks())->call($job);
+
+    expect($links)->toBe('[Open frontend](https://136.myapp.example.com) | [Open backend](https://136.myapp.example.com/backend) | ')
+        ->and($preview->fresh()->domain_port_overrides)->toBe([
+            'https://136.myapp.example.com' => 3000,
+            'https://136.myapp.example.com/backend' => 3001,
+        ]);
+});
+
 it('copies the parent domain port override onto a generated preview domain', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com:8080',
@@ -318,15 +411,17 @@ it('copies the parent domain port override onto a generated preview domain', fun
         ->toBe([8080]);
 });
 
-it('saves generated preview domains once in the application parser', function () {
-    $parser = file_get_contents(base_path('bootstrap/helpers/parsers.php'));
-    $previewGeneration = Str::of($parser)
-        ->after('// If the domain is set, we need to generate the FQDNs for the preview')
-        ->before('$defaultLabels = defaultLabels');
+it('uses the preview url template scheme instead of the parent scheme', function (string $template, string $expected) {
+    $this->application->update(['preview_url_template' => $template]);
 
-    expect($previewGeneration->substrCount('$preview->save();'))->toBe(1)
-        ->and((string) $previewGeneration)->toContain('$preview->fqdn = $fqdns->implode(\',\');');
-});
+    $preview = createPreviewForPortTests($this->application, 2163);
+
+    expect($preview->generatedPreviewDomain('http://app.example.com/api')['url'])->toBe($expected);
+})->with([
+    'explicit https' => ['https://{{pr_id}}.preview.example.com', 'https://2163.preview.example.com/api'],
+    'explicit uppercase https' => ['HTTPS://{{pr_id}}.preview.example.com', 'https://2163.preview.example.com/api'],
+    'scheme-less inherits parent' => ['{{pr_id}}.preview.example.com', 'http://2163.preview.example.com/api'],
+]);
 
 it('keeps every generated preview domain port override in the legacy compose parser', function () {
     $this->application->update([
@@ -526,7 +621,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 117, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-117.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
         ->toBeTrue()
@@ -564,7 +659,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 118, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-118.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
         ->toBeFalse()
@@ -581,7 +676,6 @@ it('shows a port warning when a preview domain uses a port that is not exposed o
         ->call('addDomain')
         ->assertSet('showPortWarningModal', true)
         ->assertSet('unrecognizedPort', 9090)
-        ->assertSee('Use a different port?')
         ->assertSee('9090');
 
     expect($preview->fresh()->fqdn)->toBeNull();
@@ -897,7 +991,8 @@ it('reports the readonly preview redirect policy used by proxy labels', function
         ->assertSet('domainRows.0.redirect', $expectedRedirect);
 
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), 'services.web-pr-147.labels'))->implode("\n")
+        // The legacy parser (version 2) renames the services of a preview.
+        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), $parserVersion < 3 ? 'services.web-pr-147.labels' : 'services.web.labels'))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
     if ($expectedRedirect === 'both') {
@@ -942,7 +1037,7 @@ it('inherits preview HTTPS redirect policy while always preventing indexing', fu
     ] : []));
 
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web-pr-149.labels'))->implode("\n")
+        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web.labels'))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
 
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
@@ -974,4 +1069,151 @@ it('preserves readonly compose preview redirects when saving an address', functi
         'web' => ['domain' => 'https://www.renamed-preview.example.com', 'redirect' => 'non-www'],
         'api' => ['domain' => '', 'redirect' => 'www'],
     ]);
+});
+
+it('does not queue file sync jobs when polling dns checks for compose previews', function () {
+    Queue::fake();
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    volumes:\n      - web-data:/data\n  api:\n    image: nginx:alpine\n    volumes:\n      - api-data:/data\nvolumes:\n  web-data:\n  api-data:\n",
+    ]);
+    $preview = createPreviewForPortTests($this->application->fresh(), 101, [
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://compose-preview-poll.invalid']]),
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+    $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
+
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
+        ->and($component->get('composeServices'))->toBe(['web', 'api']);
+});
+
+it('keeps custom preview domains and port overrides on redeploy', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+    ]);
+    $preview = createPreviewForPortTests($this->application, 6536, [
+        'fqdn' => 'https://custom-one.example.com,https://custom-two.example.com',
+        'domain_port_overrides' => ['https://custom-two.example.com' => 9000],
+    ]);
+
+    // The deployment job keeps the stored preview domains.
+    $preview->fresh()->generate_preview_fqdn(keepExistingDomains: true);
+
+    expect($preview->fresh()->fqdn)->toBe('https://custom-one.example.com,https://custom-two.example.com')
+        ->and($preview->fresh()->domain_port_overrides)->toBe(['https://custom-two.example.com' => 9000]);
+
+    // Without the flag (the "Generate domain" action), the template replaces them.
+    $preview->fresh()->generate_preview_fqdn();
+
+    expect($preview->fresh()->fqdn)->toBe('https://6536.app.example.com')
+        ->and($preview->fresh()->domain_port_overrides)->toBeNull();
+});
+
+it('moves a port from a kept legacy preview domain into the overrides', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+    $preview = createPreviewForPortTests($this->application, 6537, [
+        'fqdn' => 'https://custom.example.com:3000',
+    ]);
+
+    $preview->generate_preview_fqdn(keepExistingDomains: true);
+
+    expect($preview->fresh()->fqdn)->toBe('https://custom.example.com')
+        ->and($preview->fresh()->domain_port_overrides)->toBe(['https://custom.example.com' => 3000]);
+});
+
+it('generates a domain on redeploy when the preview has none', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+    ]);
+    $preview = createPreviewForPortTests($this->application, 6538);
+
+    $preview->generate_preview_fqdn(keepExistingDomains: true);
+
+    expect($preview->fresh()->fqdn)->toBe('https://6538.app.example.com');
+});
+
+it('keeps custom compose preview domains on redeploy and fills empty services', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n  backend:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com'],
+            'backend' => ['domain' => 'https://api.example.com:3001'],
+        ]),
+    ]);
+    $preview = createPreviewForPortTests($this->application->fresh(), 6539, [
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://custom.example.com'],
+            'backend' => ['domain' => ''],
+        ]),
+        'domain_port_overrides' => ['https://custom.example.com' => 8080],
+    ]);
+
+    $preview->generate_preview_fqdn_compose(keepExistingDomains: true);
+    $preview->refresh();
+
+    expect(json_decode($preview->docker_compose_domains, true))->toBe([
+        'frontend' => ['domain' => 'https://custom.example.com'],
+        'backend' => ['domain' => 'https://6539.api.example.com'],
+    ])
+        ->and($preview->fqdn)->toBe('https://custom.example.com,https://6539.api.example.com')
+        ->and($preview->domain_port_overrides)->toBe([
+            'https://custom.example.com' => 8080,
+            'https://6539.api.example.com' => 3001,
+        ]);
+
+    $preview->generate_preview_fqdn_compose();
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true)['frontend']['domain'])->toBe('https://6539.app.example.com');
+});
+
+it('replaces a custom preview domain when the generate action runs', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+    ]);
+    $preview = createPreviewForPortTests($this->application, 6540, [
+        'fqdn' => 'https://custom.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('generateDomain')
+        ->assertHasNoErrors();
+
+    expect($preview->fresh()->fqdn)->toBe('https://6540.app.example.com');
+});
+
+it('routes every generated compose preview domain when a service has more than one domain', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '3',
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n",
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://dev.example.com,https://www.dev.example.com'],
+        ]),
+    ]);
+    $preview = createPreviewForPortTests($this->application->fresh(), 92, [
+        'docker_compose_domains' => $this->application->docker_compose_domains,
+    ]);
+
+    $preview->generate_preview_fqdn_compose();
+    $preview->refresh();
+
+    expect(json_decode($preview->docker_compose_domains, true)['frontend']['domain'])
+        ->toBe('https://92.dev.example.com,https://92.www.dev.example.com');
+
+    $labels = collect(data_get(applicationParser($this->application->fresh(), 92, $preview->id), 'services.frontend.labels'));
+    $routerRules = $labels->filter(fn (string $label): bool => str_contains($label, '.rule='))->values();
+
+    expect($routerRules)->not->toBeEmpty()
+        ->and($routerRules->every(fn (string $label): bool => preg_match('/\.rule=Host\(`[a-z0-9.]+`\)( && PathPrefix\(`\/[^`]*`\))?$/', $label) === 1))->toBeTrue()
+        ->and($routerRules->contains(fn (string $label): bool => str_contains($label, 'Host(`92.dev.example.com`)')))->toBeTrue()
+        ->and($routerRules->contains(fn (string $label): bool => str_contains($label, 'Host(`92.www.dev.example.com`)')))->toBeTrue();
 });

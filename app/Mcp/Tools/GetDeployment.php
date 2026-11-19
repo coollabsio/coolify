@@ -9,7 +9,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetDeployment extends Tool
 {
     protected string $name = 'get_deployment';
@@ -70,6 +72,7 @@ class GetDeployment extends Tool
             'force_rebuild' => $deployment->force_rebuild,
             'is_webhook' => $deployment->is_webhook,
             'is_api' => $deployment->is_api,
+            'is_mcp' => $deployment->is_mcp,
             'restart_only' => $deployment->restart_only,
             'rollback' => $deployment->rollback,
             'git_type' => $deployment->git_type,

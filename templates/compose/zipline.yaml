@@ -7,7 +7,7 @@
 
 services:
   zipline:
-    image: ghcr.io/diced/zipline:latest
+    image: ghcr.io/diced/zipline:4.8.3
     environment:
       - SERVICE_URL_ZIPLINE_3000
       - CORE_RETURN_HTTPS=${CORE_RETURN_HTTPS:-false}

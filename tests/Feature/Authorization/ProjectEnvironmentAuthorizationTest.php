@@ -53,3 +53,21 @@ test('member cannot create environment in project', function () {
 
     expect(Environment::where('name', 'staging')->exists())->toBeFalse();
 });
+
+test('member cannot create environment in project after switching to an owned team', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(Show::class, ['project_uuid' => $this->project->uuid]);
+
+    $this->member->load('teams');
+    session(['currentTeam' => $ownTeam]);
+
+    $component->set('name', 'staging')
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect(Environment::where('name', 'staging')->exists())->toBeFalse();
+});

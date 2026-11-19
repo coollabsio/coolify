@@ -7,7 +7,7 @@
 
 services:
    classicpress:
-    image: classicpress/classicpress:latest
+    image: classicpress/classicpress:2.7.4-php8.5-apache
     volumes:
        - classicpress-files:/var/www/html
     environment:
