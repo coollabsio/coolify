@@ -40,11 +40,8 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
       - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-1}
       - N8N_SKIP_AUTH_ON_OAUTH_CALLBACK=${N8N_SKIP_AUTH_ON_OAUTH_CALLBACK:-false}
-      - N8N_ENABLED_MODULES=instance-ai
       - N8N_INSTANCE_AI_SANDBOX_ENABLED=true
       - N8N_INSTANCE_AI_SANDBOX_PROVIDER=n8n-sandbox
-      - N8N_INSTANCE_AI_SANDBOX_IMAGE=ghcr.io/n8n-io/n8n-sandbox-service-sandbox:1.3.4
-      - N8N_INSTANCE_AI_SANDBOX_API_URL=http://sandbox-api:8080
       - N8N_SANDBOX_SERVICE_URL=http://sandbox-api:8080
       - N8N_SANDBOX_SERVICE_API_KEY=$SERVICE_PASSWORD_SANDBOXAPI
       - N8N_INSTANCE_AI_SEARXNG_URL=http://searxng:8080
@@ -151,7 +148,7 @@ services:
 
   sandbox-certs:
     exclude_from_hc: true
-    image: ghcr.io/n8n-io/n8n-sandbox-service-api:1.2.0
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:1.3.4
     user: "0:0"
     restart: "no"
     entrypoint: ["sh", "-c"]
@@ -166,7 +163,7 @@ services:
       - sandbox-tls:/tls
 
   sandbox-api:
-    image: ghcr.io/n8n-io/n8n-sandbox-service-api:1.2.0
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:1.3.4
     depends_on:
       sandbox-certs:
         condition: service_completed_successfully
@@ -192,7 +189,7 @@ services:
 
   sandbox-runner-1:
     exclude_from_hc: true
-    image: ghcr.io/n8n-io/n8n-sandbox-service-runner-dind:1.2.0
+    image: ghcr.io/n8n-io/n8n-sandbox-service-runner-dind:1.3.4
     privileged: true
     depends_on:
       sandbox-api:
@@ -201,7 +198,7 @@ services:
       - SANDBOX_RUNNER_API_KEYS=$SERVICE_PASSWORD_SANDBOXRUNNER
       - SANDBOX_RUNNER_REGISTRATION_TOKEN=$SERVICE_PASSWORD_SANDBOXREG
       - SANDBOX_RUNNER_API_GRPC_ADDR=sandbox-api:9090
-      - SANDBOX_RUNNER_HTTP_BASE_URL=http://sandbox-runner-1:8080
+      - SANDBOX_RUNNER_HTTP_BASE_URL=https://sandbox-runner-1:8080
       - "SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR=:9091"
       - SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR=sandbox-runner-1:9091
       - SANDBOX_RUNNER_ID=runner-1
