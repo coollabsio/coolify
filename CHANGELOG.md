@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.6] - 2026-11-19
+
+### Security
+
+- Bound PHP-FPM in the `coolify` container to the loopback interface
+- Updated the dependencies of the Coolify image
+  - `serversideup/php` from `v5.0.3` to `v5.1.5`
+  - `PHP` from `8.4.27` to `8.4.28`
+  - `nginx` from `1.31.8` to `1.31.9`
+  - `Node.js` from `24.22.1` to `24.22.3`
+  - `cloudflared` from `2026.10.3` to `2026.11.1`
+  - `ext-uv` from `0.3.0` to `0.3.1`
+- Used the nginx defaults of the `serversideup/php` image in the `coolify` container
+  - PHP-FPM runs only existing PHP scripts outside `/storage`
+  - Responses carry the `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` headers
+  - Requests for dotfiles and for backup, config, log, SQL, and shell files return `403`
+
 ## [v4.7.5] - 2026-11-10
 
 ### Fixed
