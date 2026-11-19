@@ -9,6 +9,7 @@ use App\Ai\Ui\ApprovalForm;
 use App\Ai\Ui\Field;
 use App\Ai\Ui\FieldType;
 use App\Models\Project;
+use App\Support\CreationErrorMessage;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
 use Laravel\Ai\Concerns\InteractsWithApprovals;
@@ -69,7 +70,7 @@ class CreateEnvironment implements Approvable, HasApprovalForm, Tool
         try {
             $environment = CreateEnvironmentAction::run($project, $args['name']);
         } catch (\Throwable $e) {
-            return $e->getMessage();
+            return CreationErrorMessage::for($e, 'Could not create environment.');
         }
 
         $this->auditToolCall('create_environment', 'success', ['resource_uuid' => $environment->uuid]);

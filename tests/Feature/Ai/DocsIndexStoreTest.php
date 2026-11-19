@@ -95,3 +95,16 @@ test('a malformed payload does not clobber a good cached index', function () {
     expect(Cache::get('ai:docs:hash'))->toBe($goodHash)
         ->and(app(DocsIndexStore::class)->get())->toBeInstanceOf(DocsIndex::class);
 });
+
+test('refresh rewrites the index when it was evicted but its hash remains', function () {
+    Http::fake(['coolify.io/docs/api/search' => Http::response(rawOramaFixture())]);
+    $store = app(DocsIndexStore::class);
+
+    $store->refresh();
+    Cache::forget('ai:docs:index');
+
+    $store->refresh();
+
+    expect(Cache::get('ai:docs:index'))->toBeArray()
+        ->and($store->get())->toBeInstanceOf(DocsIndex::class);
+});

@@ -11,7 +11,7 @@ class ReadDocPage implements Tool
 {
     public function description(): string
     {
-        return 'Read the full markdown of a Coolify documentation page by the page_id returned from search_docs. Cite the page url in your answer.';
+        return 'Read the markdown of a Coolify documentation page by the page_id returned from search_docs. Long pages are truncated to the first 12,000 characters. Cite the page url in your answer.';
     }
 
     public function schema(JsonSchema $schema): array

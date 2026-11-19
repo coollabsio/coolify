@@ -59,3 +59,21 @@ test('page concatenates a page chunks and rejects unknown ids', function () {
     expect($index->page('p1'))->toContain('deploy application')
         ->and($index->page('nope'))->toBe('');
 });
+
+test('an index whose field lengths are not a map is invalid', function () {
+    $data = normalizedFixture();
+    $data['fieldLengths'] = 'broken';
+
+    expect((new DocsIndex($data))->isValid())->toBeFalse();
+});
+
+test('page marks content that is cut at the size limit', function () {
+    $data = normalizedFixture();
+    $data['docs']['d1']['content'] = str_repeat('a', 12500);
+
+    $page = (new DocsIndex($data))->page('p1');
+
+    expect($page)->toStartWith(str_repeat('a', 12000))
+        ->and($page)->toEndWith('[Page truncated: only the first 12000 characters are shown.]')
+        ->and((new DocsIndex(normalizedFixture()))->page('p2'))->not->toContain('truncated');
+});

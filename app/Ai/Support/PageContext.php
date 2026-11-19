@@ -21,9 +21,9 @@ class PageContext
      * They carry a stable identity so a later turn can tell whether the page
      * changed, and they are stripped before the message is shown in the UI.
      */
-    public const OPEN_PATTERN = '/<current_page id="([^"]*)">/';
+    public const OPEN_PATTERN = '/\A<current_page id="([^"]*)">/';
 
-    public const STRIP_PATTERN = '/<current_page id="[^"]*">.*?<\/current_page>\n*/s';
+    public const STRIP_PATTERN = '/\A<current_page id="[^"]*">.*?<\/current_page>\n*/s';
 
     /**
      * @return array{key: string, block: string}|null

@@ -8,7 +8,9 @@ use App\Ai\Ui\ApprovalForm;
 use App\Ai\Ui\Field;
 use App\Ai\Ui\FieldType;
 use App\Mcp\Concerns\ResolvesResource;
+use App\Support\ValidationPatterns;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Validator;
 use Laravel\Ai\Approvals\Approval;
 use Laravel\Ai\Concerns\InteractsWithApprovals;
 use Laravel\Ai\Contracts\Approvable;
@@ -64,12 +66,20 @@ class UpsertEnvironmentVariable implements Approvable, HasApprovalForm, Tool
 
     public function handle(Request $request): string
     {
-        $args = $request->validate([
+        $input = $request->all();
+        if (is_string($input['key'] ?? null)) {
+            $input['key'] = ValidationPatterns::normalizeEnvironmentVariableKey($input['key']);
+        }
+        $validator = Validator::make($input, [
             'resource' => 'required|in:application,database,service',
             'uuid' => 'required|string',
-            'key' => 'required|string',
+            'key' => ValidationPatterns::environmentVariableKeyRules(),
             'value' => 'required|string',
-        ]);
+        ], ValidationPatterns::environmentVariableKeyMessages());
+        if ($validator->fails()) {
+            return 'Validation failed: '.$validator->errors()->first();
+        }
+        $args = $validator->validated();
 
         $target = $this->resolve($request);
         if (! $target) {

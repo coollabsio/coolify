@@ -5,13 +5,12 @@ namespace App\Mcp\Tools;
 use App\Actions\Application\CreateApplication as CreateApplicationAction;
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Enums\BuildPackTypes;
-use App\Exceptions\ResourceCreationException;
-use App\Exceptions\ResourcePlacementException;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Support\CreationErrorMessage;
 use App\Support\ValidationPatterns;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Validator;
@@ -101,10 +100,8 @@ class CreateApplication extends Tool
                 $args['environment_uuid'] ?? null, $args['server_uuid'], $args['destination_uuid'] ?? null,
             );
             $application = CreateApplicationAction::run($placement, $type, $data, $instantDeploy);
-        } catch (ResourcePlacementException|ResourceCreationException $e) {
-            return $this->mcpError($request, $e->getMessage());
         } catch (\Throwable $e) {
-            return $this->mcpError($request, $e->getMessage());
+            return $this->mcpError($request, CreationErrorMessage::for($e, 'Could not create application.'));
         }
 
         auditLog('mcp.create_application', ['team_id' => $teamId, 'uuid' => $application->uuid, 'type' => $type, 'build_pack' => $application->build_pack, 'instant_deploy' => $instantDeploy]);

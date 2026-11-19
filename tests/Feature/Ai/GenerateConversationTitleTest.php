@@ -130,3 +130,19 @@ test('a private conversation owned by the root user (id 0) still broadcasts to i
 
     expect($channels)->toContain('private-user.0');
 });
+
+test('a rename that lands while the title is generating is kept', function () {
+    Event::fake([AssistantConversationRenamed::class]);
+    $conversation = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id, 'title' => null,
+    ]);
+    // Simulate the user renaming right after the job loaded the conversation.
+    AiConversation::retrieved(function (AiConversation $loaded) {
+        AiConversation::query()->whereKey($loaded->id)->toBase()->update(['title' => 'Renamed by user']);
+    });
+
+    (new GenerateConversationTitle($conversation->id, 'Restart the proxy', $this->user->id))->handle();
+
+    expect($conversation->fresh()->title)->toBe('Renamed by user');
+    Event::assertNotDispatched(AssistantConversationRenamed::class);
+});

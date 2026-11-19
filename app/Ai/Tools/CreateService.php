@@ -9,7 +9,7 @@ use App\Ai\Contracts\HasApprovalForm;
 use App\Ai\Ui\ApprovalForm;
 use App\Ai\Ui\Field;
 use App\Ai\Ui\FieldType;
-use App\Exceptions\ResourcePlacementException;
+use App\Support\CreationErrorMessage;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
 use Laravel\Ai\Concerns\InteractsWithApprovals;
@@ -105,10 +105,8 @@ class CreateService implements Approvable, HasApprovalForm, Tool
                 array_filter(['name' => $args['name'] ?? null]),
                 filter_var($args['instant_deploy'] ?? false, FILTER_VALIDATE_BOOLEAN),
             );
-        } catch (ResourcePlacementException $e) {
-            return $e->getMessage();
         } catch (\Throwable $e) {
-            return 'Could not create service: '.$e->getMessage();
+            return CreationErrorMessage::for($e, 'Could not create service.');
         }
 
         $this->auditToolCall('create_service', 'success', ['resource_uuid' => $service->uuid]);

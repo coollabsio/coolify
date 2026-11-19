@@ -28,8 +28,8 @@ class StartAssistantTurn
             throw new AssistantDisabledException;
         }
 
-        $key = "ai-turn:{$conversation->team_id}:{$user->id}";
-        if (RateLimiter::tooManyAttempts($key, self::MAX_PER_MINUTE)) {
+        // hit() increments atomically, so concurrent requests cannot both pass the limit.
+        if (RateLimiter::hit("ai-turn:{$conversation->team_id}:{$user->id}", 60) > self::MAX_PER_MINUTE) {
             throw new AssistantRateLimitedException;
         }
 
@@ -40,8 +40,6 @@ class StartAssistantTurn
         if (! $conversation->claim($user)) {
             throw new AssistantBusyException;
         }
-
-        RateLimiter::hit($key, 60);
 
         // If the queue push itself fails, no job will ever run finally()/failed()
         // to clear the claim, so the conversation would stay "responding" forever.

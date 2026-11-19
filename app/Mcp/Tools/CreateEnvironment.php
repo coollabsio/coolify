@@ -6,6 +6,7 @@ use App\Actions\Project\CreateEnvironment as CreateEnvironmentAction;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Project;
+use App\Support\CreationErrorMessage;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -44,7 +45,7 @@ class CreateEnvironment extends Tool
         try {
             $environment = CreateEnvironmentAction::run($project, $name);
         } catch (\Throwable $e) {
-            return $this->mcpError($request, $e->getMessage());
+            return $this->mcpError($request, CreationErrorMessage::for($e, 'Could not create environment.'));
         }
 
         auditLog('mcp.create_environment', ['team_id' => $teamId, 'uuid' => $environment->uuid, 'project_uuid' => $project->uuid]);

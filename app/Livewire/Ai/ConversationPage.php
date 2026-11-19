@@ -294,12 +294,14 @@ class ConversationPage extends Component
             return;
         }
 
-        if ($conversation->sdk_conversation_id) {
-            DB::table('agent_conversation_messages')->where('conversation_id', $conversation->sdk_conversation_id)->delete();
-            DB::table('agent_conversations')->where('id', $conversation->sdk_conversation_id)->delete();
-        }
+        DB::transaction(function () use ($conversation) {
+            if ($conversation->sdk_conversation_id) {
+                DB::table('agent_conversation_messages')->where('conversation_id', $conversation->sdk_conversation_id)->delete();
+                DB::table('agent_conversations')->where('id', $conversation->sdk_conversation_id)->delete();
+            }
 
-        $conversation->delete();
+            $conversation->delete();
+        });
 
         if ($this->activeConversationId === $id) {
             $this->redirect(route('ai.assistant'), navigate: $this->spaNavigate());

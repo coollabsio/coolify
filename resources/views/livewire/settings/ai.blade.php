@@ -9,13 +9,13 @@
                 <x-application.settings-section id="instance-ai-section" title="AI assistant & MCP"
                     helper="Instance-wide switches. When the AI assistant is disabled here, no team can use it regardless of their own settings.">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.listbox id="is_ai_assistant_enabled" label="AI assistant"
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="is_ai_assistant_enabled" label="AI assistant"
                             helper="Enable the built-in AI assistant for this instance. Teams still bring their own provider key."
                             onChange="instantSave" :options="[
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
-                        <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="is_mcp_server_enabled" label="MCP server"
                             helper="Expose the authenticated Streamable HTTP endpoint at /mcp." onChange="instantSave"
                             :options="[
                                 ['value' => true, 'label' => 'Enabled'],
@@ -33,7 +33,7 @@
             <x-application.settings-section id="team-ai-section" title="AI provider for this team"
                 helper="Bring your own provider key. Credentials and the team toggle only affect this team.">
                 <div class="flex flex-col gap-4">
-                    <x-forms.listbox id="isAiEnabled" label="AI assistant for this team" onChange="saveTeamToggle"
+                    <x-forms.listbox canGate="update" :canResource="currentTeam()" id="isAiEnabled" label="AI assistant for this team" onChange="saveTeamToggle"
                         :options="[
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
@@ -49,11 +49,11 @@
                                 @if ($credential->is_default)
                                     <x-status-badge status="Default" type="success" />
                                 @else
-                                    <x-forms.button wire:click="setDefault({{ $credential->id }})">Set
+                                    <x-forms.button canGate="update" :canResource="$credential" wire:click="setDefault({{ $credential->id }})">Set
                                         default</x-forms.button>
                                 @endif
-                                <x-forms.button wire:click="testCredential({{ $credential->id }})">Test</x-forms.button>
-                                <x-forms.button isError
+                                <x-forms.button canGate="view" :canResource="$credential" wire:click="testCredential({{ $credential->id }})">Test</x-forms.button>
+                                <x-forms.button isError canGate="delete" :canResource="$credential"
                                     wire:click="deleteCredential({{ $credential->id }})">Delete</x-forms.button>
                             </div>
                         @empty
@@ -65,19 +65,19 @@
 
                     <form wire:submit="addCredential" class="flex flex-col gap-4">
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.select wire:model="newProvider" label="Provider">
+                            <x-forms.select canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newProvider" label="Provider">
                                 @foreach ($providers as $provider)
                                     <option value="{{ $provider->value }}">{{ $provider->label() }}</option>
                                 @endforeach
                             </x-forms.select>
-                            <x-forms.input wire:model="newModel" label="Model" placeholder="gpt-5" />
-                            <x-forms.input type="password" allowToPeak wire:model="newApiKey" label="API key" />
-                            <x-forms.input wire:model="newBaseUrl" label="Base URL"
+                            <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newModel" label="Model" placeholder="gpt-5" />
+                            <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" type="password" allowToPeak wire:model="newApiKey" label="API key" />
+                            <x-forms.input canGate="create" :canResource="\App\Models\AiProviderCredential::class" wire:model="newBaseUrl" label="Base URL"
                                 helper="Optional. Required for Ollama or custom OpenAI-compatible providers."
                                 placeholder="http://localhost:11434/v1" />
                         </div>
                         <div>
-                            <x-forms.button type="submit">Add credential</x-forms.button>
+                            <x-forms.button canGate="create" :canResource="\App\Models\AiProviderCredential::class" type="submit">Add credential</x-forms.button>
                         </div>
                     </form>
                 </div>

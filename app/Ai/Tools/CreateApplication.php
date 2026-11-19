@@ -10,9 +10,8 @@ use App\Ai\Ui\ApprovalForm;
 use App\Ai\Ui\Field;
 use App\Ai\Ui\FieldType;
 use App\Enums\BuildPackTypes;
-use App\Exceptions\ResourceCreationException;
-use App\Exceptions\ResourcePlacementException;
 use App\Mcp\Tools\CreateApplication as McpCreateApplication;
+use App\Support\CreationErrorMessage;
 use App\Support\ValidationPatterns;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Validator;
@@ -123,10 +122,8 @@ class CreateApplication implements Approvable, HasApprovalForm, Tool
                 $args['environment_uuid'] ?? null, $args['server_uuid'], $args['destination_uuid'] ?? null,
             );
             $application = CreateApplicationAction::run($placement, $type, $data, $instantDeploy);
-        } catch (ResourcePlacementException|ResourceCreationException $e) {
-            return $e->getMessage();
         } catch (\Throwable $e) {
-            return 'Could not create application: '.$e->getMessage();
+            return CreationErrorMessage::for($e, 'Could not create application.');
         }
 
         $this->auditToolCall('create_application', 'success', ['resource_uuid' => $application->uuid, 'type' => $type]);

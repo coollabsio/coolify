@@ -8,6 +8,7 @@ use App\Jobs\Ai\ResumeAssistantTurn;
 use App\Listeners\Ai\RecordToolApproval;
 use App\Models\AiConversation;
 use App\Models\AiProviderCredential;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
@@ -49,7 +50,19 @@ test('resume streams a continuation and releases the thread', function () {
     expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE);
 });
 
+test('an unknown decision action fails the turn instead of approving', function () {
+    Event::fake([AssistantTurnCompleted::class, AssistantTurnFailed::class]);
+    Ai::fakeAgent(CoolifyAssistant::class, ['Done, deleted the resource.']);
+
+    (new ResumeAssistantTurn($this->conversation->id, ['call_1' => ['action' => 'aprove']], $this->user->id))->handle();
+
+    Event::assertDispatched(AssistantTurnFailed::class);
+    Event::assertNotDispatched(AssistantTurnCompleted::class);
+    expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE);
+});
+
 test('the approval listener records the approver from context', function () {
+    $this->withoutDefer();
     Context::add('ai.author_user_id', $this->user->id);
     $listener = new RecordToolApproval;
 
@@ -63,7 +76,10 @@ test('the approval listener records the approver from context', function () {
         conversationUser: $this->team,
     ));
 
-    expect(true)->toBeTrue();
+    $event = AuditEvent::query()->where('event', 'ai.tool.approved')->sole();
+    expect($event->metadata['approver_id'])->toBe($this->user->id)
+        ->and($event->metadata['tool'])->toBe('delete_server')
+        ->and($event->metadata['call_id'])->toBe('call_1');
 });
 
 test('failed() clears the turn and returns the conversation to idle', function () {

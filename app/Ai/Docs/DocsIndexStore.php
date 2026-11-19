@@ -57,8 +57,9 @@ class DocsIndexStore
             $normalized = $this->parse($this->fetch());
             $hash = hash('sha256', json_encode($normalized));
 
-            if (Cache::get(self::HASH_KEY) === $hash) {
-                return; // identical content, no rewrite
+            // Identical content: skip the rewrite, but only while the index itself is still cached.
+            if (Cache::get(self::HASH_KEY) === $hash && is_array(Cache::get(self::INDEX_KEY))) {
+                return;
             }
 
             Cache::forever(self::INDEX_KEY, $normalized);

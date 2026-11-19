@@ -5,6 +5,7 @@ use App\Ai\Tools\DeleteResource;
 use App\Ai\Tools\DeleteServer;
 use App\Ai\Tools\RunServerCommand;
 use App\Ai\Tools\UpsertEnvironmentVariable;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -115,3 +116,18 @@ test('approved run-command executes the action for an admin', function () {
 
     expect($result)->toContain('uptime');
 });
+
+test('upsert-env rejects an invalid key before anything is written', function (string $key) {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    $result = (string) (new UpsertEnvironmentVariable)->handle(new Request([
+        'resource' => 'application',
+        'uuid' => 'any-uuid',
+        'key' => $key,
+        'value' => 'x',
+    ]));
+
+    expect($result)->toStartWith('Validation failed:')
+        ->and(EnvironmentVariable::query()->count())->toBe(0);
+})->with(['with space' => 'MY KEY', 'with equals' => 'A=B', 'with quote' => 'A"B', 'with newline' => "A\nB"]);

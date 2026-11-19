@@ -55,7 +55,14 @@ class GenerateConversationTitle implements ShouldQueue
             $this->clearTeamMemberContext();
         }
 
-        $conversation->forceFill(['title' => $title])->save();
+        // Write only if the title is still unset, so a rename that landed while the
+        // provider was generating is never overwritten.
+        $updated = AiConversation::whereKey($conversation->id)
+            ->where(fn ($query) => $query->whereNull('title')->orWhere('title', ''))
+            ->update(['title' => $title]);
+        if ($updated !== 1) {
+            return;
+        }
 
         broadcast(new AssistantConversationRenamed(
             $conversation->team_id,

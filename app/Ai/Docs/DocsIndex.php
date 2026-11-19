@@ -27,6 +27,7 @@ class DocsIndex
 
         return is_array($this->data['tokenOccurrences'])
             && is_array($this->data['frequencies'])
+            && is_array($this->data['fieldLengths'])
             && is_array($this->data['docs'])
             && (float) $this->data['avgFieldLength'] > 0
             && (int) $this->data['n'] > 0;
@@ -119,7 +120,12 @@ class DocsIndex
             }
         }
 
-        return mb_substr(trim(implode("\n\n", array_filter($chunks))), 0, self::PAGE_MAX_CHARS);
+        $content = trim(implode("\n\n", array_filter($chunks)));
+        if (mb_strlen($content) <= self::PAGE_MAX_CHARS) {
+            return $content;
+        }
+
+        return mb_substr($content, 0, self::PAGE_MAX_CHARS)."\n\n[Page truncated: only the first ".self::PAGE_MAX_CHARS.' characters are shown.]';
     }
 
     /**

@@ -4,9 +4,9 @@ namespace App\Mcp\Tools;
 
 use App\Actions\Service\CreateService as CreateServiceAction;
 use App\Actions\Shared\ResolveResourcePlacement;
-use App\Exceptions\ResourcePlacementException;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
+use App\Support\CreationErrorMessage;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -52,10 +52,8 @@ class CreateService extends Tool
                 'name' => $request->get('name'),
                 'description' => $request->get('description'),
             ]), $instantDeploy);
-        } catch (ResourcePlacementException $e) {
-            return $this->mcpError($request, $e->getMessage());
         } catch (\Throwable $e) {
-            return $this->mcpError($request, $e->getMessage());
+            return $this->mcpError($request, CreationErrorMessage::for($e, 'Could not create service.'));
         }
 
         auditLog('mcp.create_service', ['team_id' => $teamId, 'uuid' => $service->uuid, 'service_type' => $service->service_type]);

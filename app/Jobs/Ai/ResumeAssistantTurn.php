@@ -83,10 +83,11 @@ class ResumeAssistantTurn implements ShouldQueue
 
             $decisions = [];
             foreach ($this->decisions as $callId => $decision) {
-                $decisions[$callId] = match ($decision['action'] ?? 'approve') {
+                $decisions[$callId] = match ($decision['action'] ?? null) {
+                    'approve' => Decision::approve(),
                     'edit' => Decision::edit($decision['arguments'] ?? []),
                     'reject' => Decision::reject(),
-                    default => Decision::approve(),
+                    default => throw new RuntimeException("Unknown approval decision for call [{$callId}]."),
                 };
             }
 
