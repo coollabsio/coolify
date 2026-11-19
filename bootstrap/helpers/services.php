@@ -117,6 +117,7 @@ function resource_logo(Model $resource): ?array
         'keydb' => $resourceLogo('keydb', true),
         'dragonfly' => $resourceLogo('dragonfly', true),
         'clickhouse' => $resourceLogo('clickhouse'),
+        'influxdb' => $resourceLogo('influxdb'),
         'sqlite' => $resourceLogo('sqlite'),
         default => null,
     };

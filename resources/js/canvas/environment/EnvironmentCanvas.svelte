@@ -1,5 +1,5 @@
 <script>
-  // Environment canvas (Beta): a read-mostly diagram of one environment.
+  // Environment canvas (experimental): a read-mostly diagram of one environment.
   // Server zones hold resource cards; admins can move cards and draw
   // visual-only links. Positions and links are stored through /canvas/api.
   //

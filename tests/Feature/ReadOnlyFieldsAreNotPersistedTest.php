@@ -3,6 +3,7 @@
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Project\Database\Clickhouse\General as ClickhouseGeneral;
 use App\Livewire\Project\Database\Dragonfly\General as DragonflyGeneral;
+use App\Livewire\Project\Database\Influxdb\General as InfluxdbGeneral;
 use App\Livewire\Project\Database\Keydb\General as KeydbGeneral;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -39,6 +40,13 @@ dataset('read-only-credential-components', [
     'clickhouse' => ['create_standalone_clickhouse', ClickhouseGeneral::class, [
         'clickhouseAdminUser' => 'clickhouse_admin_user',
         'clickhouseAdminPassword' => 'clickhouse_admin_password',
+    ]],
+    'influxdb' => ['create_standalone_influxdb', InfluxdbGeneral::class, [
+        'influxdbAdminUser' => 'influxdb_admin_user',
+        'influxdbAdminPassword' => 'influxdb_admin_password',
+        'influxdbAdminToken' => 'influxdb_admin_token',
+        'influxdbOrg' => 'influxdb_org',
+        'influxdbBucket' => 'influxdb_bucket',
     ]],
 ]);
 
