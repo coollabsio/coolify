@@ -475,7 +475,7 @@ class GetLogs extends Component
         $command = $server->isSwarm()
             ? "docker service logs {$options}{$container}"
             : "docker logs {$options}{$container}";
-        $command = dockerLogsCommandWithTimeout($command);
+        $command = remoteCommandWithTimeout($command, 30);
 
         if ($server->isNonRoot()) {
             $command = parseCommandsByLineForSudo(collect($command), $server)[0];

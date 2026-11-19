@@ -2083,16 +2083,6 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
     return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 }
 
-/**
- * Bound a remote `docker logs` read. Without it, a dropped SSH client leaves the read running on the
- * server, and Docker 29 keeps polling the deleted json log file of the container at full CPU.
- * Local waits for the command must be longer than this bound (DOCKER_LOGS_LOCAL_TIMEOUT).
- */
-function dockerLogsCommandWithTimeout(string $command): string
-{
-    return "timeout -k 5s 30s {$command}";
-}
-
 function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $command = "docker logs -n {$lines}";
@@ -2104,7 +2094,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int|str
         $command .= ' --timestamps';
     }
 
-    return dockerLogsCommandWithTimeout("{$command} ".escapeshellarg($container_id)).' 2>&1';
+    return remoteCommandWithTimeout("{$command} ".escapeshellarg($container_id), 30).' 2>&1';
 }
 
 function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string

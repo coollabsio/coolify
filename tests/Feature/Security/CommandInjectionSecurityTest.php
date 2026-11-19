@@ -1049,7 +1049,7 @@ describe('service application lifecycle command escaping', function () {
         expect($commands->all())
             ->toContain("docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}")
             ->toContain("docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}")
-            ->toContain("docker logs -n 100 {$escapedContainerName}")
+            ->toContain("timeout -k 5s 30s docker logs -n 100 {$escapedContainerName}")
             ->toContain(dockerStopCommand(10, $escapedContainerName, $server))
             ->and($commands->implode("\n"))->not->toContain(" {$containerName}");
     });

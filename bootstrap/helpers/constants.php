@@ -65,7 +65,7 @@ const MIN_STOP_GRACE_PERIOD_SECONDS = 1;
 const MAX_STOP_GRACE_PERIOD_SECONDS = 3600;
 const DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS = 5;
 const MAX_ROLLING_UPDATE_DRAIN_SECONDS = 300;
-/** Local wait for a remote `docker logs` read: the 30s remote bound + 5s kill-after + SSH setup time. */
+/** Local wait for a remote `docker logs` read bounded by remoteCommandWithTimeout(..., 30): 30s + 5s kill-after + SSH setup time. */
 const DOCKER_LOGS_LOCAL_TIMEOUT = 45;
 /**
  * caddy-docker-proxy reloads Caddy when any proxied container changes (a restart gives it a new IP), and a reload
