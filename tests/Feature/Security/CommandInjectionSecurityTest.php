@@ -1001,8 +1001,8 @@ describe('service application lifecycle command escaping', function () {
 
         expect(buildContainerStatusCommand($server, 'app$(id)'))->toBe($expected);
     })->with([
-        'docker' => [false, "docker inspect --format '{{json .}}' 'app\$(id)'"],
-        'swarm' => [true, "docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
+        'docker' => [false, "timeout -k 5s 20s docker inspect --format '{{json .}}' 'app\$(id)'"],
+        'swarm' => [true, "timeout -k 5s 20s docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
     ]);
 
     test('application deployment shell commands escape the generated container name', function () {
