@@ -278,6 +278,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
         Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
         Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+        Route::post('/databases/influxdb', [DatabasesController::class, 'create_database_influxdb'])->middleware(['api.ability:write']);
         Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
         Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
         Route::post('/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);

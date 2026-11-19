@@ -497,6 +497,10 @@
                                 docs: 'https://clickhouse.com/docs',
                                 website: 'https://clickhouse.com/?ref=coolify.io'
                             },
+                            influxdb: {
+                                docs: 'https://docs.influxdata.com/influxdb/v2/',
+                                website: 'https://www.influxdata.com/?ref=coolify.io'
+                            },
                             sqlite: {
                                 docs: 'https://sqlite.org/docs.html',
                                 website: 'https://sqlite.org/?ref=coolify.io'

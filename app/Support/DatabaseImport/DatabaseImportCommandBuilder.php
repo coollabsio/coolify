@@ -86,6 +86,7 @@ AWK;
             'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll, $restoreMysqlUsers),
             'mongodb' => $this->mongodb($replaceExisting),
             'sqlite' => $this->sqlite($resource->databaseFilePath($sqliteDatabase)),
+            'influxdb' => $this->influxdb(),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };
 
@@ -197,7 +198,7 @@ SH;
 
     public function supports(object $resource): bool
     {
-        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb', 'sqlite'], true);
+        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb', 'sqlite', 'influxdb'], true);
     }
 
     public function databaseType(object $resource): string
@@ -213,6 +214,7 @@ SH;
             str_contains($type, 'mysql') => 'mysql',
             str_contains($type, 'mongo') => 'mongodb',
             str_contains($type, 'sqlite') => 'sqlite',
+            str_contains($type, 'influxdb') => 'influxdb',
             default => 'unsupported',
         };
     }
@@ -425,6 +427,46 @@ SH;
 stream > "\$backup.db" || fail 'The backup cannot be read. Nothing was changed.'
 [ "\$(head -c 15 "\$backup.db")" = 'SQLite format 3' ] || { rm -f "\$backup.db"; fail 'The backup is not a SQLite database. Nothing was changed.'; }
 sqlite3 -bail {$file} '.timeout 10000' ".restore \$backup.db"; status=\$?; rm -f "\$backup.db"; exit \$status
+SH;
+    }
+
+    /**
+     * InfluxDB restores a tar or tar.gz of an `influx backup` directory with one bucket (or the
+     * configured bucket) into a temporary bucket first. Only after that succeeds is the current
+     * bucket deleted and the temporary bucket renamed, so a failed restore changes nothing.
+     * Credentials come from the DOCKER_INFLUXDB_INIT_* variables of the container.
+     */
+    private function influxdb(): string
+    {
+        return <<<'SH'
+cli() { influx "$@" --host http://127.0.0.1:8086 --token "$DOCKER_INFLUXDB_INIT_ADMIN_TOKEN"; }
+bucket="$DOCKER_INFLUXDB_INIT_BUCKET"
+org="$DOCKER_INFLUXDB_INIT_ORG"
+is_tar || fail 'Unsupported InfluxDB backup format. Use an influx backup directory packed as tar or tar.gz. Nothing was changed.'
+extract_tar
+manifest=$(find "$work" -type f -name '*.manifest' | head -n 1)
+[ -n "$manifest" ] || fail 'The tar backup does not contain an influx backup directory. Nothing was changed.'
+names=$(grep -o '"bucketName": *"[^"]*"' "$manifest" | sed 's/.*"\([^"]*\)"$/\1/' | sort -u)
+if [ "$(printf '%s\n' "$names" | grep -c .)" = 1 ]; then
+  source="$names"
+elif printf '%s\n' "$names" | grep -qx "$bucket"; then
+  source="$bucket"
+else
+  fail "The backup contains more than one bucket and none is named $bucket. Nothing was changed."
+fi
+source_org=$(grep -o '"organizationName": *"[^"]*"' "$manifest" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')
+staging="$bucket-restore-$$"
+cli restore "$(dirname "$manifest")" --bucket "$source" --org "$source_org" --new-bucket "$staging" --new-org "$org" || {
+  cli bucket delete --name "$staging" --org "$org" >/dev/null 2>&1
+  fail 'The restore failed. Nothing was changed.'
+}
+staging_id=$(cli bucket list --name "$staging" --org "$org" --hide-headers | awk '{print $1}')
+[ -n "$staging_id" ] || fail "The data was restored into bucket $staging, but Coolify cannot find it."
+if cli bucket list --name "$bucket" --org "$org" >/dev/null 2>&1; then
+  cli bucket delete --name "$bucket" --org "$org" >/dev/null || fail "The data was restored into bucket $staging, but bucket $bucket cannot be deleted."
+fi
+cli bucket update --id "$staging_id" --name "$bucket" >/dev/null || fail "The data was restored into bucket $staging, but it cannot be renamed to $bucket."
+echo "Restored bucket $source into $bucket."
 SH;
     }
 }

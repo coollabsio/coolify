@@ -9,6 +9,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -177,6 +178,24 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     $database->uuid = new_public_id();
     $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+function create_standalone_influxdb($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneInfluxdb
+{
+    $database = new StandaloneInfluxdb;
+    $database->uuid = new_public_id();
+    $database->name = 'influxdb-database-'.$database->uuid;
+    $database->influxdb_admin_password = Str::password(length: 64, symbols: false);
+    $database->influxdb_admin_token = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
