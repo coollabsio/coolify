@@ -344,7 +344,7 @@ class StartMongodb
 
     private function health_check_shell_command(bool $legacy): string
     {
-        $command = [$legacy ? 'mongo' : 'mongosh', '--quiet', '--host', $this->database->uuid];
+        $command = [$legacy ? 'mongo' : 'mongosh', '--quiet', '--host', $this->database->uuid, ...$this->database->healthCheckPortArguments($this->database->mongo_conf, '--port')];
 
         if ($this->database->enable_ssl) {
             $command = [...$command, $legacy ? '--ssl' : '--tls', $legacy ? '--sslCAFile' : '--tlsCAFile', '/etc/mongo/certs/ca.pem'];

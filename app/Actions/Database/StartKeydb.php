@@ -108,7 +108,10 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'keydb-cli',
+                        ...(str_contains((string) $this->database->keydb_conf, 'requirepass') ? [] : ['--pass', $this->resolvedRedisPassword]),
+                        ...$this->database->healthCheckPortArguments($this->database->keydb_conf),
+                        'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,

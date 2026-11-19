@@ -108,7 +108,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', ...$this->healthCheckHostArguments(), '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
+                        'CMD', 'psql', ...$this->healthCheckHostArguments(), ...$this->database->healthCheckPortArguments($this->database->postgres_conf), '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
