@@ -24602,7 +24602,8 @@
                                         },
                                         "output": {
                                             "type": "string",
-                                            "description": "Combined output of the executed commands."
+                                            "nullable": true,
+                                            "description": "Combined output of the executed commands. Null unless the token has the read:sensitive ability."
                                         },
                                         "created_at": {
                                             "type": "string",

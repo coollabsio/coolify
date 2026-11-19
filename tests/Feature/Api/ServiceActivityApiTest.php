@@ -21,7 +21,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user, ['role' => 'owner']);
     session(['currentTeam' => $this->team]);
-    $this->token = $this->user->tokens()->create(['name' => 'activities', 'token' => hash('sha256', 'secret'), 'abilities' => ['deploy', 'read'], 'team_id' => $this->team->id]);
+    $this->token = $this->user->tokens()->create(['name' => 'activities', 'token' => hash('sha256', 'secret'), 'abilities' => ['deploy', 'read', 'read:sensitive'], 'team_id' => $this->team->id]);
     $this->headers = ['Authorization' => 'Bearer '.$this->token->id.'|secret'];
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
     $this->destination = StandaloneDocker::firstOrCreate(['server_id' => $this->server->id, 'network' => 'coolify'], ['uuid' => (string) Str::uuid(), 'name' => 'docker']);
@@ -67,6 +67,15 @@ test('shows a team and service scoped activity', function () {
         ->assertJsonPath('finished_at', fn ($value) => $value !== null)
         ->assertJsonStructure(['id', 'status', 'exit_code', 'output', 'created_at', 'updated_at', 'finished_at'])
         ->assertJsonMissingPath('command');
+});
+
+test('hides the output from a token without the read:sensitive ability', function () {
+    $readOnly = $this->user->createToken('read-only', ['read']);
+    $activity = Activity::create(['log_name' => 'default', 'description' => json_encode([['order' => 1, 'output' => "Pulling images.\n", 'type' => 'stdout']]), 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $this->service->uuid, 'status' => 'finished', 'exitCode' => 0]]);
+
+    $this->withToken($readOnly->plainTextToken)->getJson("/api/v1/services/{$this->service->uuid}/activities/{$activity->id}")
+        ->assertOk()
+        ->assertJson(['id' => $activity->id, 'status' => 'finished', 'output' => null]);
 });
 
 test('reports a running activity without a finished timestamp', function () {

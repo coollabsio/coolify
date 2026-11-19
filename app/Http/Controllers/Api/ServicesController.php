@@ -2434,7 +2434,7 @@ class ServicesController extends Controller
                                 'id' => ['type' => 'integer', 'example' => 1234],
                                 'status' => ['type' => 'string', 'description' => 'One of queued, in_progress, finished, error, killed, cancelled, closed.', 'example' => 'finished'],
                                 'exit_code' => ['type' => 'integer', 'nullable' => true, 'example' => 0],
-                                'output' => ['type' => 'string', 'description' => 'Combined output of the executed commands.'],
+                                'output' => ['type' => 'string', 'nullable' => true, 'description' => 'Combined output of the executed commands. Null unless the token has the read:sensitive ability.'],
                                 'created_at' => ['type' => 'string', 'format' => 'date-time'],
                                 'updated_at' => ['type' => 'string', 'format' => 'date-time'],
                                 'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'Null while the activity is still running.'],
@@ -2488,7 +2488,9 @@ class ServicesController extends Controller
             'id' => $activity->id,
             'status' => $status,
             'exit_code' => data_get($activity, 'properties.exitCode'),
-            'output' => remove_iip(RunRemoteProcess::decodeOutput($activity)),
+            'output' => $request->attributes->get('can_read_sensitive', false) === true
+                ? remove_iip(RunRemoteProcess::decodeOutput($activity))
+                : null,
             'created_at' => $activity->created_at,
             'updated_at' => $activity->updated_at,
             'finished_at' => $terminal ? $activity->updated_at : null,
