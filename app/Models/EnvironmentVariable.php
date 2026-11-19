@@ -576,7 +576,7 @@ class EnvironmentVariable extends BaseModel
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
     {
         if ($resource === null) {
             return ['known' => [], 'locked' => []];
@@ -660,7 +660,7 @@ class EnvironmentVariable extends BaseModel
      * @param  array<int, string>  $unresolvedKeys
      * @return array<int, string>
      */
-    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
+    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
     {
         // Cheap check first, so variables without references never query or contact a source.
         $value = $variable->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);
