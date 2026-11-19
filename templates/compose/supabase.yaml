@@ -1694,9 +1694,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    depends_on:
-      supabase-vector:
-        condition: service_healthy
     command:
       - postgres
       - -c
@@ -2023,6 +2020,10 @@ services:
       # GOOGLE_PROJECT_NUMBER=${GOOGLE_PROJECT_NUMBER}
   supabase-vector:
     image: timberio/vector:0.61.0-alpine
+    # Logflare rejects the access token until it has seeded it, and it caches the rejection for some minutes.
+    depends_on:
+      supabase-analytics:
+        condition: service_healthy
     healthcheck:
       test:
         [

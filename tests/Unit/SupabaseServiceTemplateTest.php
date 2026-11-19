@@ -162,3 +162,20 @@ it('uses one default per variable, because Coolify stores the first default as t
 
     expect(array_keys(array_filter($defaults, fn (array $variants): bool => count($variants) > 1)))->toBe([]);
 });
+
+it('starts Vector after Logflare is healthy, without a dependency cycle', function () {
+    $services = supabaseTemplate()['services'];
+
+    expect($services['supabase-vector']['depends_on']['supabase-analytics']['condition'] ?? null)->toBe('service_healthy');
+
+    $visit = function (string $name, array $path) use (&$visit, $services): void {
+        expect($path)->not->toContain($name, 'Dependency cycle: '.implode(' -> ', [...$path, $name]));
+        foreach (array_keys($services[$name]['depends_on'] ?? []) as $dependency) {
+            $visit($dependency, [...$path, $name]);
+        }
+    };
+
+    foreach (array_keys($services) as $name) {
+        $visit($name, []);
+    }
+});
