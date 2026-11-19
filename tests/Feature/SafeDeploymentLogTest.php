@@ -241,6 +241,8 @@ it('keeps corrupted stored logs and warns once instead of overwriting them', fun
  */
 function runDeploymentCommandWithChunks(ApplicationDeploymentQueue $deployment, array $chunks, bool $hidden = false): void
 {
+    // The mocked Process facade cannot answer the host key scan.
+    config(['constants.ssh.host_key_checking' => 'off']);
     $team = $deployment->application->team();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -316,6 +318,34 @@ it('redacts a private key that is split across deployment output chunks', functi
 
     expect($outputs->implode("\n"))->not->toContain('KEYBODYLINE')
         ->and($outputs->all())->toBe(['before', REDACTED."\nafter"]);
+});
+
+it('leaves the changed host key warning of ssh out of the deployment log', function () {
+    [, $deployment] = makeSafeDeploymentLogFixture();
+    $warning = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n"
+        ."@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n"
+        ."@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n"
+        ."IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\r\n"
+        ."The fingerprint for the ED25519 key sent by the remote host is\n"
+        ."SHA256:HwD7uwuyJ8Nns/3ORRZ1nTRNABjxDxOjt16LpPM22kE.\r\n"
+        ."Offending ED25519 key in /data/known_hosts_x:1\r\n"
+        ."  remove with:\r\n"
+        ."  ssh-keygen -f '/data/known_hosts_x' -R 'coolify-x'\r\n"
+        ."Password authentication is disabled to avoid man-in-the-middle attacks.\r\n";
+
+    runDeploymentCommandWithChunks($deployment, [
+        ['err', substr($warning, 0, 150)],
+        ['err', substr($warning, 150)],
+        ['out', "built\n"],
+        ['err', "npm warn deprecated\n"],
+    ]);
+
+    $logs = collect(json_decode($deployment->refresh()->logs, true));
+
+    expect($logs->map(fn (array $entry) => [$entry['type'], $entry['output']])->all())->toBe([
+        ['stdout', 'built'],
+        ['stderr', 'npm warn deprecated'],
+    ]);
 });
 
 /**

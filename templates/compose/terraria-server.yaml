@@ -7,7 +7,7 @@
 
 services:
   terraria-server:
-    image: hexlo/terraria-server-docker:1.4.5.0
+    image: hexlo/terraria-server-docker:1.4.5.8
     stdin_open: true
     tty: true
     ports:

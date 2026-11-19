@@ -7,7 +7,7 @@
 
 services:
   qbit:
-    image: "lscr.io/linuxserver/qbittorrent:latest"
+    image: "lscr.io/linuxserver/qbittorrent:5.3.0"
     environment:
       - WEBUI_PORT=${WEBUI_PORT:-8080}
       - PUID=1000
@@ -28,7 +28,7 @@ services:
       retries: 10
 
   vuetorrent-backend:
-    image: "ghcr.io/vuetorrent/vuetorrent-backend:latest"
+    image: "ghcr.io/vuetorrent/vuetorrent-backend:2.7.4"
     environment:
       - SERVICE_URL_QBITORRENT_8080
       - PORT=${WEBUI_PORT:-8080}

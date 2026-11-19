@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Server\DeleteServer;
 use App\Jobs\CleanupHelperContainersJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -46,31 +47,40 @@ class CleanupStuckedResources extends Command
             foreach ($teams as $team) {
                 $team->delete();
             }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked teams: {$e->getMessage()}\n";
+        }
+        try {
             $servers = Server::query()->with('team.subscription')->lazyById()->filter(function ($server) {
                 return $server->isFunctional();
             });
             if (isCloud()) {
                 $servers = $servers->filter(function ($server) {
-                    return data_get($server->team->subscription, 'stripe_invoice_paid', false) === true;
+                    return data_get($server->team?->subscription, 'stripe_invoice_paid', false) === true;
                 });
             }
             foreach ($servers as $server) {
                 CleanupHelperContainersJob::dispatch($server);
             }
         } catch (\Throwable $e) {
-            echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+            echo "Error in cleaning stucked helper containers: {$e->getMessage()}\n";
         }
         try {
-            $servers = Server::onlyTrashed()->lazyById();
+            // A newer deleted server can still wait for its queued DeleteServer job, which knows whether to remove the containers.
+            // A queued job can wait behind long jobs and then run until the worker timeout (up to about 24 hours).
+            $servers = Server::onlyTrashed()->where('deleted_at', '<', now()->subHours(24))->lazyById();
             foreach ($servers as $server) {
                 echo "Force deleting stuck server: {$server->name}\n";
-                $server->forceDelete();
+                // Deletes its resources from Coolify first. The containers stay, because the choice made at the delete is not known.
+                DeleteServer::run($server->id, removeResourcesFromServer: false);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
         }
         try {
-            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()->lazyById();
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()
+                ->select(['id', 'application_id'])
+                ->lazyById();
             foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
                 if (is_null($applicationDeploymentQueue->application)) {
                     echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";

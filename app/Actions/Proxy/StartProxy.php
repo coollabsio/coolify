@@ -48,21 +48,20 @@ class StartProxy
         if ($async) {
             $server->markProxyTransitionStarted();
 
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: ProxyStatusChanged::dataFor($server), queue: deployment_queue());
         } else {
             instant_remote_process($commands, $server);
 
             $server->proxy->set('type', $proxyType);
             $server->save();
-            ProxyStatusChanged::dispatch($server->id);
+            ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
 
             return 'OK';
         }
     }
 
     /**
-     * Commands that start the proxy. They first remove an existing proxy container.
-     * RestartProxyJob uses the same commands after its stop phase.
+     * Commands that start or restart the proxy. They remove an existing proxy container only after the image pull.
      */
     public static function startCommands(Server $server): Collection
     {
@@ -90,7 +89,7 @@ class StartProxy
                 serverDockerConfigPrefix($server)."docker compose -f $compose_file pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
-                '    docker stop coolify-proxy 2>/dev/null || true',
+                '    '.dockerStopCommand(30, 'coolify-proxy', $server).' 2>/dev/null || true',
                 '    docker rm -f coolify-proxy 2>/dev/null || true',
                 '    # Wait for container to be fully removed',
                 '    for i in {1..10}; do',

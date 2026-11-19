@@ -83,11 +83,15 @@
 
         <x-application.settings-section id="container-section" title="Container"
             description="Docker options, configuration, and log forwarding for the database container.">
-            <x-forms.input
-                helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
-                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
-                id="customDockerRunOptions" label="Custom Docker options" canGate="update"
-                :canResource="$database" />
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Custom Docker options" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input
+                    helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                    id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                    :canResource="$database" />
+            @endif
             <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override only the KeyDB directives you need. All other defaults remain active.">
                 @if ($isPasswordHiddenForMember)
                     <x-forms.input label="Custom KeyDB configuration" disabled value="Hidden (only admins can view)" />

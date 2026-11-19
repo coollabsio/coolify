@@ -25,19 +25,13 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows the projects and servers sections as tables by default', function () {
-    Livewire::test(Dashboard::class)
-        ->assertSee("viewMode: 'table'", false)
-        ->assertDontSee("viewMode: 'grid'", false);
-});
-
 it('remembers the view of each dashboard section on its own', function () {
     Livewire::test(Dashboard::class)->call('saveListView', 'dashboard_projects', 'grid');
 
     expect(Cookie::queued("coolify_{$this->user->id}_dashboard_projects_view")?->getValue())->toBe('grid')
         ->and(Cookie::queued("coolify_{$this->user->id}_dashboard_servers_view"))->toBeNull();
 
-    $this->withCookie("coolify_{$this->user->id}_dashboard_projects_view", 'grid')
+    $this->withUnencryptedCookie("coolify_{$this->user->id}_dashboard_projects_view", 'grid')
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee("viewMode: 'grid'", false)

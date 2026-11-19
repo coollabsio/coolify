@@ -3,6 +3,7 @@
 namespace App\Livewire\SharedVariables\Team;
 
 use App\Livewire\Concerns\RemembersCanvasView;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -52,13 +53,14 @@ class Index extends Component
             return $this->redirectRoute('shared-variables.team.canvas', navigate: true);
         }
         $this->team = currentTeam();
+        $this->authorize('viewSharedVariables', $this->team);
         $this->getDevView();
     }
 
     public function switch()
     {
         try {
-            $this->authorize('view', $this->team);
+            $this->authorize('viewSharedVariables', $this->team);
             $this->view = $this->view === 'normal' ? 'dev' : 'normal';
             $this->getDevView();
         } catch (\Throwable $e) {
@@ -73,32 +75,21 @@ class Index extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $canViewValues = auth()->user()?->isAdminOfTeam($this->team->id) ?? false;
-
-        return $variables->map(function ($item) use ($canViewValues) {
-            if (! $canViewValues) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
-            $value = formatEnvValueForDevView($item->value);
-            if ($value === null) {
-                return "$item->key=(Value cannot be shown in this view, edit in normal view)";
-            }
-
-            return "$item->key=$value";
-        })->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
     }
 
     public function submit()
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('update', $this->team);
-            $this->handleBulkSubmit();
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
             $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -107,9 +98,8 @@ class Index extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables)
     {
-        $variables = parseEnvFormatToArray($this->variables);
         $changesMade = false;
 
         DB::transaction(function () use ($variables, &$changesMade) {
@@ -156,6 +146,9 @@ class Index extends Component
                 if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     if ($found->value !== $value) {
                         $found->value = $value;
+                    }
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -166,6 +159,7 @@ class Index extends Component
                     'value' => $value,
                     'is_multiline' => false,
                     'is_literal' => false,
+                    ...$data['settings'],
                     'type' => 'team',
                     'team_id' => $this->team->id,
                 ]);

@@ -32,7 +32,6 @@ trait CallsRestApi
         'api/v1/sentinel/',
         'api/v1/settings/',
         'api/v1/teams',
-        'api/v1/security/integration-tokens',
     ];
 
     /**

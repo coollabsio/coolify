@@ -36,6 +36,7 @@ use OpenApi\Attributes as OA;
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
+        'scan_images_on_new_servers' => ['type' => 'boolean', 'description' => 'Whether image scanning is turned on for servers added to the team from now on.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -61,12 +62,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
         'is_two_factor_required',
+        'scan_images_on_new_servers',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
+        'scan_images_on_new_servers' => false,
     ];
 
     protected $casts = [
@@ -74,6 +77,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
         'is_two_factor_required' => 'boolean',
+        'scan_images_on_new_servers' => 'boolean',
     ];
 
     protected static function booted()
@@ -152,6 +156,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
             $s3->delete();
         }
+
+        ImageScanPolicy::query()->where('scope_type', $this->getMorphClass())->where('scope_id', $this->id)->delete();
+        ImageScanIgnore::query()->where('team_id', $this->id)->delete();
     }
 
     public static function serverLimitReached(?Team $team = null)
@@ -315,9 +322,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     /**
      * Send a notification, unless it is throttled and was already sent within its interval.
      * A throttle claim is released when sending throws, so a failed send is retried on the next check.
+     * A notification without enabled channels is not sent and does not claim the throttle.
      */
     public function notify($instance): void
     {
+        if ($instance->via($this) === []) {
+            return;
+        }
+
         $subject = $instance instanceof ThrottledNotification ? $instance->throttleSubject() : null;
         if ($subject === null) {
             $this->sendNotification($instance);
@@ -340,7 +352,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function members()
     {
-        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
+        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role', 'access');
     }
 
     public function subscription()

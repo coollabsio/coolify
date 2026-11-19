@@ -45,7 +45,7 @@
                                 {{ data_get($ghapp, 'name') }}
                             </div>
                             <p class="mt-0.5 truncate text-xs text-neutral-500 dark:text-fg-dim">
-                                {{ data_get($ghapp, 'html_url') }}
+                                {{ data_get($ghapp, 'html_url') }}{{ $ghapp->accountName() ? ' · '.$ghapp->accountName() : '' }}
                             </p>
                         </div>
                     </button>
@@ -159,10 +159,10 @@
 
                         @if ($build_pack === 'dockercompose')
                             <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
-                                file="docker_compose_location" fileLabel="Compose file"
+                                file="docker_compose_location" fileLabel="Compose file" compose
                                 defaultFile="/docker-compose.yaml" />
                         @else
-                            <x-forms.input wire:model="base_directory" label="Base directory"
+                            <x-forms.input id="base_directory" label="Base directory" placeholder="/"
                                 helper="Repository directory used as the build root." />
                         @endif
                     </div>

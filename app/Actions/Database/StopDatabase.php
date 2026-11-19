@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Actions\Server\CleanupDocker;
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\BaseModel;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -33,6 +34,7 @@ class StopDatabase
                 $removeContainer = false;
             }
 
+            NotifyResourceStoppedJob::expectStop($database);
             $this->stopContainer($database, $database->uuid, 30, $removeContainer);
 
             // Reset restart tracking when database is manually stopped

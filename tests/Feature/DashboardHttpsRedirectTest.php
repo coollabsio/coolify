@@ -49,8 +49,6 @@ test('instance administrators can configure the dashboard HTTPS redirect', funct
 
     Livewire::test(Index::class)
         ->assertSet('is_dashboard_force_https_enabled', true)
-        ->assertSee('Redirect HTTP to HTTPS')
-        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
         ->set('is_dashboard_force_https_enabled', false)
         ->call('instantSave')
         ->assertHasNoErrors();

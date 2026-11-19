@@ -28,7 +28,7 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-function mcpWriteToken(User $user, array $abilities = ['write']): string
+function mcpWriteToken(User $user, array $abilities = ['write', 'delete']): string
 {
     return $user->createToken('mcp-write', $abilities)->plainTextToken;
 }

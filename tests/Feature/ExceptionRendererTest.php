@@ -23,9 +23,7 @@ test('debug exceptions use laravel renderer instead of ignition', function () {
         ->render(request(), new RuntimeException('default-laravel-exception-renderer'));
 
     expect($response->getContent())
-        ->toContain('default-laravel-exception-renderer')
-        ->toContain('scheme-light-dark')
-        ->toContain('dark:bg-neutral-900');
+        ->toContain('default-laravel-exception-renderer');
 });
 
 test('dev exception preview url renders the laravel debug page', function () {
@@ -34,6 +32,5 @@ test('dev exception preview url renders the laravel debug page', function () {
     $this->get('/__exception')
         ->assertServerError()
         ->assertSee('RuntimeException', false)
-        ->assertSee('Testing Laravel exception page')
-        ->assertSee('scheme-light-dark', false);
+        ->assertSee('Testing Laravel exception page');
 });

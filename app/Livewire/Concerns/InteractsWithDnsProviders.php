@@ -154,6 +154,28 @@ trait InteractsWithDnsProviders
         return true;
     }
 
+    /**
+     * Configures DNS for the hostnames that a domain edit added, like configureDnsAfterDomainAdd() does for a new domain.
+     *
+     * @param  array<int, string>  $urls  the URLs of the edit that need a DNS check
+     * @param  array<int, string>  $previousHostnames  the hostnames of the resource before the edit
+     * @return array<int, string> the URLs that still need a DNS check
+     */
+    protected function configureDnsAfterDomainEdit(array $urls, array $previousHostnames): array
+    {
+        $addedUrls = array_values(array_filter($urls, function (string $url) use ($previousHostnames): bool {
+            $hostname = parse_url($url, PHP_URL_HOST);
+
+            return is_string($hostname) && ! in_array(strtolower($hostname), $previousHostnames, true);
+        }));
+
+        if ($addedUrls === [] || ! $this->configureDnsAfterDomainAdd($addedUrls)) {
+            return $urls;
+        }
+
+        return array_values(array_diff($urls, $addedUrls));
+    }
+
     public function openManualDnsRecords(): void
     {
         $this->authorizeDnsProviderChange();
@@ -230,11 +252,16 @@ trait InteractsWithDnsProviders
 
     protected function markDnsManaged(string $hostname, string $credential): void
     {
+        $this->markDnsStatus($hostname, 'ok', "DNS record created through {$credential}.");
+    }
+
+    private function markDnsStatus(string $hostname, string $status, string $message): void
+    {
         foreach ($this->domainRows as $index => $row) {
             $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
             if (is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname)) {
-                $this->domainRows[$index]['dns_status'] = 'ok';
-                $this->domainRows[$index]['dns_message'] = "DNS record created through {$credential}.";
+                $this->domainRows[$index]['dns_status'] = $status;
+                $this->domainRows[$index]['dns_message'] = $message;
                 $this->domainRows[$index]['checked_at'] = now()->toIso8601String();
             }
         }
@@ -249,6 +276,8 @@ trait InteractsWithDnsProviders
         if (! auth()->user()?->can('update', $this->dnsResource())) {
             return;
         }
+
+        $event = $this->teamChannelPayload($event);
 
         if (! is_string($event['hostname'] ?? null) || ! is_string($event['resourceType'] ?? null)
             || ! is_scalar($event['resourceId'] ?? null) || ! is_bool($event['successful'] ?? null)
@@ -270,6 +299,17 @@ trait InteractsWithDnsProviders
             return;
         }
 
+        $conflict = $event['conflict'] ?? null;
+        if (is_array($conflict) && is_numeric($conflict['zone_id'] ?? null) && is_string($conflict['record_id'] ?? null)
+            && is_string($conflict['current'] ?? null) && is_string($conflict['proposed'] ?? null)) {
+            $this->dnsProviderConflicts[strtolower($event['hostname']).'|'.(int) $conflict['zone_id']] = [
+                'record_id' => $conflict['record_id'], 'current' => $conflict['current'], 'proposed' => $conflict['proposed'],
+            ];
+            $this->loadDnsProviderProposals();
+            $this->showDnsProviderModal = true;
+        }
+
+        $this->markDnsStatus($event['hostname'], 'failed', $event['message']);
         $this->dispatch('error', "DNS record could not be added for {$event['hostname']}: {$event['message']}");
     }
 
@@ -397,33 +437,15 @@ trait InteractsWithDnsProviders
             ->whereHas('integrationToken', fn ($query) => $query->where('team_id', $this->dnsTeamId()))->first();
     }
 
-    /**
-     * Server addresses that a DNS provider may publish. Private, reserved, CGNAT, and link-local addresses are excluded:
-     * a public DNS record must not expose them, and the record would not be reachable anyway.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     protected function publicServerIpsForDnsProvider(): array
     {
-        return array_values(array_filter(
-            $this->serverIpsForDnsHints(),
-            fn (?string $address): bool => is_string($address) && DnsRecordHints::isPublicAddress($address),
-        ));
+        return $this->serverDnsAddresses()->publicAddresses();
     }
 
-    /**
-     * Content of a DNS record for this resource: one of its public server addresses (IPv4 or IPv6),
-     * the first one when none is requested. Any other address is rejected.
-     */
     protected function dnsRecordContent(?string $requested = null): ?string
     {
-        $addresses = $this->publicServerIpsForDnsProvider();
-
-        if ($requested === null) {
-            return $addresses[0] ?? null;
-        }
-
-        return collect($addresses)->first(fn (string $address): bool => DnsRecordHints::sameAddress($address, $requested));
+        return $this->serverDnsAddresses()->recordContent($requested);
     }
 
     abstract protected function persistDomainDnsStatuses(): void;

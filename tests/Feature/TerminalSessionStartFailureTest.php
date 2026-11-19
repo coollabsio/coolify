@@ -15,6 +15,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -140,6 +141,25 @@ describe('Terminal::sendTerminalCommand', function () {
             ->assertNotDispatched(Terminal::SESSION_FAILED_EVENT);
     });
 
+    it('records the client IP in the terminal token like other audit events', function (string $peer, string $expectedIp) {
+        $component = Livewire::test(Terminal::class);
+        $request = Request::create('/', server: [
+            'REMOTE_ADDR' => $peer,
+            'HTTP_X_FORWARDED_FOR' => '203.0.113.42',
+        ]);
+        $request->setTrustedProxies([$peer], Request::HEADER_X_FORWARDED_FOR);
+        app()->instance('request', $request);
+
+        $component->instance()->sendTerminalCommand(false, $this->server->name, $this->server->uuid);
+        $events = \Livewire\store($component->instance())->get('dispatched');
+        $token = $events[0]->serialize()['params'][0];
+
+        expect(Cache::get('terminal-session:'.$token)['client_ip'])->toBe($expectedIp);
+    })->with([
+        'behind the local proxy' => ['127.0.0.1', '203.0.113.42'],
+        'forwarded header from a public peer' => ['198.51.100.7', '198.51.100.7'],
+    ]);
+
     it('reports a stopped container instead of leaving the terminal connecting', function () {
         fakeTerminalContainer('exited');
 
@@ -176,6 +196,18 @@ describe('Terminal::sendTerminalCommand', function () {
 
         Livewire::test(Terminal::class)
             ->call('sendTerminalCommand', false, $this->server->name, $this->server->uuid)
+            ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: 'Terminal access is disabled on this server.')
+            ->assertNotDispatched('send-terminal-token');
+
+        Process::assertNothingRan();
+    });
+
+    it('reports a server transferred to another instance without running commands on it', function () {
+        Process::fake();
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+
+        Livewire::test(Terminal::class)
+            ->call('sendTerminalCommand', true, 'app-container', $this->server->uuid)
             ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: 'Terminal access is disabled on this server.')
             ->assertNotDispatched('send-terminal-token');
 

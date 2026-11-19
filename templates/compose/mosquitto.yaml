@@ -7,7 +7,7 @@
 
 services:
   mosquitto:
-    image: eclipse-mosquitto
+    image: eclipse-mosquitto:2.1.2-alpine
     environment:
       - SERVICE_URL_MOSQUITTO_1883
       - MQTT_USERNAME=${SERVICE_USER_MOSQUITTO}

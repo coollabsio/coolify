@@ -7,7 +7,7 @@
 
 services:
   emby:
-    image: lscr.io/linuxserver/emby:latest
+    image: lscr.io/linuxserver/emby:4.10.2
     environment:
       - SERVICE_URL_EMBY_8096
       - PUID=1000

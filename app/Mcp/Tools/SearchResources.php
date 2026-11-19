@@ -7,7 +7,6 @@ use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -82,7 +81,7 @@ class SearchResources extends Tool
         }
 
         if (in_array('server', $typesList, true)) {
-            Server::whereTeamId($teamId)
+            $this->visibleServers($request, $teamId)
                 ->where(function ($q) use ($like, $needle) {
                     $q->whereRaw('LOWER(name) LIKE ?', [$like])
                         ->orWhere('uuid', $needle)

@@ -53,7 +53,7 @@ class ConfigurationChecker extends Component
     }
 
     /**
-     * Members must never see environment variable values or Compose content, so redact
+     * Members must never see environment variable values, Compose content, commands, or configuration, so redact
      * those changes before they are serialized to the browser.
      *
      * @param  array<int, array<string, mixed>>  $changes
@@ -67,8 +67,9 @@ class ConfigurationChecker extends Component
 
         return collect($changes)
             ->map(function (array $change): array {
+                $key = str((string) data_get($change, 'key'))->afterLast('.')->value();
                 $isHidden = data_get($change, 'section') === 'environment'
-                    || str((string) data_get($change, 'key'))->afterLast('.')->value() === 'docker_compose_raw';
+                    || in_array($key, [...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES, 'docker_compose_raw', 'dockerfile', 'custom_labels'], true);
                 if (! $isHidden) {
                     return $change;
                 }
@@ -106,9 +107,8 @@ class ConfigurationChecker extends Component
 
             $array = $diff->toArray();
 
-            // Fail closed: only owners/admins may see unlocked env values.
-            $teamId = $this->resource->team()?->id;
-            $redactEnvironment = is_null($teamId) || ! (bool) auth()->user()?->isAdminOfTeam($teamId);
+            // Fail closed: only users who can read the secrets of the application see unlocked env values.
+            $redactEnvironment = ! (auth()->user()?->can('viewSensitive', $this->resource) ?? false);
             $array['changes'] = $this->redactHiddenChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 

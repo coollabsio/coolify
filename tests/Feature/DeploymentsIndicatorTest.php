@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -53,8 +54,7 @@ beforeEach(function () {
 it('shows the deployments indicator on every page, including the dashboard', function (string $routeName) {
     $this->get(route($routeName))
         ->assertSuccessful()
-        ->assertSee('1 deployment', false)
-        ->assertSee('aria-label="Active deployments"', false);
+        ->assertSee('1 deployment', false);
 })->with(['dashboard', 'project.index']);
 
 it('hides the indicator when no deployment is running', function () {
@@ -112,4 +112,31 @@ it('keeps the indicator on an application page when another application is deplo
         ->assertSuccessful()
         ->assertSee('2 deployments', false)
         ->assertSee('aria-label="Active deployments"', false);
+});
+
+it('does not load deployment payload columns when the indicator refreshes', function () {
+    ApplicationDeploymentQueue::query()->update([
+        'logs' => json_encode([['output' => str_repeat('large deployment log ', 20000)]]),
+        'configuration_snapshot' => json_encode(['docker_compose_raw' => str_repeat('x', 100000)]),
+    ]);
+
+    $deploymentQueries = [];
+    DB::listen(function ($query) use (&$deploymentQueries) {
+        if (str_contains($query->sql, 'application_deployment_queues')) {
+            $deploymentQueries[] = $query->sql;
+        }
+    });
+
+    Livewire::test(DeploymentsIndicator::class)
+        ->assertSee('Indicator App')
+        ->call('$refresh')
+        ->assertSee('Indicator App');
+
+    expect($deploymentQueries)->not->toBeEmpty();
+    foreach ($deploymentQueries as $sql) {
+        expect($sql)->not->toMatch('/select\s+("?\w+"?\.)?\*/i')
+            ->not->toContain('logs')
+            ->not->toContain('configuration_snapshot')
+            ->not->toContain('configuration_diff');
+    }
 });

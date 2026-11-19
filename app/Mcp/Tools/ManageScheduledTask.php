@@ -19,15 +19,15 @@ class ManageScheduledTask extends RestActionTool
             'create' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks',
                 'service' => 'services/{uuid}/scheduled-tasks',
-            ], 'ability' => 'write', 'description' => 'create a scheduled task (data: name, command, frequency, container, timeout, enabled; an enabled task needs deploy ability)'],
+            ], 'ability' => 'write', 'description' => 'create a scheduled task (data: name, command, frequency, container, timeout, use_shell, enabled; an enabled task needs deploy ability)'],
             'update' => ['method' => 'PATCH', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}',
-            ], 'ability' => 'write', 'description' => 'update a scheduled task (data: any of name, command, frequency, container, timeout, enabled; an enabled task needs deploy ability)'],
+            ], 'ability' => 'write', 'description' => 'update a scheduled task (data: any of name, command, frequency, container, timeout, use_shell, enabled; an enabled task needs deploy ability)'],
             'delete' => ['method' => 'DELETE', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}',
-            ], 'ability' => 'write', 'confirm' => true, 'description' => 'delete a scheduled task'],
+            ], 'ability' => 'delete', 'confirm' => true, 'description' => 'delete a scheduled task'],
             'execute' => ['method' => 'POST', 'paths' => [
                 'application' => 'applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
                 'service' => 'services/{uuid}/scheduled-tasks/{task_uuid}/execute',
@@ -45,6 +45,6 @@ class ManageScheduledTask extends RestActionTool
 
     protected function dataDescription(): string
     {
-        return 'Request body, same fields as the REST API: name, command, frequency (cron or every_minute, hourly, daily, weekly, monthly, yearly), container, timeout (seconds), enabled.';
+        return 'Request body, same fields as the REST API: name, command, frequency (cron or every_minute, hourly, daily, weekly, monthly, yearly), container, timeout (seconds), use_shell (false runs the command without sh -c, for containers without a shell), enabled.';
     }
 }

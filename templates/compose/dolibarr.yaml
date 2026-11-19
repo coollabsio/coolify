@@ -7,7 +7,7 @@
 
 services:
   dolibarr:
-    image: dolibarr/dolibarr:latest
+    image: dolibarr/dolibarr:24.0.2
     environment:
       - SERVICE_URL_DOLIBARR_80
       - WWW_USER_ID=${WWW_USER_ID:-1000}
@@ -33,7 +33,7 @@ services:
       retries: 15
 
   mariadb:
-    image: mariadb:latest
+    image: mariadb:13.0.2
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE:-dolibarr-db}
       - MYSQL_USER=${SERVICE_USER_MYSQL}

@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Traits\HasS3Replicas;
+use App\Traits\RecordsWorkerHost;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScheduledVolumeBackupExecution extends BaseModel
 {
-    use HasS3Replicas;
+    use HasS3Replicas, RecordsWorkerHost;
 
     protected $fillable = [
         'uuid',

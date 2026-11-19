@@ -205,11 +205,11 @@ class StartMysql
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
 

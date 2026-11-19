@@ -1,21 +1,25 @@
-# documentation: https://github.com/wg-easy/wg-easy
+# documentation: https://wg-easy.github.io/wg-easy/latest/
 # slogan: The easiest way to run WireGuard VPN + Web-based Admin UI.
 # category: vpn
 # tags: wireguard,vpn,web,admin
 # logo: svgs/wireguard.svg
-# port: 8000
+# port: 51821
 
 services:
   wg-easy:
-    image: ghcr.io/wg-easy/wg-easy:latest
+    image: ghcr.io/wg-easy/wg-easy:15.5.0
     environment:
       - SERVICE_URL_WIREGUARDEASY_51821
-      - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
-      - LANG=${LANG:-en}
-      - WG_PORT=51820
-      - _PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - INIT_ENABLED=true
+      - INIT_USERNAME=${SERVICE_USER_ADMIN}
+      - INIT_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - INIT_HOST=${SERVICE_FQDN_WIREGUARDEASY}
+      - INIT_PORT=51820
+      - INSECURE=${INSECURE:-false}
+      - DISABLE_IPV6=${DISABLE_IPV6:-true}
     volumes:
       - wg-easy:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
     ports:
       - 51820:51820/udp
     cap_add:
@@ -24,9 +28,3 @@ services:
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv4.ip_forward=1
-    entrypoint:
-      - /bin/bash
-      - -c
-      - |
-        eval "wgpw '${SERVICE_PASSWORD_ADMIN}' > /pass-hash"
-        eval "$(cat /pass-hash) dumb-init node server.js"

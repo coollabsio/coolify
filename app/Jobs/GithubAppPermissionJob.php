@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
@@ -29,12 +30,14 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
         try {
             $github_access_token = generateGithubJwt($this->github_app);
 
-            $response = Http::GitSource($this->github_app->api_url)->withHeaders([
+            $github = Http::GitSource($this->github_app->api_url)->withHeaders([
                 'Authorization' => "Bearer $github_access_token",
                 'Accept' => 'application/vnd.github+json',
-            ])->get("{$this->github_app->api_url}/app");
+            ]);
+            $response = $github->get("{$this->github_app->api_url}/app");
 
             if (! $response->successful()) {
+                assertGithubClockInSync($response);
                 throw new \RuntimeException('Failed to fetch GitHub app permissions: '.$response->body());
             }
 
@@ -44,6 +47,12 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->contents = data_get($permissions, 'contents');
             $this->github_app->metadata = data_get($permissions, 'metadata');
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
+            $installation = $this->installation($github);
+            // GET /app returns the permissions the App requests. A new permission counts only after the installation approves it.
+            $this->github_app->deployments = data_get($installation, 'permissions.deployments');
+            if ($installation) {
+                $this->github_app->installation_account = data_get($installation, 'account.login');
+            }
             $this->github_app->administration = data_get($permissions, 'administration');
             $this->github_app->organization_self_hosted_runners = data_get($permissions, 'organization_self_hosted_runners');
             $this->github_app->actions = data_get($permissions, 'actions');
@@ -56,5 +65,22 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function installation(PendingRequest $github): ?array
+    {
+        if (! $this->github_app->installation_id) {
+            return null;
+        }
+
+        $response = $github->get("{$this->github_app->api_url}/app/installations/{$this->github_app->installation_id}");
+        if (! $response->successful()) {
+            throw new \RuntimeException('Failed to fetch GitHub app installation permissions: '.$response->body());
+        }
+
+        return $response->json();
     }
 }

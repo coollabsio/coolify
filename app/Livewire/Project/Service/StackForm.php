@@ -135,7 +135,7 @@ class StackForm extends Component
         $lockedKeys = $this->lockedFieldKeys();
         $this->fields = $this->fields->map(function ($field) use ($lockedKeys) {
             $field['isLocked'] = $lockedKeys->contains(data_get($field, 'key'));
-            if ($field['isLocked'] || ($this->isPasswordHiddenForMember && data_get($field, 'isPassword'))) {
+            if ($field['isLocked'] || $this->isPasswordHiddenForMember) {
                 $field['value'] = null;
             }
 
@@ -183,18 +183,24 @@ class StackForm extends Component
             $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
+            $isComposeChanged = $this->service->isDirty('docker_compose_raw');
 
             // Validate for command injection BEFORE any database operations
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            // Use transaction to ensure atomicity - if parse fails, save is rolled back
-            DB::transaction(function () {
+            // Use transaction to ensure atomicity - if parse or the Compose check fails, save is rolled back
+            DB::transaction(function () use ($isComposeChanged) {
                 $this->service->save();
-                $lockedKeys = $this->lockedFieldKeys();
-                $this->service->saveExtraFields(
-                    $this->fields->reject(fn ($field) => $lockedKeys->contains(data_get($field, 'key')))
-                );
+                if (auth()->user()->can('manageEnvironment', $this->service)) {
+                    $lockedKeys = $this->lockedFieldKeys();
+                    $this->service->saveExtraFields(
+                        $this->fields->reject(fn ($field) => $lockedKeys->contains(data_get($field, 'key')))
+                    );
+                }
                 $this->service->parse();
+                if ($isComposeChanged) {
+                    $this->service->ensureDockerComposeAccepted();
+                }
             });
             // Refresh and write files after a successful commit
             $this->service->refresh();

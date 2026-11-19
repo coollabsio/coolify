@@ -162,7 +162,7 @@ test('buildRestoreCommand handles MySQL without dumpAll', function () {
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toStartWith("backup='/tmp/test.dump'");
-    expect($result)->toContain('stream | mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE');
+    expect($result)->toContain('stream | mysql $client_safety -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE');
     expect($result)->not->toContain("< '/tmp/test.dump'");
 });
 
@@ -173,7 +173,7 @@ test('buildRestoreCommand handles MariaDB without dumpAll', function () {
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toStartWith("backup='/tmp/test.dump'");
-    expect($result)->toContain('stream | mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE');
+    expect($result)->toContain('stream | mariadb $client_safety -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE');
     expect($result)->not->toContain("< '/tmp/test.dump'");
 });
 

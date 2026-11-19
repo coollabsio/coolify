@@ -28,6 +28,7 @@ services:
       LOCKED_TOKEN: ""
       PLAIN_TOKEN: ""
       TEAM_SECRET: '{{team.TEAM_SECRET}}'
+      SERVER_SECRET: '{{server.SERVER_SECRET}}'
 YAML;
 
 beforeEach(function () {
@@ -49,6 +50,15 @@ beforeEach(function () {
         'key' => 'TEAM_SECRET',
         'value' => 'team-shared-locked-secret',
         'team_id' => $this->team->id,
+        'is_shown_once' => true,
+    ]);
+
+    SharedEnvironmentVariable::create([
+        'type' => 'server',
+        'key' => 'SERVER_SECRET',
+        'value' => 'server-shared-locked-secret',
+        'team_id' => $this->team->id,
+        'server_id' => $server->id,
         'is_shown_once' => true,
     ]);
 
@@ -92,6 +102,7 @@ function expectLockedValuesRedacted(?string $text): void
 {
     expect($text)->not->toContain('env-locked-secret-value')
         ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret')
         ->toContain('<locked>')
         ->toContain('plain-visible-value');
 }
@@ -101,7 +112,8 @@ function expectStoredComposeKeepsRealValues(Application|Service $resource): void
     expect($resource->fresh()->docker_compose)
         ->not->toContain('<locked>')
         ->toContain('env-locked-secret-value')
-        ->toContain('team-shared-locked-secret');
+        ->toContain('team-shared-locked-secret')
+        ->toContain('server-shared-locked-secret');
 }
 
 it('writes the locked values into the generated compose that deployments use', function (string $resource) {
@@ -117,7 +129,8 @@ it('hides locked values in the service compose that an owner sees', function (st
     expectLockedValuesRedacted($livewire->get('dockerCompose'));
     expect(json_encode($livewire->snapshot).$livewire->html())
         ->not->toContain('env-locked-secret-value')
-        ->not->toContain('team-shared-locked-secret');
+        ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret');
 })->with(['stack form' => [StackForm::class], 'compose editor' => [EditCompose::class]]);
 
 it('hides locked values in the application compose that an owner sees', function () {
@@ -129,7 +142,8 @@ it('hides locked values in the application compose that an owner sees', function
     expectLockedValuesRedacted($livewire->get('dockerCompose'));
     expect(json_encode($livewire->snapshot).$livewire->html())
         ->not->toContain('env-locked-secret-value')
-        ->not->toContain('team-shared-locked-secret');
+        ->not->toContain('team-shared-locked-secret')
+        ->not->toContain('server-shared-locked-secret');
 });
 
 it('keeps the real generated compose when an owner saves the service stack form', function () {
@@ -164,3 +178,24 @@ it('hides locked values in the generated compose returned by the API', function 
     expectLockedValuesRedacted($response->json('docker_compose'));
     expect($response->json('docker_compose_raw'))->toBe(LOCKED_COMPOSE_RAW);
 })->with(['service', 'application']);
+
+it('hides locked values in the generated compose returned by the resource list API', function () {
+    $response = $this->withToken(lockedComposeApiToken())->getJson('/api/v1/resources')->assertOk();
+
+    foreach ([$this->service, $this->application] as $resource) {
+        expectLockedValuesRedacted(collect($response->json())->firstWhere('uuid', $resource->uuid)['docker_compose']);
+    }
+});
+
+it('hides locked values in the generated compose returned by the environment API', function (string $relation, string $resource) {
+    $response = $this->withToken(lockedComposeApiToken())
+        ->getJson("/api/v1/projects/{$this->project->uuid}/{$this->environment->uuid}")
+        ->assertOk();
+
+    expectLockedValuesRedacted($response->json("{$relation}.0.docker_compose"));
+    expect($response->json("{$relation}.0.uuid"))->toBe($this->{$resource}->uuid)
+        ->and($response->json("{$relation}.0.docker_compose_raw"))->toBe(LOCKED_COMPOSE_RAW);
+})->with([
+    'service' => ['services', 'service'],
+    'application' => ['applications', 'application'],
+]);

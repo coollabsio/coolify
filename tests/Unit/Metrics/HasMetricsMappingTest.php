@@ -67,11 +67,24 @@ it('returns null for a metric when metrics are unavailable', function () {
     expect($d->getLoadMetrics(5))->toBeNull();
 });
 
-it('does not use non-root mounts when root disk samples are missing', function () {
+it('does not guess between several non-root mounts when root disk samples are missing', function () {
     $double = new MetricsMappingDouble;
-    $double->rowsByType['disk'] = [['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90]];
+    $double->rowsByType['disk'] = [
+        ['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90],
+        ['time' => 1000, 'mount' => '/home', 'usedPercent' => 20],
+    ];
 
     expect($double->getDiskMetrics(5))->toBe([]);
+});
+
+it('uses the only reported disk for disk metrics when it has another mount name', function () {
+    $double = new MetricsMappingDouble;
+    $double->rowsByType['disk'] = [
+        ['time' => 1000, 'mount' => '/home', 'usedPercent' => 19],
+        ['time' => 2000, 'mount' => '/home', 'usedPercent' => 20],
+    ];
+
+    expect($double->getDiskMetrics(5))->toBe([[1000, 19.0], [2000, 20.0]]);
 });
 
 it('uses the Sentinel data mount for disk metrics when no root mount is reported', function () {

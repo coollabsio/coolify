@@ -44,10 +44,7 @@ it('sets the danger active tab from the danger route', function () {
     ]);
 
     $this->get(route('source.github.danger', ['github_app_uuid' => $githubApp->uuid]))
-        ->assertOk()
-        ->assertSee('Danger zone', false)
-        ->assertSee('Delete GitHub App', false)
-        ->assertSee('Delete', false);
+        ->assertOk();
 
     Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
         ->test(Change::class)

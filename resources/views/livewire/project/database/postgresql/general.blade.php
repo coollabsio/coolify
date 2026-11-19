@@ -42,9 +42,11 @@
             <x-application.settings-subsection id="initialization-section" title="Initialization" helper="Configure the options used when PostgreSQL creates its initial data directory.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input label="Initial database arguments" id="postgresInitdbArgs"
-                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database" />
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
                     <x-forms.input label="Host authentication method" id="postgresHostAuthMethod"
-                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database" />
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
                 </div>
             </x-application.settings-subsection>
         </x-application.settings-section>
@@ -90,11 +92,15 @@
 
         <x-application.settings-section id="container-section" title="Container"
             description="Docker options, configuration, and log forwarding for the database container.">
-            <x-forms.input
-                helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
-                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
-                id="customDockerRunOptions" label="Custom Docker options" canGate="update"
-                :canResource="$database" />
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Custom Docker options" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input
+                    helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                    id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                    :canResource="$database" />
+            @endif
             <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the PostgreSQL configuration used by this container.">
                 @if ($isPasswordHiddenForMember)
                     <x-forms.input label="Custom PostgreSQL configuration" disabled value="Hidden (only admins can view)" />

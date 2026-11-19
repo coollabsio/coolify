@@ -54,6 +54,15 @@
                                     {{ $currentVersion }} <span class="mx-0.5">&rarr;</span>
                                     {{ $latestVersion }}
                                 </p>
+                                <p class="mt-0.5 text-[12px] leading-4"
+                                    style="color: var(--coollabs-subtle)">
+                                    {{ $updateChannel === 'custom' ? 'Custom image' : ucfirst($updateChannel) . ' channel' }}
+                                    <span class="mx-0.5">&middot;</span>
+                                    <a href="{{ route('settings.updates') }}" {{ wireNavigate() }}
+                                        @click="modalOpen=false"
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light">Change
+                                        channel</a>
+                                </p>
                             </div>
                             <button type="button" x-show="!showProgress || upgradeError"
                                 @click="upgradeError ? closeErrorModal() : modalOpen=false"
@@ -63,8 +72,7 @@
                             </button>
                         </header>
 
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             {{-- Progress View --}}
                             <template x-if="showProgress">
                                 <div class="flex flex-col gap-4">
@@ -239,6 +247,8 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
+                // Coolify restarts during the upgrade, so do not show failed Livewire requests as error pages.
+                window.coolifyUpgradeInProgress = true;
                 // Trigger server-side upgrade script via Livewire
                 this.$wire.$call('upgrade');
                 // Start client-side status polling
@@ -454,6 +464,7 @@
                     this.beforeUnloadHandler = null;
                 }
 
+                window.coolifyUpgradeInProgress = false;
                 this.upgradeError = true;
                 this.currentStatus = `Error: ${message}`;
             },

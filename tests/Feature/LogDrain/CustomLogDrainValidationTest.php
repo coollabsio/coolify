@@ -24,7 +24,7 @@ const SAFE_CUSTOM_LOG_DRAIN_CONFIG = <<<'CONF'
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
+    Exclude log ^127\.0\.0\.1\s
 [OUTPUT]
     Name  http
     Match *
@@ -97,6 +97,14 @@ describe('ValidFluentBitConfig rule', function () {
         'plugins_file key' => "[SERVICE]\n    Plugins_File /parsers.conf\n",
         'malformed section header' => "[FILTER] x\n    Name lua\n",
         'key outside a section' => "Name lua\n",
+    ]);
+
+    test('rejects a config without the forward input that receives the container logs', function (string $config) {
+        expect((new ValidFluentBitConfig)->check($config))->toContain('Name forward');
+    })->with([
+        'output only' => "[SERVICE]\n    Flush 1\n[OUTPUT]\n    Name  http\n    Match *\n",
+        'other input only' => "[INPUT]\n    Name dummy\n[OUTPUT]\n    Name stdout\n    Match *\n",
+        'forward named outside an input' => "[INPUT]\n    Name dummy\n[OUTPUT]\n    Name forward\n    Match *\n",
     ]);
 
     test('rejects parser files that are not parser declarations', function (string $parsers) {

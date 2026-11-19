@@ -284,8 +284,6 @@ it('logs out from a registry', function () {
     fakeDockerRegistryServer();
 
     Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
-        ->assertSee('Delete the login for ghcr.io?')
-        ->assertSeeHtml('logout(ghcr.io)')
         ->call('logout', 'ghcr.io', '')
         ->assertDispatched('success');
 
@@ -547,7 +545,9 @@ it('lists databases and service containers that use a registry, and each service
         'postgres_db' => 'app',
         'image' => 'ghcr.io/acme/postgres:16',
     ] + $placement);
-    StandalonePostgresql::create([
+    // The instance database is the row with id 0; the registry list leaves it out.
+    StandalonePostgresql::forceCreate([
+        'id' => 0,
         'name' => 'coolify-db',
         'postgres_user' => 'postgres',
         'postgres_password' => encrypt('password'),

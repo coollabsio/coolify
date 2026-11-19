@@ -63,6 +63,8 @@ class GitlabPrivateRepository extends Component
 
     private function getGitlabApp(): GitlabApp
     {
+        $this->authorize('useTeamCredentials');
+
         return GitlabApp::private()->where('id', $this->gitlab_app_id)->firstOrFail();
     }
 
@@ -161,7 +163,7 @@ class GitlabPrivateRepository extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,
@@ -188,6 +190,7 @@ class GitlabPrivateRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             $gitlab_app = $this->getGitlabApp();
 

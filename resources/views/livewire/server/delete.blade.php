@@ -21,22 +21,47 @@
                             This server was transferred to another Coolify instance. Only the records on this instance
                             are deleted, also the records of its resources. The server, its containers, and its data
                             stay as they are.
-                        @elseif ($server->definedResources()->count() > 0)
+                        @elseif ($resourcesToDelete->isNotEmpty())
                             It currently contains managed resources. Enable force deletion in the confirmation only
                             if those resources should also be removed.
                         @endif
+                        </p>
+                        @if (! $server->isTransferredAway() && $resourcesToDelete->isNotEmpty())
+                            <div>
+                                <p>Deleted with "Delete all resources":</p>
+                                <ul class="list-disc pl-5">
+                                    @foreach ($resourcesToDelete as $resource)
+                                        <li>{{ $resource->name }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                        @if ($detachedApplications->isNotEmpty())
+                            <div>
+                                <p>Removed only from this server (not deleted):</p>
+                                <ul class="list-disc pl-5">
+                                    @foreach ($detachedApplications as $application)
+                                        <li>{{ $application->name }} will keep running on {{ data_get($application, 'destination.server.name') }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                         @if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway())
+                            <p>
                             Hostinger deletes the VPS only at the end of its paid period, and only if you select this in the confirmation dialog.
                             <a class="underline" href="https://hpanel.hostinger.com/" target="_blank"
                                 rel="noopener noreferrer">Manage the VPS and billing in hPanel.</a>
+                            </p>
                         @endif
-                        </p>
                         <p>Type the server name in the confirmation dialog to continue.</p>
                         <x-slot:action>
                         @php
                             $deleteActions = $server->isTransferredAway()
                                 ? ['This server and the records of its resources will be permanently deleted from this Coolify instance. Nothing on the server changes.']
                                 : ['This server will be permanently deleted from Coolify.'];
+                            foreach ($detachedApplications as $application) {
+                                $deleteActions[] = "Application {$application->name} will be removed from this server and will keep running on ".data_get($application, 'destination.server.name').'.';
+                            }
                             $deleteWarningMessage = null;
                             if ($server->isTransferredAway()) {
                                 $deleteWarningMessage = '<strong>This removes the option to undo the transfer.</strong><br>'

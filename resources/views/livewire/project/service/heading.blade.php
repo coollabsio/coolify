@@ -1,4 +1,7 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$service" :wire:key="'star-mobile-'.$service->getMorphClass().'-'.$service->uuid" />
+    @endteleport
     @php
         $serviceStatus = str($service->status ?? 'exited');
         $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');

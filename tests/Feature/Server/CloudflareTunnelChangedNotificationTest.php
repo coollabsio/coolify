@@ -5,6 +5,7 @@ use App\Listeners\CloudflareTunnelChangedNotification;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -41,9 +42,25 @@ it('uses sudo for the health check on a non-root server', function () {
 
     (new CloudflareTunnelChangedNotification)->handle(new CloudflareTunnelChanged([
         'server_id' => $this->server->id,
+        'team_id' => $this->server->team_id,
         'ssh_domain' => 'ssh.example.com',
     ]));
 
     expect($this->server->settings->refresh()->is_cloudflare_tunnel)->toBeTruthy()
         ->and($this->server->refresh()->ip)->toBe('ssh.example.com');
 });
+
+it('ignores a server that is not in the event team', function (string $case) {
+    Event::fake();
+    Process::fake();
+    $data = match ($case) {
+        'other team' => ['server_id' => $this->server->id, 'team_id' => Team::factory()->create()->id, 'ssh_domain' => 'ssh.example.com'],
+        'no team' => ['server_id' => $this->server->id, 'ssh_domain' => 'ssh.example.com'],
+    };
+
+    (new CloudflareTunnelChangedNotification)->handle(new CloudflareTunnelChanged($data));
+
+    Process::assertNothingRan();
+    expect($this->server->settings->refresh()->is_cloudflare_tunnel)->toBeFalsy()
+        ->and($this->server->refresh()->ip)->not->toBe('ssh.example.com');
+})->with(['other team', 'no team']);

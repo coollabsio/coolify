@@ -132,7 +132,7 @@ trait TracksDeliveryFailures
 
             $admins = $this->team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
             foreach ($admins as $admin) {
-                send_user_an_email($mail, $admin->email);
+                send_user_an_email($mail, $admin->email, asNotification: true);
             }
         } catch (Throwable $e) {
             Log::warning('Failed to send notification channel disabled email: '.$e->getMessage());

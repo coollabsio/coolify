@@ -283,6 +283,6 @@ class CloudflareTunnelService
 
     private function client(IntegrationToken $token): PendingRequest
     {
-        return Http::withToken($token->token)->acceptJson()->connectTimeout(5)->timeout(15);
+        return Http::withToken($token->token)->acceptJson();
     }
 }

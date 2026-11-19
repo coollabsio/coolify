@@ -16,18 +16,23 @@ use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\VolumeBackup\BackupSuccess;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Server::flushIdentityMap();
     Notification::fake();
+    Sleep::fake();
     config(['broadcasting.default' => 'null']);
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
 });
@@ -90,6 +95,24 @@ function fakeMultiDestinationS3Disks(): void
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
 }
 
+it('sizes the upload parts of a large archive for providers that allow only 1000 parts', function () {
+    [$backup] = createMultiDestinationVolumeBackup();
+    fakeMultiDestinationS3Disks();
+    fakeRemoteProcesses([
+        '*du -b*' => (string) (19 * 1024 * 1024 * 1024),
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    expect(ScheduledVolumeBackupExecution::query()->sole()->s3_uploaded)->toBeTrue();
+    foreach (['first-bucket', 'second-bucket'] as $bucket) {
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker exec -e MC_UPLOAD_MULTIPART_SIZE='.(20 * 1024 * 1024).' ')
+            && str_contains(remoteProcessScript($process), ' mc cp ')
+            && str_contains(remoteProcessScript($process), "temporary/{$bucket}/"));
+    }
+});
+
 it('archives locally and uploads to every destination instead of streaming', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
     fakeMultiDestinationS3Disks();
@@ -144,6 +167,7 @@ it('signs each upload with the region of its destination', function () {
 
 it('keeps the local archive and cleans the partial upload when one destination fails', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
+    $backup->team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
     fakeMultiDestinationS3Disks();
     fakeRemoteProcesses([
         '*du -b*' => '128',
@@ -158,7 +182,7 @@ it('keeps the local archive and cleans the partial upload when one destination f
     $secondReplica = $execution->s3Replicas()->where('s3_storage_id', $second->id)->sole();
     Process::assertNotRan(fn ($process) => preg_match("/rm -f '[^']+\\.tar\\.gz'/", remoteProcessScript($process)) === 1);
     expect($execution->status)->toBe('success')
-        ->and($execution->message)->toContain('S3 upload failed: second storage:')
+        ->and($execution->message)->toContain('Storage upload failed: second storage:')
         ->and($execution->s3_uploaded)->toBeFalse()
         ->and($execution->s3_cleanup_pending)->toBeFalse()
         ->and($execution->local_storage_deleted)->toBeFalse()
@@ -167,6 +191,40 @@ it('keeps the local archive and cleans the partial upload when one destination f
         ->and($secondReplica->s3_uploaded)->toBeFalse()
         ->and($secondReplica->s3_storage_deleted)->toBeTrue()
         ->and($secondReplica->message)->not->toBeEmpty();
+    Notification::assertSentTo($backup->team, BackupSuccess::class, function (BackupSuccess $notification): bool {
+        $discord = $notification->toDiscord();
+
+        return $notification->uploadFailed
+            && $notification->via($notification->backup->team) === [DiscordChannel::class]
+            && $discord->title === ':cross_mark: Storage backup upload failed'
+            && $discord->color === DiscordMessage::errorColor()
+            && str_contains($discord->description, 'the upload to the backup storage failed')
+            && str_contains($discord->description, 'second storage: ')
+            && ! str_contains($discord->description, 'was successful')
+            && $notification->toWebhook()['upload_failed'] === true;
+    });
+});
+
+it('uploads again when the first upload to a destination fails', function () {
+    [$backup] = createMultiDestinationVolumeBackup();
+    fakeMultiDestinationS3Disks();
+    $firstBucketUploads = 0;
+    Process::fake(function ($process) use (&$firstBucketUploads) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'mc cp') && str_contains($script, 'temporary/first-bucket/') && ++$firstBucketUploads === 1) {
+            return Process::result(errorOutput: 'dial tcp: connect: network is unreachable', exitCode: 1);
+        }
+
+        return Process::result(output: str_contains($script, 'du -b') ? '128' : '');
+    });
+
+    (new VolumeBackupJob($backup))->handle();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($firstBucketUploads)->toBe(2)
+        ->and($execution->status)->toBe('success')
+        ->and($execution->message)->toBeNull()
+        ->and($execution->s3_uploaded)->toBeTrue();
 });
 
 it('applies S3 retention to each destination separately', function () {

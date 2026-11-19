@@ -421,7 +421,7 @@
                             on your target server for the specified user.
                         </p>
                         <p>
-                            <x-highlighted text="Key Format:" /> Supports RSA, ED25519, ECDSA, and DSA key types in OpenSSH
+                            <x-highlighted text="Key Format:" /> Supports ED25519, ECDSA, and RSA (2048 bits or more) key types in OpenSSH
                             format.
                         </p>
                     </x-slot:explanation>

@@ -71,10 +71,10 @@ it('builds proxy ensure commands with inspect and escaped create arguments', fun
     $server = proxyNetworkTestServer(serviceNetworks: [[$invalid, 'frontend']]);
 
     $commands = ensureProxyNetworksExist($server)->implode("\n");
-    $safeFrontend = escapeshellarg('frontend');
 
     expect($commands)
-        ->toContain("docker network inspect {$safeFrontend} >/dev/null 2>&1 || docker network create --attachable {$safeFrontend}")
+        ->toContain(dockerProxyNetworkEnsureCommand('frontend'))
+        ->toContain(dockerProxyNetworkEnsureCommand('coolify'))
         ->not->toContain('| grep');
 });
 

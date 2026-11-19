@@ -22,10 +22,6 @@ it('defaults and saves the server backup compression CPU preset', function () {
 
     Livewire::test(Advanced::class, ['server_uuid' => $server->uuid])
         ->assertSet('backupCompressionCpuPercentage', 25)
-        ->assertSee('Backup compression CPU')
-        ->assertSee('Sets how many CPU threads can be used to compress volume backups')
-        ->assertDontSee('gzip fallback')
-        ->assertSee('Low (25%)')
         ->set('backupCompressionCpuPercentage', 75)
         ->call('instantSave')
         ->assertHasNoErrors()

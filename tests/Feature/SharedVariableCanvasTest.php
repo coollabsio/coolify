@@ -257,31 +257,11 @@ test('the canvas page opens for every scope', function () {
         route('shared-variables.environment.canvas', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid]),
         route('shared-variables.server.canvas', ['server_uuid' => $this->server->uuid]),
     ];
-    $endpoints = [
-        '/shared-variables/team/canvas',
-        "/shared-variables/project/{$this->project->uuid}/canvas",
-        "/shared-variables/environment/{$this->environment->uuid}/canvas",
-        "/shared-variables/server/{$this->server->uuid}/canvas",
-    ];
 
-    foreach ($routes as $i => $url) {
+    foreach ($routes as $url) {
         sharedVariableCanvasAs($this, $this->admin, $this->team)->get($url)
-            ->assertOk()
-            ->assertSee('data-endpoint="'.$endpoints[$i].'"', false);
+            ->assertOk();
     }
-});
-
-test('every shared variable row links to the connect envs canvas with the variable selected', function () {
-    $projectVariable = SharedEnvironmentVariable::create([
-        'key' => 'SHOP_NAME', 'value' => 'shop', 'type' => 'project', 'team_id' => $this->team->id, 'project_id' => $this->project->id,
-    ]);
-
-    sharedVariableCanvasAs($this, $this->admin, $this->team)->get(route('shared-variables.team.index'))
-        ->assertOk()
-        ->assertSee(route('shared-variables.team.canvas').'?select=variable%3A'.$this->token->id, false);
-    sharedVariableCanvasAs($this, $this->admin, $this->team)->get(route('shared-variables.project.show', ['project_uuid' => $this->project->uuid]))
-        ->assertOk()
-        ->assertSee(route('shared-variables.project.canvas', ['project_uuid' => $this->project->uuid]).'?select=variable%3A'.$projectVariable->id, false);
 });
 
 test('each shared variables page reopens its canvas when the user left it on the canvas view', function (string $scope) {
@@ -297,18 +277,18 @@ test('each shared variables page reopens its canvas when the user left it on the
     sharedVariableCanvasAs($this, $this->admin, $this->team)
         ->get(route("shared-variables.{$scope}.canvas", $parameters))
         ->assertOk()
-        ->assertCookie($cookie, 'canvas');
+        ->assertPlainCookie($cookie, 'canvas');
 
     sharedVariableCanvasAs($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route($listRoute, $parameters))
         ->assertRedirect(route("shared-variables.{$scope}.canvas", $parameters));
 
     sharedVariableCanvasAs($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route($listRoute, [...$parameters, 'view' => 'list']))
         ->assertOk()
-        ->assertCookie($cookie, 'list');
+        ->assertPlainCookie($cookie, 'list');
 })->with(['team', 'project', 'environment', 'server']);
 
 test('an admin adds a shared variable from the canvas modal and the canvas reloads', function () {

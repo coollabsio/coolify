@@ -1,4 +1,4 @@
-# documentation: https://github.com/get-convex/convex-backend/blob/main/self-hosted/README.md
+# documentation: https://github.com/convex/convex-backend/blob/main/self-hosted/README.md
 # slogan: Convex is the open-source reactive database for app developers.
 # category: backend
 # tags: database, reactive, database, ai, agents, chatbot, api, team, bot, flows
@@ -7,7 +7,7 @@
 
 services:
   backend:
-    image: ghcr.io/get-convex/convex-backend:a9a760ca10399ed42e1b4bb87c78539a235488c7
+    image: ghcr.io/convex/convex-backend:a9a760ca10399ed42e1b4bb87c78539a235488c7
     volumes:
       - data:/convex/data
     environment:
@@ -48,7 +48,7 @@ services:
       start_period: 10s
 
   dashboard:
-    image: ghcr.io/get-convex/convex-dashboard:a9a760ca10399ed42e1b4bb87c78539a235488c7
+    image: ghcr.io/convex/convex-dashboard:a9a760ca10399ed42e1b4bb87c78539a235488c7
     environment:
       - SERVICE_URL_DASHBOARD_6791
       # URL of the Convex API as accessed by the dashboard (browser).

@@ -176,9 +176,29 @@ test('a finished service start stores the status of each service part and broadc
         inspectedContainer("db-{$service->uuid}", 'running', 'healthy', $labels('database', $db->uuid, 'db')),
     ])]);
 
-    event(new ServiceStartFinished($service->id));
+    event(new ServiceStartFinished(ServiceStartFinished::dataFor($service)));
 
     expect($app->fresh()->status)->toBe('running:unknown')
         ->and($db->fresh()->status)->toBe('running:healthy');
     Event::assertDispatched(ServiceStatusChanged::class, fn (ServiceStatusChanged $event) => $event->teamId === $this->team->id);
 });
+
+test('a finished service start is ignored when the event team does not own the service', function (string $case) {
+    Event::fake([ServiceStatusChanged::class]);
+    Process::fake();
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $data = match ($case) {
+        'other team' => ['service_id' => $service->id, 'team_id' => Team::factory()->create()->id],
+        'no team' => ['service_id' => $service->id],
+    };
+
+    event(new ServiceStartFinished($data));
+
+    Process::assertNothingRan();
+    Event::assertNotDispatched(ServiceStatusChanged::class);
+})->with(['other team', 'no team']);

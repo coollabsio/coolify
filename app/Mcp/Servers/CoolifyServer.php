@@ -34,6 +34,7 @@ use App\Mcp\Tools\GetServerResources;
 use App\Mcp\Tools\GetService;
 use App\Mcp\Tools\GetServiceApplication;
 use App\Mcp\Tools\GetServiceDatabase;
+use App\Mcp\Tools\GetVulnerabilities;
 use App\Mcp\Tools\ListApplicationPreviews;
 use App\Mcp\Tools\ListApplications;
 use App\Mcp\Tools\ListAuditEvents;
@@ -64,10 +65,14 @@ use App\Mcp\Tools\ListTeamMembers;
 use App\Mcp\Tools\ListUnhealthyResources;
 use App\Mcp\Tools\ManageApplication;
 use App\Mcp\Tools\ManageBackup;
+use App\Mcp\Tools\ManageCloudflareTunnel;
 use App\Mcp\Tools\ManageDatabase;
 use App\Mcp\Tools\ManageDestination;
+use App\Mcp\Tools\ManageDns;
 use App\Mcp\Tools\ManageEnv;
 use App\Mcp\Tools\ManageGitSource;
+use App\Mcp\Tools\ManageImageScanning;
+use App\Mcp\Tools\ManageIntegrationTokens;
 use App\Mcp\Tools\ManageNotifications;
 use App\Mcp\Tools\ManagePreview;
 use App\Mcp\Tools\ManagePrivateKey;
@@ -76,6 +81,7 @@ use App\Mcp\Tools\ManageProxy;
 use App\Mcp\Tools\ManageRegistry;
 use App\Mcp\Tools\ManageS3Storage;
 use App\Mcp\Tools\ManageScheduledTask;
+use App\Mcp\Tools\ManageSecretManager;
 use App\Mcp\Tools\ManageServer;
 use App\Mcp\Tools\ManageService;
 use App\Mcp\Tools\ManageSharedEnv;
@@ -83,7 +89,9 @@ use App\Mcp\Tools\ManageStorage;
 use App\Mcp\Tools\ManageTags;
 use App\Mcp\Tools\RollbackApplication;
 use App\Mcp\Tools\SearchResources;
+use App\Services\Access\AccessResolver;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
 
 class CoolifyServer extends Server
@@ -112,17 +120,18 @@ Then: list_*/get_* for details. Debug is DB-first:
 - list_deployments → get_deployment(include_log_summary=true)
 - list_env_keys / list_shared_env_keys (names only, never values)
 - get_logs only if status is running; on failure use reason + next_tools (do not loop)
+- get_vulnerabilities — image vulnerability scan results (list for the team, resource for one app/service/database); manage_image_scanning turns scanning on or off
 
 Lifecycle (requires token ability **deploy**):
 - control (start|stop|restart; stop needs confirm=true)
 - deploy, cancel_deployment, rollback_application
 
-Changes (requires token ability **write**): manage_* and create_* tools. They run the same REST API routes, with the same validation and permissions. Destructive actions need confirm=true: ask the user first.
+Changes (requires token ability **write**, or **delete** for delete actions): manage_* and create_* tools. They run the same REST API routes, with the same validation and permissions. Destructive actions need confirm=true: ask the user first.
 
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
 
-Responses: `{ data, _actions?, _pagination? }`. Private keys, S3 secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
+Responses: `{ data, _actions?, _pagination? }`. Private keys, storage secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
 MD;
 
     /**
@@ -196,21 +205,86 @@ MD;
         ManageBackup::class,
         ManageStorage::class,
         ManageTags::class,
+        ManageDns::class,
+        ManageSecretManager::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,
         ManageRegistry::class,
         ManagePrivateKey::class,
         ManageS3Storage::class,
         ManageGitSource::class,
+        ManageIntegrationTokens::class,
         CloudProvider::class,
         ManageNotifications::class,
         ListAuditEvents::class,
         GetServerMetrics::class,
+        GetVulnerabilities::class,
+        ManageImageScanning::class,
+    ];
+
+    /**
+     * Tools for team-level objects. Tokens and members limited to some projects, environments,
+     * or resources do not get them (same rule as ApiAbility::SCOPED_ACCESS_ROUTES for REST).
+     *
+     * @var array<int, class-string<Tool>>
+     */
+    public const TEAM_LEVEL_TOOLS = [
+        GetCurrentTeam::class,
+        ListTeamMembers::class,
+        ListServers::class,
+        GetServer::class,
+        GetServerDomains::class,
+        GetServerResources::class,
+        GetServerMetrics::class,
+        ListDestinations::class,
+        GetDestination::class,
+        ListTags::class,
+        ListGithubApps::class,
+        ListGithubRepositories::class,
+        ListGithubBranches::class,
+        ListAuditEvents::class,
+        ManageTags::class,
+        ManageServer::class,
+        ManageProxy::class,
+        ManageImageScanning::class,
+        ManageCloudflareTunnel::class,
+        DockerCleanup::class,
+        ManageDestination::class,
+        ManageRegistry::class,
+        ManagePrivateKey::class,
+        ManageS3Storage::class,
+        ManageGitSource::class,
+        ManageIntegrationTokens::class,
+        CloudProvider::class,
+        ManageNotifications::class,
     ];
 
     protected array $tools = self::TOOLS;
+
+    /**
+     * @return array<int, class-string<Tool>>
+     */
+    public static function toolsForCurrentActor(): array
+    {
+        $user = request()->user();
+        $teamId = $user?->currentAccessToken()?->team_id;
+
+        if ($user !== null && $teamId !== null && app(AccessResolver::class)->coversWholeTeam($user, (int) $teamId)) {
+            return self::TOOLS;
+        }
+
+        return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+    }
+
+    public function createContext(): ServerContext
+    {
+        $this->tools = self::toolsForCurrentActor();
+
+        return parent::createContext();
+    }
 
     protected array $resources = [
         InfrastructureOverviewResource::class,

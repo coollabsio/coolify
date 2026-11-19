@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\ComposeRejectedException;
 use App\Services\ContainerStatusAggregator;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
@@ -12,6 +13,8 @@ use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,7 +49,7 @@ use OpenApi\Attributes as OA;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -76,15 +79,20 @@ class Service extends BaseModel
     ];
 
     /**
+     * Compose files that can embed credentials. Only `read:sensitive` or `root` tokens may read them.
+     */
+    public const COMPOSE_ATTRIBUTES = [
+        'docker_compose_raw',
+        'docker_compose',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability. Internal compose generators
      * must makeVisible explicitly before toArray().
      */
-    protected $hidden = [
-        'docker_compose',
-        'docker_compose_raw',
-    ];
+    protected $hidden = self::COMPOSE_ATTRIBUTES;
 
     protected function casts(): array
     {
@@ -99,10 +107,12 @@ class Service extends BaseModel
             if (blank($service->name)) {
                 $service->name = 'service-'.new_public_id();
             }
-        });
-        static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
-            $service->save();
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
         });
     }
 
@@ -156,7 +166,7 @@ class Service extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                return $this->server->isFunctional();
+                return $this->server?->isFunctional() ?? false;
             }
         );
     }
@@ -324,6 +334,11 @@ class Service extends BaseModel
         $resources = $applications->concat($databases);
 
         foreach ($resources as $resource) {
+            // A part that is not in the compose file has no container, so it does not count.
+            if ($resource->is_removed_from_compose ?? false) {
+                continue;
+            }
+
             $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
 
             // Filter based on excludedOnly flag
@@ -1636,6 +1651,32 @@ class Service extends BaseModel
         return service_configuration_dir()."/{$this->uuid}";
     }
 
+    /**
+     * Docker Compose must accept the generated file, or the next deployment fails with the old containers still running.
+     * Call it after parse(), in the transaction that saves the Compose file. The check is best effort: it is skipped
+     * when the server is not reachable or the SSH connection fails, so the file can still be edited.
+     *
+     * @throws ComposeRejectedException If `docker compose config` on the server rejects the generated file
+     */
+    public function ensureDockerComposeAccepted(): void
+    {
+        $server = $this->server;
+        if (! $server?->isFunctional()) {
+            return;
+        }
+        try {
+            checkComposeFileOnServer((string) $this->docker_compose, $server, $this->workdir());
+        } catch (\Throwable $e) {
+            // Only an exit code of the remote command is a rejection: 255 is an SSH failure, 124 a timeout.
+            $exitCode = $e->getCode();
+            if (! $e instanceof \RuntimeException || ! is_int($exitCode) || in_array($exitCode, [0, 124, 255], true)) {
+                return;
+            }
+
+            throw new ComposeRejectedException("Docker Compose rejected the file, so Coolify did not save it.\n{$e->getMessage()}", previous: $e);
+        }
+    }
+
     public function saveComposeConfigs()
     {
         // Guard against null or empty docker_compose
@@ -1665,6 +1706,10 @@ class Service extends BaseModel
         }
 
         $envs_from_coolify = $this->environment_variables()->get();
+        // So that Docker Compose can resolve ${COOLIFY_RESOURCE_UUID} in the compose file
+        if ($envs_from_coolify->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $envs->push("COOLIFY_RESOURCE_UUID={$this->uuid}");
+        }
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
                 return 1;

@@ -8,6 +8,8 @@ use App\Models\Project;
 use App\Models\ResourceLink;
 use App\Models\Server;
 use App\Models\Service;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ResourceStartActivity;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -43,7 +45,7 @@ class EnvironmentCanvas
 
     private const DATABASE_ENGINE_NAMES = [
         'postgresql' => 'PostgreSQL',
-        'redis' => 'Redis',
+        'redis' => 'Redis / Valkey',
         'mongodb' => 'MongoDB',
         'mysql' => 'MySQL',
         'mariadb' => 'MariaDB',
@@ -101,13 +103,17 @@ class EnvironmentCanvas
     {
         $startingServiceUuids = $this->startingServiceUuids($resources->filter(fn (Model $resource) => $resource instanceof Service));
 
+        $markers = VulnerabilityMarkers::for($resources->values());
+
         $servers = collect();
-        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids) {
+        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids, $markers) {
             $node = match (true) {
                 $resource instanceof Application => $this->applicationNode($resource),
                 $resource instanceof Service => $this->serviceNode($resource, in_array($resource->uuid, $startingServiceUuids, true)),
                 default => $this->databaseNode($resource),
             };
+            // The security marker of the card: "Update now" or "No fix yet".
+            $node['security'] = $markers[ResourceScans::key($resource)] ?? null;
             foreach ($node['servers'] as $server) {
                 $servers->put($server->id, $server);
             }

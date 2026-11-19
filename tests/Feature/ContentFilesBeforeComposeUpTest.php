@@ -318,11 +318,33 @@ test('a Compose deployment does not write storages without Coolify content', fun
     'host file' => [['is_host_file' => true]],
     'file from the Git repository' => [['is_based_on_git' => true]],
     'directory' => [['is_directory' => true, 'content' => null]],
-    'file without content' => [['content' => null]],
-    'file with empty content' => [['content' => '']],
     'binary file placeholder' => [['content' => LocalFileVolume::BINARY_PLACEHOLDER]],
     'too large file placeholder' => [['content' => LocalFileVolume::TOO_LARGE_PLACEHOLDER]],
 ]);
+
+test('a Compose deployment creates a missing file without content as an empty file', function (array $attributes, string $state) {
+    $volume = contentFilesVolume($this->application, 'config/prometheus.yml', $attributes);
+    fakeContentFilesServer([$volume->fs_path => $state]);
+
+    runComposeStart($this);
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'touch '.escapeshellarg($volume->fs_path)));
+    expect(ContentFilesUpRecorder::indexOf('ssh', 'touch '))->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'))
+        ->and($volume->fresh()->is_directory)->toBeFalsy();
+})->with([
+    'file without content' => [['content' => null]],
+    'file with empty content' => [['content' => '']],
+])->with(['missing', 'empty-directory']);
+
+test('a Compose deployment keeps an existing file without content', function () {
+    $volume = contentFilesVolume($this->application, 'config/prometheus.yml', ['content' => null]);
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+
+    runComposeStart($this);
+
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'touch '));
+    contentFilesAssertNoWrite();
+});
 
 test('a pull request deployment writes the preview content file path', function () {
     $volume = contentFilesVolume($this->application, 'config/app.conf');
@@ -379,14 +401,14 @@ test('a deployment to an additional server writes missing content files on that 
         ->and(ContentFilesUpRecorder::ssh()[$write])->not->toContain("@'{$this->server->ip}'");
 });
 
-test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function () {
+test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function (string $state) {
     $this->application->update(['build_pack' => 'dockerfile', 'docker_compose_location' => null]);
     $volume = contentFilesVolume($this->application, 'config/app.conf');
     $otherServer = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->server->private_key_id,
     ])->fresh();
-    fakeContentFilesServer([$volume->fs_path => 'missing']);
+    fakeContentFilesServer([$volume->fs_path => $state]);
 
     $job = new ContentFilesUpDeploymentJob;
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
@@ -421,11 +443,20 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         ->and($write)->toBeLessThan($up)
         ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
+    if ($state === 'empty-directory') {
+        $writeCommand = ContentFilesUpRecorder::ssh()[$write];
+        $escapedPath = escapeshellarg($volume->fs_path);
+        expect(strpos($writeCommand, "rmdir {$escapedPath}"))->toBeLessThan(strpos($writeCommand, "tee {$escapedPath}"));
+    }
 
     $connect = ContentFilesUpRecorder::indexOf('deployment', "docker network connect '{$this->destination->network}' coolify-proxy");
     expect($connect)->not->toBeNull()
         ->and($connect)->toBeLessThan($up);
-});
+})->with([
+    'missing file' => ['missing'],
+    // Docker creates a missing bind source as an empty directory (#10398).
+    'empty directory left by Docker' => ['empty-directory'],
+]);
 
 test('the content file check and write are safe for non-root servers', function () {
     $this->server->update(['user' => 'ubuntu']);

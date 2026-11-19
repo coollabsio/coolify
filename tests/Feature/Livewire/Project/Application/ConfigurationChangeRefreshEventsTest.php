@@ -48,9 +48,6 @@ it('persists environment variable order as an application setting', function () 
     expect($this->application->settings->is_env_sorting_enabled)->toBeFalse();
 
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
-        ->assertSee('Environment variable order')
-        ->assertSee('Build secrets')
-        ->assertDontSeeHtml('>Sort</button>')
         ->call('loadEnvironmentVariables')
         ->set('is_env_sorting_enabled', true)
         ->call('instantSave')

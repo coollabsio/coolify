@@ -125,14 +125,13 @@ class Control extends Tool
             deployment_uuid: $deploymentUuid,
             force_rebuild: false,
             restart_only: $action === 'restart',
-            is_api: true,
-            no_questions_asked: $action === 'start',
+            is_mcp: true,
         );
 
         if (($result['status'] ?? null) === 'skipped' || ($result['status'] ?? null) === 'queue_full') {
             return [
                 'message' => $result['message'] ?? 'Deployment skipped.',
-                'deployment_uuid' => null,
+                'deployment_uuid' => $result['deployment_uuid'] ?? null,
             ];
         }
 

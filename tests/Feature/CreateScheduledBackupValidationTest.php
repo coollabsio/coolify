@@ -56,11 +56,11 @@ it('creates a standalone database backup without S3 and opens its configuration'
 
     $backup = ScheduledDatabaseBackup::query()->sole();
 
-    $component->assertRedirectToRoute('project.database.backup.execution', [
+    $component->assertRedirectToRoute('project.database.backup.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'database_uuid' => $database->uuid,
-        'backup_uuid' => $backup->uuid,
+        'schedule' => $backup->uuid,
     ]);
 
     expect($backup->save_s3)->toBeFalsy()
@@ -98,6 +98,30 @@ it('creates a service database backup without S3 and opens its configuration', f
     expect($backup->save_s3)->toBeFalsy()
         ->and($backup->s3_storage_id)->toBeNull();
 });
+
+it('backs up all databases by default for an Odoo service database', function (string $serviceType, bool $expectedDumpAll) {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+        'service_type' => $serviceType,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgresql',
+        'image' => 'postgres:16-alpine',
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    expect((bool) ScheduledDatabaseBackup::query()->sole()->dump_all)->toBe($expectedDumpAll);
+})->with([
+    'odoo' => ['odoo', true],
+    'other service' => ['drupal-with-postgresql', false],
+]);
 
 it('rejects an unsupported service database name during backup', function () {
     $service = Service::factory()->create([
@@ -146,7 +170,6 @@ it('selects a service database when creating a backup from the unified backups p
     ]);
 
     $component = Livewire::test(CreateScheduledBackup::class, ['service' => $service])
-        ->assertSee('Database')
         ->assertSee('analytics')
         ->set('selectedDatabaseUuid', $analytics->uuid)
         ->set('frequency', 'daily')
@@ -184,11 +207,11 @@ it('creates a clickhouse backup for its configured database', function () {
 
     $backup = ScheduledDatabaseBackup::firstOrFail();
 
-    $component->assertRedirectToRoute('project.database.backup.execution', [
+    $component->assertRedirectToRoute('project.database.backup.index', [
         'project_uuid' => $project->uuid,
         'environment_uuid' => $environment->uuid,
         'database_uuid' => $database->uuid,
-        'backup_uuid' => $backup->uuid,
+        'schedule' => $backup->uuid,
     ]);
 
     expect($backup->database_type)->toBe(StandaloneClickhouse::class)

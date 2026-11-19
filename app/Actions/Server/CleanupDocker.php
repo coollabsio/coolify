@@ -197,7 +197,7 @@ class CleanupDocker implements ShouldBeUnique
         if (! $activeDeployment) {
             $commands[] = 'docker builder prune -af';
             // The prune fails on a stopped builder, so start it first.
-            $commands[] = railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, 'docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; docker buildx prune --builder coolify-railpack -af');
+            $commands[] = railpackBuilderHelperCommand(railpackBuildxMetadataVolume($server), $helperImageWithVersion, railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af');
         } else {
             $cleanupLog[] = [
                 'command' => self::BUILD_CACHE_KEPT_LOG_COMMAND,

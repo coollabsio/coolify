@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -62,7 +63,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 $commands,
                 $this->server,
                 callEventOnFinish: 'ProxyStatusChanged',
-                callEventData: $this->server->id,
+                callEventData: ProxyStatusChanged::dataFor($this->server),
                 queue: deployment_queue(),
             );
 
@@ -92,47 +93,13 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Build combined stop + start commands for proxy restart.
-     * This creates a single command sequence that shows all logs in one activity.
+     * The start commands replace the running proxy only after the image pull, so a failed pull keeps it running.
      */
     private function buildRestartCommands(string $configuration): array
     {
-        $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
-        $stopTimeout = 30;
-
         SaveProxyConfiguration::run($this->server, $configuration);
         $this->server->markProxyConfigurationApplied($configuration);
 
-        $commands = collect([]);
-
-        // === STOP PHASE ===
-        $commands = $commands->merge([
-            "echo 'Stopping proxy...'",
-            dockerStopCommand($stopTimeout, $containerName, $this->server).' 2>/dev/null || true',
-            "docker rm -f $containerName 2>/dev/null || true",
-            '# Wait for container to be fully removed',
-            'for i in {1..15}; do',
-            "    if ! docker ps -a --format \"{{.Names}}\" | grep -q \"^$containerName$\"; then",
-            "        echo 'Container removed successfully.'",
-            '        break',
-            '    fi',
-            '    echo "Waiting for container to be removed... ($i/15)"',
-            '    sleep 1',
-            '    # Force remove on each iteration in case it got stuck',
-            "    docker rm -f $containerName 2>/dev/null || true",
-            'done',
-            '# Final verification and force cleanup',
-            "if docker ps -a --format \"{{.Names}}\" | grep -q \"^$containerName$\"; then",
-            "    echo 'Container still exists after wait, forcing removal...'",
-            "    docker rm -f $containerName 2>/dev/null || true",
-            '    sleep 2',
-            'fi',
-            "echo 'Proxy stopped successfully.'",
-        ]);
-
-        // === START PHASE ===
-        $commands = $commands->merge(StartProxy::startCommands($this->server));
-
-        return $commands->toArray();
+        return StartProxy::startCommands($this->server)->toArray();
     }
 }

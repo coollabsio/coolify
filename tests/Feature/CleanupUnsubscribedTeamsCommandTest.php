@@ -22,6 +22,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config()->set('constants.coolify.self_hosted', false);
+    config()->set('constants.cloud.data_retention_days', 30);
+    Storage::fake('backups');
     Process::fake();
     fakeOpenStripeSubscriptions();
 });

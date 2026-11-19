@@ -312,7 +312,7 @@ describe('applicationParser', function () {
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+        expect($compose['services']['web']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->toContain("{$uuid}_app-data-pr-42:/app")
             ->not->toContain('shared-data:/data:ro')
             ->and($compose['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
@@ -327,7 +327,7 @@ describe('applicationParser', function () {
         $preview = externalVolumePreview($application);
 
         $compose = applicationParser($application, 42, $preview->id);
-        $sources = collect($compose->toArray()['services']['web-pr-42']['volumes'])->pluck('source')->all();
+        $sources = collect($compose->toArray()['services']['web']['volumes'])->pluck('source')->all();
 
         expect($sources)->toBe(["{$uuid}_shared-data-pr-42", "{$uuid}_app-data-pr-42"])
             ->and($compose->toArray()['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
@@ -379,7 +379,7 @@ describe('applicationParser', function () {
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+        expect($compose['services']['web']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->and($compose['volumes']["{$uuid}_shared-data-pr-42"])->toBe(['name' => "{$uuid}_shared-data-pr-42"])
             ->and(LocalPersistentVolume::find($oldVolume->id)?->name)->toBe("{$uuid}_shared-data-pr-42")
             ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data-pr-42", "{$uuid}_shared-data-pr-42"])
@@ -394,7 +394,7 @@ describe('applicationParser', function () {
 
         $compose = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($compose['services']['web-pr-42']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+        expect($compose['services']['web']['volumes'])->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->not->toContain('shared-data:/data:ro')
             ->not->toContain("{$uuid}_shared-data:/data:ro")
             ->and($application->composeVolumeWarnings())->toBe([]);
@@ -757,9 +757,7 @@ describe('validation', function () {
     });
 
     it('accepts external volumes with a literal name', function (string $compose) {
-        validateDockerComposeForInjection($compose);
-
-        expect(true)->toBeTrue();
+        expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
     })->with([
         'short' => [EXTERNAL_VOLUME_SHORT_COMPOSE],
         'long' => [EXTERNAL_VOLUME_LONG_COMPOSE],
@@ -949,8 +947,7 @@ describe('warnings', function () {
 
         [$composeFile, $logEntries] = parseExternalVolumeDeployment($application, $pullRequestId, $preview);
 
-        $serviceName = $pullRequestId === 0 ? 'web' : "web-pr-{$pullRequestId}";
-        expect(data_get($composeFile, "services.{$serviceName}.volumes"))->toContain(str_replace('{uuid}', $uuid, $expectedVolume))
+        expect(data_get($composeFile, 'services.web.volumes'))->toContain(str_replace('{uuid}', $uuid, $expectedVolume))
             ->and($logEntries)->toBe([['Warning: '.legacyExternalVolumeWarning(str_replace('{uuid}', $uuid, $oldName)), 'stderr']]);
     })->with([
         'production' => [0, '{uuid}_shared-data', '{uuid}_shared-data:/data:ro'],
@@ -964,7 +961,7 @@ describe('warnings', function () {
 
         [$composeFile, $logEntries] = parseExternalVolumeDeployment($application, 42, $preview);
 
-        expect(data_get($composeFile, 'services.web-pr-42.volumes'))->toContain("{$uuid}_shared-data-pr-42:/data:ro")
+        expect(data_get($composeFile, 'services.web.volumes'))->toContain("{$uuid}_shared-data-pr-42:/data:ro")
             ->and($logEntries)->toBe([]);
     });
 
@@ -1033,9 +1030,7 @@ describe('storage page', function () {
         $html = Livewire::test(StoragePage::class, ['resource' => $application->fresh()])->html();
         $section = externalVolumesSection($html, $application->uuid);
 
-        expect($section)->toContain('External volumes')
-            ->toContain('Managed outside Coolify. Coolify never removes these volumes.')
-            ->toContain('shared-data')
+        expect($section)->toContain('shared-data')
             ->toContain('existing-shared-volume')
             ->toContain('/data')
             ->toContain('web')

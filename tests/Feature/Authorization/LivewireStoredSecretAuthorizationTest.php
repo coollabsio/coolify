@@ -9,6 +9,7 @@ use App\Models\PrivateKey;
 use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -38,11 +39,13 @@ it('does not serialize a private key for a member who cannot update it', functio
 
     Livewire::test(PrivateKeyShow::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSuccessful()
-        ->assertSet('privateKeyValue', '')
-        ->assertDontSee($privateKeyValue);
+        ->assertSet('newPrivateKey', '', strict: true)
+        ->assertDontSee($privateKeyValue)
+        ->call('revealPrivateKey', 'password')
+        ->assertReturned(null);
 });
 
-it('keeps a private key available to an owner who can update it', function () {
+it('does not serialize a private key for an owner until it is revealed', function () {
     $privateKeyValue = PrivateKey::generateNewKeyPair('ed25519')['private_key'];
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,
@@ -54,7 +57,10 @@ it('keeps a private key available to an owner who can update it', function () {
 
     Livewire::test(PrivateKeyShow::class, ['private_key_uuid' => $privateKey->uuid])
         ->assertSuccessful()
-        ->assertSet('privateKeyValue', $privateKeyValue);
+        ->assertSet('newPrivateKey', '', strict: true)
+        ->assertDontSee($privateKeyValue)
+        ->call('revealPrivateKey', 'password')
+        ->assertReturned($privateKeyValue);
 });
 
 it('does not serialize GitHub App secrets for a member who cannot update it', function () {
@@ -141,6 +147,7 @@ it('does not serialize S3 credentials for a member after any storage action', fu
     Livewire::test(StorageForm::class, ['storage' => $storage])
         ->assertSet('key', '')
         ->assertSet('secret', '')
+        ->assertSet('hasSavedSecret', false)
         ->call('submit')
         ->assertSet('key', '')
         ->assertSet('secret', '')
@@ -148,15 +155,36 @@ it('does not serialize S3 credentials for a member after any storage action', fu
         ->assertDontSee('stored-secret-key');
 });
 
-it('keeps S3 credentials available to an owner who can update the storage', function () {
+it('lets an owner save S3 settings with the saved secret without sending it to the browser', function () {
+    if (! defined('CURLOPT_RESOLVE')) {
+        define('CURLOPT_RESOLVE', 10203);
+    }
     $storage = createS3StorageWithSecrets($this->team);
+    $storage->update(['endpoint' => 'https://1.1.1.1']);
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->allows('files')->andReturn([]);
+    Storage::shouldReceive('build')
+        ->atLeast()->once()
+        ->with(Mockery::on(fn (array $config): bool => $config['secret'] === 'stored-secret-key'))
+        ->andReturn($disk);
 
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->team]);
 
     Livewire::test(StorageForm::class, ['storage' => $storage])
         ->assertSet('key', 'stored-access-key')
-        ->assertSet('secret', 'stored-secret-key');
+        ->assertSet('secret', '')
+        ->assertSet('hasSavedSecret', true)
+        ->assertDontSee('stored-secret-key')
+        ->set('name', 'Renamed storage')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertSet('secret', '')
+        ->assertDontSee('stored-secret-key');
+
+    $storage->refresh();
+    expect($storage->name)->toBe('Renamed storage')
+        ->and($storage->secret)->toBe('stored-secret-key');
 });
 
 it('hides the S3 credential fields for a member after the session switches to a team they own', function () {

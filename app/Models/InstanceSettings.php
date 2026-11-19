@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Once;
@@ -9,6 +10,8 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    use HasSmtpServers;
+
     protected $attributes = [
         'is_dashboard_force_https_enabled' => true,
     ];
@@ -22,12 +25,16 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_backup_before_update_enabled',
+        'auto_update_target_version',
+        'auto_update_started_at',
         'is_registration_enabled',
         'disable_registration_when_oauth_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
         'smtp_from_name',
+        'notification_from_address',
+        'notification_from_name',
         'smtp_recipients',
         'smtp_host',
         'smtp_port',
@@ -38,6 +45,8 @@ class InstanceSettings extends Model
         'smtp_ehlo_domain',
         'resend_enabled',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'is_dns_validation_enabled',
         'custom_dns_servers',
         'domain_connect_private_key',
@@ -46,6 +55,9 @@ class InstanceSettings extends Model
         'allowed_ips',
         'auto_update_frequency',
         'update_check_frequency',
+        'update_channel',
+        'update_custom_tag',
+        'previous_update_channel',
         'new_version_available',
         'instance_timezone',
         'helper_version',
@@ -67,11 +79,15 @@ class InstanceSettings extends Model
     protected $hidden = [
         'smtp_from_address',
         'smtp_from_name',
+        'notification_from_address',
+        'notification_from_name',
         'smtp_recipients',
         'smtp_host',
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
         'domain_connect_private_key',
         'sentinel_token',
     ];
@@ -80,6 +96,8 @@ class InstanceSettings extends Model
         'smtp_enabled' => 'boolean',
         'smtp_from_address' => 'encrypted',
         'smtp_from_name' => 'encrypted',
+        'notification_from_address' => 'encrypted',
+        'notification_from_name' => 'encrypted',
         'smtp_recipients' => 'encrypted',
         'smtp_host' => 'encrypted',
         'smtp_port' => 'integer',
@@ -89,11 +107,14 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
         'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'is_backup_before_update_enabled' => 'boolean',
+        'auto_update_started_at' => 'datetime',
         'is_registration_enabled' => 'boolean',
         'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
@@ -141,6 +162,28 @@ class InstanceSettings extends Model
     public static function randomAutoUpdateFrequency(): string
     {
         return random_int(0, 59).' 0 * * *';
+    }
+
+    /**
+     * After a switch to a more stable channel, the instance keeps the updates of the channel it left until the stable release of its version is out.
+     */
+    public function switchUpdateChannel(string $channel): void
+    {
+        $from = $this->getOriginal('update_channel');
+        $this->update_channel = $channel;
+        if ($channel === $from) {
+            return;
+        }
+
+        $channels = ['stable', 'preview', 'nightly'];
+        $fromRank = array_search($from, $channels, true);
+        $toRank = array_search($channel, $channels, true);
+        $followed = $this->getOriginal('previous_update_channel');
+        $this->previous_update_channel = match (true) {
+            $fromRank === false || $toRank === false || $toRank >= $fromRank => null,
+            array_search($followed, $channels, true) > $fromRank => $followed,
+            default => $from,
+        };
     }
 
     public function isPasswordRegistrationAllowed(): bool

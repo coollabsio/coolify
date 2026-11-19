@@ -215,3 +215,24 @@ it('replaces an existing preview copy of a production magic value for a public p
         ->not->toBeEmpty()
         ->not->toBe($production['SERVICE_PASSWORD_DB']);
 });
+
+it('keeps the production magic value of a public pull request preview from before v4.5.1', function () {
+    composePreviewMagicParse($this->application);
+    $production = composePreviewMagicValues($this->application)['production'];
+    $this->application->environment_variables_preview()->create([
+        'key' => 'SERVICE_PASSWORD_DB',
+        'value' => $production['SERVICE_PASSWORD_DB'],
+        'is_preview' => true,
+    ]);
+    ApplicationPreview::query()->create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => 'https://github.com/example/repository/pull/7',
+        'keeps_production_values' => true,
+    ]);
+    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+
+    composePreviewMagicParse($this->application, 7);
+
+    expect(composePreviewMagicValues($this->application)['preview']['SERVICE_PASSWORD_DB'])->toBe($production['SERVICE_PASSWORD_DB']);
+});

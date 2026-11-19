@@ -224,9 +224,6 @@ describe('other application creation endpoints use_build_secrets', function () {
         ]);
 
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'github-installation-token',
             ], 201),
@@ -278,9 +275,6 @@ describe('other application creation endpoints use_build_secrets', function () {
         ]);
 
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/9876/access_tokens' => Http::response([
                 'token' => 'github-installation-token',
             ], 201),

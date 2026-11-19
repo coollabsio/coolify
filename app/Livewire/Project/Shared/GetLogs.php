@@ -172,7 +172,7 @@ class GetLogs extends Component
 
         $since = is_string($since) ? $since : null;
         if (is_string($since) && preg_match(self::DOCKER_TIMESTAMP_PATTERN, $since)) {
-            $options = "--since {$since} -t";
+            $options = $this->sinceOptions($since);
         } else {
             $options = "-n {$this->resolveLogTail()} -t";
         }
@@ -281,7 +281,7 @@ class GetLogs extends Component
             if ($all) {
                 $options = '-t';
             } elseif ($sinceValue !== null) {
-                $options = "--since {$sinceValue} -t";
+                $options = $this->sinceOptions($sinceValue);
             } else {
                 $options = "-n {$tail} -t";
             }
@@ -441,6 +441,16 @@ class GetLogs extends Component
         return collect();
     }
 
+    /**
+     * `--since` without `-n` makes dockerd decode the complete log file of the container on each
+     * stream tick, which keeps it at full CPU for large logs. With `-n`, dockerd reads from the end.
+     * The viewer keeps at most MAX_LOG_LINES lines, so a stream tick never needs more.
+     */
+    private function sinceOptions(string $since): string
+    {
+        return "--since {$since} -n ".self::MAX_LOG_LINES.' -t';
+    }
+
     private function resolveLogTail(): int|string
     {
         if ($this->numberOfLines === -1) {
@@ -465,6 +475,7 @@ class GetLogs extends Component
         $command = $server->isSwarm()
             ? "docker service logs {$options}{$container}"
             : "docker logs {$options}{$container}";
+        $command = remoteCommandWithTimeout($command, 30);
 
         if ($server->isNonRoot()) {
             $command = parseCommandsByLineForSudo(collect($command), $server)[0];
@@ -496,10 +507,11 @@ class GetLogs extends Component
      */
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $this->boundedLogCommand($command, $maxBytes));
-
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand)->output();
+        $output = Process::timeout(DOCKER_LOGS_LOCAL_TIMEOUT)
+            ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
+            ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
+            ->output();
         $truncated = strlen($output) > $maxBytes;
         // Invalid UTF-8 from a container would make the JSON response fail, so the viewer would stay empty.
         $logs = rtrim(sanitize_utf8_text(removeAnsiColors($truncated ? substr($output, 0, $maxBytes) : $output)), "\n");

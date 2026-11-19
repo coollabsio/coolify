@@ -46,8 +46,9 @@ services:
           - coolify-realtime
     healthcheck:
       test: curl --fail http://127.0.0.1:8080/api/health && curl --fail http://127.0.0.1:${PUSHER_BACKEND_PORT:-6001}/up || exit 1
-      interval: 5s
-      retries: 24
+      # Each check is a PHP request plus a docker exec; every 5 seconds this cost about 0.4 CPU seconds per minute.
+      interval: 10s
+      retries: 12
       start_period: 1m
       timeout: 2s
     depends_on:

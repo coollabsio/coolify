@@ -306,7 +306,7 @@ it('deletes scheduled volume backups outside the local deletion transaction', fu
     });
     Process::fake(['*' => Process::result(output: '')]);
 
-    (new DeleteResourceJob($this->application))->handle();
+    (new DeleteResourceJob($this->application, deleteBackups: true))->handle();
 
     expect($deletingTransactionLevel)->toBe($transactionLevel);
 });

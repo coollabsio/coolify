@@ -114,3 +114,70 @@ it('keeps reconciling a disabled server until its running jobs finish', function
     Process::assertRan(reconcileDisabledTestCommandFor($server));
     expect($running->fresh()->status)->toBe(GithubRunnerStatus::Failed);
 });
+
+function reconcileDisabledTestExecution(GithubApp $githubApp, Server $server, GithubRunnerStatus $status): GithubRunnerExecution
+{
+    static $jobId = 4000;
+
+    return GithubRunnerExecution::create([
+        'github_app_id' => $githubApp->id,
+        'server_id' => $server->id,
+        'trigger_workflow_job_id' => ++$jobId,
+        'labels' => ['self-hosted', 'coolify'],
+        'status' => $status,
+    ]);
+}
+
+function reconcileDisabledTestSelectedIds(): array
+{
+    return (new ReconcileGithubRunnersJob)->serversToReconcile()->pluck('id')->all();
+}
+
+it('selects servers with enabled runners or occupying executions', function () {
+    $enabled = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: true);
+    $disabled = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: false);
+    $disabledWithFinished = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: false);
+    $executionOnly = Server::factory()->create(['team_id' => $this->team->id]);
+    $finishedOnly = Server::factory()->create(['team_id' => $this->team->id]);
+
+    foreach ([GithubRunnerStatus::Queued, GithubRunnerStatus::Completed, GithubRunnerStatus::Failed, GithubRunnerStatus::Cancelled, GithubRunnerStatus::TimedOut] as $status) {
+        reconcileDisabledTestExecution($this->githubApp, $disabledWithFinished, $status);
+        reconcileDisabledTestExecution($this->githubApp, $finishedOnly, $status);
+    }
+    reconcileDisabledTestExecution($this->githubApp, $executionOnly, GithubRunnerStatus::Provisioning);
+
+    expect(reconcileDisabledTestSelectedIds())->toEqualCanonicalizing([$enabled->id, $executionOnly->id])
+        ->not->toContain($disabled->id);
+});
+
+it('selects each server once when several conditions match', function () {
+    $server = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: true);
+    foreach (GithubRunnerStatus::occupying() as $status) {
+        reconcileDisabledTestExecution($this->githubApp, $server, $status);
+    }
+
+    expect(reconcileDisabledTestSelectedIds())->toBe([$server->id]);
+});
+
+it('does not select soft-deleted servers', function () {
+    $server = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: true);
+    reconcileDisabledTestExecution($this->githubApp, $server, GithubRunnerStatus::Running);
+    Server::query()->whereKey($server->id)->update(['deleted_at' => now()]);
+
+    expect(reconcileDisabledTestSelectedIds())->toBe([]);
+});
+
+it('follows configuration and execution status changes', function () {
+    $server = reconcileDisabledTestServer($this->team, $this->githubApp, enabled: false);
+    expect(reconcileDisabledTestSelectedIds())->toBe([]);
+
+    $server->githubRunnerConfig->update(['is_enabled' => true]);
+    expect(reconcileDisabledTestSelectedIds())->toBe([$server->id]);
+
+    $server->githubRunnerConfig->update(['is_enabled' => false]);
+    $execution = reconcileDisabledTestExecution($this->githubApp, $server, GithubRunnerStatus::Idle);
+    expect(reconcileDisabledTestSelectedIds())->toBe([$server->id]);
+
+    $execution->update(['status' => GithubRunnerStatus::Completed]);
+    expect(reconcileDisabledTestSelectedIds())->toBe([]);
+});

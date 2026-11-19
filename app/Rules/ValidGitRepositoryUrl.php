@@ -12,10 +12,16 @@ class ValidGitRepositoryUrl implements ValidationRule
 
     protected bool $allowIP;
 
-    public function __construct(bool $allowSSH = true, bool $allowIP = true)
+    protected bool $allowRepositoryPath;
+
+    /**
+     * @param  bool  $allowRepositoryPath  Also accept a repository path such as `owner/name`, which applications with a Git source store.
+     */
+    public function __construct(bool $allowSSH = true, bool $allowIP = true, bool $allowRepositoryPath = false)
     {
         $this->allowSSH = $allowSSH;
         $this->allowIP = $allowIP;
+        $this->allowRepositoryPath = $allowRepositoryPath;
     }
 
     /**
@@ -195,6 +201,9 @@ class ValidGitRepositoryUrl implements ValidationRule
 
                 return;
             }
+        } elseif ($this->allowRepositoryPath && preg_match('/^[a-zA-Z0-9_][a-zA-Z0-9._-]*(\/[a-zA-Z0-9._-]+)+$/', $value) === 1) {
+            // A repository path (owner/name, or group/subgroup/name) that the Git source turns into a URL.
+            return;
         } else {
             $fail('The :attribute must start with https://, http://, git://, ssh://, or be an SSH URL (user@host:path).');
 

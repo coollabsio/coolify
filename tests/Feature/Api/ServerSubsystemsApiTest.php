@@ -190,6 +190,26 @@ describe('Log drains API', function () {
             ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
     });
 
+    test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+            ])
+            ->assertOk()
+            ->assertJsonPath('logdrain_axiom_domain', 'eu-central-1.aws.edge.axiom.co');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => "evil.example.com\nAXIOM_API_KEY=x",
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_axiom_domain');
+
+        expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+    });
+
     test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
         Queue::fake();
 
@@ -223,7 +243,7 @@ describe('Log drains API', function () {
 
     test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
-        $this->server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name stdout"]);
+        $this->server->settings->update(['logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout"]);
         $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
@@ -232,7 +252,7 @@ describe('Log drains API', function () {
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
                 'is_logdrain_custom_enabled' => true,
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
@@ -248,11 +268,11 @@ describe('Log drains API', function () {
             'Accept' => 'application/json',
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
+        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout");
     });
 
     test('PATCH enables the Amazon CloudWatch Logs drain', function () {

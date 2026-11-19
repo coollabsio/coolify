@@ -7,7 +7,7 @@
 
 services:
   marimo:
-    image: ghcr.io/marimo-team/marimo:latest-sql
+    image: ghcr.io/marimo-team/marimo:0.25.2-sql
     environment:
       - SERVICE_URL_MARIMO_8080
       - TOKEN_PASSWORD=$SERVICE_PASSWORD_MARIMO

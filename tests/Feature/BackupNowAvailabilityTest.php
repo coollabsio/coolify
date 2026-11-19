@@ -121,7 +121,7 @@ it('refreshes service backup buttons when the service status changes', function 
         ? ['service' => $this->service]
         : ['backup' => $this->backups['service']->fresh(), 'availableS3Storages' => collect()];
     $component = Livewire::test($componentClass, $parameters);
-    $disabledButton = '/<button\s+disabled[^>]*wire:click(\.stop)?="backupNow/s';
+    $disabledButton = '/<button(?=[^>]*\sdisabled\b)(?=[^>]*wire:click(\.stop)?="backupNow)[^>]*>/s';
     $database->update(['status' => 'running:healthy']);
 
     $component->dispatch('echo-private:team.'.currentTeam()->id.','.$event);

@@ -116,3 +116,51 @@ test('changing the comment of a locked shared variable keeps its value', functio
     expect($env->value)->toBe('locked-shared-secret')
         ->and($env->comment)->toBe('rotated monthly');
 });
+
+test('a locked variable can get a new value and stays locked', function () {
+    $env = createLockedVariableForUpdateTest();
+
+    Livewire::test(Show::class, ['env' => $env, 'type' => 'application'])
+        ->call('loadValues')
+        ->set('newLockedValue', 'rotated-secret')
+        ->call('submit')
+        ->assertDispatched('success')
+        ->assertSet('newLockedValue', null)
+        ->assertSet('value', null);
+
+    $env->refresh();
+    expect($env->value)->toBe('rotated-secret')
+        ->and((bool) $env->is_shown_once)->toBeTrue();
+});
+
+test('a locked variable that Docker Compose uses can get a new value', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    environment:\n      - API_TOKEN=\${API_TOKEN}\n",
+    ]);
+    $env = createLockedVariableForUpdateTest(required: true, value: null);
+
+    Livewire::test(Show::class, ['env' => $env, 'type' => 'application'])
+        ->call('loadValues')
+        ->set('newLockedValue', 'rotated-secret')
+        ->call('submit')
+        ->assertNotDispatched('error')
+        ->assertDispatched('success');
+
+    $env->refresh();
+    expect($env->value)->toBe('rotated-secret')
+        ->and((bool) $env->is_shown_once)->toBeTrue();
+});
+
+test('a member cannot replace a locked value', function () {
+    $env = createLockedVariableForUpdateTest();
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $this->actingAs($member);
+
+    expect(fn () => Livewire::test(Show::class, ['env' => $env, 'type' => 'application'])
+        ->set('newLockedValue', 'attacker')
+        ->call('submit'))->toThrow(Exception::class, 'This action is unauthorized.');
+
+    expect($env->refresh()->value)->toBe('locked-secret');
+});

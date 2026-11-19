@@ -4,17 +4,20 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
+use App\Services\Access\AccessResolver;
 use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
-    description: 'Project model',
+    description: 'Application deployment model',
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],
@@ -30,6 +33,7 @@ use OpenApi\Attributes as OA;
         'status' => ['type' => 'string'],
         'is_webhook' => ['type' => 'boolean'],
         'is_api' => ['type' => 'boolean'],
+        'is_mcp' => ['type' => 'boolean'],
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
         'logs' => ['type' => 'string'],
@@ -49,6 +53,20 @@ use OpenApi\Attributes as OA;
 )]
 class ApplicationDeploymentQueue extends Model
 {
+    /**
+     * Only deployments of applications the authenticated member or API token can see.
+     */
+    public function scopeVisibleToCurrentActor(Builder $query): Builder
+    {
+        foreach (app(AccessResolver::class)->currentLayers() as $layer) {
+            if (! $layer->coversWholeTeam()) {
+                return $query->whereIn('application_id', Application::query()->pluck('id')->map(fn ($id) => (string) $id));
+            }
+        }
+
+        return $query;
+    }
+
     /**
      * Log redaction variants of remote secrets. Kept in memory only, never saved.
      *
@@ -73,7 +91,11 @@ class ApplicationDeploymentQueue extends Model
             }
 
             $application = $deployment->application;
-            $source = $deployment->is_api ? 'api' : 'ui';
+            $source = match (true) {
+                (bool) $deployment->is_mcp => 'mcp',
+                (bool) $deployment->is_api => 'api',
+                default => 'ui',
+            };
 
             auditLog("{$source}.application.rollback", [
                 'team_id' => $application?->team()?->id,
@@ -84,6 +106,31 @@ class ApplicationDeploymentQueue extends Model
             ]);
         });
 
+        // A worker that kills the job at the timeout skips the finally block of handle(), which records the end time.
+        static::saving(function (ApplicationDeploymentQueue $deployment): void {
+            if ($deployment->isDirty('status')
+                && $deployment->finished_at === null
+                && ApplicationDeploymentStatus::tryFrom((string) $deployment->status)?->isFinal()) {
+                $deployment->finished_at = now();
+            }
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            // A failed GitHub sync must not stop the status transition or the deployment queue.
+            try {
+                SyncGithubDeploymentJob::dispatchFor($deployment);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to queue the GitHub deployment sync.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
             if (! auth()->check()
                 || ! $deployment->wasChanged('status')
@@ -91,10 +138,10 @@ class ApplicationDeploymentQueue extends Model
                 return;
             }
 
+            // The API and MCP cancel paths do not fire model events and record their own audit event.
             $application = $deployment->application;
-            $source = $deployment->is_api ? 'api' : 'ui';
 
-            auditLog("{$source}.deployment.cancelled", [
+            auditLog('ui.deployment.cancelled', [
                 'team_id' => $application?->team()?->id,
                 'application_uuid' => $application?->uuid,
                 'application_name' => $application?->name,
@@ -129,10 +176,14 @@ class ApplicationDeploymentQueue extends Model
         'rollback',
         'commit_message',
         'is_api',
+        'is_mcp',
         'build_server_id',
         'horizon_job_id',
         'horizon_job_worker',
         'finished_at',
+        'scan_gate_result',
+        'scan_gate_bypassed_by',
+        'deploy_started_at',
     ];
 
     /**
@@ -152,6 +203,8 @@ class ApplicationDeploymentQueue extends Model
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
+        'scan_gate_result' => 'array',
+        'deploy_started_at' => 'datetime',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,
     ];
@@ -166,13 +219,23 @@ class ApplicationDeploymentQueue extends Model
      */
     public function scopeOwnedByTeam(Builder $query, int $teamId): Builder
     {
-        // application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
-        $applicationIds = Application::withTrashed()
+        return $query->whereIn('application_id', self::applicationIdsOwnedByTeam($teamId));
+    }
+
+    /**
+     * IDs of the team's applications, deleted ones included, as strings to match application_id.
+     *
+     * application_id is varchar; whereHas joins to applications.id (bigint) and breaks on PostgreSQL.
+     *
+     * @return Collection<int, string>
+     */
+    public static function applicationIdsOwnedByTeam(int $teamId): Collection
+    {
+        return Application::withTrashed()
+            ->withoutGlobalScope('withRelations')
             ->whereRelation('environment.project.team', 'id', $teamId)
             ->pluck('id')
             ->map(fn ($id) => (string) $id);
-
-        return $query->whereIn('application_id', $applicationIds);
     }
 
     public function server(): Attribute
@@ -214,6 +277,22 @@ class ApplicationDeploymentQueue extends Model
             'unknown' => $this->updated_at?->gt(now()->subSeconds($this->server?->settings?->dynamic_timeout ?? 3600)) ?? false,
             default => false,
         };
+    }
+
+    /**
+     * The image scan gate stopped this deployment. The status stays failed, the UI shows "Blocked".
+     */
+    public function isImageScanBlocked(): bool
+    {
+        return (bool) data_get($this->scan_gate_result, 'blocked', false);
+    }
+
+    /**
+     * The image scan could not run and the deployment went on without it.
+     */
+    public function isImageScanSkipped(): bool
+    {
+        return ! $this->isImageScanBlocked() && filled(data_get($this->scan_gate_result, 'error'));
     }
 
     public function commitMessage()

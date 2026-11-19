@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
@@ -41,6 +42,7 @@ beforeEach(function () {
     defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
     Event::fake([BackupCreated::class]);
     Notification::fake();
+    Sleep::fake();
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();

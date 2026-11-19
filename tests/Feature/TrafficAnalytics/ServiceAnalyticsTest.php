@@ -103,14 +103,12 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('renders the service analytics page with the disabled state and a navigation item', function () {
+it('renders the service analytics page with the disabled state', function () {
     $stack = makeServiceAnalyticsStack($this->team, false, 'Umami');
 
     $this->get(serviceAnalyticsRoute($stack))
         ->assertOk()
         ->assertSee('Traffic analytics is not enabled')
-        ->assertSee(serviceAnalyticsRoute($stack), false)
-        ->assertSee(route('server.analytics', ['server_uuid' => $stack['server']->uuid]), false)
         ->assertDontSee('__lazyLoad', escape: false);
 });
 

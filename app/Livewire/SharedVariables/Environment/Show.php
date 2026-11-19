@@ -5,6 +5,7 @@ namespace App\Livewire\SharedVariables\Environment;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Application;
 use App\Models\Project;
+use App\Models\SharedEnvironmentVariable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -61,6 +62,7 @@ class Show extends Component
 
         $this->project = Project::ownedByCurrentTeam()->where('uuid', $projectUuid)->firstOrFail();
         $this->environment = $this->project->environments()->where('uuid', $environmentUuid)->firstOrFail();
+        $this->authorize('viewSharedVariables', $this->environment);
         if ($this->prefersCanvasView('environment_variables')) {
             return $this->redirectRoute('shared-variables.environment.canvas', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid], navigate: true);
         }
@@ -69,7 +71,7 @@ class Show extends Component
 
     public function switch()
     {
-        $this->authorize('view', $this->environment);
+        $this->authorize('viewSharedVariables', $this->environment);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         $this->getDevView();
     }
@@ -81,32 +83,21 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $canViewValues = auth()->user()?->isAdminOfTeam($this->project->team_id) ?? false;
-
-        return $variables->map(function ($item) use ($canViewValues) {
-            if (! $canViewValues) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
-            $value = formatEnvValueForDevView($item->value);
-            if ($value === null) {
-                return "$item->key=(Value cannot be shown in this view, edit in normal view)";
-            }
-
-            return "$item->key=$value";
-        })->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
     }
 
     public function submit()
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('update', $this->environment);
-            $this->handleBulkSubmit();
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
             $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -115,9 +106,8 @@ class Show extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables)
     {
-        $variables = parseEnvFormatToArray($this->variables);
         $changesMade = false;
 
         DB::transaction(function () use ($variables, &$changesMade) {
@@ -165,6 +155,9 @@ class Show extends Component
                 if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     if ($found->value !== $value) {
                         $found->value = $value;
+                    }
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -175,6 +168,7 @@ class Show extends Component
                     'value' => $value,
                     'is_multiline' => false,
                     'is_literal' => false,
+                    ...$data['settings'],
                     'type' => 'environment',
                     'team_id' => $this->project->team_id,
                 ]);

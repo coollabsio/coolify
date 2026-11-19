@@ -7,7 +7,7 @@
 
 services:
   glance:
-    image: glanceapp/glance:latest
+    image: glanceapp/glance:v0.8.8
     environment:
       - SERVICE_URL_GLANCE_8080
     volumes:

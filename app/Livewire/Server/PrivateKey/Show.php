@@ -62,7 +62,7 @@ class Show extends Component
                 $this->server->save();
                 ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection(justCheckingNewKey: true);
                 if (! $uptime) {
-                    throw new \Exception($error);
+                    throw new \Exception($this->unreachableMessage($error));
                 }
             });
             $this->loadPrivateKeys();
@@ -113,14 +113,20 @@ class Show extends Component
                 $this->dispatch('success', 'Server is reachable.');
                 $this->dispatch('refreshServerShow');
             } else {
-                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
-                $this->dispatch('error', 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$sanitizedError);
+                $this->dispatch('error', $this->unreachableMessage($error));
 
                 return;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function unreachableMessage(?string $error): string
+    {
+        $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+
+        return 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$sanitizedError;
     }
 
     public function render()

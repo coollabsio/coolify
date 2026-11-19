@@ -71,7 +71,7 @@
                                     <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Docker network</p>
                                 </div>
                                 <x-forms.button canGate="update" :canResource="$server"
-                                    wire:click="add('{{ data_get($network, 'Name') }}')">
+                                    wire:click="add({{ Js::from(data_get($network, 'Name')) }})">
                                     Add destination
                                 </x-forms.button>
                             </div>

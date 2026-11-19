@@ -3,6 +3,36 @@ import { parseCookie } from 'cookie';
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
 /**
+ * A PTY with no input and no output for this long is ended. 0 turns the idle limit off, so a
+ * long command without output (for example a restore) keeps running until the maximum duration.
+ */
+export const TERMINAL_IDLE_TIMEOUT_SECONDS = 0;
+
+/** How often each live PTY checks with Coolify that the user may still use it. */
+export const TERMINAL_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+
+/** Consecutive failed checks (Coolify unreachable, 5xx, or an unexpected answer) that end a PTY. */
+export const TERMINAL_SESSION_CHECK_MAX_FAILURES = 3;
+
+/** Session check statuses with which Coolify says that the session is no longer allowed. */
+const TERMINAL_SESSION_REVOKED_STATUSES = new Set([401, 403, 404, 419]);
+
+/**
+ * Reads the answer of Coolify to a session check. Only an explicit rejection revokes the
+ * session at once. Anything else, for example a redirect from a page gate, is a failed check.
+ *
+ * @param {{ status: number, data: unknown } | null} response null when the request failed
+ * @returns {'active' | 'revoked' | 'failed'}
+ */
+export function terminalSessionCheckResult(response) {
+    if (response?.status === 200 && response.data?.active === true) {
+        return 'active';
+    }
+
+    return TERMINAL_SESSION_REVOKED_STATUSES.has(response?.status) ? 'revoked' : 'failed';
+}
+
+/**
  * WebSocket close codes sent to the browser. Browsers cannot read the HTTP
  * status of a rejected WebSocket handshake, so rejections are reported with
  * application close codes (4000-4999) that the client can act on.
@@ -21,36 +51,62 @@ export const TERMINAL_REJECTED_SOCKET_TERMINATE_MS = 2000;
 export const MAX_XSRF_TOKEN_CANDIDATES = 5;
 
 /**
+ * The XSRF cookie names of Coolify, with the scheme of the request that set them.
+ * When SESSION_SECURE_COOKIE is not set, Coolify gives plain HTTP its own session
+ * and XSRF cookie names (the TrustProxies middleware), because a browser does
+ * not let plain HTTP overwrite the Secure cookies of an HTTPS visit to the same host.
+ */
+const XSRF_COOKIE_SCHEMES = Object.freeze({
+    'XSRF-TOKEN': 'https',
+    'XSRF-TOKEN-HTTP': 'http',
+});
+
+/**
  * Builds the header sets that can authenticate terminal requests to Coolify, one
- * for each XSRF-TOKEN cookie. The whole browser Cookie header is forwarded, so
+ * for each XSRF cookie. The whole browser Cookie header is forwarded, so
  * Laravel finds its session cookie by its own name (SESSION_COOKIE or the slug
- * of APP_NAME).
+ * of APP_NAME). X-Forwarded-Proto tells Coolify the scheme of the XSRF cookie,
+ * so it reads the session cookie that was set together with that XSRF cookie.
  *
  * The browser sends more than one XSRF-TOKEN cookie when a Laravel app on a
  * parent domain also sets one (for example SESSION_DOMAIN=.example.com). Their
  * order in the header does not show which one is Coolify's, so the caller must
  * try each one.
  *
+ * The cookies of the page scheme (from the Origin header) come first, so a stale
+ * cookie of the other scheme cannot pick another session of the same browser.
+ *
  * @param {string | undefined} cookieHeader
- * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string }>} empty when a required value is missing
+ * @param {string | undefined} origin the Origin header of the WebSocket upgrade
+ * @returns {Array<{ 'Cookie': string, 'X-XSRF-TOKEN': string, 'X-Forwarded-Proto': string }>} empty when a required value is missing
  */
-export function getTerminalAuthHeaders(cookieHeader) {
+export function getTerminalAuthHeaders(cookieHeader, origin) {
     if (!cookieHeader) {
         return [];
     }
 
     // parseCookie() keeps only the first cookie of a name, so parse each pair alone.
-    const xsrfTokens = cookieHeader
-        .split(';')
-        .map((pair) => parseCookie(pair)['XSRF-TOKEN'])
-        .filter(Boolean);
+    const candidates = new Map();
 
-    return [...new Set(xsrfTokens)]
-        .slice(0, MAX_XSRF_TOKEN_CANDIDATES)
-        .map((xsrfToken) => ({
-            'Cookie': cookieHeader,
-            'X-XSRF-TOKEN': xsrfToken,
-        }));
+    for (const pair of cookieHeader.split(';')) {
+        for (const [name, value] of Object.entries(parseCookie(pair))) {
+            const scheme = Object.hasOwn(XSRF_COOKIE_SCHEMES, name) ? XSRF_COOKIE_SCHEMES[name] : null;
+
+            if (scheme && value && !candidates.has(`${scheme} ${value}`)) {
+                candidates.set(`${scheme} ${value}`, {
+                    'Cookie': cookieHeader,
+                    'X-XSRF-TOKEN': value,
+                    'X-Forwarded-Proto': scheme,
+                });
+            }
+        }
+    }
+
+    const pageScheme = origin?.startsWith('https:') ? 'https' : 'http';
+
+    return [...candidates.values()]
+        .sort((a, b) => Number(b['X-Forwarded-Proto'] === pageScheme) - Number(a['X-Forwarded-Proto'] === pageScheme))
+        .slice(0, MAX_XSRF_TOKEN_CANDIDATES);
 }
 
 /**
@@ -243,13 +299,8 @@ export function extractSshArgs(commandString) {
     }
 
     sshArgs = sshArgs.map((arg) => normalizeShellArgument(arg));
-    sshArgs = sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
 
-    if (!sshArgs.includes('RequestTTY=yes') && !sshArgs.some(arg => arg.includes('RequestTTY='))) {
-        sshArgs.push('-o', 'RequestTTY=yes');
-    }
-
-    return sshArgs;
+    return sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
 }
 
 export function extractHereDocContent(commandString) {
@@ -321,6 +372,9 @@ const REQUIRED_SSH_OPTIONS = new Set([
     'StrictHostKeyChecking',
     'UserKnownHostsFile',
     'PasswordAuthentication',
+    'IdentitiesOnly',
+    'ClearAllForwardings',
+    'ForwardAgent',
     'ConnectTimeout',
     'ServerAliveInterval',
     'RequestTTY',
@@ -329,9 +383,10 @@ const REQUIRED_SSH_OPTIONS = new Set([
 
 function isAllowedSshOption(name, value) {
     const fixedOptions = {
-        StrictHostKeyChecking: 'no',
-        UserKnownHostsFile: '/dev/null',
         PasswordAuthentication: 'no',
+        IdentitiesOnly: 'yes',
+        ClearAllForwardings: 'yes',
+        ForwardAgent: 'no',
         LogLevel: 'ERROR',
         ControlMaster: 'auto',
         ProxyCommand: 'cloudflared access ssh --hostname %h',
@@ -339,6 +394,18 @@ function isAllowedSshOption(name, value) {
 
     if (Object.hasOwn(fixedOptions, name)) {
         return value === fixedOptions[name];
+    }
+
+    if (name === 'StrictHostKeyChecking') {
+        return value === 'yes' || value === 'no';
+    }
+
+    if (name === 'UserKnownHostsFile') {
+        return value === '/dev/null' || /^\/var\/www\/html\/storage\/app\/ssh\/known_hosts\/known_hosts_[a-zA-Z0-9_-]+$/.test(value);
+    }
+
+    if (name === 'HostKeyAlias') {
+        return /^coolify-[a-zA-Z0-9_-]+$/.test(value);
     }
 
     if (name === 'RequestTTY') {
@@ -364,6 +431,8 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
     const seenOptions = new Set();
     let hasIdentityFile = false;
     let hasPort = false;
+    let hasConfigFile = false;
+    let hasEndOfOptions = false;
     let targetHost = null;
 
     for (let index = 0; index < sshArgs.length; index++) {
@@ -371,6 +440,18 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
         if (typeof argument !== 'string' || /[\0\r\n]/.test(argument)) {
             return false;
+        }
+
+        // ssh reads every argument after `--` as the destination or the remote command.
+        if (hasEndOfOptions) {
+            if (targetHost !== null || !/^[a-zA-Z0-9_.][a-zA-Z0-9._-]*@[^@]+$/.test(argument)) {
+                return false;
+            }
+            targetHost = extractTargetHost([argument]);
+            if (!/^(?:[a-zA-Z0-9]|\[)/.test(targetHost ?? '')) {
+                return false;
+            }
+            continue;
         }
 
         if (argument === '-i') {
@@ -391,6 +472,19 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
             continue;
         }
 
+        if (argument === '-F') {
+            if (hasConfigFile || sshArgs[++index] !== '/dev/null') {
+                return false;
+            }
+            hasConfigFile = true;
+            continue;
+        }
+
+        if (argument === '--') {
+            hasEndOfOptions = true;
+            continue;
+        }
+
         if (argument === '-o') {
             const option = sshArgs[++index];
             const separator = option?.indexOf('=') ?? -1;
@@ -407,14 +501,6 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
             continue;
         }
 
-        if (/^[a-zA-Z0-9_][a-zA-Z0-9._-]*@[^@]+$/.test(argument) && targetHost === null) {
-            targetHost = extractTargetHost([argument]);
-            if (!/^(?:[a-zA-Z0-9]|\[)/.test(targetHost ?? '')) {
-                return false;
-            }
-            continue;
-        }
-
         return false;
     }
 
@@ -425,6 +511,7 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
     return hasIdentityFile
         && hasPort
+        && hasConfigFile
         && targetHost !== null
         && hasRequiredOptions
         && hasCompleteMultiplexingOptions

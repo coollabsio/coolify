@@ -7,6 +7,7 @@ use App\Actions\Server\StopLogDrain;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
 use App\Rules\ValidFluentBitConfig;
+use App\Rules\ValidHostname;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -20,6 +21,7 @@ class ServerLogDrainsController extends Controller
         'is_logdrain_axiom_enabled',
         'logdrain_axiom_dataset_name',
         'logdrain_axiom_api_key',
+        'logdrain_axiom_domain',
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
@@ -47,6 +49,7 @@ class ServerLogDrainsController extends Controller
             'logdrain_newrelic_base_uri' => $settings->logdrain_newrelic_base_uri,
             'is_logdrain_axiom_enabled' => (bool) $settings->is_logdrain_axiom_enabled,
             'logdrain_axiom_dataset_name' => $settings->logdrain_axiom_dataset_name,
+            'logdrain_axiom_domain' => $settings->logdrain_axiom_domain,
             'is_logdrain_custom_enabled' => (bool) $settings->is_logdrain_custom_enabled,
             'is_logdrain_cloudwatch_enabled' => (bool) $settings->is_logdrain_cloudwatch_enabled,
             'logdrain_cloudwatch_region' => $settings->logdrain_cloudwatch_region,
@@ -85,6 +88,7 @@ class ServerLogDrainsController extends Controller
                         new OA\Property(property: 'logdrain_newrelic_base_uri', type: 'string', nullable: true),
                         new OA\Property(property: 'is_logdrain_axiom_enabled', type: 'boolean'),
                         new OA\Property(property: 'logdrain_axiom_dataset_name', type: 'string', nullable: true),
+                        new OA\Property(property: 'logdrain_axiom_domain', type: 'string', nullable: true),
                         new OA\Property(property: 'logdrain_axiom_api_key', type: 'string', description: 'Only present with read:sensitive.'),
                         new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                         new OA\Property(property: 'logdrain_custom_config', type: 'string', description: 'Only present with read:sensitive.'),
@@ -138,6 +142,7 @@ class ServerLogDrainsController extends Controller
                     new OA\Property(property: 'logdrain_newrelic_base_uri', type: 'string'),
                     new OA\Property(property: 'is_logdrain_axiom_enabled', type: 'boolean'),
                     new OA\Property(property: 'logdrain_axiom_dataset_name', type: 'string'),
+                    new OA\Property(property: 'logdrain_axiom_domain', type: 'string', description: 'Base domain of the Axiom edge deployment. Default: us-east-1.aws.edge.axiom.co. Use eu-central-1.aws.edge.axiom.co for EU datasets.'),
                     new OA\Property(property: 'logdrain_axiom_api_key', type: 'string'),
                     new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                     new OA\Property(property: 'logdrain_custom_config', type: 'string'),
@@ -185,6 +190,7 @@ class ServerLogDrainsController extends Controller
             'is_logdrain_axiom_enabled' => 'boolean',
             'logdrain_axiom_dataset_name' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
             'logdrain_axiom_api_key' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+            'logdrain_axiom_domain' => ['nullable', 'string', new ValidHostname],
             'is_logdrain_custom_enabled' => 'boolean',
             'logdrain_custom_config' => ['nullable', 'string', new ValidFluentBitConfig],
             'logdrain_custom_config_parser' => ['nullable', 'string', new ValidFluentBitConfig(parsersOnly: true)],
@@ -250,7 +256,7 @@ class ServerLogDrainsController extends Controller
         }
 
         if ($settings->is_logdrain_cloudwatch_enabled) {
-            if ($settings->is_logdrain_newrelic_enabled || $settings->is_logdrain_axiom_enabled || $settings->is_logdrain_custom_enabled || $settings->is_logdrain_highlight_enabled) {
+            if ($settings->is_logdrain_newrelic_enabled || $settings->is_logdrain_axiom_enabled || $settings->is_logdrain_custom_enabled) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [

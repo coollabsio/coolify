@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AccessLevel;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Services\Access\AccessResolver;
 use App\Services\EnvironmentCanvas;
 use App\Services\ProjectCanvas;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +29,7 @@ class ProjectCanvasController extends Controller
             return invalidTokenResponse();
         }
 
-        return response()->json($this->canvas->teamPayload((int) $teamId, (bool) $request->attributes->get('can_read_sensitive', false), $this->canEdit($request, (int) $teamId)));
+        return response()->json($this->canvas->teamPayload((int) $teamId, (bool) $request->attributes->get('can_read_sensitive', false), $this->canEdit($request, app(AccessResolver::class)->allowsTeamWide($request->user(), AccessLevel::Write, (int) $teamId))));
     }
 
     public function show(Request $request, string $uuid): JsonResponse
@@ -42,7 +44,7 @@ class ProjectCanvasController extends Controller
         }
         $this->authorize('view', $project);
 
-        return response()->json($this->canvas->payload($project, (bool) $request->attributes->get('can_read_sensitive', false), $this->canEdit($request, (int) $project->team_id)));
+        return response()->json($this->canvas->payload($project, (bool) $request->attributes->get('can_read_sensitive', false), $this->canEdit($request, $request->user()->can('update', $project))));
     }
 
     /**
@@ -90,13 +92,12 @@ class ProjectCanvasController extends Controller
     }
 
     /**
-     * Same rule as the environment canvas: team admins with a write token move cards and draw links.
+     * Same rule as the environment canvas: users with write access and a write token move cards and draw links.
      */
-    private function canEdit(Request $request, int $teamId): bool
+    private function canEdit(Request $request, bool $hasWriteAccess): bool
     {
-        $user = $request->user();
-        $token = $user->currentAccessToken();
+        $token = $request->user()->currentAccessToken();
 
-        return $user->isAdminOfTeam($teamId) && ($token->can('root') || $token->can('write'));
+        return $hasWriteAccess && ($token->can('root') || $token->can('write'));
     }
 }

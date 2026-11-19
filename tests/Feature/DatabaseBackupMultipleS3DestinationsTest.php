@@ -344,6 +344,29 @@ describe('backup job', function () {
         expect($regionOfBucket)->toBe(['first-bucket' => 'ru-central-1', 'second-bucket' => 'us-east-1']);
     });
 
+    it('sizes the upload parts of a large dump for providers that allow only 1000 parts', function () {
+        $backup = createMultiS3Backup();
+        S3Storage::query()->update(['endpoint' => 'https://8.8.8.8']);
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('files')->andReturn([]);
+        $sshDisk = Storage::disk('ssh-keys');
+        Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+        Storage::shouldReceive('build')->andReturn($disk);
+        $commands = collect();
+        Process::fake(function ($process) use ($commands) {
+            $commands->push(remoteProcessScript($process));
+
+            return Process::result(output: str_contains(remoteProcessScript($process), 'du -b') ? (string) (19 * 1024 * 1024 * 1024) : '');
+        });
+
+        (new DatabaseBackupJob($backup))->handle();
+
+        $uploads = $commands->filter(fn (string $command) => str_contains($command, ' mc cp '));
+        expect(ScheduledDatabaseBackupExecution::query()->sole()->s3_uploaded)->toBeTrue()
+            ->and($uploads)->toHaveCount(2)
+            ->and($uploads->every(fn (string $command) => str_contains($command, 'docker exec -e MC_UPLOAD_MULTIPART_SIZE='.(20 * 1024 * 1024).' backup-of-')))->toBeTrue();
+    });
+
     it('keeps the local file and names the failed destination when one upload fails', function () {
         [$execution, $commands] = runMultiS3BackupJob(['Second']);
 

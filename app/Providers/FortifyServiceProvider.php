@@ -52,6 +52,8 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.register', [
                 'isFirstUser' => $isFirstUser,
+                'isRootUserPredefined' => $isFirstUser && RootSetupWindow::isReservedForPredefinedRootUser(),
+                'isRootSetupWindowPending' => $isFirstUser && RootSetupWindow::isPending(),
                 'isRootSetupWindowClosed' => $isFirstUser && ! RootSetupWindow::isOpen(),
             ]);
         });

@@ -867,3 +867,109 @@ it('keeps the images of an application while it deploys, because its new images 
         ->and($removals->first())->toContain("'{$idle->uuid}:old'")
         ->not->toContain($deploying->uuid);
 })->with(['queued', 'in_progress']);
+
+it('fails an interrupted cleanup of a deleted server without breaking its broadcast', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $interrupted = DockerCleanupExecution::create(['server_id' => $server->id]);
+    $server->delete();
+    Carbon::setTestNow(now()->addSeconds(CleanupDocker::overlapLockExpiresAfter() + 1));
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect($interrupted->fresh()->status)->toBe('failed');
+    Queue::assertPushed(BroadcastEvent::class, fn (BroadcastEvent $job) => $job->event instanceof DockerCleanupDone
+        && $job->event->broadcastOn() === []);
+});
+
+/**
+ * Creates an execution at an exact age, so tests can place it on either side of the stale cutoff.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function dockerCleanupExecutionCreatedSecondsAgo(Server $server, int $secondsAgo, array $attributes = []): DockerCleanupExecution
+{
+    $execution = DockerCleanupExecution::create(['server_id' => $server->id, ...$attributes]);
+    $execution->forceFill(['created_at' => now()->subSeconds($secondsAgo)])->saveQuietly();
+
+    return $execution;
+}
+
+it('fails only running, unfinished cleanups that are older than the server lock and sends one event and notification each', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    Notification::fake();
+    $server = dockerCleanupReachableServer();
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $cutoff = CleanupDocker::overlapLockExpiresAfter();
+
+    $stale = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 1, ['message' => 'still running', 'cleanup_log' => '["kept"]']);
+    $atCutoff = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff);
+    $recent = dockerCleanupExecutionCreatedSecondsAgo($server, 60);
+    $finished = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['finished_at' => now()->subHour()]);
+    $succeeded = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['status' => 'success', 'message' => 'Saved 3%']);
+    $failed = dockerCleanupExecutionCreatedSecondsAgo($server, $cutoff + 3600, ['status' => 'failed', 'message' => 'original error']);
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    $stale->refresh();
+    expect($stale->status)->toBe('failed')
+        ->and($stale->message)->toBe(DockerCleanupJob::INTERRUPTED_MESSAGE)
+        ->and($stale->finished_at)->not->toBeNull()
+        ->and($stale->cleanup_log)->toBe('["kept"]');
+    foreach ([$atCutoff, $recent] as $running) {
+        expect($running->fresh()->only(['status', 'finished_at']))->toBe(['status' => 'running', 'finished_at' => null]);
+    }
+    expect($finished->fresh()->status)->toBe('running')
+        ->and($succeeded->fresh()->only(['status', 'message', 'finished_at']))->toBe(['status' => 'success', 'message' => 'Saved 3%', 'finished_at' => null])
+        ->and($failed->fresh()->only(['status', 'message', 'finished_at']))->toBe(['status' => 'failed', 'message' => 'original error', 'finished_at' => null]);
+
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
+    Event::assertDispatched(DockerCleanupDone::class, fn (DockerCleanupDone $event) => $event->execution->is($stale)
+        && $event->execution->status === 'failed'
+        && $event->teamId === $server->team_id);
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Notification::assertSentTo($server->team, DockerCleanupFailed::class, fn (DockerCleanupFailed $notification) => $notification->server->is($server)
+        && str_contains($notification->message, DockerCleanupJob::INTERRUPTED_MESSAGE));
+});
+
+it('fails interrupted cleanups across more than one batch', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $count = DockerCleanupJob::INTERRUPTED_EXECUTIONS_CHUNK_SIZE * 2 + 1;
+    $staleAge = CleanupDocker::overlapLockExpiresAfter() + 1;
+    foreach (range(1, $count) as $ignored) {
+        dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    }
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect(DockerCleanupExecution::query()->where('status', 'failed')->whereNotNull('finished_at')->count())->toBe($count)
+        ->and(DockerCleanupExecution::query()->where('status', 'running')->count())->toBe(0);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, $count);
+});
+
+it('does not fail a cleanup again when it finished after the stale lookup read it', function () {
+    Carbon::setTestNow(Carbon::create(2026, 10, 28, 12, 0, 0, 'UTC'));
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $staleAge = CleanupDocker::overlapLockExpiresAfter() + 1;
+    $first = dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    $finishesMeanwhile = dockerCleanupExecutionCreatedSecondsAgo($server, $staleAge);
+    DB::listen(function ($query) use ($first, $finishesMeanwhile) {
+        static $done = false;
+        if (! $done && str_starts_with(strtolower($query->sql), 'update') && in_array($first->id, $query->bindings, true)) {
+            $done = true;
+            DockerCleanupExecution::query()->whereKey($finishesMeanwhile->id)->update(['status' => 'success', 'message' => 'done', 'finished_at' => now()]);
+        }
+    });
+
+    DockerCleanupJob::failInterruptedExecutions();
+
+    expect($first->fresh()->status)->toBe('failed')
+        ->and($finishesMeanwhile->fresh()->only(['status', 'message']))->toBe(['status' => 'success', 'message' => 'done']);
+    Event::assertDispatchedTimes(DockerCleanupDone::class, 1);
+});

@@ -7,7 +7,7 @@
 
 services:
   transmission:
-    image: lscr.io/linuxserver/transmission:latest
+    image: lscr.io/linuxserver/transmission:4.1.4
     environment:
       - SERVICE_URL_TRANSMISSION_9091
       - PUID=1000

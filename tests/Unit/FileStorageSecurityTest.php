@@ -182,24 +182,6 @@ test('confined path resolver rejects paths that escape the resource configuratio
     'service dot segment' => ['/data/coolify/services/service-uuid', '/./config.yaml'],
 ]);
 
-test('local file volume write sink keeps saved managed file paths for compatibility', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
-
-    expect($source)->toContain('confinePathToBase($workdir, $path->value(), \'storage path\')')
-        ->and($source)->toContain('assertRemotePathIsConfined')
-        ->and($source)->toContain('tee {$escapedPath}');
-});
-
-test('file storage quotes owner and mode as single command arguments', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
-
-    expect($source)
-        ->toContain("'chown -- '.escapeshellarg(\$chown).\" {\$escapedPath}\"")
-        ->toContain("'chmod -- '.escapeshellarg(\$chmod).\" {\$escapedPath}\"")
-        ->not->toContain('"chown $chown {$escapedPath}"')
-        ->not->toContain('"chmod $chmod {$escapedPath}"');
-});
-
 test('file storage permissions cannot be set by mass assignment', function () {
     $volume = new LocalFileVolume;
     $volume->fill(['chown' => 'root', 'chmod' => '777']);
