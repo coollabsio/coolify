@@ -3556,7 +3556,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Container logs:');
         $this->execute_remote_command(
             [
-                'command' => "docker logs -n 100 {$escapedContainerName}",
+                'command' => remoteCommandWithTimeout("docker logs -n 100 {$escapedContainerName}", 30),
                 'type' => 'stderr',
                 'ignore_errors' => true,
             ],

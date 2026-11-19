@@ -203,7 +203,7 @@ it('wraps the helper command in one sudo shell for non-root servers', function (
     (new ContainerFilesystemService($server, 'app-123', useHelper: true))->list('/');
 
     expect($commands[0])->toContain("sudo cat /proc/$(sudo docker inspect --format '{{.State.Pid}}' 'app-123')/status")
-        ->and($commands[1])->toContain("sudo bash -c 'docker run --rm")
+        ->and($commands[1])->toContain("sudo bash -c 'timeout -k 5s 30s docker run --rm")
         ->and(substr_count($commands[1], 'sudo'))->toBe(1);
 });
 
@@ -387,7 +387,7 @@ it('executes read guards for real file bytes through the non-root sudo parser', 
         $body = implode("\n", array_slice($lines, 1, -1));
         $local = new Symfony\Component\Process\Process([
             'bash', '-c',
-            'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body,
+            'sudo() { "$@"; }; docker() { shift 2; "$@"; }; timeout() { shift 3; "$@"; }; export -f sudo docker timeout;'."\n".$body,
         ]);
         $local->run();
 
@@ -420,7 +420,7 @@ it('rejects a symlink to an oversized file before reading its content', function
     symlink($path, $link);
     Process::fake(function ($process) {
         $body = implode("\n", array_slice(explode("\n", remoteProcessScript($process)), 1, -1));
-        $local = new Symfony\Component\Process\Process(['bash', '-c', 'sudo() { "$@"; }; docker() { shift 2; "$@"; }; export -f sudo docker;'."\n".$body]);
+        $local = new Symfony\Component\Process\Process(['bash', '-c', 'sudo() { "$@"; }; docker() { shift 2; "$@"; }; timeout() { shift 3; "$@"; }; export -f sudo docker timeout;'."\n".$body]);
         $local->run();
 
         return Process::result(output: $local->getOutput(), exitCode: $local->getExitCode());

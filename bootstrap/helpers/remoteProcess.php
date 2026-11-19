@@ -194,6 +194,16 @@ function instant_remote_process_with_input(Server $server, string $remoteCommand
     );
 }
 
+/**
+ * Bound one remote command with `timeout` (GNU coreutils or BusyBox). Without a bound, a command that
+ * waits on a hung or slow dockerd keeps running on the server after the local wait ends, and each
+ * periodic check adds one more process. The local wait must be longer than $seconds plus the 5s kill-after.
+ */
+function remoteCommandWithTimeout(string $command, int $seconds = 20): string
+{
+    return "timeout -k 5s {$seconds}s {$command}";
+}
+
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;

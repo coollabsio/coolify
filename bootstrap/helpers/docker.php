@@ -657,15 +657,15 @@ function executeInDocker(string $containerId, string $command)
 function buildContainerStatusCommand(Server $server, string $container_id): string
 {
     if ($server->isSwarm()) {
-        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
+        return remoteCommandWithTimeout('docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ");
     }
 
-    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
+    return remoteCommandWithTimeout("docker inspect --format '{{json .}}' ".escapeshellarg($container_id));
 }
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError, timeout: 30);
     if (! $container) {
         return 'exited';
     }
@@ -2094,12 +2094,12 @@ function buildContainerLogsCommand(Server $server, string $container_id, int|str
         $command .= ' --timestamps';
     }
 
-    return "{$command} ".escapeshellarg($container_id).' 2>&1';
+    return remoteCommandWithTimeout("{$command} ".escapeshellarg($container_id), 30).' 2>&1';
 }
 
 function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
-    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server, timeout: DOCKER_LOGS_LOCAL_TIMEOUT);
     $output = removeAnsiColors($output);
 
     return $output;
