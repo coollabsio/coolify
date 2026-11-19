@@ -138,6 +138,22 @@ function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
 }
 
 /**
+ * True when the API request can read the secrets of one resource (an application, service, database, or
+ * environment variable): admins with a read:sensitive token, and members whose access grants give
+ * read:sensitive on the resource. Team credentials and server secrets stay admin-only.
+ */
+function canReadResourceSecretsFromApi(?Model $resource): bool
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return true;
+    }
+
+    return $resource !== null
+        && request()->attributes->get('has_read_sensitive_ability', false) === true
+        && (request()->user()?->can('viewSensitive', $resource) ?? false);
+}
+
+/**
  * True when the API token can read server secrets (Sentinel token, log drain keys, proxy configuration).
  * A token limited to some projects, environments, or resources cannot, because servers are team-level.
  */

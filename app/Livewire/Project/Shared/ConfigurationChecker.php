@@ -107,9 +107,8 @@ class ConfigurationChecker extends Component
 
             $array = $diff->toArray();
 
-            // Fail closed: only owners/admins may see unlocked env values.
-            $teamId = $this->resource->team()?->id;
-            $redactEnvironment = is_null($teamId) || ! (bool) auth()->user()?->isAdminOfTeam($teamId);
+            // Fail closed: only users who can read the secrets of the application see unlocked env values.
+            $redactEnvironment = ! (auth()->user()?->can('viewSensitive', $this->resource) ?? false);
             $array['changes'] = $this->redactHiddenChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 
