@@ -139,7 +139,7 @@ class DatabasesController extends Controller
 
     private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -219,7 +219,7 @@ class DatabasesController extends Controller
     private function createdDatabasePayload(Request $request, $database): array
     {
         $payload = ['uuid' => $database->uuid];
-        if ($request->attributes->get('can_read_sensitive', false) !== true) {
+        if (! canReadResourceSecretsFromApi($database)) {
             return $payload;
         }
         $payload['internal_db_url'] = $database->internal_db_url;
@@ -236,7 +236,7 @@ class DatabasesController extends Controller
             'id',
             'laravel_through_key',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($database)) {
             $database->makeVisible([
                 'internal_db_url',
                 'external_db_url',
@@ -373,7 +373,7 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases($databaseRelations));
         }
 
-        if ($request->attributes->get('can_read_sensitive', false) === true) {
+        if ($request->attributes->get('has_read_sensitive_ability', false) === true) {
             // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
             $databases
                 ->filter(fn ($database) => $database instanceof StandaloneRedis || $database instanceof StandaloneKeydb || $database instanceof StandaloneDragonfly)
@@ -3824,7 +3824,7 @@ class DatabasesController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($env)) {
             $env->makeVisible([
                 'value',
                 'real_value',
@@ -5424,7 +5424,7 @@ class DatabasesController extends Controller
     private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution, ?Model $database, array &$secretsByDatabase): void
     {
         $message = $execution->message;
-        if (request()->attributes->get('can_read_sensitive', false) !== true || ! is_string($message) || ! $database) {
+        if (! is_string($message) || ! canReadResourceSecretsFromApi($database)) {
             $execution->setAttribute('message', null);
 
             return;

@@ -120,7 +120,7 @@ class ApplicationsController extends Controller
 
     private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -135,7 +135,7 @@ class ApplicationsController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($application)) {
             $application->makeVisible([
                 ...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
                 'custom_labels',

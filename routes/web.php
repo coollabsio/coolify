@@ -638,8 +638,8 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            if (! auth()->user()->can('manageBackups', $execution->scheduledDatabaseBackup->database)) {
+                return response()->json(['message' => 'You need write access on this database to download its backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -683,8 +683,9 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            $resource = $execution->scheduledVolumeBackup->targetResource();
+            if (is_null($resource) || ! auth()->user()->can('update', $resource)) {
+                return response()->json(['message' => 'You need write access on this resource to download its backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);

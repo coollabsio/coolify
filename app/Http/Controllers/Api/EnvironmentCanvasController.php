@@ -33,7 +33,7 @@ class EnvironmentCanvasController extends Controller
 
         $user = $request->user();
         $token = $user->currentAccessToken();
-        $canEdit = $user->isAdminOfTeam((int) $environment->project->team_id)
+        $canEdit = $user->can('update', $environment)
             && ($token->can('root') || $token->can('write'));
 
         return response()->json($this->canvas->payload(

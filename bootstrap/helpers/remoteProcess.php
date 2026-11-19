@@ -303,12 +303,9 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
     $serverTimezone = getServerTimezone(data_get($application, 'destination.server'));
 
-    // Members should never see debug logs, even if an admin enabled debug mode
-    if ($is_debug_enabled && auth()->check()) {
-        $teamId = $application?->team()?->id;
-        if (is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId)) {
-            $is_debug_enabled = false;
-        }
+    // Debug logs can hold secrets, so only users who can change the application see them
+    if ($is_debug_enabled && auth()->check() && (is_null($application) || auth()->user()->cannot('update', $application))) {
+        $is_debug_enabled = false;
     }
 
     $logs = data_get($application_deployment_queue, 'logs');
