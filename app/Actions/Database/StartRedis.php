@@ -106,10 +106,7 @@ class StartRedis
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD-SHELL',
-                        $this->healthCheckCommand(),
-                    ]),
+                    'healthcheck' => $this->database->healthCheckConfiguration($this->healthCheckCommand()),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -344,13 +341,15 @@ class StartRedis
      * error replies (NOAUTH, LOADING). A custom redis.conf with its own requirepass has a password that
      * Coolify does not know, so that check only requires that the server replies.
      */
-    private function healthCheckCommand(): string
+    private function healthCheckCommand(): array
     {
         if (str_contains((string) $this->database->redis_conf, 'requirepass')) {
-            return "redis-cli ping | grep -qE 'PONG|NOAUTH'";
+            return ['CMD', 'redis-cli', 'ping'];
         }
 
-        return 'redis-cli -a '.$this->requirePassArgument().' --no-auth-warning ping | grep -q PONG';
+        $exitOnError = preg_match('~(^|/)redis:([0-5]|6\.[01])\b~', (string) $this->database->image) === 1 ? [] : ['-e'];
+
+        return ['CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, '--no-auth-warning', ...$exitOnError, 'ping'];
     }
 
     private function add_custom_redis()
