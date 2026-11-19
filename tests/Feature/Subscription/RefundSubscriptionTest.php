@@ -288,7 +288,7 @@ describe('execute', function () {
         expect($result['error'])->toContain('No payment intent');
     });
 
-    test('records refund and proceeds when cancel fails', function () {
+    test('records refund and preserves the subscription when cancel fails', function () {
         $stripeSubscription = (object) [
             'status' => 'active',
             'start_date' => now()->subDays(10)->timestamp,
@@ -327,16 +327,19 @@ describe('execute', function () {
         $action = new RefundSubscription($this->mockStripe);
         $result = $action->execute($this->team);
 
-        // Should still succeed — refund went through
-        expect($result['success'])->toBeTrue();
-        expect($result['error'])->toBeNull();
+        expect($result['success'])->toBeFalse();
+        expect($result['error'])->toBe('Refund succeeded, but subscription cancellation failed.');
 
         $this->subscription->refresh();
         // Refund timestamp must be recorded
         expect($this->subscription->stripe_refunded_at)->not->toBeNull();
-        // Subscription should still be marked as ended locally
-        expect($this->subscription->stripe_invoice_paid)->toBeFalsy();
-        expect($this->subscription->stripe_subscription_id)->toBeNull();
+        expect($this->subscription->stripe_invoice_paid)->toBeTruthy();
+        expect($this->subscription->stripe_subscription_id)->toBe('sub_test_123');
+
+        $retry = $action->execute($this->team->fresh());
+
+        expect($retry['success'])->toBeFalse();
+        expect($retry['error'])->toContain('already been processed');
     });
 
     test('fails when subscription is past refund window', function () {

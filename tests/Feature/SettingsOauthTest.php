@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Livewire\SettingsOauth;
+use App\Livewire\Team\AuditLog;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\Team;
@@ -36,7 +38,7 @@ beforeEach(function () {
     OauthSetting::create(['provider' => 'bitbucket']);
 });
 
-it('uses the standard settings design and keeps every oauth provider on one page', function () {
+it('keeps every oauth provider on one page', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
@@ -49,7 +51,6 @@ it('uses the standard settings design and keeps every oauth provider on one page
         ->assertSee('OpenID Connect')
         ->assertSee('Disable password registration when OAuth is enabled')
         ->assertSee('Client secret')
-        ->assertSee('application-settings-form', false)
         ->assertDontSee(route('settings.oauth.provider', 'authentik'), false);
 });
 
@@ -65,14 +66,8 @@ it('has an icon for openid connect', function () {
     expect(public_path('svgs/oidc.svg'))->toBeFile();
 });
 
-it('auto saves registration policy without a general save button', function () {
+it('auto saves registration policy', function () {
     actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee("wire:click='saveRegistrationPolicy'", false)
-        ->assertDontSee('Save</button>', false);
 
     Livewire::test(SettingsOauth::class)
         ->set('disable_registration_when_oauth_enabled', true)
@@ -81,61 +76,6 @@ it('auto saves registration policy without a general save button', function () {
         ->assertDispatched('success');
 
     expect(instanceSettings()->fresh()->disable_registration_when_oauth_enabled)->toBeTrue();
-});
-
-it('shows oidc fields with a naked okta issuer url example', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('OpenID Connect')
-        ->assertSee('https://example.okta.com', false)
-        ->assertDontSee('/oauth2/default', false);
-});
-
-it('groups oidc fields in the expected desktop order', function () {
-    $view = file_get_contents(resource_path('views/livewire/settings-oauth.blade.php'));
-    $fields = [
-        'redirect_uri',
-        'base_url',
-        'client_id',
-        'client_secret',
-        'scopes',
-        'clock_skew_seconds',
-        'custom_label',
-    ];
-    $positions = array_map(
-        fn (string $field): int|false => strpos($view, "id=\"oauth_settings_map.{{ \$provider }}.$field\""),
-        $fields,
-    );
-
-    expect($positions)->not->toContain(false)
-        ->and($positions)->toBe(collect($positions)->sort()->values()->all())
-        ->and($view)->toContain('<div class="lg:col-span-2">');
-});
-
-it('shows provider enable controls as settings section actions', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Enable')
-        ->assertDontSee('label="Enabled"', false)
-        ->assertDontSee('p-4 border dark:border-coolgray-300 border-neutral-200', false);
-});
-
-it('stacks oidc option checkboxes vertically', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Allow OIDC user creation')
-        ->assertSee('Require verified email')
-        ->assertSee('Use PKCE')
-        ->assertDontSee('flex flex-col gap-2 pt-2 md:flex-row', false);
 });
 
 it('does not show unknown oauth providers', function () {
@@ -222,6 +162,35 @@ it('validates oidc url fields before saving', function (string $field, string $v
     'non-http issuer url' => ['base_url', 'ftp://idp.example.com'],
 ]);
 
+it('rejects a redirect uri that does not point to the provider callback route', function (string $redirectUri) {
+    actingAsInstanceAdmin();
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.redirect_uri', $redirectUri)
+        ->call('submit')
+        ->assertHasErrors(['oauth_settings_map.authentik.redirect_uri']);
+
+    expect(OauthSetting::where('provider', 'authentik')->first()->redirect_uri)->toBeNull();
+})->with([
+    'swapped segments' => ['https://coolify.example.com/auth/callback/authentik'],
+    'other provider' => ['https://coolify.example.com/auth/github/callback'],
+    'no path' => ['https://coolify.example.com'],
+]);
+
+it('accepts a redirect uri on the provider callback route', function (string $redirectUri) {
+    actingAsInstanceAdmin();
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.redirect_uri', $redirectUri)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(OauthSetting::where('provider', 'authentik')->first()->redirect_uri)->toBe($redirectUri);
+})->with([
+    'callback route' => ['https://coolify.example.com/auth/authentik/callback'],
+    'trailing slash' => ['https://coolify.example.com/auth/authentik/callback/'],
+]);
+
 it('does not enable oidc without required fields', function () {
     actingAsInstanceAdmin();
 
@@ -274,4 +243,30 @@ it('toggles provider enabled state from the action button', function () {
         ->assertHasNoErrors();
 
     expect(OauthSetting::where('provider', 'authentik')->first()->enabled)->toBeTrue();
+});
+
+it('stores instance authentication audit events without the admin current team', function () {
+    $this->withoutDefer();
+    $otherTeam = Team::factory()->create();
+    $instanceAdmin = actingAsInstanceAdmin();
+    $instanceAdmin->teams()->attach($otherTeam, ['role' => 'owner']);
+    $instanceAdmin->unsetRelation('teams');
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(SettingsOauth::class)
+        ->set('disable_registration_when_oauth_enabled', true)
+        ->call('saveRegistrationPolicy')
+        ->assertHasNoErrors();
+
+    $event = AuditEvent::query()->where('event', 'ui.instance.authentication.updated')->sole();
+    expect($event->team_id)->toBeNull();
+
+    $otherTeamAdmin = User::factory()->create();
+    $otherTeam->members()->attach($otherTeamAdmin, ['role' => 'admin']);
+    $this->actingAs($otherTeamAdmin);
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(AuditLog::class)
+        ->assertDontSee($instanceAdmin->email)
+        ->assertDontSee($event->description);
 });

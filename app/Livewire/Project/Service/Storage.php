@@ -2,19 +2,28 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Livewire\Project\Shared\Storages\All as StorageList;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Storage extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $resource;
 
@@ -31,9 +40,12 @@ class Storage extends Component
 
     public string $mount_path = '';
 
-    public ?string $host_path = null;
-
     public string $file_storage_path = '';
+
+    /**
+     * Optional host path of a new file mount; empty means the resource directory.
+     */
+    public string $file_storage_source = '';
 
     public ?string $file_storage_content = null;
 
@@ -53,14 +65,23 @@ class Storage extends Component
 
     public int $cachedDirectoryCount = 0;
 
+    /**
+     * External Compose volumes that this resource mounts as written. They have no storage entry,
+     * so the page shows them read-only (see loadExternalVolumes()).
+     *
+     * @var list<array{key: string, dockerName: string, service: string, mountPaths: list<string>}>
+     */
+    #[Locked]
+    public array $externalVolumes = [];
+
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},FileStorageChanged" => 'refreshStoragesFromEvent',
             'storageCountsChanged' => 'refreshStorages',
             'addNewVolume',
+            ...$this->teamChannelListeners([
+                'FileStorageChanged' => 'refreshStoragesFromEvent',
+            ]),
         ];
     }
 
@@ -82,6 +103,7 @@ class Storage extends Component
         // Counts only on mount — child All (volumes) / file list load their own payloads.
         $this->loadVolumeCount();
         $this->loadFileStorageMetaCounts();
+        $this->loadExternalVolumes();
         $this->activeTab = $this->resolveDefaultTab();
         $this->fileStorage = collect();
         $this->loadFileStorageForActiveTab();
@@ -102,6 +124,7 @@ class Storage extends Component
         $this->resource->unsetRelation('persistentStorages');
         $this->loadVolumeCount();
         $this->loadFileStorageMetaCounts();
+        $this->loadExternalVolumes();
         $this->loadFileStorageForActiveTab();
 
         if ($this->activeTab === 'volumes' && $hadVolumes && $this->cachedVolumeCount > 0) {
@@ -139,6 +162,46 @@ class Storage extends Component
     private function loadVolumeCount(): void
     {
         $this->cachedVolumeCount = $this->resource->persistentStorages()->count();
+    }
+
+    /**
+     * Loads the external volumes that the current Compose file of the resource declares and that the
+     * resource mounts as written. Coolify does not manage these volumes, so they have no storage entry.
+     *
+     * Not included:
+     * - an external volume for which the resource still has the old storage entry with the generated
+     *   name. The parsers keep that old volume, and the storage list shows the entry with a note.
+     * - the external volumes of a legacy Compose application (parser version 1 or 2). These parsers
+     *   keep the old volume names, and the deployment log shows a warning.
+     */
+    private function loadExternalVolumes(): void
+    {
+        $this->externalVolumes = [];
+        if (! Gate::allows('view', $this->resource)) {
+            return;
+        }
+
+        if ($this->resource instanceof Application) {
+            if ($this->resource->build_pack !== 'dockercompose' || (int) $this->resource->compose_parsing_version < 3) {
+                return;
+            }
+            $compose = $this->resource->docker_compose_raw;
+            $uuid = $this->resource->uuid;
+            $serviceName = null;
+        } elseif ($this->resource instanceof ServiceApplication || $this->resource instanceof ServiceDatabase) {
+            $compose = $this->resource->service?->docker_compose_raw;
+            $uuid = $this->resource->service?->uuid;
+            $serviceName = $this->resource->name;
+        } else {
+            return;
+        }
+
+        $storageNames = $this->resource->persistentStorages()->pluck('name')->all();
+        $this->externalVolumes = collect(composeExternalVolumeMounts($compose))
+            ->when($serviceName !== null, fn ($mounts) => $mounts->where('service', $serviceName))
+            ->reject(fn (array $mount): bool => in_array("{$uuid}_".Str::slug($mount['key'], '-'), $storageNames, true))
+            ->values()
+            ->all();
     }
 
     /**
@@ -193,6 +256,14 @@ class Storage extends Component
         return collect($this->fileStorage)->where('is_directory', true);
     }
 
+    /**
+     * The reason why the resource cannot get a volume mount, or null if it can.
+     */
+    public function getVolumeUnavailableReasonProperty(): ?string
+    {
+        return $this->resource instanceof Application ? $this->resource->persistentStorageUnavailableReason() : null;
+    }
+
     public function getVolumeCountProperty()
     {
         return $this->cachedVolumeCount;
@@ -215,7 +286,6 @@ class Storage extends Component
 
             if (filled($this->existing_volume)) {
                 $this->existingVolumes = $this->existingVolumesOnServer();
-                $this->host_path = null;
             }
 
             $this->validate([
@@ -225,26 +295,31 @@ class Storage extends Component
                     Rule::in($this->existingVolumes),
                 ],
                 'mount_path' => 'required|string',
-                'host_path' => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             ], array_merge(ValidationPatterns::volumeNameMessages(), [
                 'existing_volume.in' => 'The selected volume is not available on this server.',
                 'existing_volume.regex' => 'The selected volume has an invalid Docker volume name.',
-                'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
             ]));
+
+            if ($reason = $this->volumeUnavailableReason) {
+                $this->dispatch('error', 'Failed to add volume.', $reason);
+
+                return;
+            }
 
             $name = filled($this->existing_volume)
                 ? $this->existing_volume
                 : $this->resource->uuid.'-'.$this->name;
 
-            LocalPersistentVolume::create([
+            $volume = LocalPersistentVolume::create([
                 'name' => $name,
                 'mount_path' => $this->mount_path,
-                'host_path' => $this->host_path,
+                'host_path' => null,
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->getMorphClass(),
                 'is_external' => filled($this->existing_volume),
                 'is_preview_suffix_enabled' => blank($this->existing_volume),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $volume);
             $this->clearForm();
             $this->activeTab = 'volumes';
             $this->refreshStorages();
@@ -274,14 +349,20 @@ class Storage extends Component
 
             $this->validate([
                 'file_storage_path' => 'required|string',
+                'file_storage_source' => 'nullable|string',
                 'file_storage_content' => 'nullable|string',
             ]);
 
             $this->file_storage_path = validateFileMountPath($this->file_storage_path, 'file storage path');
 
-            $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
+            if (filled($this->file_storage_source)) {
+                $fs_path = LocalFileVolume::resolveHostPath($this->fileStorageHostPath(), $this->file_storage_source, 'file storage source path');
+                LocalFileVolume::assertHostPathOnServer($this->fileStorageHostPath(), $fs_path, $this->storageServer(), isDirectory: false);
+            } else {
+                $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
+            }
 
-            LocalFileVolume::create([
+            $fileVolume = LocalFileVolume::create([
                 'fs_path' => $fs_path,
                 'mount_path' => $this->file_storage_path,
                 'content' => $this->file_storage_content,
@@ -289,6 +370,7 @@ class Storage extends Component
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $fileVolume);
 
             $this->clearForm();
             $this->activeTab = 'files';
@@ -314,7 +396,7 @@ class Storage extends Component
             $this->host_file_storage_source = validateHostFileMountPath($this->host_file_storage_source, 'host file source path');
             $this->host_file_storage_destination = validateFileMountPath($this->host_file_storage_destination, 'host file destination path');
 
-            LocalFileVolume::create([
+            $hostFileVolume = LocalFileVolume::create([
                 'fs_path' => $this->host_file_storage_source,
                 'mount_path' => $this->host_file_storage_destination,
                 'content' => null,
@@ -323,6 +405,7 @@ class Storage extends Component
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $hostFileVolume);
 
             $this->clearForm();
             $this->activeTab = 'files';
@@ -345,22 +428,25 @@ class Storage extends Component
                 'file_storage_directory_destination' => 'required|string',
             ]);
 
-            $this->file_storage_directory_source = trim($this->file_storage_directory_source);
-            $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
-            $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
-            $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
+            $this->file_storage_directory_source = LocalFileVolume::resolveHostPath(
+                $this->fileStorageHostPath(),
+                $this->file_storage_directory_source,
+                'storage source path'
+            );
+            $this->file_storage_directory_destination = validateFileMountPath(
+                $this->file_storage_directory_destination,
+                'storage destination path'
+            );
+            LocalFileVolume::assertHostPathOnServer($this->fileStorageHostPath(), $this->file_storage_directory_source, $this->storageServer(), isDirectory: true);
 
-            // Validate paths to prevent command injection
-            validateShellSafePath($this->file_storage_directory_source, 'storage source path');
-            validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
-
-            LocalFileVolume::create([
+            $directoryVolume = LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
                 'mount_path' => $this->file_storage_directory_destination,
                 'is_directory' => true,
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $directoryVolume);
 
             $this->clearForm();
             $this->activeTab = 'directories';
@@ -379,8 +465,8 @@ class Storage extends Component
         $this->existing_volume = null;
         $this->existingVolumes = [];
         $this->mount_path = '';
-        $this->host_path = null;
         $this->file_storage_path = '';
+        $this->file_storage_source = '';
         $this->file_storage_content = null;
         $this->file_storage_directory_destination = '';
         $this->host_file_storage_source = '';
@@ -393,24 +479,12 @@ class Storage extends Component
         }
     }
 
-    private function server(): Server
-    {
-        $server = data_get($this->resource, 'service.server')
-            ?? data_get($this->resource, 'destination.server');
-
-        if (! $server instanceof Server) {
-            throw new \Exception('No server found for this resource.');
-        }
-
-        return $server;
-    }
-
     /** @return array<int, string> */
     private function existingVolumesOnServer(): array
     {
         $output = instant_remote_process(
             ["docker volume ls --format '{{.Name}}'"],
-            $this->server(),
+            $this->storageServer(),
             throwError: false,
         );
 
@@ -451,8 +525,18 @@ class Storage extends Component
         return ($name ?: 'volume').'-data';
     }
 
+    private function storageServer(): Server
+    {
+        return $this->resource->service?->server ?? $this->resource->destination->server;
+    }
+
     public function fileStoragePreviewPath(): string
     {
+        $source = str($this->file_storage_source)->trim();
+        if ($source->isNotEmpty()) {
+            return $source->startsWith('/') ? $source->value() : $this->fileStorageHostPath().'/'.preg_replace('#^\./#', '', $source->value());
+        }
+
         $path = str($this->file_storage_path)->trim();
 
         if ($path->isEmpty()) {

@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Profile;
 
+use App\Actions\User\DeleteUserAccount;
+use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public int $userId;
 
     public string $email;
@@ -95,6 +100,7 @@ class Index extends Component
             Auth::user()->update([
                 'name' => $this->name,
             ]);
+            auditLog('ui.user.profile_updated', $this->auditContext(['changed_fields' => ['name']]));
 
             $this->dispatch('success', 'Profile updated.');
         } catch (\Throwable $e) {
@@ -110,13 +116,10 @@ class Index extends Component
             }
 
             // For self-hosted, check if email is enabled
-            if (! isCloud()) {
-                $settings = instanceSettings();
-                if (! $settings->smtp_enabled && ! $settings->resend_enabled) {
-                    $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
+            if (! isCloud() && ! is_transactional_emails_enabled()) {
+                $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
 
-                    return;
-                }
+                return;
             }
 
             $this->validate([
@@ -145,7 +148,7 @@ class Index extends Component
                 }
 
                 // Additional rate limit by IP address (5 requests per hour)
-                $ipKey = 'email-change:ip:'.request()->ip();
+                $ipKey = 'email-change:ip:'.client_ip(request());
                 if (! RateLimiter::attempt($ipKey, 5, function () {}, 3600)) {
                     $this->dispatch('error', 'Too many requests from your IP address. Please try again later.');
 
@@ -154,6 +157,7 @@ class Index extends Component
             }
 
             Auth::user()->requestEmailChange($this->new_email);
+            auditLog('ui.user.email_change_requested', $this->auditContext());
 
             $this->show_email_change = false;
             $this->show_verification = true;
@@ -216,6 +220,8 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
+                auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
             }
@@ -328,11 +334,35 @@ class Index extends Component
             auth()->user()->update([
                 'password' => Hash::make($this->new_password),
             ]);
+            auditLog('ui.user.password_changed', $this->auditContext());
             $this->dispatch('success', 'Password updated.');
             $this->current_password = '';
             $this->new_password = '';
             $this->new_password_confirmation = '';
             $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function deleteAccount(string $password, array $selectedActions = []): mixed
+    {
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            $deleteUserAccount = app(DeleteUserAccount::class);
+            $deleteUserAccount->handle(Auth::user(), removeTeamResources: $deleteUserAccount->removesTeamResources(Auth::user()));
+            auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+            Auth::guard('web')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            $this->redirect(route('login'));
+
+            return true;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -346,8 +376,24 @@ class Index extends Component
         };
     }
 
+    private function auditContext(array $context = []): array
+    {
+        $user = Auth::user();
+
+        return array_merge([
+            'team_id' => $user->currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+        ], $context);
+    }
+
     public function render()
     {
-        return view('livewire.profile.index');
+        $deleteUserAccount = app(DeleteUserAccount::class);
+
+        return view('livewire.profile.index', [
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user(), $deleteUserAccount->removesTeamResources(Auth::user())),
+            'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
+        ]);
     }
 }

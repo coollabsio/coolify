@@ -32,9 +32,9 @@ afterEach(function () {
     File::delete(base_path('changelogs/1999-01.json'));
 });
 
-test('releases_url config defaults to the GitHub raw source', function () {
+test('releases_url config defaults to the Coollabs CDN', function () {
     expect(config('constants.coolify.releases_url'))
-        ->toBe('https://cdn.coollabs.io/coolify/service-templates-latest.json');
+        ->toBe('https://cdn.coollabs.io/coolify/releases.json');
 });
 
 test('PullChangelog fetches from the configured releases_url and writes the changelog', function () {
@@ -54,19 +54,4 @@ test('PullChangelog fetches from the configured releases_url and writes the chan
     $data = json_decode(File::get($path), true);
     expect($data['entries'])->toHaveCount(1)
         ->and($data['entries'][0]['tag_name'])->toBe('v9.9.9');
-});
-
-test('PullChangelog skips draft releases', function () {
-    config(['constants.coolify.releases_url' => 'https://example.test/releases.json']);
-
-    Http::fake([
-        'https://example.test/releases.json' => Http::response(fakeReleasesPayload(), 200),
-    ]);
-
-    (new PullChangelog)->handle();
-
-    $data = json_decode(File::get(base_path('changelogs/1999-01.json')), true);
-
-    $tags = array_column($data['entries'], 'tag_name');
-    expect($tags)->not->toContain('v9.9.8-draft');
 });

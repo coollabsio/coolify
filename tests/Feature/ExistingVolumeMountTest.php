@@ -4,7 +4,6 @@ use App\Jobs\VolumeCloneJob;
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\Storages\All as AllStorages;
 use App\Models\Application;
-use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
@@ -12,9 +11,11 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
@@ -49,12 +50,6 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows the searchable existing volume field and data corruption warning', function () {
-    Livewire::test(Storage::class, ['resource' => $this->application])
-        ->assertSee('Existing Volume')
-        ->assertSee('Attaching an existing volume that is already used by another container can cause data corruption.');
-});
-
 it('loads unique sorted Docker volumes from the resource server', function () {
     Process::fake([
         '*' => Process::result(output: "zeta-volume\nalpha-volume\nzeta-volume\n"),
@@ -64,7 +59,7 @@ it('loads unique sorted Docker volumes from the resource server', function () {
         ->call('loadExistingVolumes')
         ->assertSet('existingVolumes', ['alpha-volume', 'zeta-volume']);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume ls --format '{{.Name}}'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume ls --format '{{.Name}}'"));
 });
 
 it('attaches an existing volume without changing its Docker name', function () {
@@ -75,8 +70,6 @@ it('attaches an existing volume without changing its Docker name', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
         ->set('existingVolumes', ['shared-database-data'])
         ->set('existing_volume', 'shared-database-data')
-        ->set('isSwarm', true)
-        ->set('host_path', '/previous/source/path')
         ->set('mount_path', '/var/lib/data')
         ->call('submitPersistentVolume')
         ->assertDispatched('success');
@@ -135,170 +128,132 @@ it('does not delete attached external volumes with the application', function ()
     Process::assertNothingRan();
 });
 
-it('allows a Docker Compose volume to keep its declared name', function () {
-    $this->application->update(['build_pack' => 'dockercompose']);
+it('lets a preview deployment create its own volume when the preview suffix is enabled', function () {
     $storage = LocalPersistentVolume::create([
-        'name' => $this->application->uuid.'_app-data',
-        'mount_path' => '/app/data',
+        'name' => 'shared-database-data',
+        'mount_path' => '/var/lib/data',
         'resource_id' => $this->application->id,
         'resource_type' => $this->application->getMorphClass(),
-    ])->load('resource');
+        'is_external' => true,
+    ]);
 
-    expect($storage->isDockerComposeResource())->toBeTrue();
-
-    Livewire::test(AllStorages::class, ['resource' => $this->application])
-        ->assertSee('Use volume name as-is')
-        ->set("forms.{$storage->id}.isNameAsIs", true)
-        ->call('saveNameAsIs', $storage->id)
-        ->assertHasNoErrors()
-        ->assertDispatched('success');
-
-    expect($storage->fresh()->is_name_as_is)->toBeTrue();
+    expect($storage->dockerComposeVolumeDefinition('shared-database-data-pr-7'))->toBe([
+        'name' => 'shared-database-data-pr-7',
+        'external' => false,
+    ]);
 });
 
-it('does not automatically delete name-as-is volumes', function () {
-    $this->application->update(['build_pack' => 'dockercompose']);
+it('does not delete an attached external volume with a standalone database', function () {
+    $database = StandalonePostgresql::create([
+        'name' => 'external-volume-db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'app',
+        'image' => 'postgres:17',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+    $database->persistentStorages()->delete();
     LocalPersistentVolume::create([
-        'name' => 'shared-app-data',
-        'mount_path' => '/app/data',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
+        'name' => 'shared-database-data',
+        'mount_path' => '/var/lib/data',
+        'resource_id' => $database->id,
+        'resource_type' => $database->getMorphClass(),
+        'is_external' => true,
     ]);
     Process::fake();
 
-    $this->application->deleteVolumes();
+    $database->deleteVolumes();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker compose down')
-        && ! str_contains($process->command, 'docker compose down -v'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'docker volume rm'));
+    Process::assertNothingRan();
 });
 
-it('copies name-as-is volume data only when cloning to another server', function () {
-    $storage = LocalPersistentVolume::create([
-        'name' => 'shared-app-data',
-        'mount_path' => '/app/data',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
-    ]);
-    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
-
-    expect($storage->shouldCopyDataWhenCloning(true, $this->server, $this->server))->toBeFalse()
-        ->and($storage->shouldCopyDataWhenCloning(true, $this->server, $otherServer))->toBeTrue()
-        ->and($storage->shouldCopyDataWhenCloning(false, $this->server, $otherServer))->toBeFalse();
-});
-
-it('refuses to overwrite an existing name-as-is volume during a cross-server clone', function () {
-    $storage = LocalPersistentVolume::create([
-        'name' => 'shared-app-data',
-        'mount_path' => '/app/data',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
-    ]);
-    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
-    Process::fake([
-        '*' => Process::result(output: "__COOLIFY_VOLUME_PRESENT__\n"),
-    ]);
-
-    $job = new VolumeCloneJob('shared-app-data', 'shared-app-data', $this->server, $otherServer, $storage);
-
-    expect(fn () => $job->handle())->toThrow(RuntimeException::class, 'already exists');
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume ls'));
-});
-
-it('does not delete a name-as-is volume when deleting a Docker Compose preview', function () {
-    $this->application->update([
-        'build_pack' => 'dockercompose',
-        'docker_compose_raw' => <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - app-data:/app/data
-volumes:
-  app-data:
-    name: shared-app-data
-YAML,
-    ]);
+it('keeps the name of an external volume and copies no data when cloning an application', function () {
     LocalPersistentVolume::create([
         'name' => 'shared-app-data',
         'mount_path' => '/app/data',
-        'container_id' => 'app:app-data',
         'resource_id' => $this->application->id,
         'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
+        'is_external' => true,
     ]);
-    $preview = ApplicationPreview::create([
-        'uuid' => 'preview-with-shared-volume',
-        'application_id' => $this->application->id,
-        'pull_request_id' => 42,
-        'pull_request_html_url' => 'https://example.com/pull/42',
-        'status' => 'exited',
-    ]);
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    Bus::fake();
     Process::fake();
 
-    $preview->forceDelete();
+    $clone = clone_application($this->application, $this->application->destination, cloneVolumeData: true);
 
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'docker volume rm -f')
-        && str_contains($process->command, 'shared-app-data'));
+    $clonedStorage = $clone->persistentStorages()->sole();
+    expect($clonedStorage->name)->toBe('shared-app-data')
+        ->and($clonedStorage->is_external)->toBeTrue();
+    Bus::assertNotDispatched(VolumeCloneJob::class);
 });
 
-it('rejects tampering that enables name-as-is for unsupported resources', function () {
-    $storage = LocalPersistentVolume::create([
-        'name' => 'application-data',
-        'mount_path' => '/app/data',
-        'resource_id' => $this->application->id,
-        'resource_type' => $this->application->getMorphClass(),
-    ])->load('resource');
-
-    Livewire::test(AllStorages::class, ['resource' => $this->application])
-        ->set("forms.{$storage->id}.isNameAsIs", true)
-        ->call('saveNameAsIs', $storage->id);
-
-    expect($storage->fresh()->is_name_as_is)->toBeFalse();
-});
-
-it('does not persist an application clone when its name-as-is target volume already exists', function () {
+it('does not clone an application to a server that does not have its external volume', function () {
     LocalPersistentVolume::create([
         'name' => 'shared-app-data',
         'mount_path' => '/app/data',
         'resource_id' => $this->application->id,
         'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
+        'is_external' => true,
     ]);
     $targetServer = Server::factory()->create([
         'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
     ]);
     $targetDestination = StandaloneDocker::factory()->create([
         'server_id' => $targetServer->id,
         'network' => 'clone-target',
     ]);
     Process::fake([
-        '*' => Process::result(output: "__COOLIFY_VOLUME_PRESENT__\n"),
+        '*' => Process::result(output: "__COOLIFY_VOLUME_ABSENT__\n"),
     ]);
-    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
     $applicationCount = Application::query()->count();
 
-    expect(fn () => clone_application($this->application, $targetDestination, cloneVolumeData: true))
-        ->toThrow(RuntimeException::class, 'already exists');
+    expect(fn () => clone_application($this->application, $targetDestination))
+        ->toThrow(RuntimeException::class, 'does not exist on the target server');
     expect(Application::query()->count())->toBe($applicationCount);
 });
 
-it('fails closed when target volume availability cannot be checked', function () {
+it('fails closed when the external volume cannot be checked on the target server', function () {
     $storage = LocalPersistentVolume::create([
         'name' => 'shared-app-data',
         'mount_path' => '/app/data',
         'resource_id' => $this->application->id,
         'resource_type' => $this->application->getMorphClass(),
-        'is_name_as_is' => true,
+        'is_external' => true,
     ]);
-    $targetServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $targetServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+    ]);
     Process::fake([
         '*' => Process::result(errorOutput: 'SSH connection failed', exitCode: 255),
     ]);
 
-    expect(fn () => $storage->ensureCloneTargetIsAvailable(true, $this->server, $targetServer))
+    expect(fn () => $storage->ensureCloneTargetIsAvailable($this->server, $targetServer))
         ->toThrow(RuntimeException::class);
+});
+
+it('does not rename or delete the Docker volume of an external storage', function () {
+    $storage = LocalPersistentVolume::create([
+        'name' => 'shared-app-data',
+        'mount_path' => '/app/data',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_external' => true,
+    ]);
+    Process::fake();
+
+    $component = Livewire::test(AllStorages::class, ['resource' => $this->application])
+        ->set("forms.{$storage->id}.name", 'other-volume')
+        ->call('submit', $storage->id)
+        ->call('submit', $storage->id, true);
+
+    expect($storage->fresh()->name)->toBe('shared-app-data');
+
+    $component->call('delete', $storage->id, 'password', ['deleteDockerVolume']);
+
+    expect(LocalPersistentVolume::query()->find($storage->id))->toBeNull();
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm'));
 });

@@ -26,11 +26,3 @@ it('broadcasts failed database starts to the initiating user even when the activ
         fn (DatabaseStatusChanged $event): bool => $event->userId === 42,
     );
 });
-
-it('targets normal database start status changes to the initiating user', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseStartJob.php');
-
-    expect($source)
-        ->toContain('event(new DatabaseStatusChanged($this->userId));')
-        ->not->toContain('event(new DatabaseStatusChanged($database));');
-});

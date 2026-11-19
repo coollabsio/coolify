@@ -5,13 +5,20 @@ namespace App\Models;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRestartLimit;
+use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use RuntimeException;
 use Spatie\Url\Url;
+use Throwable;
 
 class ApplicationPreview extends BaseModel
 {
-    use HasRestartLimit, SoftDeletes;
+    use HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
+
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
 
     protected $fillable = [
         'uuid',
@@ -27,6 +34,7 @@ class ApplicationPreview extends BaseModel
         'last_online_at',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'keeps_production_values',
     ];
 
     protected $hidden = [
@@ -37,6 +45,7 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'keeps_production_values' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -46,41 +55,20 @@ class ApplicationPreview extends BaseModel
             $application = $preview->application;
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
-                // Docker Compose volume and network cleanup
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                $volumes = collect(data_get($composeFile, 'volumes'));
-                $networks = data_get($composeFile, 'networks');
-                $networkKeys = collect($networks)->keys();
-                $protectedVolumeNames = $application->persistentStorages()
-                    ->where(function ($query) {
-                        $query->where('is_external', true)
-                            ->orWhere('is_name_as_is', true);
-                    })
-                    ->pluck('name');
-                $volumes->keys()->each(function ($key) use ($server, $volumes, $protectedVolumeNames) {
-                    if (! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
-                        return;
-                    }
-                    if ($protectedVolumeNames->contains($key) || (bool) data_get($volumes->get($key), 'external', false)) {
-                        return;
-                    }
-                    instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);
-                });
-                $networkKeys->each(function ($key) use ($server) {
-                    if (! preg_match(ValidationPatterns::DOCKER_NETWORK_PATTERN, $key)) {
-                        return;
-                    }
-                    $k = escapeshellarg($key);
-                    instant_remote_process(["docker network disconnect {$k} coolify-proxy"], $server, false);
-                    instant_remote_process(["docker network rm {$k}"], $server, false);
-                });
+                $volumeNames = $preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', [])));
+                foreach ($volumeNames as $volumeName) {
+                    // Docker does not remove a volume that a container still uses, also with -f.
+                    instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
+                }
+                // The compose parser stores preview volumes on the application, not on the preview
+                $application->persistentStorages()->whereIn('name', $volumeNames)->delete();
+                $preview->removeComposePreviewNetwork($application, $server);
             } else {
                 // Regular application volume cleanup
                 $persistentStorages = $application->persistentStorages()
                     ->get()
                     ->filter(fn (LocalPersistentVolume $storage): bool => blank($storage->host_path)
-                        && ! $storage->is_external
-                        && ! $storage->is_name_as_is
                         && $storage->is_preview_suffix_enabled);
 
                 foreach ($persistentStorages as $storage) {
@@ -113,6 +101,78 @@ class ApplicationPreview extends BaseModel
         });
     }
 
+    /**
+     * Names of the Docker Compose volumes that Coolify generated for this preview. The parser names
+     * them "{uuid}_{volume}-pr-{id}" ("{uuid}-{volume}-pr-{id}" before parser version 3). Volumes
+     * named in the Compose file (external, shared, or of the main application) are not included.
+     *
+     * @param  Collection<array-key, mixed>  $volumes  top-level volumes of the parsed preview Compose file
+     * @return list<string>
+     */
+    private function generatedComposeVolumeNames(Application $application, Collection $volumes): array
+    {
+        $prefix = $application->uuid.((int) $application->compose_parsing_version >= 3 ? '_' : '-');
+        $suffix = addPreviewDeploymentSuffix('', $this->pull_request_id);
+
+        return $volumes
+            ->map(function (mixed $volume, int|string $key) use ($prefix, $suffix): ?string {
+                $key = (string) $key;
+                if (isComposeExternalVolume($volume)) {
+                    return null;
+                }
+                if (data_get($volume, 'name', $key) !== $key) {
+                    return null;
+                }
+                if (strlen($key) <= strlen($prefix.$suffix)
+                    || ! str_starts_with($key, $prefix)
+                    || ! str_ends_with($key, $suffix)
+                    || ! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
+                    return null;
+                }
+
+                return $key;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Removes the network that the deployment created for this preview ("{uuid}-{id}"). Networks
+     * named in the Compose file (such as coolify or an external proxy network) are never removed.
+     * The network stays when a container other than coolify-proxy still uses it.
+     */
+    private function removeComposePreviewNetwork(Application $application, Server $server): void
+    {
+        $network = "{$application->uuid}-{$this->pull_request_id}";
+        if (! isUsableDockerNetworkName($network) || $network === $application->destination?->network) {
+            return;
+        }
+
+        $quotedNetwork = escapeshellarg($network);
+        try {
+            $output = instant_remote_process(["docker network inspect --format '{{json .Containers}}' {$quotedNetwork}"], $server);
+        } catch (Throwable) {
+            // The network does not exist or its state is not known.
+            return;
+        }
+
+        $containers = json_decode($output ?? '{}', true);
+        if (! is_array($containers)) {
+            return;
+        }
+        $otherContainers = collect($containers)
+            ->map(fn (mixed $container): mixed => data_get($container, 'Name'))
+            ->reject(fn (mixed $name): bool => $name === 'coolify-proxy');
+        if ($otherContainers->isNotEmpty()) {
+            return;
+        }
+
+        instant_remote_process(["docker network disconnect {$quotedNetwork} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$quotedNetwork}"], $server, false);
+    }
+
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
@@ -138,8 +198,23 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domains from the preview URL template.
+     *
+     * With $keepExistingDomains, domains already stored on the preview (for example custom
+     * domains set in the UI) are kept, and only an empty preview gets generated domains.
+     */
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
+        if ($keepExistingDomains && filled($this->fqdn)) {
+            $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
+            $this->fqdn = $normalized['fqdn'];
+            $this->domain_port_overrides = $normalized['overrides'];
+            $this->save();
+
+            return $this;
+        }
+
         $applicationFqdn = $this->application->fqdn;
         if (! $applicationFqdn && $generateWithoutApplicationDomain) {
             $applicationFqdn = generateUrl(
@@ -163,7 +238,13 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domain of every compose service from the preview URL template.
+     *
+     * With $keepExistingDomains, a service that already has domains on the preview keeps them,
+     * and only services without a preview domain get generated domains.
+     */
+    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -204,6 +285,21 @@ class ApplicationPreview extends BaseModel
         $docker_compose_domains = [];
         $previewPortOverrides = [];
         foreach ($serviceNames as $service_name) {
+            $existingPreviewDomains = $keepExistingDomains
+                ? DomainPortOverrides::normalize(getComposeServiceDomainString($previewDomains, $service_name), $this->domain_port_overrides)
+                : ['fqdn' => null, 'overrides' => null];
+            if (filled($existingPreviewDomains['fqdn'])) {
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    $existingPreviewDomains['fqdn'],
+                    $serviceNames,
+                );
+                $previewPortOverrides = array_merge($previewPortOverrides, $existingPreviewDomains['overrides'] ?? []);
+
+                continue;
+            }
+
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
             if (empty($domain_string)) {
@@ -282,6 +378,10 @@ class ApplicationPreview extends BaseModel
         $previewFqdn = str_replace('{{random}}', $random, $template);
         $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
         $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        if (preg_match('#^(https?)://(.*)$#i', $previewFqdn, $matches)) {
+            $schema = strtolower($matches[1]);
+            $previewFqdn = $matches[2];
+        }
         $previewUrl = "{$schema}://{$previewFqdn}{$path}";
         $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
         $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);

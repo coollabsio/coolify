@@ -11,7 +11,7 @@
         {{ $customActions }}
     @else
         <div
-            class="flex lg:items-center flex-col justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 border-neutral-200 dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded-sm">
+            class="flex lg:items-center flex-col justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-modal lg:border-t dark:border-coolgray-300 border-neutral-200 dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded-sm">
             <div
                 class="flex flex-col items-start h-full pb-6 text-xs lg:items-center lg:flex-row lg:pb-0 lg:pr-6 lg:space-x-5 dark:text-neutral-300">
                 @if (isset($icon))

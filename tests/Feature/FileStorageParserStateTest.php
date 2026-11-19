@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\LocalFileVolume;
@@ -11,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
 
@@ -29,34 +31,6 @@ services:
     image: nginx:latest
     volumes:
       - ./data:/app/data
-YAML;
-
-const NAMED_VOLUME_COMPOSE = <<<'YAML'
-services:
-  app:
-    image: nginx:latest
-    volumes:
-      - app-data:/app/data
-volumes:
-  app-data:
-    name: shared-app-data
-YAML;
-
-const SAME_TARGET_NAMED_VOLUMES_COMPOSE = <<<'YAML'
-services:
-  database:
-    image: postgres:latest
-    volumes:
-      - database-data:/data
-  cache:
-    image: redis:latest
-    volumes:
-      - cache-data:/data
-volumes:
-  database-data:
-    name: shared-database-data
-  cache-data:
-    name: shared-cache-data
 YAML;
 
 beforeEach(function () {
@@ -115,6 +89,85 @@ function seedFileVolume($resource, string $baseDir, string $fileName, string $mo
         'resource_type' => $resource->getMorphClass(),
     ]);
 }
+
+it('preserves comments in a service source Compose when parsing', function () {
+    $source = "# Service notes\nservices:\n  app:\n    # Keep this image note\n    image: nginx:latest # pinned by operator\n";
+    [$service] = makeComposeService($source);
+
+    serviceParser($service);
+
+    expect($service->fresh()->docker_compose_raw)->toBe($source)
+        ->and($service->fresh()->docker_compose)->toContain('services:');
+});
+
+it('preserves comments in an application source Compose when parsing', function () {
+    $source = "# Application notes\nservices:\n  app:\n    # Keep this image note\n    image: nginx:latest # pinned by operator\n";
+    $application = makeComposeApplication($source);
+
+    applicationParser($application);
+
+    expect($application->fresh()->docker_compose_raw)->toBe($source)
+        ->and($application->fresh()->docker_compose)->toContain('services:');
+});
+
+it('removes one-time volume fields without losing service source comments', function () {
+    $source = "# Service note\nservices:\n  app:\n    image: nginx:latest # Image note\n    command: |\n      volumes:\n        - type: bind\n          content: keep-this-command\n    volumes:\n      # Volume note\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        content: |\n          first line\n          second line\n        isDirectory: false\n        # After content\n";
+    [$service] = makeComposeService($source);
+
+    serviceParser($service);
+
+    expect($service->fresh()->docker_compose_raw)->toBe("# Service note\nservices:\n  app:\n    image: nginx:latest # Image note\n    command: |\n      volumes:\n        - type: bind\n          content: keep-this-command\n    volumes:\n      # Volume note\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        # After content\n");
+});
+
+it('removes one-time volume fields without losing application source comments', function () {
+    $source = "# Application note\nservices:\n  app:\n    image: nginx:latest # Image note\n    volumes:\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        content: initial\n        is_directory: false\n        # After content\n";
+    $application = makeComposeApplication($source);
+
+    applicationParser($application);
+
+    expect($application->fresh()->docker_compose_raw)->toBe("# Application note\nservices:\n  app:\n    image: nginx:latest # Image note\n    volumes:\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        # After content\n");
+});
+
+it('keeps valid Compose when one-time fields use flow syntax', function () {
+    $source = "# Flow-style volume\nservices:\n  app:\n    image: nginx:latest\n    volumes: [{type: bind, source: ./config.txt, target: /app/config.txt, content: initial}]\n";
+    $cleanedYaml = Yaml::parse($source);
+    unset($cleanedYaml['services']['app']['volumes'][0]['content']);
+
+    $cleanedSource = removeComposeVolumeFieldsPreservingComments($source, $cleanedYaml, ['content']);
+
+    expect(Yaml::parse($cleanedSource))->toBe($cleanedYaml)
+        ->and($cleanedSource)->not->toContain('content: initial');
+});
+
+it('rejects unsafe array source defaults in the application parser', function (string $source) {
+    $application = makeComposeApplication("services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n");
+
+    expect(fn () => applicationParser($application))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:-/tmp/evil`id`}', '${DATA:-/tmp/evil$(id)}', '${DATA:-/tmp/evil;id}']);
+
+it('rejects unsafe array source defaults in the service parser', function (string $source) {
+    [$service] = makeComposeService("services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n");
+
+    expect(fn () => serviceParser($service))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:-/tmp/evil`id`}', '${DATA:-/tmp/evil$(id)}', '${DATA:-/tmp/evil;id}']);
+
+it('keeps safe array source expressions in both parsers', function (string $source) {
+    $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n";
+    $application = makeComposeApplication($compose);
+    [$service] = makeComposeService($compose);
+
+    expect(fn () => applicationParser($application))->not->toThrow(Exception::class)
+        ->and(fn () => serviceParser($service))->not->toThrow(Exception::class);
+})->with(['${DATA}', '${DATA}/config', '${DATA}//config', '${DATA:-/srv/app/data}', '/srv/$HOME/config.yml', '$HOME/$FILE', '${DATA:-/srv/$HOME/config.yml}']);
+
+it('keeps unsupported array source forms rejected in both parsers', function (string $source) {
+    $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n";
+    $application = makeComposeApplication($compose);
+    [$service] = makeComposeService($compose);
+
+    expect(fn () => applicationParser($application))->toThrow(Exception::class, 'Invalid Docker volume definition')
+        ->and(fn () => serviceParser($service))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
 
 it('preserves existing application file volume content when reparsing compose bind mounts', function () {
     $application = makeComposeApplication(TWO_FILE_COMPOSE);
@@ -198,72 +251,26 @@ it('defaults new service bind mounts to directories', function () {
         ->and($fileVolume->is_directory)->toBeTrue();
 });
 
-it('preserves a Docker Compose application volume name when enabled', function () {
-    $application = makeComposeApplication(NAMED_VOLUME_COMPOSE);
+it('queues a new application mount once without loading its service relation', function () {
+    $application = makeComposeApplication(DATA_DIR_COMPOSE);
 
     applicationParser($application);
+    applicationParser($application);
 
-    $storage = $application->persistentStorages()->sole();
-    $storage->update(['is_name_as_is' => true]);
-
-    applicationParser($application->fresh());
-
-    $storage = $application->persistentStorages()->sole();
-
-    expect($storage->name)->toBe('shared-app-data')
-        ->and($storage->is_name_as_is)->toBeTrue();
+    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
+    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
+        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
+    });
 });
 
-it('preserves a Docker Compose service volume name when enabled', function () {
-    [$service, $serviceApplication] = makeComposeService(NAMED_VOLUME_COMPOSE);
+it('queues a new service mount once without loading its service relation', function () {
+    [$service] = makeComposeService(DATA_DIR_COMPOSE);
 
     serviceParser($service);
+    serviceParser($service);
 
-    $storage = $serviceApplication->persistentStorages()->sole();
-    $storage->update(['is_name_as_is' => true]);
-
-    serviceParser($service->fresh());
-
-    $storage = $serviceApplication->persistentStorages()->sole();
-
-    expect($storage->name)->toBe('shared-app-data')
-        ->and($storage->is_name_as_is)->toBeTrue();
-});
-
-it('keeps settings separate for application volumes mounted to the same target by different services', function () {
-    $application = makeComposeApplication(SAME_TARGET_NAMED_VOLUMES_COMPOSE);
-
-    applicationParser($application);
-
-    expect($application->persistentStorages()->count())->toBe(2);
-
-    $databaseStorage = $application->persistentStorages()
-        ->where('name', $application->uuid.'_database-data')
-        ->sole();
-    $databaseStorage->update(['is_name_as_is' => true]);
-
-    applicationParser($application->fresh());
-
-    $storages = $application->persistentStorages()->get();
-
-    expect($storages)->toHaveCount(2)
-        ->and($storages->where('name', 'shared-database-data')->sole()->is_name_as_is)->toBeTrue()
-        ->and($storages->where('name', $application->uuid.'_cache-data')->sole()->is_name_as_is)->toBeFalse();
-});
-
-it('stores a bounded identity for long Compose service and volume names', function () {
-    $volumeName = str_repeat('v', 255);
-    $application = makeComposeApplication(<<<YAML
-services:
-  application-service-with-a-long-name:
-    image: nginx:latest
-    volumes:
-      - {$volumeName}:/data
-volumes:
-  {$volumeName}: {}
-YAML);
-
-    applicationParser($application);
-
-    expect(strlen($application->persistentStorages()->sole()->container_id))->toBeLessThanOrEqual(255);
+    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
+    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
+        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
+    });
 });

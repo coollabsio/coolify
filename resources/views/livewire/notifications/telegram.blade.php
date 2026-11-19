@@ -11,14 +11,15 @@
                 description="Deliver team notifications through a Telegram bot and chat.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$telegramEnabled" enabledProperty="telegramEnabled"
-                        toggleMethod="instantSaveTelegramEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveTelegramEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     @can('update', $settings)
-                        <x-forms.input type="password" autocomplete="new-password" required id="telegramToken"
+                        <x-forms.input type="password" autocomplete="new-password" :required="$telegramEnabled" id="telegramToken"
                             label="Bot API token" helper="Create a bot with BotFather to obtain this token." />
-                        <x-forms.input type="password" autocomplete="new-password" required id="telegramChatId"
+                        <x-forms.input type="password" autocomplete="new-password" :required="$telegramEnabled" id="telegramChatId"
                             label="Chat ID" helper="Add the bot to your chat, then enter that chat ID." />
                     @else
                         <x-forms.input disabled label="Bot API token" value="Hidden (only admins can view)" />

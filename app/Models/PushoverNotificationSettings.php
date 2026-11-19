@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class PushoverNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -32,7 +33,9 @@ class PushoverNotificationSettings extends Model
         'server_reachable_pushover_notifications',
         'server_unreachable_pushover_notifications',
         'server_patch_pushover_notifications',
+        'server_auto_update_pushover_notifications',
         'traefik_outdated_pushover_notifications',
+        'image_vulnerabilities_pushover_notifications',
     ];
 
     protected $hidden = [
@@ -58,7 +61,9 @@ class PushoverNotificationSettings extends Model
         'server_reachable_pushover_notifications' => 'boolean',
         'server_unreachable_pushover_notifications' => 'boolean',
         'server_patch_pushover_notifications' => 'boolean',
+        'server_auto_update_pushover_notifications' => 'boolean',
         'traefik_outdated_pushover_notifications' => 'boolean',
+        'image_vulnerabilities_pushover_notifications' => 'boolean',
     ];
 
     public function team()
@@ -69,5 +74,15 @@ class PushoverNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->pushover_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Pushover';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->pushover_enabled = false;
     }
 }

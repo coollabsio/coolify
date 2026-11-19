@@ -1,6 +1,6 @@
 @props(['application'])
 
-@if ($application->stoppedAfterRestartLimit())
+@if (method_exists($application, 'stoppedAfterRestartLimit') && $application->stoppedAfterRestartLimit())
     @php($restartLimit = method_exists($application, 'restartLimitMaximum') ? $application->restartLimitMaximum() : ($application->max_restart_count ?? 0))
     @php($displayRestartCount = max($application->restart_count ?? 0, $restartLimit))
     <x-status-badge

@@ -1,0 +1,109 @@
+{
+  "id": "evt_1QxExpiredCheckout0000001",
+  "object": "event",
+  "api_version": "2025-02-24.acacia",
+  "created": 1761779100,
+  "data": {
+    "object": {
+      "id": "cs_test_b1ExpiredSubscriptionCheckout000000000000000000000000001",
+      "object": "checkout.session",
+      "adaptive_pricing": null,
+      "after_expiration": {
+        "recovery": {
+          "allow_promotion_codes": false,
+          "enabled": true,
+          "expires_at": 1764371100,
+          "url": "https://buy.stripe.com/r/test_recoveryabc123"
+        }
+      },
+      "allow_promotion_codes": true,
+      "amount_subtotal": 1000,
+      "amount_total": 1000,
+      "automatic_tax": {
+        "enabled": true,
+        "liability": {
+          "type": "self"
+        },
+        "provider": "stripe",
+        "status": "requires_location_inputs"
+      },
+      "billing_address_collection": "required",
+      "cancel_url": "https://app.coolify.io/subscription/new?cancelled=1",
+      "client_reference_id": "{{client_reference_id}}",
+      "client_secret": null,
+      "collected_information": null,
+      "consent": null,
+      "consent_collection": null,
+      "created": 1761777000,
+      "currency": "usd",
+      "currency_conversion": null,
+      "custom_fields": [],
+      "custom_text": {
+        "after_submit": null,
+        "shipping_address": null,
+        "submit": null,
+        "terms_of_service_acceptance": null
+      },
+      "customer": "cus_TestExpiredCheckout",
+      "customer_creation": null,
+      "customer_details": null,
+      "customer_email": null,
+      "discounts": [],
+      "expires_at": 1761779100,
+      "invoice": null,
+      "invoice_creation": null,
+      "livemode": false,
+      "locale": null,
+      "metadata": {},
+      "mode": "subscription",
+      "payment_intent": null,
+      "payment_link": null,
+      "payment_method_collection": "if_required",
+      "payment_method_configuration_details": null,
+      "payment_method_options": {},
+      "payment_method_types": [
+        "card"
+      ],
+      "payment_status": "unpaid",
+      "permissions": null,
+      "phone_number_collection": {
+        "enabled": false
+      },
+      "recovered_from": null,
+      "saved_payment_method_options": {
+        "allow_redisplay_filters": [
+          "always"
+        ],
+        "payment_method_remove": null,
+        "payment_method_save": null
+      },
+      "setup_intent": null,
+      "shipping_address_collection": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "shipping_options": [],
+      "status": "expired",
+      "submit_type": null,
+      "subscription": null,
+      "success_url": "https://app.coolify.io/?success=1",
+      "tax_id_collection": {
+        "enabled": true,
+        "required": "never"
+      },
+      "total_details": {
+        "amount_discount": 0,
+        "amount_shipping": 0,
+        "amount_tax": 0
+      },
+      "ui_mode": "hosted",
+      "url": null
+    }
+  },
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.expired"
+}

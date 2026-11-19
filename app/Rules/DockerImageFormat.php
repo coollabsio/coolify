@@ -10,6 +10,11 @@ use Illuminate\Translation\PotentiallyTranslatedString;
 class DockerImageFormat implements ValidationRule
 {
     /**
+     * @param  bool  $allowVariableTag  Allow $VAR tags. Use it only for images that Docker Compose runs, because only Compose fills in the variables.
+     */
+    public function __construct(private bool $allowVariableTag = false) {}
+
+    /**
      * Run the validation rule.
      *
      * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
@@ -35,15 +40,15 @@ class DockerImageFormat implements ValidationRule
         if (preg_match('/\A(.+)@sha256:([a-f0-9]{64})\z/i', $value, $matches) === 1) {
             $imageName = $matches[1];
         } else {
-            $lastColon = strrpos($value, ':');
             $lastSlash = strrpos($value, '/');
-            if ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash)) {
-                $imageName = substr($value, 0, $lastColon);
-                $tag = substr($value, $lastColon + 1);
+            $tagColon = strpos($value, ':', $lastSlash === false ? 0 : $lastSlash + 1);
+            if ($tagColon !== false) {
+                $imageName = substr($value, 0, $tagColon);
+                $tag = substr($value, $tagColon + 1);
             }
         }
 
-        if (! ValidationPatterns::isValidDockerImageName($imageName) || ! ValidationPatterns::isValidDockerImageTag($tag)) {
+        if (! ValidationPatterns::isValidDockerImageName($imageName) || ! ValidationPatterns::isValidDockerImageTag($tag, allowVariables: $this->allowVariableTag)) {
             $fail('The :attribute format is invalid. Use image:tag or image@sha256:hash format.');
         }
     }

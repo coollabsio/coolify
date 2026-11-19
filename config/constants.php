@@ -1,23 +1,40 @@
 <?php
 
+$release = json_decode(file_get_contents(dirname(__DIR__).'/release.json'), true);
+$upstream = json_decode(file_get_contents(dirname(__DIR__).'/upstream.json'), true);
+
+// 0 or an invalid value would remove the time limit of every remote command.
+$sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
+
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.3.15',
-        'helper_version' => '1.0.16',
-        'realtime_version' => '1.0.18',
-        'railpack_version' => '0.23.0',
+        'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
+        'helper_version' => $upstream['helper']['version'],
+        'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+        // Development only: Docker volumes that the testing-host server mounts at /data/coolify and /data/coolify/backups.
+        // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
+        'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
+        'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
+        // Development only: IP for the seeded sslip.io wildcard domain and application domains (for example a Tailscale IP).
+        'dev_seed_ip' => env('DEV_SEED_IP') ?: '127.0.0.1',
         'registry_url' => env('REGISTRY_URL', 'docker.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-helper'),
-        'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-realtime'),
-        'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
+        // https://hub.docker.com/r/rclone/rclone/tags (also on ghcr.io with the same digest): copies backups to SFTP, FTPS, and WebDAV storages on the servers.
+        'rclone_image' => env('RCLONE_IMAGE', env('REGISTRY_URL', 'docker.io').'/rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5'),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
-        'avatar_cdn_url' => env('AVATAR_CDN_URL'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
         'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),
+        // "sequential" or "concurrent". Empty uses sequential on self-hosted and concurrent on Coolify Cloud.
+        'scheduled_jobs_dispatch_mode' => env('SCHEDULED_JOBS_DISPATCH_MODE'),
+    ],
+
+    'cloud' => [
+        // Days after a subscription ends (or after a never-paid team was created) before cloud:cleanup-unsubscribed-teams deletes the team's data.
+        'data_retention_days' => (int) env('CLOUD_DATA_RETENTION_DAYS', 60),
     ],
 
     'urls' => [
@@ -37,6 +54,12 @@ return [
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
         'command_timeout' => 0,
+        // Docker's default detach escape for `docker attach`. Pressing this
+        // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
+        'detach_keys' => 'ctrl-p,ctrl-q',
+        // Recent log lines shown when a console (attach) session opens, so the
+        // screen is not blank until the next line of live output arrives.
+        'console_history_lines' => 200,
     ],
 
     'pusher' => [
@@ -58,13 +81,19 @@ return [
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
     ],
 
-    'nightwatch' => [
-        'is_nightwatch_enabled' => env('NIGHTWATCH_ENABLED', false),
-    ],
-
     'docker' => [
         'minimum_required_version' => '24.0',
         'stop_timeout_flag_since' => '28.0.0',
+    ],
+
+    // Scanner images run on managed servers, pinned by digest. Change them only with a Coolify release.
+    'image_scan' => [
+        'images' => [
+            'syft' => ['repo' => 'anchore/syft', 'version' => '1.55.0', 'digest' => 'sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a'],
+            'grype' => ['repo' => 'anchore/grype', 'version' => '0.121.0', 'digest' => 'sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea'],
+            'regctl' => ['repo' => 'regclient/regctl', 'version' => '0.11.7', 'digest' => 'sha256:45b57933c2b67bb1e280b4baaa220ef1ab212c81268ab19589fa1e83719c7c82'],
+            'init' => ['repo' => 'alpine', 'version' => '3.22.7', 'digest' => 'sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f'],
+        ],
     ],
 
     'ssh' => [
@@ -78,11 +107,13 @@ return [
         'mux_orphan_reap_enabled' => env('SSH_MUX_ORPHAN_REAP_ENABLED', false), // false = dry-run, only log orphans
         'connection_timeout' => 10,
         'server_interval' => 20,
-        'command_timeout' => env('SSH_COMMAND_TIMEOUT', 3600),
+        'command_timeout' => $sshCommandTimeout > 0 ? $sshCommandTimeout : 3600,
         'max_retries' => env('SSH_MAX_RETRIES', 3),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
         'retry_multiplier' => env('SSH_RETRY_MULTIPLIER', 2),
+        // SSH host key check of managed servers: warn (connect, report a changed key), enforce (refuse a changed key), off.
+        'host_key_checking' => strtolower(trim((string) env('SSH_HOST_KEY_CHECKING', 'warn'))),
     ],
 
     'invitation' => [
@@ -95,10 +126,6 @@ return [
         'verification_code_expiry_minutes' => 10,
     ],
 
-    'sentry' => [
-        'sentry_dsn' => env('SENTRY_DSN'),
-    ],
-
     'sentinel' => [
         'dev_url' => env('DEV_SENTINEL_URL'),
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
@@ -109,22 +136,23 @@ return [
 
     ],
 
-    'proxy' => [
-        // How often (seconds) PushServerUpdateJob periodically re-connects the
-        // proxy to Docker networks as a safety net. Real network-layout changes
-        // already connect the proxy on-demand; this only covers gaps (Swarm
-        // networks added via UI, proxy crash recovery).
-        'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
+    'github_runner' => [
+        // GitHub stops sending jobs to runners that are more than 30 days behind, so the default follows
+        // "latest" and is pulled for every runner. Users can pin a tag in the runner settings.
+        'image' => env('GITHUB_RUNNER_IMAGE', 'ghcr.io/actions/actions-runner:latest'),
+        'dind_image' => env('GITHUB_RUNNER_DIND_IMAGE', 'docker:29.8-dind'),
+        'sysbox' => [
+            'version' => '0.7.1',
+            'checksums' => [
+                'amd64' => '9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5',
+                'arm64' => '04ca894ae0b53f0fa54eaacc173ce40363c9a95ea5450f773716a84ef650a69b',
+            ],
+        ],
     ],
 
     'webhooks' => [
         'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
         'dev_webhook' => env('SERVEO_URL'),
-    ],
-
-    'bunny' => [
-        'storage_api_key' => env('BUNNY_STORAGE_API_KEY'),
-        'api_key' => env('BUNNY_API_KEY'),
     ],
 
     'server_checks' => [

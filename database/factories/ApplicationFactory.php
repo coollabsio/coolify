@@ -13,7 +13,7 @@ class ApplicationFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->name(),
+            'name' => fake()->unique()->words(2, true),
             'destination_id' => 1,
             'git_repository' => fake()->url(),
             'git_branch' => fake()->word(),
@@ -21,6 +21,9 @@ class ApplicationFactory extends Factory
             'ports_exposes' => '3000',
             'environment_id' => 1,
             'destination_id' => 1,
+            'http_basic_auth_bcrypt_cost' => 10,
+            'http_basic_auth_argon2id_memory_cost' => 65536,
+            'http_basic_auth_argon2id_time_cost' => 4,
         ];
     }
 }

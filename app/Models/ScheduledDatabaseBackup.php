@@ -2,18 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Destinations;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
+    use HasS3Destinations;
+
     protected function casts(): array
     {
         return [
             'dump_all' => 'boolean',
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
+            'missing_backup_notification_days' => 'integer',
+            'last_execution_at' => 'datetime',
         ];
     }
 
@@ -37,6 +43,7 @@ class ScheduledDatabaseBackup extends BaseModel
         'database_backup_retention_max_storage_s3',
         'timeout',
         'disable_local_backup',
+        'missing_backup_notification_days',
     ];
 
     public static function ownedByCurrentTeam()
@@ -75,14 +82,14 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 
-    public function get_last_days_backup_status($days = 7)
+    public function s3Storages(): BelongsToMany
     {
-        return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
+        return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
     }
 
     public function executionsPaginated(int $skip = 0, int $take = 10)
     {
-        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->orderBy('created_at', 'desc');
+        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->with('s3Replicas.s3')->orderBy('created_at', 'desc');
         $count = $executions->count();
         $executions = $executions->skip($skip)->take($take)->get();
 

@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Stripe\CancelSubscription;
+use App\Actions\Stripe\FindOpenStripeSubscriptions;
 use App\Actions\Stripe\UpdateSubscriptionQuantity;
 use App\Models\Subscription;
 use App\Models\Team;
@@ -23,7 +25,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(public $event)
     {
-        $this->onQueue('high');
+        $this->onQueue(webhooks_queue());
     }
 
     public function handle(): void
@@ -45,14 +47,18 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $pi = data_get($data, 'payment_intent');
                     $piData = $stripe->paymentIntents->retrieve($pi, []);
                     $customerId = data_get($piData, 'customer');
-                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    if ($subscription) {
-                        $subscriptionId = data_get($subscription, 'stripe_subscription_id');
-                        $stripe->subscriptions->cancel($subscriptionId, []);
-                        $subscription->update([
-                            'stripe_invoice_paid' => false,
-                        ]);
-                        send_internal_notification("Early fraud warning created Refunded, subscription canceled. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    // Cancel every subscription of the email, also those of its other Stripe customers.
+                    $email = $customerId ? $stripe->customers->retrieve($customerId)->email : null;
+                    $subscriptionIds = app(FindOpenStripeSubscriptions::class)->handle([$email], [$customerId])->keys()
+                        ->merge(Subscription::where('stripe_customer_id', $customerId)->whereNotNull('stripe_subscription_id')->pluck('stripe_subscription_id'))
+                        ->unique();
+                    if ($subscriptionIds->isNotEmpty()) {
+                        $failedIds = $subscriptionIds->reject(fn (string $subscriptionId): bool => CancelSubscription::cancelById($subscriptionId));
+                        if ($failedIds->isNotEmpty()) {
+                            send_internal_notification("Early fraud warning: refunded, but could not cancel subscriptions {$failedIds->implode(', ')}. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                            throw new \RuntimeException("Early fraud warning: could not cancel subscriptions {$failedIds->implode(', ')}.");
+                        }
+                        send_internal_notification("Early fraud warning created Refunded, subscriptions canceled: {$subscriptionIds->implode(', ')}. Email: {$email}, Charge: {$charge}, id: {$id}, pi: {$pi}");
                     } else {
                         send_internal_notification("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
                         throw new \RuntimeException("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
@@ -74,7 +80,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                     }
-                    Subscription::updateOrCreate(
+                    $subscription = Subscription::updateOrCreate(
                         ['team_id' => $teamId],
                         [
                             'stripe_subscription_id' => $subscriptionId,
@@ -83,6 +89,44 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_past_due' => false,
                         ]
                     );
+                    logger()->info('Stripe subscription checkout completed.', [
+                        'team_id' => $team->id,
+                        'stripe_customer_id' => $customerId,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                        'stripe_subscription_id' => $subscription->stripe_subscription_id,
+                    ]);
+                    break;
+                case 'checkout.session.expired':
+                    $clientReferenceId = data_get($data, 'client_reference_id');
+                    if (! isCloud() || data_get($data, 'mode') !== 'subscription' || ! is_string($clientReferenceId)) {
+                        break;
+                    }
+                    $userId = Str::before($clientReferenceId, ':');
+                    $teamId = Str::after($clientReferenceId, ':');
+                    $team = Team::find($teamId);
+                    $user = $team?->members->where('id', $userId)->first();
+                    if (! $user?->isAdmin()) {
+                        break;
+                    }
+                    // Atomic claim: one reminder per team per 7 days, also when Stripe delivers several expired sessions at once.
+                    $claimed = Subscription::query()
+                        ->where('team_id', $team->id)
+                        ->where('stripe_invoice_paid', false)
+                        ->where(fn ($query) => $query->whereNull('stripe_checkout_reminder_sent_at')
+                            ->orWhere('stripe_checkout_reminder_sent_at', '<', now()->subDays(7)))
+                        ->update(['stripe_checkout_reminder_sent_at' => now()]);
+                    if ($claimed === 0) {
+                        break;
+                    }
+                    $recoveryUrl = data_get($data, 'after_expiration.recovery.url');
+                    SubscriptionCheckoutReminderJob::dispatch(
+                        $user,
+                        is_string($recoveryUrl) && $recoveryUrl !== '' ? $recoveryUrl : route('subscription.index'),
+                    );
+                    logger()->info('Stripe subscription checkout reminder queued.', [
+                        'team_id' => $team->id,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                    ]);
                     break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
@@ -218,7 +262,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                     }
-                    Subscription::updateOrCreate(
+                    $subscription = Subscription::firstOrCreate(
                         ['team_id' => $teamId],
                         [
                             'stripe_subscription_id' => $subscriptionId,
@@ -226,6 +270,11 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_invoice_paid' => false,
                         ]
                     );
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_customer_id === $customerId) {
+                        $subscription->update(['stripe_subscription_id' => $subscriptionId]);
+                    } elseif ($subscription->stripe_customer_id !== $customerId) {
+                        throw new \RuntimeException("Stripe customer ID mismatch for team {$teamId}: stored {$subscription->stripe_customer_id}, event {$customerId}.");
+                    }
                     break;
                 case 'customer.subscription.updated':
                     $teamId = data_get($data, 'metadata.team_id');
@@ -278,6 +327,9 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         'stripe_plan_id' => $planId,
                         'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                     ]);
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_invoice_paid) {
+                        VerifyStripeSubscriptionStatusJob::dispatch($subscription);
+                    }
                     if ($status === 'paused' || $status === 'incomplete_expired') {
                         if ($subscription->stripe_subscription_id === $subscriptionId) {
                             $subscription->update([
@@ -302,7 +354,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         }
                         $team = data_get($subscription, 'team');
                         if ($team) {
-                            $team->subscriptionEnded();
+                            $team->subscriptionEnded($subscription);
                         } else {
                             // send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
@@ -328,24 +380,40 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $customerId = data_get($data, 'customer');
                     $subscriptionId = data_get($data, 'id');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->where('stripe_subscription_id', $subscriptionId)->first();
-                    if ($subscription) {
-                        $team = data_get($subscription, 'team');
-                        if ($team) {
-                            $team->subscriptionEnded();
-                        } else {
-                            // send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
-                            throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
-                        }
-                    } else {
-                        // send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
+                    if (! $subscription) {
+                        $this->verifyUnlinkedPaidSubscription($customerId);
                         break;
                     }
+                    $team = data_get($subscription, 'team');
+                    if (! $team) {
+                        throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                    }
+                    $team->subscriptionEnded($subscription);
                     break;
                 default:
                     throw new \RuntimeException("Unhandled event type: {$type}");
             }
         } catch (\Exception $e) {
             send_internal_notification('StripeProcessJob error: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * A paid row without a Stripe subscription ID matches no webhook by ID. Verify it against Stripe.
+     */
+    private function verifyUnlinkedPaidSubscription(?string $customerId): void
+    {
+        if (! $customerId) {
+            return;
+        }
+
+        $subscription = Subscription::where('stripe_customer_id', $customerId)
+            ->whereNull('stripe_subscription_id')
+            ->where('stripe_invoice_paid', true)
+            ->first();
+
+        if ($subscription) {
+            VerifyStripeSubscriptionStatusJob::dispatch($subscription);
         }
     }
 }

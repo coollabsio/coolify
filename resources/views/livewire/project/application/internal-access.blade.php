@@ -34,7 +34,7 @@
             Internal hostnames are only reachable by resources connected to this Docker network.
         </p>
         <button type="button" class="button shrink-0"
-            @click="window.scrollToSettingsSection?.('networking-section')">
+            @click="$dispatch('open-networking-modal')">
             Edit networking
         </button>
     </div>

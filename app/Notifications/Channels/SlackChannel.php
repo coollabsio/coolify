@@ -19,6 +19,6 @@ class SlackChannel
             return;
         }
 
-        SendMessageToSlackJob::dispatch($message, $slackSettings->slack_webhook_url);
+        SendMessageToSlackJob::dispatch($message, $slackSettings->slack_webhook_url, data_get($notification, 'isTestNotification', false) ? null : $slackSettings);
     }
 }

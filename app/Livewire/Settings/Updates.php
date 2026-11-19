@@ -31,6 +31,12 @@ class Updates extends Component
     #[Validate('required|string|in:docker.io,ghcr.io')]
     public string $docker_registry_url;
 
+    #[Validate('required|string|in:stable,preview,nightly,custom')]
+    public string $update_channel = 'stable';
+
+    #[Validate('nullable|required_if:update_channel,custom|string|max:128|regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/')]
+    public ?string $update_custom_tag = null;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -45,6 +51,8 @@ class Updates extends Component
         $this->update_check_frequency = $this->settings->update_check_frequency;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->docker_registry_url = $this->settings->docker_registry_url ?: 'docker.io';
+        $this->update_channel = $this->settings->update_channel;
+        $this->update_custom_tag = $this->settings->update_custom_tag;
     }
 
     public function instantSave()
@@ -58,13 +66,32 @@ class Updates extends Component
             }
             $validated = $this->validate([
                 'docker_registry_url' => ['required', 'string', 'in:docker.io,ghcr.io'],
+                'update_channel' => ['required', 'string', 'in:stable,preview,nightly,custom'],
+                'update_custom_tag' => ['nullable', 'required_if:update_channel,custom', 'string', 'max:128', 'regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/'],
             ]);
             $this->settings->auto_update_frequency = $this->auto_update_frequency;
             $this->settings->update_check_frequency = $this->update_check_frequency;
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
+            $this->settings->switchUpdateChannel($validated['update_channel']);
+            $this->settings->update_custom_tag = $validated['update_custom_tag'];
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
+            $channelChanged = $this->settings->isDirty(['update_channel', 'update_custom_tag']);
+            $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
+            if ($channelChanged) {
+                invalidate_versions_cache();
+                (new CheckForUpdatesJob(cdnTries: 1))->handle();
+                $this->dispatch('updateAvailable');
+            }
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'updates',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
             $this->dispatch('success', 'Settings updated!');
         } catch (ValidationException $e) {
             throw $e;
@@ -80,9 +107,7 @@ class Updates extends Component
         }
 
         try {
-            instant_remote_process([
-                $this->registryEnvSyncCommand($registryUrl),
-            ], $this->server);
+            instant_remote_process($this->registryEnvSyncCommand($registryUrl), $this->server);
         } catch (\Exception $e) {
             Log::warning('Failed to sync REGISTRY_URL to .env', [
                 'error' => $e->getMessage(),
@@ -92,13 +117,25 @@ class Updates extends Component
         }
     }
 
-    private function registryEnvSyncCommand(string $registryUrl): string
+    /**
+     * One command per line: the non-root sudo parser adds sudo to line starts, not to `then`/`else` branches,
+     * and a `>>` redirect would be opened by the SSH user.
+     *
+     * @return list<string>
+     */
+    private function registryEnvSyncCommand(string $registryUrl): array
     {
         $envFile = '/data/coolify/source/.env';
         $sedExpression = escapeshellarg("s|^REGISTRY_URL=.*|REGISTRY_URL={$registryUrl}|");
         $registryLine = escapeshellarg("REGISTRY_URL={$registryUrl}");
 
-        return "if grep -q '^REGISTRY_URL=' {$envFile}; then sed -i {$sedExpression} {$envFile}; else printf '%s\\n' {$registryLine} >> {$envFile}; fi";
+        return [
+            "if grep -q '^REGISTRY_URL=' {$envFile}; then",
+            "    sed -i {$sedExpression} {$envFile}",
+            'else',
+            "    printf '%s\\n' {$registryLine} | tee -a {$envFile} > /dev/null",
+            'fi',
+        ];
     }
 
     public function submit()
@@ -111,7 +148,7 @@ class Updates extends Component
             if ($this->is_auto_update_enabled && ! validate_cron_expression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
                 if (empty($this->auto_update_frequency)) {
-                    $this->auto_update_frequency = '0 0 * * *';
+                    $this->auto_update_frequency = InstanceSettings::randomAutoUpdateFrequency();
                 }
 
                 return;
@@ -140,10 +177,14 @@ class Updates extends Component
     public function checkManually()
     {
         $this->authorize('update', $this->settings);
-        CheckForUpdatesJob::dispatchSync();
+        $checked = (new CheckForUpdatesJob(cdnTries: 1))->handle();
         $this->dispatch('updateAvailable');
-        $settings = instanceSettings();
-        if ($settings->new_version_available) {
+        if (! $checked) {
+            $this->dispatch('error', 'Could not check for updates. Try again later.');
+
+            return;
+        }
+        if (instanceSettings()->new_version_available) {
             $this->dispatch('success', 'New version available!');
         } else {
             $this->dispatch('success', 'No new version available.');

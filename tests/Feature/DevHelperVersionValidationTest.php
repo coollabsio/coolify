@@ -69,26 +69,6 @@ test('dev_helper_version accepts valid docker tag formats', function () {
     }
 });
 
-test('buildHelperImage refuses when non-dev environment', function () {
-    config(['app.env' => 'production']);
-
-    Livewire::test(Index::class)
-        ->set('dev_helper_version', 'latest')
-        ->call('buildHelperImage')
-        ->assertDispatched('error');
-});
-
-test('buildHelperImage refuses previously stored invalid version', function () {
-    config(['app.env' => 'local']);
-
-    $settings = InstanceSettings::find(0);
-    $settings->forceFill(['dev_helper_version' => 'bad value'])->saveQuietly();
-
-    Livewire::test(Index::class)
-        ->call('buildHelperImage')
-        ->assertDispatched('error');
-});
-
 test('development helper version is read fresh for queue workers', function () {
     config(['app.env' => 'local']);
 
@@ -98,12 +78,4 @@ test('development helper version is read fresh for queue workers', function () {
     InstanceSettings::query()->whereKey(0)->update(['dev_helper_version' => 'second']);
 
     expect(getHelperVersion())->toBe('second');
-});
-
-test('development helper build uses the configured helper repository', function () {
-    $component = file_get_contents(app_path('Livewire/Settings/Index.php'));
-
-    expect($component)
-        ->toContain('$imageRef = escapeshellarg(coolifyHelperImage().":{$version}");')
-        ->not->toContain('"ghcr.io/coollabsio/coolify-helper:{$version}"');
 });

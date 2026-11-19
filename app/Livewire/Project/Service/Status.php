@@ -3,11 +3,14 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Status extends Component
 {
+    use ListensToTeamChannel;
+
     public Service $service;
 
     public ?string $selectedResourceUuid = null;
@@ -19,11 +22,12 @@ class Status extends Component
 
     public function getListeners(): array
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'refreshStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'refreshStatus',
+            'serviceResourceStatusesChanged' => 'refreshStatus',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'refreshStatus',
+                'ServiceChecked' => 'refreshStatus',
+            ]),
         ];
     }
 
