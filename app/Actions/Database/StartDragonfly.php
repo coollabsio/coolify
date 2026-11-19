@@ -106,7 +106,9 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword,
+                        ...($this->database->enable_ssl ? ['--tls', '--cacert', '/etc/dragonfly/certs/coolify-ca.crt', '--cert', '/etc/dragonfly/certs/server.crt', '--key', '/etc/dragonfly/certs/server.key'] : []),
+                        'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,

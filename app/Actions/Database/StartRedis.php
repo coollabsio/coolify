@@ -343,13 +343,15 @@ class StartRedis
      */
     private function healthCheckCommand(): array
     {
+        $port = $this->database->healthCheckPortArguments($this->database->redis_conf);
+
         if (str_contains((string) $this->database->redis_conf, 'requirepass')) {
-            return ['CMD', 'redis-cli', 'ping'];
+            return ['CMD', 'redis-cli', ...$port, 'ping'];
         }
 
         $exitOnError = preg_match('~(^|/)redis:([0-5]|6\.[01])\b~', (string) $this->database->image) === 1 ? [] : ['-e'];
 
-        return ['CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, '--no-auth-warning', ...$exitOnError, 'ping'];
+        return ['CMD', 'redis-cli', ...$port, '-a', $this->resolvedRedisPassword, '--no-auth-warning', ...$exitOnError, 'ping'];
     }
 
     private function add_custom_redis()
