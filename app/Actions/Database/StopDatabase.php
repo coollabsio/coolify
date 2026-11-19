@@ -8,6 +8,7 @@ use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\BaseModel;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -21,7 +22,7 @@ class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true, bool $keepAnonymousDataVolume = true): string
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true, bool $keepAnonymousDataVolume = true): string
     {
         try {
             $server = $database->destination->server;

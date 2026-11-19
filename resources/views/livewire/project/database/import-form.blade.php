@@ -80,7 +80,12 @@
                                 <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
             @endif
-                    @if ($resourceDbType !== 'standalone-sqlite')
+                    @if ($resourceDbType === 'standalone-influxdb')
+                        <x-callout type="warning" title="The restore replaces the bucket">
+                            Coolify restores the backup into a temporary bucket first. When that succeeds, it deletes the configured bucket and renames the temporary bucket to its name. If the restore fails, the current bucket stays unchanged.
+                        </x-callout>
+                    @endif
+                    @if (! in_array($resourceDbType, ['standalone-sqlite', 'standalone-influxdb'], true))
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
                             ['value' => true, 'label' => 'Backup contains all databases'],
