@@ -245,6 +245,43 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
             ]);
     });
 
+    test('updates only the image of a parsed service whose name contains a dot', function () {
+        $service = Service::factory()->create([
+            'environment_id' => $this->environment->id,
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'docker_compose_raw' => "services:\n  api.test:\n    image: nginx:1.26\n    environment:\n      KEEP: original\n  api:\n    image: redis:7\n",
+        ]);
+        $service->parse();
+        $serviceApplication = $service->applications()->where('name', 'api.test')->firstOrFail();
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$service->uuid}/applications/{$serviceApplication->uuid}", [
+            'image' => 'nginx:1.27',
+        ])->assertSuccessful();
+
+        $service = $service->fresh();
+        expect(parseDockerComposeYaml($service->docker_compose_raw)['services'])->toBe([
+            'api.test' => [
+                'image' => 'nginx:1.27',
+                'environment' => ['KEEP' => 'original'],
+            ],
+            'api' => ['image' => 'redis:7'],
+        ]);
+
+        $service->parse();
+        $parsed = parseDockerComposeYaml($service->fresh()->docker_compose)['services'];
+
+        expect(array_keys($parsed))->toBe(['api.test', 'api'])
+            ->and($parsed['api.test']['image'])->toBe('nginx:1.27')
+            ->and($parsed['api.test']['environment']['KEEP'])->toBe('original')
+            ->and($parsed['api']['image'])->toBe('redis:7')
+            ->and($service->applications()->pluck('image', 'name')->all())->toBe(['api.test' => 'nginx:1.27'])
+            ->and($service->databases()->pluck('image', 'name')->all())->toBe(['api' => 'redis:7']);
+    });
+
     test('updates the HTTP to HTTPS redirect setting', function () {
         config(['app.maintenance.driver' => 'file']);
         $ctx = createServiceWithApplicationForApiTest($this);
@@ -257,6 +294,69 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
 
         $response->assertSuccessful();
         expect($ctx->serviceApplication->fresh()->is_force_https_enabled)->toBeFalse();
+    });
+
+    test('updates the maximum restart count', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['restart_limit_reached' => true]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'max_restart_count' => 0,
+        ])->assertSuccessful()
+            ->assertJsonPath('max_restart_count', 0)
+            ->assertJsonPath('restart_limit_reached', false);
+
+        expect($ctx->serviceApplication->fresh())
+            ->max_restart_count->toBe(0)
+            ->restart_limit_reached->toBeFalse();
+    });
+
+    test('rejects an invalid maximum restart count', function (mixed $value) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'max_restart_count' => $value,
+        ])->assertJsonValidationErrors('max_restart_count');
+    })->with([
+        'negative' => -1,
+        'decimal' => 1.5,
+        'text' => 'unlimited',
+    ]);
+
+    test('updates the traefik certificate resolver', function (?string $initial, ?string $value) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['traefik_certificate_resolver' => $initial]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'traefik_certificate_resolver' => $value,
+        ])->assertSuccessful()
+            ->assertJsonPath('traefik_certificate_resolver', $value);
+
+        expect($ctx->serviceApplication->fresh()->traefik_certificate_resolver)->toBe($value);
+    })->with([
+        'custom resolver' => [null, 'cloudflare'],
+        'no resolver' => [null, 'none'],
+        'server setting' => ['cloudflare', null],
+    ]);
+
+    test('rejects an invalid traefik certificate resolver', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['traefik_certificate_resolver' => 'cloudflare']);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'traefik_certificate_resolver' => 'a.b=c',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+        expect($ctx->serviceApplication->fresh()->traefik_certificate_resolver)->toBe('cloudflare');
     });
 
     test('returns 422 for invalid url scheme', function () {

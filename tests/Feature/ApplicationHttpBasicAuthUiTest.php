@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Livewire\Project\Application\General;
 use App\Models\Application;
 use App\Models\Environment;
@@ -16,6 +17,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -47,9 +49,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
+afterEach(fn () => Server::flushIdentityMap());
+
 function createApplicationForHttpBasicAuth(array $overrides = []): Application
 {
     return Application::factory()->create(array_merge([
+        'name' => 'Basic Auth App',
         'environment_id' => test()->environment->id,
         'destination_id' => test()->destination->id,
         'destination_type' => StandaloneDocker::class,
@@ -112,3 +117,68 @@ test('disabling http basic auth is saved instantly', function () {
 
     expect((bool) $application->is_http_basic_auth_enabled)->toBeFalse();
 });
+
+function useCaddyProxyForHttpBasicAuth(string $image): void
+{
+    test()->server->forceFill(['proxy' => [
+        'type' => ProxyTypes::CADDY->value,
+        'status' => 'running',
+        'last_saved_settings' => 'applied',
+        'last_applied_settings' => 'applied',
+        'last_saved_proxy_configuration' => "services:\n  caddy:\n    image: '{$image}'\n",
+    ]])->save();
+}
+
+test('changing the bcrypt cost factor is saved instantly and applied to the proxy labels', function () {
+    $application = createApplicationForHttpBasicAuth(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('httpBasicAuthBcryptCost', 4)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    $application->refresh();
+
+    expect($application->http_basic_auth_bcrypt_cost)->toBe(4)
+        ->and(base64_decode($application->custom_labels))->toContain('.basicauth.users=admin:$2y$04$');
+});
+
+test('selecting Argon2id is saved instantly and applied to the Caddy labels', function () {
+    useCaddyProxyForHttpBasicAuth('lucaslorentz/caddy-docker-proxy:2.13-alpine');
+    $application = createApplicationForHttpBasicAuth(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('httpBasicAuthHashAlgorithm', 'argon2id')
+        ->set('httpBasicAuthArgon2idMemoryCost', 8192)
+        ->call('instantSave')
+        ->assertDispatched('success')
+        ->assertSee('Iterations')
+        ->assertDontSee('Cost factor');
+
+    expect(base64_decode($application->refresh()->custom_labels))
+        ->toContain('caddy_0.basic_auth=argon2id', 'caddy_0.basic_auth.admin="$argon2id$v=19$m=8192,t=4,p=1$');
+});
+
+test('http basic auth form explains why Argon2id cannot be selected', function (?string $image, string $reason) {
+    if ($image !== null) {
+        useCaddyProxyForHttpBasicAuth($image);
+    }
+
+    Livewire::test(General::class, ['application' => createApplicationForHttpBasicAuth()])
+        ->assertSee($reason);
+})->with([
+    'Traefik' => [null, 'Only supported by the Caddy proxy'],
+    'Caddy 2.10' => ['lucaslorentz/caddy-docker-proxy:2.10-alpine', 'Needs Caddy 2.11 or newer on this server'],
+]);
+
+test('an unsupported http basic auth setting is rejected', function (string $property, mixed $value) {
+    Livewire::test(General::class, ['application' => createApplicationForHttpBasicAuth()])
+        ->set($property, $value)
+        ->call('instantSave')
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+})->with([
+    'Argon2id on a proxy without it' => ['httpBasicAuthHashAlgorithm', 'argon2id'],
+    'bcrypt cost above 14' => ['httpBasicAuthBcryptCost', 15],
+    'password longer than 72 characters' => ['httpBasicAuthPassword', str_repeat('a', 73)],
+]);

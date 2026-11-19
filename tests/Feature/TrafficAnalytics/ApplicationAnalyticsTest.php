@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\Analytics;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -82,6 +83,7 @@ beforeEach(function () {
     // Server (from a prior enabled test) can leak into a later test and be treated as
     // analytics-enabled, mounting the component against an unreachable server.
     Server::flushIdentityMap();
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -114,11 +116,37 @@ function makeAnalyticsApplication(Team $team, PrivateKey $privateKey, Environmen
     ]);
 }
 
+it('renders the disabled state in the initial application analytics page response', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
+
+    $this->get(route('project.application.analytics', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $application->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertDontSee('__lazyLoad', escape: false)
+        ->assertDontSee('analytics-range-section');
+});
+
+it('guards the lazy placeholder when traffic analytics is disabled', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
+
+    Livewire::test(Analytics::class, ['application' => $application, 'lazy' => true])
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertDontSee('analytics-range-section');
+});
+
 it('renders KPIs from a mocked traffic client when analytics is enabled', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
 
     $fake = new FakeAnalyticsTrafficClient($application->destination->server);
     $fake->responses = fakeAnalyticsResponses();
+    $fake->responses['/traffic/breakdown/referer'] = json_encode([
+        ['value' => 'https://www.google.com/search', 'requests' => 250, 'bytes_out' => 7000],
+        ['value' => 'http://google.com/news', 'requests' => 50, 'bytes_out' => 1000],
+    ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
     loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
@@ -129,7 +157,10 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
         ->assertSee('Error rate')
         ->assertSee('/')
         ->assertSee('United States')
-        ->assertSee('GeoIP data by MaxMind');
+        ->assertSee('GeoIP data by MaxMind')
+        ->assertSet('breakdowns.referer', [
+            ['value' => 'google.com', 'requests' => 300, 'bytesOut' => 8000],
+        ]);
 });
 
 it('loads the per-app status time series when Sentinel exposes the series endpoint', function () {
@@ -141,7 +172,6 @@ it('loads the per-app status time series when Sentinel exposes the series endpoi
 
     loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
-        ->assertSet('hasSeries', true)
         ->assertSet('series', [
             ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
@@ -170,28 +200,34 @@ it('decorates per-app paths with the app domain and surfaces AI agents', functio
     expect($component->instance()->topPaths[0]['domain'])->toBe('api.example.com');
 });
 
-it('falls back to the donut for the per-app chart when the series endpoint is absent', function () {
+it('hides the IP breakdown when the server does not record client IPs', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+    $server = $application->destination->server;
+    $server->settings->traffic_ip_mode = 'off';
+    // Saved quietly: a mode change restarts Sentinel, which needs SSH.
+    $server->settings->saveQuietly();
 
-    $responses = fakeAnalyticsResponses();
-    unset($responses['/traffic/series']);
-
-    $fake = new FakeAnalyticsTrafficClient($application->destination->server);
-    $fake->responses = $responses;
+    $fake = new FakeAnalyticsTrafficClient($server);
+    $fake->responses = fakeAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application->fresh()]))
         ->assertOk()
-        ->assertSet('hasSeries', false)
-        ->assertSet('series', []);
+        ->assertSee('Top user agents')
+        ->assertDontSee('Top IPs')
+        ->assertDontSee('198.51.100.42');
 });
 
 it('shows an empty state when traffic analytics is disabled for the server', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
 
-    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
+    Livewire::test(Analytics::class, ['application' => $application, 'lazy' => false])
         ->assertOk()
         ->assertSee('Analytics')
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertSee('Server analytics')
+        ->assertSeeHtml(route('server.analytics', ['server_uuid' => $application->destination->server->uuid]))
+        ->assertDontSee('__lazyLoad', escape: false)
         ->assertDontSee('Unique visitors');
 });
 
@@ -204,8 +240,10 @@ it('renders the disabled empty-state without crashing when the application has n
 
     expect($application->destination)->toBeNull();
 
-    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
+    Livewire::test(Analytics::class, ['application' => $application, 'lazy' => false])
         ->assertOk()
         ->assertSee('Analytics')
-        ->assertDontSee('Server settings');
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertDontSee('__lazyLoad', escape: false)
+        ->assertDontSee('Server analytics');
 });

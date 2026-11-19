@@ -1,4 +1,10 @@
-@props(['status', 'title' => 'Application status', 'containerName' => 'Container', 'align' => 'left'])
+@props([
+    'status',
+    'title' => 'Application status',
+    'containerName' => 'Container',
+    'align' => 'left',
+    'healthcheckUrl' => null,
+])
 
 @php
     $rawStatus = str((string) $status)->lower()->trim()->value();
@@ -79,21 +85,40 @@
             <span class="flex-1">{{ $containerName }}</span>
             <span>{{ $containerLabel }}</span>
         </div>
-        <div class="listbox-option cursor-default! gap-2.5!">
-            <span @class([
+        @php
+            $healthDot = [
                 'size-1.5 shrink-0 rounded-full',
                 'bg-success' => $healthType === 'success',
                 'bg-warning' => $healthType === 'warning',
                 'bg-error' => $healthType === 'error',
-            ])></span>
-            <span class="flex-1">Healthcheck</span>
-            <span class="inline-flex items-center gap-1.5">
-                {{ $healthLabel }}
+            ];
+            $healthHelper = 'No healthcheck is configured, so Coolify can only report the container state. Traffic can still be routed to the container, but Coolify cannot verify that the application inside it is ready to receive requests.';
+        @endphp
+        @if ($healthcheckUrl)
+            <div class="listbox-option gap-0! p-0!">
+                <a href="{{ $healthcheckUrl }}" {{ wireNavigate() }} role="menuitem"
+                    class="flex min-h-8 flex-1 items-center gap-2.5 px-2 py-1.5">
+                    <span @class($healthDot)></span>
+                    <span class="flex-1">Healthcheck</span>
+                    <span>{{ $healthLabel }}</span>
+                </a>
                 @if ($healthLabel === 'Not configured')
-                    <x-helper label="About unconfigured healthchecks"
-                        helper="No healthcheck is configured, so Coolify can only report the container state. Traffic can still be routed to the container, but Coolify cannot verify that the application inside it is ready to receive requests." />
+                    <span class="inline-flex pr-2">
+                        <x-helper label="About unconfigured healthchecks" :helper="$healthHelper" />
+                    </span>
                 @endif
-            </span>
-        </div>
+            </div>
+        @else
+            <div class="listbox-option cursor-default! gap-2.5!">
+                <span @class($healthDot)></span>
+                <span class="flex-1">Healthcheck</span>
+                <span class="inline-flex items-center gap-1.5">
+                    {{ $healthLabel }}
+                    @if ($healthLabel === 'Not configured')
+                        <x-helper label="About unconfigured healthchecks" :helper="$healthHelper" />
+                    @endif
+                </span>
+            </div>
+        @endif
     </div>
 </div>

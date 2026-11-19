@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\StandaloneClickhouse;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('clickhouse uses clickhouse_db field in internal connection string', function () {
     $clickhouse = new StandaloneClickhouse;

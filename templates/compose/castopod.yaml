@@ -7,7 +7,7 @@
 
 services:
   castopod:
-    image: castopod/castopod:1.15.4
+    image: castopod/castopod:1.15.6
     volumes:
       - castopod-media:/var/www/castopod/public/media
     environment:

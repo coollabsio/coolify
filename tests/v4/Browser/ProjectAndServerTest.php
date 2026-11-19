@@ -44,7 +44,9 @@ beforeEach(function () {
 });
 
 it('shows dashboard with projects and servers after login', function () {
-    $page = loginAndSkipBoarding();
+    loginAndSkipBoarding();
+
+    $page = visit('/dashboard');
 
     $page->assertSee('Dashboard')
         ->assertSee('Core Project Alpha')
@@ -85,23 +87,9 @@ it('shows server configuration page for owner', function () {
 
     $page->assertSee('localhost')
         ->assertSee('General')
-        ->assertSee('Configuration')
+        ->assertSee('Server overview')
         ->assertSee('Save')
         ->screenshot(filename: 'core-server-configuration');
-});
-
-it('shows team general and members pages', function () {
-    loginAndSkipBoarding();
-
-    visit('/team')
-        ->assertSee('General')
-        ->assertSee('Danger Zone')
-        ->screenshot(filename: 'core-team-general');
-
-    visit('/team/members')
-        ->assertSee('Members')
-        ->assertSee('Invite a member')
-        ->screenshot(filename: 'core-team-members');
 });
 
 it('shows projects index', function () {

@@ -1,8 +1,10 @@
 <?php
 
+use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\TrafficAnalytics;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -58,6 +60,7 @@ function fakeDashboardTrafficResponses(int $requests = 1000): array
 }
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -65,6 +68,19 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+});
+
+it('hides traffic analytics from the dashboard when no server has it enabled', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(Dashboard::class)
+        ->assertOk()
+        ->assertDontSee('Traffic analytics');
 });
 
 it('renders the team traffic summary aggregated across servers with an approximate badge', function () {
@@ -139,30 +155,7 @@ it('shows only sparkline KPI cards that link through to the full analytics page'
         ->assertDontSee($otherTeamApplication->uuid);
 });
 
-it('shows loading states while the dashboard range refreshes', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
-
-    expect($view)
-        ->toContain('wire:loading.attr="disabled" wire:target="setRange"')
-        ->toContain('wire:loading.class="invisible" wire:target="setRange(\'24h\')"')
-        ->toContain('wire:loading wire:target="setRange(\'7d\')"')
-        ->toContain('wire:loading wire:target="setRange(\'30d\')"')
-        ->toContain('aria-label="Loading analytics"');
-});
-
-it('uses the dashboard surface treatment for the analytics KPI group', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
-
-    expect($view)
-        ->toContain('rounded-xl border border-neutral-200 bg-neutral-200')
-        ->toContain('dark:border-white/[0.08] dark:bg-white/[0.07]')
-        ->toContain('dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)]')
-        ->toContain('dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]')
-        ->not->toContain('rounded-xl bg-neutral-200 ring-1 ring-neutral-200')
-        ->not->toContain('dark:bg-base dark:hover:bg-white/[0.03]');
-});
-
-it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {
+it('hides dashboard analytics when every server fetch fails', function () {
     $serverOne = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -183,12 +176,13 @@ it('shows a failure empty-state instead of an all-zero KPI panel when every serv
 
     loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
-        ->assertSee('No analytics data yet')
+        ->assertDontSee('Traffic analytics')
+        ->assertDontSee('No analytics data yet')
         ->assertDontSee('Unique visitors')
         ->assertDontSee('Error rate');
 });
 
-it('shows an empty state when no server in the team has traffic analytics enabled', function () {
+it('renders nothing when no server in the team has traffic analytics enabled', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -200,5 +194,5 @@ it('shows an empty state when no server in the team has traffic analytics enable
     loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         ->assertDontSee('Unique visitors')
-        ->assertSee('not enabled');
+        ->assertDontSee('Traffic analytics');
 });

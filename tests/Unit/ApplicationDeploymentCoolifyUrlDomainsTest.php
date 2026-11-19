@@ -44,6 +44,7 @@ function coolifyVariablesForFqdn(string $fqdn, string $composeParsingVersion = '
     // The created hook resets this, so it has to be set afterwards.
     $application->compose_parsing_version = $composeParsingVersion;
     $application->save();
+    Application::withoutGlobalScopes()->whereKey($application->id)->update(['fqdn' => $fqdn]);
 
     $job = new TestableCoolifyUrlDeploymentJob;
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
@@ -91,4 +92,60 @@ it('still resolves a single domain', function () {
     expect($variables)
         ->toContain("COOLIFY_URL='https://a.example.com'")
         ->toContain("COOLIFY_FQDN='a.example.com'");
+});
+
+it('ignores a hostless stored domain while setting deployment variables', function () {
+    $variables = coolifyVariablesForFqdn('https://,https://a.example.com');
+
+    expect($variables)
+        ->toContain("COOLIFY_URL='https://a.example.com'")
+        ->toContain("COOLIFY_FQDN='a.example.com'");
+});
+
+it('does not set domain variables for a hostless stored fqdn', function () {
+    $variables = coolifyVariablesForFqdn('https://');
+
+    expect($variables)
+        ->not->toContain('COOLIFY_URL=')
+        ->not->toContain('COOLIFY_FQDN=');
+});
+
+function coolifyEnvFileVariablesForFqdn(string $fqdn, string $composeParsingVersion = '3'): array
+{
+    coolifyVariablesForFqdn($fqdn, $composeParsingVersion);
+    $application = Application::withoutGlobalScopes()->latest('id')->firstOrFail();
+
+    $job = new TestableCoolifyUrlDeploymentJob;
+    $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
+
+    foreach ([
+        'application' => $application,
+        'pull_request_id' => 0,
+        'commit' => 'HEAD',
+        'branch' => 'main',
+    ] as $property => $value) {
+        $reflection->getProperty($property)->setValue($job, $value);
+    }
+
+    return $reflection->getMethod('generate_coolify_env_variables')->invoke($job, true)->all();
+}
+
+it('drops the path from COOLIFY_FQDN in the generated env file', function () {
+    $envs = coolifyEnvFileVariablesForFqdn('http://x.com/admin');
+
+    expect($envs['COOLIFY_FQDN'])->toBe('x.com')
+        ->and($envs['COOLIFY_URL'])->toBe('http://x.com/admin');
+});
+
+it('drops the path and port from every domain in the generated env file', function () {
+    $envs = coolifyEnvFileVariablesForFqdn('https://a.example.com/admin,https://b.example.com:8080/api');
+
+    expect($envs['COOLIFY_FQDN'])->toBe('a.example.com,b.example.com');
+});
+
+it('drops the path from COOLIFY_URL in the generated env file on the legacy compose parsing version', function () {
+    $envs = coolifyEnvFileVariablesForFqdn('http://x.com/admin', '2');
+
+    expect($envs['COOLIFY_URL'])->toBe('x.com')
+        ->and($envs['COOLIFY_FQDN'])->toBe('http://x.com/admin');
 });

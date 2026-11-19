@@ -151,7 +151,7 @@
                         <div class="compose-editor-container min-h-[24rem] overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-white/[0.10] dark:bg-[#0b0b0c]"
                             style="--editor-height: clamp(24rem, calc(100dvh - 25rem), 48rem)">
                             <x-forms.monaco-editor id="editorContent" name="editorContent" language="yaml"
-                                readonly="" autofocus="" diff
+                                :readonly="! $canUpdate" autofocus="" diff
                                 :original="(string) $service->docker_compose_raw" />
                         </div>
 

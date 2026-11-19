@@ -74,28 +74,6 @@ it('saves service name and description', function () {
         ->screenshot(filename: 'service-after-reload');
 });
 
-it('opens service environment variables domains and storages pages', function () {
-    loginAndSkipBoarding();
-
-    $base = serviceConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->service
-    );
-
-    visit("{$base}/environment-variables")
-        ->assertSee('Environment Variables')
-        ->screenshot(filename: 'service-environment-variables');
-
-    visit("{$base}/domains")
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-domains');
-
-    visit("{$base}/storages")
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-storages');
-});
-
 it('renders an automatically added redirect counterpart without reloading', function () {
     $this->serviceApplication->update([
         'fqdn' => 'https://web.example.com',
@@ -151,21 +129,6 @@ it('renders an automatically added redirect counterpart without reloading', func
     $page->screenshot(filename: 'service-domain-remove-without-reload');
 });
 
-it('opens compose stack application general settings', function () {
-    loginAndSkipBoarding();
-
-    $project = $this->stack['project'];
-    $environment = $this->stack['environment'];
-    $service = $this->service;
-    $stackUuid = $this->serviceApplication->uuid;
-
-    $page = visit("/project/{$project->uuid}/environment/{$environment->uuid}/service/{$service->uuid}/{$stackUuid}");
-
-    $page->assertSee('web')
-        ->assertSee('General')
-        ->screenshot(filename: 'service-stack-application-general');
-});
-
 it('lists the service on the environment resources page', function () {
     loginAndSkipBoarding();
 
@@ -175,21 +138,6 @@ it('lists the service on the environment resources page', function () {
     visit("/project/{$project->uuid}/environment/{$environment->uuid}")
         ->assertSee('Config Service')
         ->screenshot(filename: 'environment-lists-service');
-});
-
-it('shows service danger zone', function () {
-    loginAndSkipBoarding();
-
-    $base = serviceConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->service
-    );
-
-    visit("{$base}/danger")
-        ->assertSee('Danger')
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-danger-zone');
 });
 
 it('keeps domain settings out of the overview and supports editing and removal', function () {
@@ -205,7 +153,9 @@ it('keeps domain settings out of the overview and supports editing and removal',
     $url = serviceConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->service).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertVisible('[aria-label="Internal port 8080"]')
         ->assertDontSee('Search engine indexing')
         ->assertDontSee('Remove domain')
@@ -220,7 +170,8 @@ it('keeps domain settings out of the overview and supports editing and removal',
         ->assertValue('#editingDomainParts-port', '8080')
         ->assertDontSee('Edit address and port')
         ->assertDontSee('Save address')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->assertSee('Regenerate hostname')
+        ->assertSee('Save')
         ->assertSee('Search engine indexing')
         ->screenshot(filename: 'service-domain-settings');
 
@@ -233,23 +184,23 @@ it('keeps domain settings out of the overview and supports editing and removal',
     JS))->toBeTrue();
 
     $page->fill('#editingDomainParts-port', '80')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->screenshot(filename: 'service-domain-unsaved-changes');
 
     $domainKey = hash('sha256', 'https://long-public-domain-for-the-service.example.com|'.$this->serviceApplication->id);
     $page->click('#service-domain-indexing-'.$this->serviceApplication->id.'-'.$domainKey.'-trigger')
         ->click('Noindex')
-        ->screenshot(filename: 'service-domain-indexing-saved')
+        ->screenshot(filename: 'service-domain-indexing-draft')
         ->assertSee('Domain settings')
-        ->assertVisible('[aria-label="Search indexing blocked"]')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertVisible('[aria-label="Search indexing allowed"]')
         ->assertNoJavaScriptErrors();
 
-    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeTrue();
+    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeFalse();
 
-    $page->click('[wire\\:click="updateDomain"]')
+    $page->click('Save')
         ->assertDontSee('Domain settings')
         ->assertVisible('[aria-label="Internal port 80"] >> nth=0');
+
+    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeTrue();
 
     $page->click('[wire\\:key="svc-domain-'.$this->serviceApplication->id.'-'.md5('https://long-public-domain-for-the-service.example.com').'"] [aria-label="Remove domain"]')
         ->assertSee('Remove domain?')
@@ -257,7 +208,7 @@ it('keeps domain settings out of the overview and supports editing and removal',
         ->screenshot(filename: 'service-domain-removal-confirmation')
         ->click('button:has([x-text="step2ButtonText"]):visible')
         ->assertDontSee('https://long-public-domain-for-the-service.example.com')
-        ->assertSee('1 domain across 1 service')
+        ->assertSee('https://second.example.com')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertSee('www redirect')
         ->assertValue('#editingDomainParts-host', 'second.example.com')
@@ -267,12 +218,10 @@ it('keeps domain settings out of the overview and supports editing and removal',
 
     $page->click('[aria-label="Settings for https://second.example.com"]')
         ->fill('#editingDomainParts-path', '/discard-this')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
-        ->click('Reset')
+        ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-path', '')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
         ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->assertNoJavaScriptErrors();

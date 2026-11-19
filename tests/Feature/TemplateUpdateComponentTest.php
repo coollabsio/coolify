@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\TemplateUpdateChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Once;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -232,4 +233,61 @@ it('dismisses the current version so the badge is suppressed', function () {
     $service->refresh();
     expect($service->template_dismissed_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
     expect(TemplateUpdateChecker::showBadge($service))->toBeFalse();
+});
+
+it('rejects a compose that fails the command injection check', function () {
+    $service = makeDemoService();
+    $original = $service->docker_compose_raw;
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', "services:\n  'app;id':\n    image: nginx:2\n")
+        ->call('applyEditor')
+        ->assertDispatched('error');
+
+    expect($service->refresh()->docker_compose_raw)->toBe($original);
+});
+
+it('refuses to apply hunks once the template changed after render', function () {
+    $service = makeDemoService();
+    $component = Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->set('acceptedHunks', [0 => true]);
+
+    Cache::forever('coolify:service-templates-bundle', [
+        'fetched_at' => now()->addMinute()->toIso8601String(),
+        'json' => json_encode(['demo' => ['compose' => base64_encode("services:\n  app:\n    image: nginx:3\n")]]),
+    ]);
+    Once::flush();
+
+    $component->call('apply')
+        ->assertDispatched('error')
+        ->assertSet('acceptedHunks', [])
+        ->assertSee('image: nginx:3');
+
+    $service->refresh();
+    expect($service->docker_compose_raw)->toContain('nginx:1')
+        ->and($service->template_reference_hash)->toBe('stale');
+});
+
+it('shows the refreshed diff right after replacing with the latest template', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('replaceAll')
+        ->assertSee('Your compose already matches the latest template.')
+        ->assertSee('Up to date');
+
+    expect($service->refresh()->docker_compose_raw)->toContain('nginx:2');
+});
+
+it('forbids a team member from applying template changes', function () {
+    $service = makeDemoService();
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('replaceAll');
+
+    expect($service->refresh()->docker_compose_raw)->toContain('nginx:1');
 });

@@ -7,16 +7,26 @@
                 && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
                 && !$wire.showPortWarningModal;
         },
-        openEditDomain() {
+        editingServiceLabel: '',
+        openEditDomain(index, domain, parts, service) {
+            if (index !== undefined) {
+                $wire.set('editingIndex', index, false);
+                $wire.set('editingDomainParts', parts, false);
+            }
+            this.editingServiceLabel = service || '';
             this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
             this.editOpen = true;
             this.$nextTick(() => this.$refs.editForm.querySelector('input[required]')?.focus());
         },
-        closeEditDomain() { this.editOpen = false; this.editingDomainBaseline = null; },
+        closeEditDomain(discardDraft = true) {
+            this.editOpen = false;
+            this.editingDomainBaseline = null;
+            if (discardDraft) this.$wire.cancelEdit();
+        },
         matchesDomainSearch(value) { return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase()); },
     }"
     @open-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) openEditDomain()"
-    @close-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) closeEditDomain()"
+    @close-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) closeEditDomain(false)"
     @keydown.escape.window="if (editOpen && !$wire.showPortWarningModal) closeEditDomain()">
     @if (collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking'))
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
@@ -31,7 +41,7 @@
         @endif
         @can('update', $preview->application)
             @if (count($domainRows) > 0)
-                <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
+                <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
                     <x-reicon name="refresh" class="size-3.5" />
                     Check all DNS
                 </x-forms.button>
@@ -100,6 +110,10 @@
                             default => 'DNS unknown',
                         };
                         $domainKey = hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
+                        $editingParts = \App\Support\DomainUrlParts::split($row['url']);
+                        if ($row['has_port_override'] ?? false) {
+                            $editingParts['port'] = (string) $row['internal_port'];
+                        }
                     @endphp
                     <div wire:key="preview-domain-{{ md5(($row['service'] ?? '') . $row['url']) }}" x-show="matchesDomainSearch(@js(($row['service'] ?? '').' '.$row['url']))" class="env-table-item">
                         <div class="data-table-row service-domains-overview-grid">
@@ -107,7 +121,7 @@
                                 <div class="flex min-w-0 items-center gap-2">
                                     <x-reicon name="globe" class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" />
                                     <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank" rel="noopener noreferrer"
-                                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                        class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                                         title="{{ getFqdnWithoutPort($row['url']) }}">{{ getFqdnWithoutPort($row['url']) }}</a>
                                 </div>
                             </div>
@@ -152,40 +166,44 @@
                             </div>
 
                             <div class="service-domain-dns flex min-w-0 items-center">
-                                <x-status-badge :status="$dnsLabel" :type="$dnsType" :title="$row['dns_message']" />
+                                @if ($row['dns_status'] === 'checking')
+                                    <x-status-badge dynamic :title="$row['dns_message']">
+                                        <x-loading compact aria-label="Checking DNS" />
+                                        <span class="truncate">Checking DNS...</span>
+                                    </x-status-badge>
+                                @else
+                                    <x-status-badge :status="$dnsLabel" :type="$dnsType" :title="$row['dns_message']" />
+                                @endif
                             </div>
                             <div class="service-domain-actions flex items-center justify-end gap-1">
                                 @can('update', $preview->application)
-                                    <button type="button" wire:click="checkDomainDns({{ $index }})"
-                                        wire:loading.attr="disabled"
-                                        wire:target="checkDomainDns({{ $index }}),checkAllDns"
-                                        class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                                        <x-reicon name="refresh" class="size-3.5" wire:loading.remove.delay
-                                            wire:target="checkDomainDns({{ $index }}),checkAllDns" />
-                                        <x-loading-on-button wire:loading.delay
-                                            wire:target="checkDomainDns({{ $index }}),checkAllDns" />
-                                    </button>
-                                    <button type="button" wire:click="startEdit({{ $index }})"
-                                        class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ getFqdnWithoutPort($row['url']) }}">
-                                        <x-reicon name="settings" class="size-3.5" />
-                                    </button>
-                                    <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
-                                        buttonTitle="Remove" isErrorButton
-                                        submitAction="removeDomainByKey({{ $domainKey }})"
-                                        :actions="[
-                                            'This domain will be removed from the preview deployment.',
-                                            'Redeploy the preview to apply proxy changes.',
-                                        ]"
-                                        :confirmWithPassword="false" :confirmWithText="false"
-                                        step2ButtonText="Remove domain">
-                                        <x-slot:trigger>
-                                            <button type="button"
-                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                title="Remove domain" aria-label="Remove domain">
-                                                <x-reicon name="trash" class="size-3.5" />
-                                            </button>
-                                        </x-slot:trigger>
-                                    </x-modal-confirmation>
+                                    <x-table.row-actions label="Domain actions">
+                                        <x-table.row-action wire:click="checkDomainDns({{ $index }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="checkDomainDns({{ $index }}),checkAllDns">
+                                            Check DNS
+                                        </x-table.row-action>
+                                        <x-table.row-action
+                                            x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from($row['service']) }})"
+                                            aria-label="Edit {{ getFqdnWithoutPort($row['url']) }}">
+                                            Edit
+                                        </x-table.row-action>
+                                        <x-slot:danger>
+                                            <x-modal-confirmation buttonFullWidth title="Remove domain?"
+                                                buttonTitle="Remove" isErrorButton
+                                                submitAction="removeDomainByKey({{ $domainKey }})"
+                                                :actions="[
+                                                    'This domain will be removed from the preview deployment.',
+                                                    'Redeploy the preview to apply proxy changes.',
+                                                ]"
+                                                :confirmWithPassword="false" :confirmWithText="false"
+                                                step2ButtonText="Remove domain">
+                                                <x-slot:trigger>
+                                                    <x-table.row-action>Delete</x-table.row-action>
+                                                </x-slot:trigger>
+                                            </x-modal-confirmation>
+                                        </x-slot:danger>
+                                    </x-table.row-actions>
                                 @endcan
                             </div>
                         </div>
@@ -212,12 +230,12 @@
                     </header>
                     <div class="application-settings-section-body">
                         <form x-ref="editForm" wire:submit="updateDomain" class="flex flex-col gap-4">
-                            <template x-if="editOpen">
-                                <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges" targets="updateDomain,confirmUseUnknownPort" />
-                            </template>
-                            @if ($editingIndex !== null && filled($domainRows[$editingIndex]['service'] ?? null))
-                                <x-forms.input label="Service" :value="$domainRows[$editingIndex]['service']" readonly />
-                            @endif
+                            <div x-show="editingServiceLabel" x-cloak>
+                                <div class="mb-1.5 flex h-4 items-center">
+                                    <label class="mb-0! leading-4">Service</label>
+                                </div>
+                                <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
+                            </div>
                             <x-forms.domain-input id="editingDomainParts" />
                             <div class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
                                 <x-forms.listbox id="preview-domain-indexing-{{ $preview->id }}" label="Search engine indexing"
@@ -232,6 +250,10 @@
                                         ['value' => 'www', 'label' => 'Redirect to www'],
                                         ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                     ]" />
+                            </div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                <x-forms.button type="button" wire:click="regenerateEditingDomain">Regenerate hostname</x-forms.button>
+                                <x-forms.button type="submit" isHighlighted>Save</x-forms.button>
                             </div>
                         </form>
                     </div>

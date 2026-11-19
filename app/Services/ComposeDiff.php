@@ -2,15 +2,12 @@
 
 namespace App\Services;
 
-use Symfony\Component\Yaml\Yaml;
-use Throwable;
-
 class ComposeDiff
 {
     private const CONTEXT = 3;
 
-    /** Above this line count on either side, skip the quadratic LCS and treat the change as a whole-file replace. */
-    private const MAX_LCS_LINES = 4000;
+    /** Above this many LCS matrix cells (~8 MB), treat the changed region as one replacement. */
+    private const MAX_LCS_CELLS = 500_000;
 
     /**
      * @return array<int, array{index: int, lines: array<int, array{type: string, text: string}>}>
@@ -78,17 +75,6 @@ class ComposeDiff
         return implode("\n", $out)."\n";
     }
 
-    public static function isValidYaml(string $yaml): bool
-    {
-        try {
-            Yaml::parse($yaml);
-
-            return true;
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
     /** @return array<int, string> */
     private static function lines(string $text): array
     {
@@ -98,7 +84,8 @@ class ComposeDiff
     }
 
     /**
-     * difflib-style opcodes via LCS.
+     * difflib-style opcodes. Equal leading and trailing lines are stripped first, so
+     * the LCS matrix only covers the changed middle of the file.
      *
      * @param  array<int, string>  $old
      * @param  array<int, string>  $new
@@ -106,56 +93,88 @@ class ComposeDiff
      */
     private static function opcodes(array $old, array $new): array
     {
-        $n = count($old);
-        $m = count($new);
+        $oldCount = count($old);
+        $newCount = count($new);
 
-        // Guard against the O(n·m) LCS matrix exhausting memory on very large
-        // composes: present the change as a single whole-file replacement.
-        if ($n > self::MAX_LCS_LINES || $m > self::MAX_LCS_LINES) {
-            if ($n === 0) {
-                return [['insert', 0, 0, 0, $m]];
-            }
-            if ($m === 0) {
-                return [['delete', 0, $n, 0, 0]];
-            }
-
-            return [['replace', 0, $n, 0, $m]];
+        $prefix = 0;
+        while ($prefix < $oldCount && $prefix < $newCount && $old[$prefix] === $new[$prefix]) {
+            $prefix++;
+        }
+        $suffix = 0;
+        while ($suffix < $oldCount - $prefix && $suffix < $newCount - $prefix
+            && $old[$oldCount - 1 - $suffix] === $new[$newCount - 1 - $suffix]) {
+            $suffix++;
         }
 
-        $lcs = array_fill(0, $n + 1, array_fill(0, $m + 1, 0));
-        for ($i = $n - 1; $i >= 0; $i--) {
-            for ($j = $m - 1; $j >= 0; $j--) {
-                $lcs[$i][$j] = $old[$i] === $new[$j]
-                    ? $lcs[$i + 1][$j + 1] + 1
-                    : max($lcs[$i + 1][$j], $lcs[$i][$j + 1]);
+        $ops = $prefix > 0 ? [['equal', 0, $prefix, 0, $prefix]] : [];
+        array_push($ops, ...self::middleOpcodes($old, $new, $prefix, $oldCount - $suffix, $prefix, $newCount - $suffix));
+        if ($suffix > 0) {
+            $ops[] = ['equal', $oldCount - $suffix, $oldCount, $newCount - $suffix, $newCount];
+        }
+
+        return $ops;
+    }
+
+    /**
+     * LCS opcodes for $old[$oldStart..$oldEnd) against $new[$newStart..$newEnd).
+     *
+     * @param  array<int, string>  $old
+     * @param  array<int, string>  $new
+     * @return array<int, array{0:string,1:int,2:int,3:int,4:int}>
+     */
+    private static function middleOpcodes(array $old, array $new, int $oldStart, int $oldEnd, int $newStart, int $newEnd): array
+    {
+        $rows = $oldEnd - $oldStart;
+        $cols = $newEnd - $newStart;
+
+        if ($rows === 0 && $cols === 0) {
+            return [];
+        }
+        if ($rows === 0) {
+            return [['insert', $oldStart, $oldStart, $newStart, $newEnd]];
+        }
+        if ($cols === 0) {
+            return [['delete', $oldStart, $oldEnd, $newStart, $newStart]];
+        }
+        // The LCS matrix is O(rows·cols) memory: show huge changes as one replacement.
+        if ($rows * $cols > self::MAX_LCS_CELLS) {
+            return [['replace', $oldStart, $oldEnd, $newStart, $newEnd]];
+        }
+
+        $lcs = array_fill(0, $rows + 1, array_fill(0, $cols + 1, 0));
+        for ($row = $rows - 1; $row >= 0; $row--) {
+            for ($col = $cols - 1; $col >= 0; $col--) {
+                $lcs[$row][$col] = $old[$oldStart + $row] === $new[$newStart + $col]
+                    ? $lcs[$row + 1][$col + 1] + 1
+                    : max($lcs[$row + 1][$col], $lcs[$row][$col + 1]);
             }
         }
 
         $ops = [];
-        $i = 0;
-        $j = 0;
-        while ($i < $n && $j < $m) {
-            if ($old[$i] === $new[$j]) {
-                $si = $i;
-                $sj = $j;
-                while ($i < $n && $j < $m && $old[$i] === $new[$j]) {
-                    $i++;
-                    $j++;
+        $row = 0;
+        $col = 0;
+        while ($row < $rows && $col < $cols) {
+            if ($old[$oldStart + $row] === $new[$newStart + $col]) {
+                $equalRowStart = $row;
+                $equalColStart = $col;
+                while ($row < $rows && $col < $cols && $old[$oldStart + $row] === $new[$newStart + $col]) {
+                    $row++;
+                    $col++;
                 }
-                $ops[] = ['equal', $si, $i, $sj, $j];
-            } elseif ($lcs[$i + 1][$j] >= $lcs[$i][$j + 1]) {
-                $ops[] = ['delete', $i, $i + 1, $j, $j];
-                $i++;
+                $ops[] = ['equal', $oldStart + $equalRowStart, $oldStart + $row, $newStart + $equalColStart, $newStart + $col];
+            } elseif ($lcs[$row + 1][$col] >= $lcs[$row][$col + 1]) {
+                $ops[] = ['delete', $oldStart + $row, $oldStart + $row + 1, $newStart + $col, $newStart + $col];
+                $row++;
             } else {
-                $ops[] = ['insert', $i, $i, $j, $j + 1];
-                $j++;
+                $ops[] = ['insert', $oldStart + $row, $oldStart + $row, $newStart + $col, $newStart + $col + 1];
+                $col++;
             }
         }
-        if ($i < $n) {
-            $ops[] = ['delete', $i, $n, $j, $j];
+        if ($row < $rows) {
+            $ops[] = ['delete', $oldStart + $row, $oldEnd, $newStart + $col, $newStart + $col];
         }
-        if ($j < $m) {
-            $ops[] = ['insert', $i, $i, $j, $m];
+        if ($col < $cols) {
+            $ops[] = ['insert', $oldStart + $row, $oldStart + $row, $newStart + $col, $newEnd];
         }
 
         return self::coalesce($ops);

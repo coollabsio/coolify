@@ -1,4 +1,5 @@
 <div class="flex w-full min-w-0 flex-col gap-6">
+    @if (! ($hideSkeleton ?? false))
     {{-- Header (real chrome; only the data below is a skeleton) --}}
     <div class="flex flex-col gap-4">
         @if (empty($scopedServerUuid ?? null))
@@ -51,7 +52,16 @@
         <x-skeleton.table :rows="6" flush />
     </x-application.settings-section>
 
-    <x-application.settings-section id="analytics-country-section" title="Countries" flush>
-        <x-skeleton class="h-64 w-full" />
+    <x-application.settings-section id="analytics-country-section" title="Locations" flush>
+        <x-slot:actions>
+            <x-skeleton class="h-9 w-36 rounded-lg" />
+        </x-slot:actions>
+        <div class="grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[2fr_3fr]">
+            <div class="flex items-center justify-center">
+                <x-skeleton class="aspect-square w-full max-w-[320px] rounded-full" />
+            </div>
+            <x-skeleton.table :rows="7" flush />
+        </div>
     </x-application.settings-section>
+    @endif
 </div>

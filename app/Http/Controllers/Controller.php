@@ -33,7 +33,7 @@ class Controller extends BaseController
         if (auth()->user()?->currentTeam()->id !== 0) {
             return redirect(RouteServiceProvider::HOME);
         }
-        TestEvent::dispatch();
+        TestEvent::dispatch(currentTeam()->id);
 
         return 'Look at your other tab.';
     }
@@ -132,26 +132,33 @@ class Controller extends BaseController
 
             [$user, $invitation] = $credentials;
             $team = $invitation->team;
-            if (! $user->teams()->where('team_id', $team->id)->exists()) {
-                $user->teams()->attach($team->id, ['role' => $invitation->role]);
+            $alreadyMember = $user->teams()->where('team_id', $team->id)->exists();
+            if (! $alreadyMember) {
+                $user->teams()->attach($team->id, $invitation->membershipAttributes());
             }
 
             $user->forceFill([
                 'password' => Hash::make(Str::random(64)),
-            ])->save();
+            ]);
+            // Only an emailed token proves the address. A copied link can be used by the inviting admin.
+            if ($invitation->via === 'email' && ! $user->hasVerifiedEmail()) {
+                $user->forceFill(['email_verified_at' => now()]);
+            }
+            $user->save();
             $invitation->delete();
 
-            return [$user, $team];
+            return [$user, $team, $invitation, $alreadyMember];
         });
 
         if (! $acceptedInvitation) {
             return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        [$user, $team] = $acceptedInvitation;
+        [$user, $team, $invitation, $alreadyMember] = $acceptedInvitation;
 
         Auth::login($user);
         session(['currentTeam' => $team]);
+        $this->auditInvitationAccepted($user, $invitation, $alreadyMember);
 
         return redirect()->route('dashboard');
     }
@@ -222,6 +229,11 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
@@ -247,20 +259,44 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
 
         if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
             $invitation->delete();
+            $this->auditInvitationAccepted($user, $invitation, alreadyMember: true);
 
             return redirect()->route('team.index');
         }
-        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+        $user->teams()->attach($invitation->team->id, $invitation->membershipAttributes());
         $invitation->delete();
+        $this->auditInvitationAccepted($user, $invitation, alreadyMember: false);
 
         refreshSession($invitation->team);
 
         return redirect()->route('team.index');
+    }
+
+    private function auditInvitationAccepted(User $user, TeamInvitation $invitation, bool $alreadyMember): void
+    {
+        auditLog('ui.team_invitation.accepted', [
+            'team_id' => $invitation->team_id,
+            'invitation_uuid' => $invitation->uuid,
+            'invitation_email' => $invitation->email,
+            'role' => $invitation->role,
+            'via' => $invitation->via,
+            'already_member' => $alreadyMember,
+            'member_id' => $user->id,
+            'member_name' => $user->name,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+        ]);
     }
 }

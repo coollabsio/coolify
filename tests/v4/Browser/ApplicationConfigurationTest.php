@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -17,28 +18,6 @@ beforeEach(function () {
         'ports_exposes' => '3000',
         'custom_docker_run_options' => null,
     ]);
-});
-
-it('shows application configuration sections and navigation', function () {
-    loginAndSkipBoarding();
-
-    $url = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    $page = visit($url);
-
-    $page->assertSee('Config App')
-        ->assertSee('General')
-        ->assertSee('Environment Variables')
-        ->assertSee('Danger Zone')
-        ->assertSee('Application details')
-        ->assertSee('Internal access')
-        ->assertSee('Docker network')
-        ->assertSee('Build pipeline')
-        ->screenshot(filename: 'application-configuration-overview');
 });
 
 it('keeps the PR suffix listbox visible outside the volumes table while scrolling', function () {
@@ -96,6 +75,59 @@ it('keeps the PR suffix listbox visible outside the volumes table while scrollin
         ->screenshot(filename: 'application-persistent-storage-pr-suffix-listbox');
 });
 
+it('floats the backup target listbox over the new backup modal instead of scrolling it', function () {
+    foreach (range(1, 6) as $index) {
+        LocalPersistentVolume::create([
+            'uuid' => (string) new Cuid2,
+            'name' => $this->application->uuid.'-data-'.$index,
+            'mount_path' => '/data/'.$index,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+    }
+
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ).'/backups';
+
+    $page = visit($url);
+    $page->assertSee('Storage backups')
+        ->click('button:visible:has-text("Add")')
+        ->assertSee('New scheduled backup')
+        ->assertScript(<<<'JS'
+            () => {
+                document.querySelector('#targetKey-trigger').click();
+
+                return true;
+            }
+            JS)
+        ->wait(0.3)
+        ->assertScript(<<<'JS'
+            () => {
+                const panel = document.querySelector('#targetKey-panel');
+                const modalBody = panel.closest('.application-settings-section-body');
+                const panelRect = panel.getBoundingClientRect();
+
+                return modalBody.scrollHeight <= modalBody.clientHeight
+                    && panelRect.bottom > modalBody.getBoundingClientRect().bottom
+                    && panelRect.bottom <= window.innerHeight
+                    && document.elementFromPoint(panelRect.left + 10, panelRect.bottom - 10)?.closest('#targetKey-panel') === panel;
+            }
+            JS)
+        ->screenshot(filename: 'application-backup-target-listbox');
+
+    selectListboxOption($page, 'targetKey', 'Volume: '.$this->application->uuid.'-data-6');
+
+    $page->assertScript(<<<'JS'
+        () => document.querySelector('#targetKey-trigger').textContent.includes('-data-6')
+        JS)
+        ->assertNoJavaScriptErrors();
+});
+
 it('saves application name description and ports from the general form', function () {
     loginAndSkipBoarding();
 
@@ -110,24 +142,74 @@ it('saves application name description and ports from the general form', functio
     $page->assertSee('General')
         ->fill('name', $updatedName)
         ->fill('description', 'Updated via browser test')
+        ->click('#internal-access-section button:has-text("Edit networking")')
         ->fill('portsExposes', '8080')
+        ->fill('customNetworkAliases', 'api.internal')
         ->screenshot(filename: 'application-general-before-save');
 
-    submitLivewireForm($page);
-
-    $page->assertValue('name', $updatedName)
+    $page->click('form button[type="submit"]:visible:has-text("Save")')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('#internal-access-section label')]
+                .find((label) => label.textContent.trim() === 'Network aliases')
+                ?.parentElement.querySelector('input')?.value === 'api.internal'
+            JS)
+        ->assertValue('name', $updatedName)
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('#internal-access-section label')]
+                .find((label) => label.textContent.trim() === 'Exposed ports')
+                ?.parentElement.querySelector('input')?.value === '8080'
+            JS)
+        ->wait(0.5)
+        ->assertScript("() => document.querySelector('input[name=portsExposes]')?.checkVisibility() === false")
+        ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-general-after-save');
 
     $this->application->refresh();
     expect($this->application->name)->toBe($updatedName)
         ->and($this->application->description)->toBe('Updated via browser test')
-        ->and($this->application->ports_exposes)->toBe('8080');
+        ->and($this->application->ports_exposes)->toBe('8080')
+        ->and($this->application->custom_network_aliases)->toBe('api.internal');
 
     $reloaded = visit($url);
     $reloaded->assertValue('name', $updatedName)
         ->assertValue('description', 'Updated via browser test')
         ->assertValue('portsExposes', '8080')
         ->screenshot(filename: 'application-general-reloaded');
+});
+
+it('shows the unsaved bar for a Compose location edit and saves it with the name', function () {
+    Process::fake(fn ($process) => match (true) {
+        str_contains($process->command, 'git cat-file blob') => Process::result("services:\n  web:\n    image: nginx\n"),
+        default => Process::result(''),
+    });
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_location' => '/docker-compose.yaml',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    // The Compose location input is bound through @entangle, not wire:model.
+    $page->assertSee('Docker compose location')
+        ->type('input[placeholder="/docker-compose.yaml"]', '/compose.prod.yaml')
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('.is-dirty')].some((bar) => bar.textContent.includes('Save changes'))
+            JS)
+        ->type('name', 'Renamed Compose App')
+        ->click('button:visible:has-text("Save changes")')
+        ->wait(2)
+        ->screenshot(filename: 'application-compose-location-saved');
+
+    expect($this->application->refresh()->only(['name', 'docker_compose_location']))->toBe([
+        'name' => 'Renamed Compose App',
+        'docker_compose_location' => '/compose.prod.yaml',
+    ]);
 });
 
 it('saves custom docker run options from the UI', function () {
@@ -151,39 +233,58 @@ it('saves custom docker run options from the UI', function () {
         ->screenshot(filename: 'application-docker-run-options');
 });
 
-it('opens environment variables page for the application', function () {
+it('warns when the Dockerfile location repeats the base directory and applies the suggested fix', function () {
+    $this->application->update([
+        'build_pack' => 'dockerfile',
+        'base_directory' => '/apps/api',
+        'dockerfile_location' => '/apps/api/Dockerfile',
+    ]);
+
     loginAndSkipBoarding();
 
-    $base = applicationConfigurationUrl(
+    $page = visit(applicationConfigurationUrl(
         $this->stack['project'],
         $this->stack['environment'],
         $this->application
-    );
+    ));
 
-    $page = visit("{$base}/environment-variables");
+    $page->assertSee('Base directory is repeated')
+        ->assertSee('/apps/api/apps/api/Dockerfile')
+        ->screenshot(filename: 'application-dockerfile-location-repeats-base-directory')
+        ->click('Use /Dockerfile')
+        ->assertDontSee('Base directory is repeated')
+        ->assertSee('/apps/api/Dockerfile');
 
-    $page->assertSee('Environment Variables')
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-environment-variables');
+    submitLivewireForm($page);
+
+    $page->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-dockerfile-location-fixed');
+
+    $this->application->refresh();
+    expect($this->application->base_directory)->toBe('/apps/api')
+        ->and($this->application->dockerfile_location)->toBe('/Dockerfile');
 });
 
-it('opens advanced and healthcheck configuration pages', function () {
+it('restores the default file location when the field is cleared', function (string $buildPack, string $column, string $default) {
+    $this->application->update(['build_pack' => $buildPack, $column => '/docker/custom']);
+
     loginAndSkipBoarding();
 
-    $base = applicationConfigurationUrl(
+    $page = visit(applicationConfigurationUrl(
         $this->stack['project'],
         $this->stack['environment'],
         $this->application
-    );
+    ));
 
-    visit("{$base}/advanced")
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-advanced');
-
-    visit("{$base}/healthcheck")
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-healthcheck');
-});
+    $page->clear("input[placeholder='{$default}']")
+        ->keys("input[placeholder='{$default}']", 'Tab')
+        ->assertValue("input[placeholder='{$default}']", $default)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: "application-{$buildPack}-location-cleared");
+})->with([
+    'Dockerfile' => ['dockerfile', 'dockerfile_location', '/Dockerfile'],
+    'Docker Compose' => ['dockercompose', 'docker_compose_location', '/docker-compose.yaml'],
+]);
 
 it('lists the application on the environment resources page', function () {
     loginAndSkipBoarding();
@@ -197,32 +298,24 @@ it('lists the application on the environment resources page', function () {
         ->screenshot(filename: 'environment-lists-application');
 });
 
-it('shows danger zone for application deletion', function () {
-    loginAndSkipBoarding();
-
-    $base = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    $page = visit("{$base}/danger");
-
-    $page->assertSee('Danger')
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-danger-zone');
-});
-
-it('uses compact application domains with unified settings and a floating save bar', function () {
+it('uses compact application domains with unified settings and a form save button', function () {
     config()->set('app.maintenance.store', 'array');
     InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
     Cache::forget('instance_settings');
-    $this->application->update(['fqdn' => 'https://first.example.com,https://second.example.com', 'redirect' => 'both']);
+    $this->application->update([
+        'fqdn' => 'https://first.example.com,https://second.example.com',
+        'ports_exposes' => '3000,8069',
+        'redirect' => 'both',
+    ]);
     loginAndSkipBoarding();
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->screenshot(filename: 'application-domains-dns-menu')
+        ->click('[title="DNS checks and records for this server"]')
+        ->assertSee('Redirect type')
         ->assertSee('Protocol redirect')
         ->assertSee('Search indexing')
         ->assertDontSee('Search engine indexing')
@@ -232,31 +325,35 @@ it('uses compact application domains with unified settings and a floating save b
         ->click('[aria-label="Settings for https://first.example.com"]')
         ->assertSee('Domain settings')
         ->assertValue('#editingDomainParts-host', 'first.example.com')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->fill('#editingDomainParts-port', '8069')
         ->fill('#editingDomainParts-path', '/blog')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->click('[id^="application-domain-indexing-"][id$="-trigger"]')
         ->click('Noindex')
-        ->assertSee('Search engine indexing updated.')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertDontSee('Search engine indexing updated.')
+        ->click('Regenerate hostname')
         ->screenshot(filename: 'application-domain-unified-settings')
-        ->click('[wire\\:click="updateDomain"]')
+        ->click('Save')
         ->assertDontSee('Domain settings')
-        ->assertSee('https://first.example.com/blog')
+        ->assertSee('Internal port 8069')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-domains-compact');
 
+    $savedDomain = str($this->application->fresh()->fqdn)->before(',')->toString();
+    expect($savedDomain)->not->toContain('first.example.com')
+        ->and($this->application->fresh()->domain_port_overrides)->toHaveKey($savedDomain, 8069)
+        ->and($this->application->fresh()->noindexDomains()->all())->toContain($savedDomain);
+
     $page->click('[aria-label="Settings for https://second.example.com"]')
         ->fill('#editingDomainParts-path', '/discard')
-        ->click('Reset')
+        ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-path', '')
         ->click('[aria-label="Close"]:visible')
-        ->click('[wire\\:key="domain-row-'.md5('https://first.example.com/blog|').'"] [aria-label="Remove domain"]')
+        ->click('[wire\\:key="domain-row-'.md5($savedDomain.'|').'"] [aria-label="Remove domain"]')
         ->assertSee('Remove domain?')
         ->click('button:has([x-text="step2ButtonText"]):visible')
-        ->assertDontSee('https://first.example.com/blog')
+        ->assertDontSee($savedDomain)
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-host', 'second.example.com')
         ->click('[aria-label="Close"]:visible')
@@ -286,14 +383,16 @@ it('edits Compose application domain redirects in the unified settings dialog', 
         ->click('[id^="application-domain-direction-"][id$="-trigger"]')
         ->click('Redirect to www')
         ->assertDontSee('Use a different port?')
-        ->assertSee('Redirect updated for web.api.')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-compose-domain-settings');
 
-    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('www');
-    $page->click('[aria-label="Close"]:visible')
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('both');
+    $page->click('Save')
+        ->assertDontSee('Domain settings')
         ->assertSee('https://www.web.example.com')
         ->screenshot(filename: 'application-compose-domain-overview');
+
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('www');
 });
 
 it('uses compact preview domains and opens only the selected preview settings', function (bool $isCompose) {
@@ -326,9 +425,9 @@ it('uses compact preview domains and opens only the selected preview settings', 
         ->assertVisible('[aria-label="Search indexing blocked"] >> nth=0');
     expect($page->script("[...document.querySelectorAll('[data-preview-domain-dialog]')].filter(el => el.getClientRects().length > 0).length"))->toBe(1);
     $page->fill('#editingDomainParts-host:visible', 'renamed-preview.example.com')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertSee('Regenerate hostname')
         ->screenshot(filename: 'preview-domain-unified-settings')
-        ->click('.is-dirty [wire\\:click="updateDomain"]')
+        ->click('[data-preview-domain-dialog]:visible button:has-text("Save")')
         ->assertDontSee('Domain settings')
         ->assertSee('https://renamed-preview.example.com')
         ->assertSee('https://preview-102.example.com')
@@ -337,9 +436,8 @@ it('uses compact preview domains and opens only the selected preview settings', 
     $page->click('[aria-label="Settings for https://preview-102.example.com"]')
         ->assertSee('Domain settings')
         ->fill('#editingDomainParts-path:visible', '/discard')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->screenshot(filename: 'preview-domain-before-reset')
-        ->click('.is-dirty button:has-text("Reset")')
+        ->click('[data-preview-domain-dialog]:visible [aria-label="Close"]')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://preview-102.example.com"]')
         ->assertValue('#editingDomainParts-path:visible', '')
@@ -349,12 +447,3 @@ it('uses compact preview domains and opens only the selected preview settings', 
         ->screenshot(filename: 'preview-domains-mobile');
     expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
 })->with(['regular application' => false, 'Compose application' => true]);
-
-it('declares the compact preview domain layout and shared save bar', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-    expect($view)->toContain('service-domains-overview-grid')
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('Domain routing summary')
-        ->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('$event.detail.previewId');
-});

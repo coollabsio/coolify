@@ -2,19 +2,36 @@
     <form wire:submit.prevent="saveTrafficAnalyticsSettings" class="contents">
         @if ($isTrafficAnalyticsEnabled)
             <x-unsaved-bar action="saveTrafficAnalyticsSettings"
-                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey" />
+                targets="trafficTopn,trafficSampleThreshold,trafficRetention1hDays,trafficRetention1dDays,isGeoipEnabled,geoipRefreshDays,geoipMaxmindLicenseKey,trafficIpMode" />
         @endif
 
         <x-application.settings-section id="server-traffic-analytics-settings-section" title="Traffic analytics"
             helper="Control proxy traffic collection, retention, and visitor geolocation for this server.">
             <x-slot:actions>
-                <x-forms.button canGate="update" :canResource="$server" wire:click="toggleTrafficAnalytics"
-                    wire:confirm="{{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics? The proxy and Sentinel will restart, causing a brief connectivity blip for all applications on this server.">
-                    {{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics
-                </x-forms.button>
+                @if ($isTrafficAnalyticsEnabled)
+                    <div class="flex items-center gap-3">
+                        <x-modal-confirmation title="Disable traffic analytics?"
+                            buttonTitle="Disable traffic analytics" submitAction="toggleTrafficAnalytics"
+                            :actions="[
+                                'Disabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.',
+                            ]"
+                            warningMessage="Application traffic may be interrupted while Sentinel and the proxy restart."
+                            :confirmWithText="false" :confirmWithPassword="false" :ignoreWire="false"
+                            step2ButtonText="Disable traffic analytics"
+                            :disabled="! auth()->user()->can('update', $server)"
+                            :authDisabled="! auth()->user()->can('update', $server)" />
+                    </div>
+                @endif
             </x-slot:actions>
 
+            @if ($outdatedCaddyImage)
+                <x-server.caddy-image-outdated-callout :image="$outdatedCaddyImage" />
+            @endif
+
             @if ($isTrafficAnalyticsEnabled)
+                @if ($caddyRedeployNote)
+                    <x-callout type="info" title="Redeploy to start logging">{{ $caddyRedeployNote }}</x-callout>
+                @endif
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="trafficTopn" label="Top-N cap" required
@@ -35,6 +52,14 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]"
                         helper="Country enrichment from visitor IPs. Disable to skip GeoIP lookups." />
+                    <x-forms.listbox canGate="update" :canResource="$server"
+                        id="trafficIpMode" label="Client IP addresses"
+                        :options="[
+                            ['value' => 'full', 'label' => 'Full'],
+                            ['value' => 'anonymized', 'label' => 'Anonymized (/24 IPv4, /48 IPv6)'],
+                            ['value' => 'off', 'label' => 'Disabled'],
+                        ]"
+                        helper="How Sentinel stores visitor IPs for the Top IPs list. Anonymized keeps only the network. Disabled does not store IPs or visitor cities. When you change this setting, Sentinel deletes the stored IPs that the new setting does not allow." />
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="geoipRefreshDays" label="GeoIP refresh interval" required
                         helper="Days between GeoIP database update checks." />
@@ -44,8 +69,29 @@
                 </div>
             @else
                 <x-empty size="sm" title="Traffic analytics is disabled"
-                    description="Enable traffic analytics to collect proxy access logs and geolocate visitor traffic."
-                    icon-name="dashboard" />
+                    :description="$unsupportedReason ?? 'Enable traffic analytics to collect proxy access logs and geolocate visitor traffic.'"
+                    icon-name="dashboard">
+                    <x-slot:contents>
+                        <div class="flex items-center gap-3">
+                            @if ($unsupportedReason)
+                                <x-forms.button disabled :tooltip="$unsupportedReason">
+                                    Enable traffic analytics
+                                </x-forms.button>
+                            @else
+                            <x-modal-confirmation title="Enable traffic analytics?"
+                                buttonTitle="Enable traffic analytics" submitAction="toggleTrafficAnalytics"
+                                :actions="[
+                                    'Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.',
+                                ]"
+                                warningMessage="Application traffic may be interrupted while Sentinel and the proxy restart."
+                                :confirmWithText="false" :confirmWithPassword="false" :ignoreWire="false"
+                                step2ButtonText="Enable traffic analytics" isHighlightedButton
+                                :disabled="! auth()->user()->can('update', $server)"
+                                :authDisabled="! auth()->user()->can('update', $server)" />
+                            @endif
+                        </div>
+                    </x-slot:contents>
+                </x-empty>
             @endif
         </x-application.settings-section>
     </form>

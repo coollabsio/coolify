@@ -25,7 +25,7 @@
                         {{ data_get($diff, 'count') === 1 ? 'change' : 'changes' }} unapplied.
                         {{ data_get($diff, 'requires_build') ? 'Rebuild required.' : 'Redeploy to apply.' }}
                         <button type="button"
-                            class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
+                            class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-brand-light dark:hover:text-brand-light/80"
                             @click="open = false; $dispatch('open-configuration-diff')">
                             View changes
                             <x-reicon name="arrow-right" class="size-2.5" />

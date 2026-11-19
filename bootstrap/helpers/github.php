@@ -4,6 +4,10 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -148,11 +152,25 @@ function encodeGithubPathSegment(string $segment): string
     return rawurlencode($segment);
 }
 
-function assertGithubClockInSync(string $apiUrl): void
+/**
+ * GitHub rejects an App JWT when the clocks of Coolify and GitHub differ.
+ * Call this with the failed response of a JWT request: its Date header shows the difference without an extra request.
+ */
+function assertGithubClockInSync(Response $response): void
 {
-    $response = Http::get("{$apiUrl}/zen");
+    $date = $response->header('Date');
+
+    if (blank($date)) {
+        return;
+    }
+
+    try {
+        $githubTime = Carbon::parse($date);
+    } catch (Throwable) {
+        return;
+    }
+
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
-    $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
@@ -166,11 +184,30 @@ function assertGithubClockInSync(string $apiUrl): void
     }
 }
 
-function generateGithubToken(GithubApp $source, string $type)
+/**
+ * GitHub sometimes answers with a 5xx page or drops the connection. A repeated read or token request is harmless.
+ */
+function isTransientGithubFailure(Throwable $exception): bool
 {
-    assertGithubClockInSync($source->api_url);
+    return $exception instanceof ConnectionException
+        || ($exception instanceof RequestException && $exception->response->serverError());
+}
 
-    $signingKey = InMemory::plainText($source->privateKey->private_key);
+function githubAppPrivateKey(GithubApp $source): ?PrivateKey
+{
+    $privateKey = $source->privateKey;
+
+    return $privateKey?->team_id === $source->team_id ? $privateKey : null;
+}
+
+/**
+ * @param  int|null  $timeout  Seconds for each request to GitHub. Null keeps the HTTP client default.
+ */
+function generateGithubToken(GithubApp $source, string $type, ?int $timeout = null)
+{
+    $privateKey = githubAppPrivateKey($source) ?? throw new RuntimeException('Private key not found for this GitHub App.');
+
+    $signingKey = InMemory::plainText($privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
     $now = CarbonImmutable::now()->setTimezone('UTC');
@@ -185,16 +222,17 @@ function generateGithubToken(GithubApp $source, string $type)
 
     return match ($type) {
         'jwt' => $jwt,
-        'installation' => (function () use ($source, $jwt) {
-            $response = Http::withHeaders([
+        'installation' => (function () use ($source, $jwt, $timeout) {
+            $response = githubRequestTimeout(Http::GitSource($source->api_url), $timeout)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false)->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
-                $error = data_get($response->json(), 'message', 'no error message found');
+                assertGithubClockInSync($response);
+                $error = data_get($response->json(), 'message', "HTTP {$response->status()}");
                 if ($error === 'Not Found') {
-                    $error = 'Repository not found. Is it moved or deleted?';
+                    $error = "GitHub App installation {$source->installation_id} was not found. Install the GitHub App again or update its installation ID.";
                 }
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
@@ -205,9 +243,17 @@ function generateGithubToken(GithubApp $source, string $type)
     };
 }
 
-function generateGithubInstallationToken(GithubApp $source)
+function generateGithubInstallationToken(GithubApp $source, ?int $timeout = null)
 {
-    return generateGithubToken($source, 'installation');
+    return $source->installationToken($timeout);
+}
+
+/**
+ * Limits how long a request waits for GitHub, both to connect and for the whole answer.
+ */
+function githubRequestTimeout(PendingRequest $request, ?int $timeout): PendingRequest
+{
+    return $timeout === null ? $request : $request->connectTimeout($timeout)->timeout($timeout);
 }
 
 function generateGithubJwt(GithubApp $source)
@@ -215,7 +261,7 @@ function generateGithubJwt(GithubApp $source)
     return generateGithubToken($source, 'jwt');
 }
 
-function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
+function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true, ?int $timeout = null)
 {
     if (is_null($source)) {
         throw new Exception('Source is required for API calls');
@@ -225,15 +271,19 @@ function githubApi(?GithubApp $source, string $endpoint, string $method = 'get',
         throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
-    if ($source->is_public) {
-        $response = Http::GitHub($source->api_url)->$method($endpoint);
+    $request = githubRequestTimeout($source->is_public
+        ? Http::GitHub($source->api_url)
+        : Http::GitHub($source->api_url, generateGithubInstallationToken($source, $timeout)), $timeout);
+
+    // Only reads are retried: a repeated POST could create a second pull request comment.
+    if (strtolower($method) === 'get') {
+        $request = $request->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false);
+    }
+
+    if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
+        $response = $request->$method($endpoint, $data);
     } else {
-        $token = generateGithubInstallationToken($source);
-        if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint, $data);
-        } else {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint);
-        }
+        $response = $request->$method($endpoint);
     }
 
     if (! $response->successful() && $throwError) {
@@ -279,23 +329,22 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
             return null;
         }
 
-        $privateKey = $source->privateKey ?: PrivateKey::find($source->private_key_id);
+        $privateKey = githubAppPrivateKey($source);
 
         if (! $privateKey) {
             return null;
         }
 
-        assertGithubClockInSync($source->api_url);
-
         $jwt = generateGithubAppJwt($privateKey->private_key, $source->app_id);
 
-        $response = Http::withHeaders([
+        $response = Http::GitSource($source->api_url)->withHeaders([
             'Accept' => 'application/vnd.github+json',
             'X-GitHub-Api-Version' => '2022-11-28',
             'Authorization' => "Bearer {$jwt}",
         ])->get("{$source->api_url}/app");
 
         if (! $response->successful()) {
+            assertGithubClockInSync($response);
             throw new RuntimeException(data_get($response->json(), 'message', 'Failed to fetch GitHub App information.'));
         }
 
@@ -370,10 +419,9 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         ]);
     $json = $response->json();
     if ($response->status() !== 200) {
-        return [
-            'total_count' => 0,
-            'repositories' => [],
-        ];
+        $error = data_get($json, 'message', "HTTP {$response->status()}");
+
+        throw new RuntimeException("Failed to load repositories for {$source->name} with error: ".$error);
     }
 
     if ($json['total_count'] === 0) {
@@ -388,28 +436,34 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         'repositories' => $json['repositories'],
     ];
 }
-function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): array
+/**
+ * Returns null when the full list of changed files is unknown (API error or truncated list).
+ */
+function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $repo, string $beforeSha, string $afterSha): ?array
 {
     try {
         if (! $source) {
             // Manual webhooks don't have GitHub App authentication
-            // Return empty array so watch paths are ignored (current behavior)
             return [];
         }
 
         $endpoint = "/repos/{$owner}/{$repo}/compare/{$beforeSha}...{$afterSha}";
-        $response = githubApi($source, $endpoint, 'get', null, false);
-
-        if (! $response) {
-            return [];
-        }
-
+        $response = githubApi($source, $endpoint);
         $files = collect(data_get($response, 'data.files', []));
 
-        return $files->pluck('filename')->filter()->values()->toArray();
-    } catch (Exception $e) {
+        // The compare API returns at most 300 files and cannot paginate them.
+        if ($files->count() >= 300) {
+            return null;
+        }
 
-        return [];
+        // A renamed file also changes its previous path.
+        return $files->flatMap(fn (mixed $file): array => [data_get($file, 'filename'), data_get($file, 'previous_filename')])
+            ->filter(fn (mixed $filename): bool => is_string($filename) && $filename !== '')
+            ->unique()
+            ->values()
+            ->toArray();
+    } catch (Exception $e) {
+        return null;
     }
 }
 
@@ -435,27 +489,34 @@ function getGithubCommitMessage(?GithubApp $source, string $owner, string $repo,
     }
 }
 
-function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): array
+/**
+ * Returns null when the full list of changed files is unknown (API error or truncated list).
+ */
+function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $repo, int $pullRequestId): ?array
 {
     try {
         if (! $source) {
             // Manual webhooks don't have GitHub App authentication
-            // Return empty array so watch paths are ignored (current behavior)
             return [];
         }
 
-        $endpoint = "/repos/{$owner}/{$repo}/pulls/{$pullRequestId}/files";
-        $response = githubApi($source, $endpoint, 'get', null, false);
+        // GitHub returns at most 100 files per page and 3000 files per pull request.
+        $perPage = 100;
+        $maxPages = 30;
+        $files = collect();
 
-        if (! $response) {
-            return [];
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $endpoint = "/repos/{$owner}/{$repo}/pulls/{$pullRequestId}/files?per_page={$perPage}&page={$page}";
+            $pageFiles = collect(data_get(githubApi($source, $endpoint), 'data', []));
+            $files = $files->merge($pageFiles->pluck('filename'));
+
+            if ($pageFiles->count() < $perPage) {
+                return $files->filter()->values()->toArray();
+            }
         }
 
-        $files = collect(data_get($response, 'data', []));
-
-        return $files->pluck('filename')->filter()->values()->toArray();
+        return null;
     } catch (Exception $e) {
-
-        return [];
+        return null;
     }
 }

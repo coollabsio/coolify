@@ -123,7 +123,7 @@
                     @if ($isDiff)
                     const diffEditor = monaco.editor.createDiffEditor($refs.monacoEditorElement, {
                         ...sharedEditorOptions,
-                        readOnly: false,
+                        readOnly: '{{ $readonly ?? false }}',
                         originalEditable: false,
                         renderSideBySide: true,
                         renderOverviewRuler: false,
@@ -132,18 +132,15 @@
                     const originalText = $refs.monacoOriginalData ? $refs.monacoOriginalData.dataset.content : '';
                     diffEditor.setModel({
                         original: monaco.editor.createModel(originalText, '{{ $language }}'),
-                        modified: monaco.editor.createModel(monacoContent, '{{ $language }}'),
+                        modified: monaco.editor.createModel(monacoContent ?? '', '{{ $language }}'),
                     });
                     editor = diffEditor.getModifiedEditor();
                     document.getElementById(monacoId).diffEditor = diffEditor;
                     @else
                     editor = monaco.editor.create($refs.monacoEditorElement, {
                         ...sharedEditorOptions,
-                        value: monacoContent,
+                        value: monacoContent ?? '',
                         readOnly: '{{ $readonly ?? false }}',
-                        language: '{{ $language }}',
-                        domReadOnly: '{{ $readonly ?? false }}',
-                        contextmenu: '!{{ $readonly ?? false }}',
                     });
                     @endif
         
@@ -171,8 +168,8 @@
                     @endif
         
                     $watch('monacoContent', value => {
-                        if (editor.getValue() !== value) {
-                            editor.setValue(value);
+                        if (editor.getValue() !== (value ?? '')) {
+                            editor.setValue(value ?? '');
                         }
                     });
         

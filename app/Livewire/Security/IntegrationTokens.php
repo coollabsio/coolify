@@ -20,9 +20,10 @@ class IntegrationTokens extends Component
     }
 
     #[On('integrationTokenAdded')]
+    #[On('integration-token-deleted')]
     public function loadTokens(): void
     {
-        $this->tokens = IntegrationToken::ownedByCurrentTeam()->latest()->get();
+        $this->tokens = IntegrationToken::ownedByCurrentTeam()->withCount('dnsZones')->latest()->get();
     }
 
     public function deleteToken(int $tokenId, string $password = ''): void
@@ -30,8 +31,8 @@ class IntegrationTokens extends Component
         $token = IntegrationToken::ownedByCurrentTeam()->findOrFail($tokenId);
         $this->authorize('delete', $token);
 
-        if ($token->secretManagerLinks()->exists()) {
-            $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
+        if ($blocker = $token->deletionBlocker()) {
+            $this->dispatch('error', $blocker);
 
             return;
         }

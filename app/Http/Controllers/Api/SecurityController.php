@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PrivateKey;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 class SecurityController extends Controller
@@ -187,10 +189,10 @@ class SecurityController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|max:255',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'private_key' => 'required|string',
-        ]);
+        ], ValidationPatterns::combinedMessages());
 
         if ($validator->fails()) {
             $errors = $validator->errors();
@@ -207,25 +209,20 @@ class SecurityController extends Controller
             $request->offsetSet('description', 'Created by Coolify via API');
         }
 
+        // A key that is not PEM text can be sent base64 encoded. Other text is validated as it is.
         $isPrivateKeyString = str_starts_with($request->private_key, '-----BEGIN');
-        if (! $isPrivateKeyString) {
-            try {
-                $base64PrivateKey = base64_decode($request->private_key);
-                $request->offsetSet('private_key', $base64PrivateKey);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'message' => 'Invalid private key.',
-                ], 422);
-            }
+        $base64PrivateKey = $isPrivateKeyString ? false : base64_decode($request->private_key, true);
+        if ($base64PrivateKey !== false) {
+            $request->offsetSet('private_key', $base64PrivateKey);
         }
-        $isPrivateKeyValid = PrivateKey::validatePrivateKey($request->private_key);
-        if (! $isPrivateKeyValid) {
+        $privateKeyError = PrivateKey::validationError($request->private_key);
+        if ($privateKeyError) {
             return response()->json([
-                'message' => 'Invalid private key.',
+                'message' => $privateKeyError,
             ], 422);
         }
         $fingerPrint = PrivateKey::generateFingerprint($request->private_key);
-        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint);
+        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint, teamId: $teamId);
         if ($isFingerPrintExists) {
             return response()->json([
                 'message' => 'Private key already exists.',
@@ -253,12 +250,15 @@ class SecurityController extends Controller
     #[OA\Patch(
         summary: 'Update',
         description: 'Update a private key.',
-        path: '/security/keys',
+        path: '/security/keys/{uuid}',
         operationId: 'update-private-key',
         security: [
             ['bearerAuth' => []],
         ],
         tags: ['Private Keys'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Private Key UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: [
@@ -266,7 +266,6 @@ class SecurityController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['private_key'],
                         properties: [
                             'name' => ['type' => 'string'],
                             'description' => ['type' => 'string'],
@@ -301,6 +300,10 @@ class SecurityController extends Controller
                 ref: '#/components/responses/400',
             ),
             new OA\Response(
+                response: 404,
+                description: 'Private Key not found.',
+            ),
+            new OA\Response(
                 response: 422,
                 ref: '#/components/responses/422',
             ),
@@ -319,10 +322,10 @@ class SecurityController extends Controller
         }
 
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|max:255',
-            'private_key' => 'required|string',
-        ]);
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
+            'private_key' => 'string',
+        ], ValidationPatterns::combinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -345,7 +348,14 @@ class SecurityController extends Controller
             ], 404);
         }
         $this->authorize('update', $foundKey);
-        $foundKey->update($request->only($allowedFields));
+        try {
+            $foundKey->update($request->only($allowedFields));
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
 
         auditLog('api.private_key.updated', [
             'team_id' => $teamId,

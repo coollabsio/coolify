@@ -31,9 +31,7 @@ class TemplateUpdateBanner extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->service->template_dismissed_hash = TemplateUpdateChecker::currentHash($this->service->service_type);
-            $this->service->save();
-            $this->service->refresh();
+            TemplateUpdateChecker::dismiss($this->service);
             $this->dispatch('success', 'Update dismissed. You will be notified when a newer version ships.');
             $this->dispatch('refreshServices');
         } catch (\Throwable $e) {

@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class TemplateUpdate extends Component
@@ -29,9 +30,14 @@ class TemplateUpdate extends Component
     /** Hunk-selection signature the editor was last seeded from; null until first seed. */
     public ?string $editorSeededSignature = null;
 
+    /** Template hash the user is reviewing; actions are rejected once the template moves past it. */
+    #[Locked]
+    public ?string $reviewedTemplateHash = null;
+
     public function mount(Service $service): void
     {
         $this->service = $service;
+        $this->reviewedTemplateHash = TemplateUpdateChecker::currentHash($service->service_type);
     }
 
     public function getTemplateProperty(): ?array
@@ -135,7 +141,7 @@ class TemplateUpdate extends Component
 
     public function apply(): void
     {
-        if ($this->latestCompose === null || ! $this->hasSelectedHunks) {
+        if ($this->templateChangedSinceRender() || $this->latestCompose === null || ! $this->hasSelectedHunks) {
             return;
         }
 
@@ -147,7 +153,7 @@ class TemplateUpdate extends Component
 
     public function replaceAll(): void
     {
-        if (! $this->hasHunks) {
+        if ($this->templateChangedSinceRender() || ! $this->hasHunks) {
             return;
         }
 
@@ -160,6 +166,10 @@ class TemplateUpdate extends Component
 
     public function applyEditor(): void
     {
+        if ($this->templateChangedSinceRender()) {
+            return;
+        }
+
         $this->persistCompose((string) $this->editorContent);
     }
 
@@ -167,14 +177,39 @@ class TemplateUpdate extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->service->template_dismissed_hash = TemplateUpdateChecker::currentHash($this->service->service_type);
-            $this->service->save();
-            $this->service->refresh();
+            TemplateUpdateChecker::dismiss($this->service);
             $this->dispatch('success', 'Update dismissed. You will be notified when a newer version ships.');
             $this->dispatch('refreshServices');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Hunk indexes and editor content belong to the template version that was rendered.
+     * If the template catalog refreshed since then, reload the review instead of applying stale changes.
+     */
+    private function templateChangedSinceRender(): bool
+    {
+        $currentHash = TemplateUpdateChecker::currentHash($this->service->service_type);
+        if ($currentHash === $this->reviewedTemplateHash) {
+            return false;
+        }
+
+        $this->reviewedTemplateHash = $currentHash;
+        $this->resetReviewState();
+        $this->dispatch('error', 'The template changed while you were reviewing it. Review the latest changes and try again.');
+
+        return true;
+    }
+
+    private function resetReviewState(): void
+    {
+        $this->acceptedHunks = [];
+        $this->editorContent = null;
+        $this->editorSeededSignature = null;
+        $this->mode = 'review';
+        unset($this->hunks, $this->hasHunks, $this->hasSelectedHunks, $this->updateAvailable);
     }
 
     private function mergedFromSelection(): string
@@ -193,13 +228,15 @@ class TemplateUpdate extends Component
         try {
             $this->authorize('update', $this->service);
 
-            if (trim($compose) === '' || ! ComposeDiff::isValidYaml($compose)) {
-                $this->dispatch('error', 'The compose is not valid YAML. Fix it and try again.');
+            try {
+                validateDockerComposeForInjection($compose);
+            } catch (\Throwable $e) {
+                $this->dispatch('error', 'The compose is not valid: '.$e->getMessage());
 
                 return;
             }
 
-            $newHash = TemplateUpdateChecker::currentHash($this->service->service_type);
+            $newHash = $this->reviewedTemplateHash;
 
             // parse() materializes any new env vars via firstOrCreate, so values
             // the user has already set are never overwritten.
@@ -212,10 +249,7 @@ class TemplateUpdate extends Component
             });
 
             $this->service->refresh();
-            $this->acceptedHunks = [];
-            $this->editorContent = null;
-            $this->editorSeededSignature = null;
-            $this->mode = 'review';
+            $this->resetReviewState();
 
             $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
             $this->dispatch('refreshEnvs');

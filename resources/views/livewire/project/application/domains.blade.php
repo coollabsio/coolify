@@ -1,6 +1,4 @@
 @php
-    $configuredCount = collect($domainRows)->where('is_suggested', false)->count();
-    $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
     $hasDnsChecksInProgress = collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking');
     $composeDomainGroups = collect($domainRows)
@@ -16,22 +14,28 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        editingDomainBaseline: null,
-        get hasAddressChanges() {
-            return this.modalOpen && this.editingDomainBaseline !== null
-                && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
-                && !$wire.showPortWarningModal && !$wire.showDomainConflictModal;
-        },
-        openEditDomain() {
-            this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
-            this.editingServiceLabel = $wire.editingService || '';
+        openEditDomain(index, domain, parts, service, indexing, redirect, inheritedPort) {
+            if (index !== undefined) {
+                $wire.set('editingIndex', index, false);
+                $wire.set('editingDomain', domain, false);
+                $wire.set('editingDomainParts', parts, false);
+                $wire.set('editingDomainPartsChanged', false, false);
+                $wire.set('editingService', service, false);
+                $wire.set('editingIndexing', indexing, false);
+                $wire.set('editingRedirect', redirect, false);
+                $wire.set('editingOriginalRedirect', redirect, false);
+                $wire.set('editingDomainWasRegenerated', false, false);
+                $wire.set('editingGeneratedHost', null, false);
+                $wire.set('editingInheritedPort', inheritedPort ?? null, false);
+            }
+            this.editingServiceLabel = service ?? $wire.editingService ?? '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainParts-host')?.focus?.());
         },
-        closeEditDomain() {
+        closeEditDomain(discardDraft = true) {
             this.modalOpen = false;
-            this.editingDomainBaseline = null;
             this.editingServiceLabel = '';
+            if (discardDraft) this.$wire.cancelEdit();
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -41,13 +45,24 @@
         },
     }"
     @open-edit-domain.window="openEditDomain()"
-    @edit-domain-saved.window="closeEditDomain()">
+    @edit-domain-saved.window="closeEditDomain(false)">
     @if ($hasDnsChecksInProgress)
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
     @endif
     @if ($labelsAreWritable)
         <x-callout type="warning" title="Domains managed via labels" class="mb-4">
             Container label readonly mode is disabled. Domains must be set in the Labels section on the General page.
+            @unless ($isCompose)
+                <a class="mt-2 block font-medium underline"
+                    href="{{ route('project.application.configuration', [
+                        'project_uuid' => data_get($application, 'environment.project.uuid'),
+                        'environment_uuid' => data_get($application, 'environment.uuid'),
+                        'application_uuid' => $application->uuid,
+                    ]) }}#container-labels-section"
+                    {{ wireNavigate() }}>
+                    Go to Container labels
+                </a>
+            @endunless
         </x-callout>
     @endif
 
@@ -64,18 +79,8 @@
         </x-callout>
     @endcannot
 
-    {{-- Toolbar --}}
-    <div class="flex flex-wrap items-center gap-2">
-        <div class="min-w-0 flex-1">
-            <h2 id="domains-section">Domains</h2>
-            <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                {{ $configuredCount }} domain{{ $configuredCount === 1 ? '' : 's' }}
-                @if ($suggestedCount > 0)
-                    · {{ $suggestedCount }} not added
-                @endif
-            </p>
-        </div>
-        <div class="ml-auto flex flex-wrap items-center gap-2">
+    <x-application.settings-section id="domains-section" title="Domains" :flush="$hasRows" class="scroll-mt-28">
+        <x-slot:actions>
             @if ($hasRows)
                 <div class="relative w-full sm:w-64">
                     <x-reicon name="search"
@@ -84,90 +89,69 @@
                         class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
                 </div>
             @endif
-            @can('update', $application)
-                <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
-                    <x-reicon name="refresh" class="size-3.5" />
-                    Check all DNS
-                </x-forms.button>
-                <div class="relative shrink-0">
-                    @include('livewire.project.shared.cloudflare-autoconfigure')
-                </div>
-                @unless ($labelsAreWritable)
-                    @if (! $isCompose || count($composeServices) > 0)
-                        <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
-                            canGate="update" :canResource="$application">
-                            <x-slot:content>
-                                <button type="button"
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    Add domain
-                                </button>
-                            </x-slot:content>
-                            <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
-                                @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
-                                        :options="collect($composeServices)->map(fn ($serviceName) => [
-                                            'value' => $serviceName,
-                                            'label' => $serviceName,
-                                        ])->values()->all()"
-                                        :disabled="! auth()->user()->can('update', $application)" />
-                                @endif
+            <div class="flex flex-wrap items-center gap-2">
+                @can('update', $application)
+                    <div class="relative shrink-0">
+                        @include('livewire.project.shared.cloudflare-autoconfigure', ['showCheckAllDns' => $hasRows])
+                    </div>
+                    @unless ($labelsAreWritable)
+                        @if (! $isCompose || count($composeServices) > 0)
+                            <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
+                                canGate="update" :canResource="$application">
+                                <x-slot:content>
+                                    <button type="button"
+                                        class="button button-highlighted">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Add domain
+                                    </button>
+                                </x-slot:content>
+                                <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
+                                    @if ($isCompose && count($composeServices) > 0)
+                                        <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
+                                            :options="collect($composeServices)->map(fn ($serviceName) => [
+                                                'value' => $serviceName,
+                                                'label' => $serviceName,
+                                            ])->values()->all()"
+                                            :disabled="! auth()->user()->can('update', $application)" />
+                                    @endif
 
-                                <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
+                                    <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
 
-                                @if ($addDomainDnsFailed)
-                                    <x-callout type="danger" title="DNS is not pointing to the right IP">
-                                        This domain does not currently resolve to this server.
-                                        Traffic may not reach Coolify until you update DNS.
-                                        Are you sure you want to add it anyway?
-                                        @if (filled($addDomainDnsMessage))
-                                            <div class="pt-2">{{ $addDomainDnsMessage }}</div>
-                                        @endif
-                                    </x-callout>
-                                @endif
+                                    @if ($addDomainDnsFailed)
+                                        <x-callout type="danger" title="DNS is not pointing to the right IP">
+                                            This domain does not currently resolve to this server.
+                                            Traffic may not reach Coolify until you update DNS.
+                                            Are you sure you want to add it anyway?
+                                            @if (filled($addDomainDnsMessage))
+                                                <div class="pt-2">{{ $addDomainDnsMessage }}</div>
+                                            @endif
+                                        </x-callout>
+                                    @endif
 
-                                <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                    <x-forms.button type="button" wire:click="generateDomain">
-                                        Generate domain
-                                    </x-forms.button>
-                                    <div class="flex flex-wrap gap-2">
-                                        @if ($addDomainDnsFailed)
-                                            <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
-                                                Continue
-                                            </x-forms.button>
-                                        @else
-                                            <x-forms.button type="submit" isHighlighted>
-                                                Save
-                                            </x-forms.button>
-                                        @endif
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                                        <x-forms.button type="button" wire:click="generateDomain">
+                                            Generate domain
+                                        </x-forms.button>
+                                        <div class="flex flex-wrap gap-2">
+                                            @if ($addDomainDnsFailed)
+                                                <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
+                                                    Continue
+                                                </x-forms.button>
+                                            @else
+                                                <x-forms.button type="submit" isHighlighted>
+                                                    Save
+                                                </x-forms.button>
+                                            @endif
+                                        </div>
                                     </div>
-                                </div>
-                            </form>
-                        </x-modal-input>
-                    @endif
-                @endunless
-            @endcan
-        </div>
-    </div>
-
-    @if ($hasHttpsDomains && ! $labelsAreWritable)
-        <div class="flex flex-wrap items-center justify-end gap-2 service-domains-https">
-            <label for="isForceHttpsEnabled-trigger" class="mb-0! text-[12px]!">Redirect HTTP to HTTPS</label>
-            <x-helper helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL." />
-            <div class="w-28 shrink-0">
-                <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
-                    onChange="updateForceHttps" portal
-                    :options="[
-                        ['value' => true, 'label' => 'Enabled'],
-                        ['value' => false, 'label' => 'Disabled'],
-                    ]" :disabled="! auth()->user()->can('update', $application)" />
+                                </form>
+                            </x-modal-input>
+                        @endif
+                    @endunless
+                @endcan
             </div>
-        </div>
-    @endif
+        </x-slot:actions>
 
-    {{-- Table / empty --}}
-    <div id="domains-table-section"
-        class="application-settings-section-body mt-1 scroll-mt-28 {{ $hasRows ? 'is-flush' : '' }} w-full">
         @if ($hasRows)
             <div class="data-table-header service-domains-overview-grid">
                 <span>Domain</span>
@@ -269,7 +253,31 @@
                     description="No domain matches your search." icon-name="search" />
             </div>
         @endif
-    </div>
+    </x-application.settings-section>
+
+    @if ($hasRows && ! $labelsAreWritable)
+        <x-application.settings-section id="domain-redirects-section" title="Redirects"
+            helper="Applies to all domains of this application.">
+            <div class="grid gap-4 lg:grid-cols-2">
+                @if ($hasHttpsDomains)
+                    <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled"
+                        label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
+                        helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" :disabled="! auth()->user()->can('update', $application)" />
+                @endif
+                <x-forms.listbox canGate="update" :canResource="$application" id="isPermanentRedirectEnabled"
+                    label="Redirect type" onChange="updatePermanentRedirect"
+                    helper="Applies to the HTTP to HTTPS and www redirects. Permanent (301/308) is better for SEO, but browsers cache it. Use Temporary (302/307) while you test a redirect."
+                    :options="[
+                        ['value' => false, 'label' => 'Temporary'],
+                        ['value' => true, 'label' => 'Permanent'],
+                    ]" :disabled="! auth()->user()->can('update', $application)" />
+            </div>
+        </x-application.settings-section>
+    @endif
 
     {{-- One dialog for address edits and automatically saved domain settings. --}}
     <div class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }"
@@ -299,13 +307,10 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
-                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
-                                <template x-if="modalOpen">
-                                    <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges"
-                                        targets="updateDomain,confirmUpdateDomainDespiteDns" />
-                                </template>
+                        <div class="application-settings-section-body relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                            <form wire:submit="updateDomain" class="flex min-h-0 flex-1 flex-col">
+                                <div data-testid="domain-settings-scroll"
+                                    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service</label>
@@ -313,7 +318,8 @@
                                     <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain"
+                                    inheritedPortExpression="$wire.editingInheritedPort" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -326,47 +332,49 @@
                                     </x-callout>
                                 @endif
 
-                                @if ($editDomainDnsFailed)
-                                    <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">Continue</x-forms.button>
-                                @endif
-                            </form>
-                            @php
-                                $editingRow = $editingIndex !== null ? ($domainRows[$editingIndex] ?? null) : null;
-                            @endphp
-                            @if ($editingRow && ! $labelsAreWritable)
-                                @can('update', $application)
-                                    @php
-                                        $editingKey = hash('sha256', $editingRow['url'].'|'.($editingRow['service'] ?? ''));
-                                        $editingRedirectKey = $isCompose ? $this->serviceRedirectWireKey($editingRow['service']) : null;
-                                        $editingRedirectProperty = $isCompose ? 'serviceRedirects.'.$editingRedirectKey : 'redirect';
-                                    @endphp
-                                    <div wire:key="editing-application-domain-settings-{{ $editingKey }}"
-                                        class="mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
-                                        <p class="sm:col-span-2 text-[12px] text-neutral-500 dark:text-fg-dim">Indexing and redirect changes save automatically.</p>
-                                        <x-forms.listbox id="application-domain-indexing-{{ $editingKey }}"
-                                            label="Search engine indexing" :wire="false" preserveValue
-                                            :value="$application->isDomainNoindexed($editingRow['url']) ? 'noindex' : 'index'"
-                                            onChange="toggleNoindexDomain" :onChangeArgs="[$editingRow['url']]" portal
+                                @unless ($labelsAreWritable)
+                                    @can('update', $application)
+                                        <div
+                                            class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
+                                        <x-forms.listbox id="editingIndexing"
+                                            htmlId="application-domain-indexing" label="Search engine indexing" portal
                                             :options="[
                                                 ['value' => 'index', 'label' => 'Indexable'],
                                                 ['value' => 'noindex', 'label' => 'Noindex'],
                                             ]" />
-                                        <x-forms.listbox id="application-domain-direction-{{ $editingKey }}"
-                                            label="www redirect" :wire="false" preserveValue
-                                            :value="$isCompose ? ($serviceRedirects[$editingRedirectKey] ?? 'both') : $redirect"
-                                            :x-effect="'value = $wire.get('.json_encode($editingRedirectProperty).')'"
+                                        <x-forms.listbox id="editingRedirect"
+                                            htmlId="application-domain-direction" label="www redirect"
                                             :helper="$isCompose ? 'Applies to all domains for this Compose service.' : 'Applies to all domains for this application.'"
-                                            :onChange="$isCompose ? 'updateServiceRedirect' : 'updateRedirect'"
-                                            :onChangeArgs="$isCompose ? [$editingRow['service']] : []" portal
+                                            portal
                                             :options="[
                                                 ['value' => 'both', 'label' => 'No redirect'],
                                                 ['value' => 'www', 'label' => 'Redirect to www'],
                                                 ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                             ]" />
-                                    </div>
-                                @endcan
-                            @endif
+                                        </div>
+                                    @endcan
+                                @endunless
+                                </div>
 
+                                <div data-testid="domain-settings-footer"
+                                    class="shrink-0 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <x-forms.button type="button" wire:click="regenerateEditingDomain"
+                                        wire:target="regenerateEditingDomain">
+                                        Regenerate hostname
+                                    </x-forms.button>
+                                    @if ($editDomainDnsFailed)
+                                        <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">
+                                            Continue
+                                        </x-forms.button>
+                                    @else
+                                        <x-forms.button type="submit" wire:target="updateDomain" isHighlighted>
+                                            Save
+                                        </x-forms.button>
+                                    @endif
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -420,4 +428,5 @@
             </template>
         </div>
     @endif
+    @include('livewire.project.shared.dns-provider-management')
 </div>
