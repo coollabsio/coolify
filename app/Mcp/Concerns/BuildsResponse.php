@@ -45,6 +45,7 @@ trait BuildsResponse
         'mariadb_password', 'mariadb_root_password',
         'mysql_password', 'mysql_root_password',
         'clickhouse_admin_password',
+        'influxdb_admin_password', 'influxdb_admin_token',
 
         // app/env secrets
         'value', 'real_value', 'http_basic_auth_password', 'git_https_password',

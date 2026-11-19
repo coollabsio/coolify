@@ -29,6 +29,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -4716,7 +4717,7 @@ function isAssociativeArray($array)
  * @param  iterable<int, string>  $definedKeys
  * @return Collection<string, string>
  */
-function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
+function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
 {
     // A model created in this request has no column default loaded yet (null), which means on.
     $isEnabled = $resource instanceof Application

@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -127,6 +128,7 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
                 $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneInfluxdb::class ||
                 $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
                 $uuid = new_public_id();
@@ -165,6 +167,10 @@ class ResourceOperations extends Component
                         $newName = 'redis-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                        $newName = 'influxdb-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                        $newName = 'influxdb-config-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {

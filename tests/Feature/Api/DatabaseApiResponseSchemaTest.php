@@ -41,6 +41,7 @@ beforeEach(function () {
         'keydb' => ['keydb_password' => 'secret'],
         'dragonfly' => ['dragonfly_password' => 'secret'],
         'clickhouse' => ['clickhouse_admin_password' => 'secret'],
+        'influxdb' => ['influxdb_admin_password' => 'secret', 'influxdb_admin_token' => 'secret-token'],
         'sqlite' => [],
     ];
 
