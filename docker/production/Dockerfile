@@ -1,17 +1,17 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.0.3
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.10.3
+ARG CLOUDFLARED_VERSION=2026.11.1
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.8-r1
+ARG NGINX_VERSION=1.31.9-r1
 # https://nodejs.org/en/about/previous-releases
-ARG NODE_VERSION=24.22.1
+ARG NODE_VERSION=24.22.3
 # https://pecl.php.net/package/uv
-ARG PHP_UV_VERSION=0.3.0
+ARG PHP_UV_VERSION=0.3.1
 
 # Add user/group
 ARG USER_ID=9999
@@ -166,6 +166,7 @@ RUN mkdir -p /usr/local/bin && \
 
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
 ENV PHP_OPCACHE_ENABLE=1
 # v5 defaults this to 0. Keep 1: app:init rebuilds the Laravel caches while php-fpm already runs.
 ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
@@ -204,9 +205,19 @@ RUN composer dump-autoload
 COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
+# Configure the Nginx site of the base image
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
+ENV NGINX_FASTCGI_BUFFERS="16 16k"
+ENV NGINX_FASTCGI_BUFFER_SIZE=32k
+ENV TRUSTED_PROXY=off
+
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
-COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
+COPY docker/production/etc/nginx/server-opts.d/coolify.conf /etc/nginx/server-opts.d/coolify.conf
+# Drop HSTS, which would force HTTPS on every subdomain of the dashboard domain, and the
+# year-long caching of static files, which keeps files without a hash in their name stale after an upgrade
+RUN sed -i '/Strict-Transport-Security/d' /etc/nginx/server-opts.d/security.conf && \
+    rm /etc/nginx/server-opts.d/performance.conf
 COPY --chmod=755 docker/production/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN mkdir -p /etc/nginx/conf.d && \
