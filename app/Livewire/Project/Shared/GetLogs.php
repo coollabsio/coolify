@@ -475,6 +475,7 @@ class GetLogs extends Component
         $command = $server->isSwarm()
             ? "docker service logs {$options}{$container}"
             : "docker logs {$options}{$container}";
+        $command = dockerLogsCommandWithTimeout($command);
 
         if ($server->isNonRoot()) {
             $command = parseCommandsByLineForSudo(collect($command), $server)[0];
@@ -507,7 +508,7 @@ class GetLogs extends Component
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))
+        $output = Process::timeout(DOCKER_LOGS_LOCAL_TIMEOUT)
             ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
             ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
             ->output();
