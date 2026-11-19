@@ -17,6 +17,15 @@ class ManagedDnsRecordFactory extends Factory
             'integration_token_id' => fn (array $attributes) => DnsProviderZone::query()->findOrFail($attributes['dns_provider_zone_id'])->integration_token_id,
             'team_id' => fn (array $attributes) => DnsProviderZone::query()->findOrFail($attributes['dns_provider_zone_id'])->integrationToken->team_id,
             'provider_record_id' => fake()->uuid(), 'type' => 'A', 'name' => fake()->domainName(), 'content' => fake()->ipv4(),
+            'owned' => false,
         ];
+    }
+
+    /**
+     * A record Coolify created itself (carries the ownership comment in the provider).
+     */
+    public function owned(): static
+    {
+        return $this->state(fn (array $attributes) => ['owned' => true]);
     }
 }

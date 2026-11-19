@@ -4,18 +4,21 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ByIp extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     #[Locked]
     public $private_keys;
@@ -52,7 +55,7 @@ class ByIp extends Component
     protected function rules(): array
     {
         return [
-            'private_key_id' => 'nullable|integer',
+            'private_key_id' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', currentTeam()->id)],
             'new_private_key_name' => 'nullable|string',
             'new_private_key_description' => 'nullable|string',
             'new_private_key_value' => 'nullable|string',
@@ -70,6 +73,7 @@ class ByIp extends Component
         return array_merge(ValidationPatterns::combinedMessages(), [
             'private_key_id.integer' => 'The Private Key field must be an integer.',
             'private_key_id.nullable' => 'The Private Key field is optional.',
+            'private_key_id.exists' => 'The selected Private Key is invalid.',
             'new_private_key_name.string' => 'The Private Key Name must be a string.',
             'new_private_key_description.string' => 'The Private Key Description must be a string.',
             'new_private_key_value.string' => 'The Private Key Value must be a string.',
@@ -141,9 +145,9 @@ class ByIp extends Component
         $this->validate();
         try {
             $this->authorize('create', Server::class);
-            $foundServer = Server::whereIp($this->ip)->first();
-            if ($foundServer) {
-                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
+            $this->ip = Server::normalizeIp($this->ip);
+            if (Server::sshEndpointInUse($this->ip, $this->port)) {
+                return $this->dispatch('error', 'A server with this IP/Domain and SSH port already exists.');
             }
 
             if (is_null($this->private_key_id)) {
@@ -171,6 +175,7 @@ class ByIp extends Component
             $server->settings->server_role = ServerRole::from($this->server_role);
             $server->settings->is_build_server = $this->server_role === ServerRole::BUILD->value;
             $server->settings->save();
+            $this->applyImageScanning($server);
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {

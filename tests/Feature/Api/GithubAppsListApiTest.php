@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -460,11 +461,14 @@ describe('GitHub app API url normalization', function () {
             'is_public' => false,
         ]);
 
+        // The GHE host is fictional, so resolve it to a public IP instead of hitting real DNS.
+        Http::macro('GitSource', fn (string $url) => Http::withOptions(SafeExternalUrl::httpClientOptions(
+            $url,
+            resolver: fn (string $host): array => ['93.184.216.34'],
+        )));
+
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.octocorp.ghe.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.octocorp.ghe.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'installation-token',
             ]),

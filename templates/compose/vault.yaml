@@ -6,7 +6,7 @@
 
 services:
   vault:
-    image: 'hashicorp/vault:${VAULT_VERSION:-latest}'
+    image: 'hashicorp/vault:${VAULT_VERSION:-2.2.2}'
     command: server
     environment:
       - SERVICE_URL_VAULT_8200

@@ -2,6 +2,8 @@
 
 namespace App\Actions\Development;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use InvalidArgumentException;
@@ -12,7 +14,10 @@ class SeedDevelopmentQemuServer
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false): Server
+    /**
+     * $ip and $port override the profile address, for example for a Lima VM whose SSH port is forwarded to the host.
+     */
+    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false, ?string $ip = null, int $port = 22): Server
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -28,10 +33,13 @@ class SeedDevelopmentQemuServer
         }
 
         if ($removeOtherServers) {
+            // A server that still has resources stays, because its resources need it.
             Server::query()
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
-                ->delete();
+                ->get()
+                ->filter(fn (Server $server) => $server->definedResources()->isEmpty())
+                ->each->delete();
         }
 
         $server = $asLocalhost
@@ -41,12 +49,16 @@ class SeedDevelopmentQemuServer
         $server->fill([
             'name' => $asLocalhost ? 'localhost' : $profile['name'],
             'description' => 'Development QEMU virtual machine',
-            'ip' => $profile['ip'],
-            'port' => 22,
+            'ip' => $ip ?? $profile['ip'],
+            'port' => $port,
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
         ]);
+        if (! $server->proxyType()) {
+            $server->proxy->set('type', ProxyTypes::CADDY->value);
+            $server->proxy->set('status', ProxyStatus::EXITED->value);
+        }
         $server->deleted_at = null;
         $server->save();
 

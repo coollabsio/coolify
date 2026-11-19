@@ -2,7 +2,6 @@
 
 namespace App\Notifications\ScheduledTask;
 
-use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
@@ -17,11 +16,7 @@ class TaskSuccess extends CustomEmailNotification
     public function __construct(public ScheduledTask $task, public string $output)
     {
         $this->onQueue('high');
-        $resource = $task->application ?? $task->service;
-        if ($resource) {
-            $type = $resource instanceof Application ? 'application' : 'service';
-            $this->url = base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/{$type}/{$resource->uuid}/tasks/{$task->uuid}";
-        }
+        $this->url = $task->url();
     }
 
     public function via(object $notifiable): array

@@ -5,7 +5,10 @@
     // single JS expression here — a directive inside the <x-copy-button> tag would
     // break Blade's component-tag compiler.
     $copyResolve = null;
-    if ($copyable) {
+    if ($copyable && $type === 'password') {
+        // Copy the field as shown: it includes unsaved edits and works without Livewire.
+        $copyResolve = "\$el.parentElement.querySelector('input').value";
+    } elseif ($copyable) {
         $copyModel = $modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model');
         $copyResolve = $copyModel
             ? "\$wire.get('".$copyModel."')"
@@ -27,6 +30,8 @@
             <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
                 @if ($required)
                     <x-highlighted text="*" />
+                @elseif ($requiredWhen)
+                    <span x-cloak x-show="{{ $requiredWhen }}"><x-highlighted text="*" /></span>
                 @endif
                 @isset($labelSuffix)
                     {{ $labelSuffix }}
@@ -46,7 +51,7 @@
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 x-bind:type="type"
                 x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
-                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @if ($requiredWhen) x-bind:required="{{ $requiredWhen }}" @endif
                 @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
                 wire:loading.attr="disabled"
                 @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
@@ -70,11 +75,13 @@
 
         </div>
     @else
-        @if ($copyable)
+        @if ($type === 'number')
+            <div class="relative" x-data="numberStepper">
+        @elseif ($copyable)
             <div class="relative">
         @endif
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
-            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
+            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @if ($requiredWhen) x-bind:required="{{ $requiredWhen }}" @endif @readonly($readonly)
             @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
             wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
@@ -83,7 +90,19 @@
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
-        @if ($copyable)
+        @if ($type === 'number')
+                <div class="number-stepper">
+                    <button type="button" tabindex="-1" aria-label="Decrease" x-on:click="step(-1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="minus" class="size-3.5" />
+                    </button>
+                    <button type="button" tabindex="-1" aria-label="Increase" x-on:click="step(1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="plus" class="size-3.5" />
+                    </button>
+                </div>
+            </div>
+        @elseif ($copyable)
                 <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
                     class="absolute top-1/2 right-1 z-10 -translate-y-1/2" />
             </div>

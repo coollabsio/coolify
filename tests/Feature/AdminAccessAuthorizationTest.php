@@ -172,7 +172,8 @@ test('root user sees the admin link in the navbar', function () {
     expect($navbar)
         ->toContain('href="'.route('admin.index').'"')
         ->toContain('title="Admin"')
-        ->toContain('text-pink-500');
+        ->toContain('nav-admin')
+        ->not->toContain('text-pink-500');
 });
 
 test('non-root user does not see the admin link in the navbar', function () {

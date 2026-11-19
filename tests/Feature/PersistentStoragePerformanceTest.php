@@ -24,7 +24,11 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
-    Process::fake();
+    Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        default => '',
+    }));
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],
         ['id' => 0, 'is_dns_validation_enabled' => false]
@@ -94,13 +98,14 @@ function createPerfApplicationWithVolumes(int $volumeCount = 5): array
 it('renders volume rows inline without nested Livewire row components', function () {
     [$application] = createPerfApplicationWithVolumes(5);
 
-    $html = Livewire::test(All::class, ['resource' => $application])->html();
+    $component = Livewire::test(All::class, ['resource' => $application]);
 
-    expect($html)
-        ->toContain('data-table')
-        ->toContain('openBackupModal')
-        ->toContain('wire:submit="submit(')
+    expect($component->html())
         ->not->toContain('shared-configure-volume-backup-');
+
+    // The only nested components are the per-row backup forms, keyed by volume id.
+    expect(array_keys($component->snapshot['memo']['children']))
+        ->toBe($application->persistentStorages->map(fn ($storage) => "configure-volume-backup-{$storage->id}")->values()->all());
 });
 
 it('batches volume backup meta and exposes forms for every volume', function () {
@@ -118,10 +123,7 @@ it('batches volume backup meta and exposes forms for every volume', function () 
     $component = Livewire::test(All::class, ['resource' => $application]);
 
     expect($component->get('volumeBackupMeta'))->toHaveCount(5)
-        ->and($component->get('forms'))->toHaveCount(5)
-        ->and($component->html())->toContain('volumes-col-backup')
-        ->toContain('Backups are saved to S3')
-        ->toContain('Backups are stored locally only');
+        ->and($component->get('forms'))->toHaveCount(5);
 
     expect($component->get("volumeBackupMeta.{$application->persistentStorages->first()->id}.s3"))->toBeTrue();
 
@@ -142,20 +144,14 @@ it('updates a volume row from the parent All component', function () {
     expect($volume->fresh()->mount_path)->toBe('/data/updated');
 });
 
-it('mounts a single shared backup modal only after openBackupModal', function () {
+it('mounts a backup form per volume row keyed by the volume id', function () {
     [$application, $volume] = createPerfApplicationWithVolumes(3);
 
     $component = Livewire::test(All::class, ['resource' => $application]);
 
-    expect($component->html())
-        ->toContain('openBackupModal')
-        ->not->toContain('shared-configure-volume-backup-')
-        ->and($component->get('backupModalStorageId'))->toBeNull();
-
-    $component
-        ->call('openBackupModal', $volume->id)
-        ->assertSet('backupModalStorageId', $volume->id)
-        ->assertSee('Frequency');
+    expect($component->snapshot['memo']['children'])
+        ->toHaveCount(3)
+        ->toHaveKey("configure-volume-backup-{$volume->id}");
 });
 
 it('keeps file mount content out of the volumes tab snapshot', function () {

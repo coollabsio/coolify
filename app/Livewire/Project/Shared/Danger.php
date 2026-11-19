@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -28,6 +30,8 @@ class Danger extends Component
     public bool $docker_cleanup = true;
 
     public bool $delete_connected_networks = true;
+
+    public bool $delete_backups = false;
 
     public ?string $modalId = null;
 
@@ -72,7 +76,8 @@ class Danger extends Component
             'standalone-mariadb',
             'standalone-keydb',
             'standalone-dragonfly',
-            'standalone-clickhouse' => $this->resource->name ?? 'Database',
+            'standalone-clickhouse',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
@@ -97,22 +102,32 @@ class Danger extends Component
             return 'Resource not found.';
         }
 
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
+        }
+
         if (! empty($selectedActions)) {
             $this->delete_volumes = in_array('delete_volumes', $selectedActions);
             $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
             $this->delete_configurations = in_array('delete_configurations', $selectedActions);
             $this->docker_cleanup = in_array('docker_cleanup', $selectedActions);
+            $this->delete_backups = in_array('delete_backups', $selectedActions);
         }
 
         try {
             $this->authorize('delete', $this->resource);
+            // Soft delete first, so the environment page after the redirect does not list the resource.
+            $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
                 $this->delete_connected_networks,
                 $this->delete_configurations,
                 $this->docker_cleanup,
-            )->afterResponse();
+                deleteBackups: $this->delete_backups,
+            );
 
             return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,
@@ -123,29 +138,28 @@ class Danger extends Component
         }
     }
 
-    public function deleteFromCoolifyOnly(string $password): mixed
+    public function flush($password)
     {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return 'The provided password is incorrect.';
-        }
-
-        if (! $this->resource instanceof Service) {
-            return 'Service not found.';
-        }
-
         try {
-            $this->authorize('delete', $this->resource);
-            DeleteResourceJob::dispatch(
-                resource: $this->resource,
-                deleteFromCoolifyOnly: true,
-            )->afterResponse();
+            $this->authorize('manage', $this->resource);
 
-            return redirectRoute($this, 'project.resource.index', [
-                'project_uuid' => $this->projectUuid,
-                'environment_uuid' => $this->environmentUuid,
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            FlushDatabase::run($this->resource);
+            auditLog('ui.database.flushed', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
             ]);
+            $this->dispatch('success', 'Database flushed.');
+
+            return true;
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
+
+            return false;
         }
     }
 
@@ -157,9 +171,11 @@ class Danger extends Component
                 ['id' => 'delete_connected_networks', 'label' => __('resource.delete_connected_networks')],
                 ['id' => 'delete_configurations', 'label' => __('resource.delete_configurations')],
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
-                // ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this Ressource will be permanently deleted from local storage.'],
-                // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected S3 Storage.'],
-                // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']
+                [
+                    'id' => 'delete_backups',
+                    'label' => __('resource.delete_backups'),
+                    'default_warning' => __('resource.keep_backups'),
+                ],
             ],
         ]);
     }

@@ -7,7 +7,7 @@
 
 services:
   radarr:
-    image: lscr.io/linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:7.0.3
     environment:
       - SERVICE_URL_RADARR_7878
       - _APP_URL=$SERVICE_URL_RADARR

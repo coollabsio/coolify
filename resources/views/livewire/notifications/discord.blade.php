@@ -25,7 +25,7 @@
                         ]" />
                     <div class="lg:col-span-2">
                         @can('update', $settings)
-                            <x-forms.input type="password" required id="discordWebhookUrl" label="Webhook URL"
+                            <x-forms.input type="password" :required="$discordEnabled" id="discordWebhookUrl" label="Webhook URL"
                                 helper="Create an incoming webhook in your Discord server settings." />
                         @else
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />

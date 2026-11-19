@@ -9,6 +9,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class Navbar extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -39,14 +41,14 @@ class Navbar extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'refreshServerShow' => 'refreshServer',
             'sentinel-restart-requested' => 'hideSentinelWarning',
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
-            "echo-private:team.{$teamId},SentinelRestarted" => 'refreshSentinelStatus',
-            "echo-private:team.{$teamId},SentinelSynchronized" => 'refreshSentinelStatus',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'showNotification',
+                'SentinelRestarted' => 'refreshSentinelStatus',
+                'SentinelSynchronized' => 'refreshSentinelStatus',
+            ]),
         ];
     }
 
@@ -169,6 +171,7 @@ class Navbar extends Component
         }
 
         try {
+            $this->authorize('manageProxy', $this->server);
             $this->isChecking = true;
             CheckProxy::run($this->server, true);
         } catch (\Throwable $e) {
@@ -249,6 +252,12 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->serverSwitcherOptions = collect($this->serverSwitcherOptions)
+            ->map(fn (array $option): array => $option['uuid'] === $this->server->uuid
+                ? [...$option, 'functional' => $this->server->isFunctional()]
+                : $option)
+            ->all();
         $this->dispatchProxyConfigurationState();
     }
 
@@ -258,6 +267,7 @@ class Navbar extends Component
             'proxy-configuration-state-changed',
             pending: $this->server->hasPendingProxyConfiguration(),
             traefikOutdated: $this->server->hasCurrentTraefikOutdatedInfo(),
+            proxyNotRunning: $this->server->proxySet() && ($this->server->proxy->status ?? 'unknown') !== 'running',
         );
     }
 

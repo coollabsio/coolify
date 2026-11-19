@@ -7,12 +7,12 @@
 
 services:
   openobserve:
-    image: public.ecr.aws/zinclabs/openobserve:v0.90.0
+    image: public.ecr.aws/zinclabs/openobserve:v1.1.2
     environment:
       - SERVICE_URL_OPENOBSERVE_5080
       - ZO_DATA_DIR=/data
       - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-root@example.com}
-      - ZO_ROOT_USER_PASSWORD=${SERVICE_PASSWORD_OPENOBSERVE}
+      - ZO_ROOT_USER_PASSWORD=${SERVICE_PASSWORDWITHSYMBOLS_OPENOBSERVE}
       - ZO_TELEMETRY=${ZO_TELEMETRY:-false}
       - ZO_COOKIE_SECURE_ONLY=${ZO_COOKIE_SECURE_ONLY:-true}
     volumes:

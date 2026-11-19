@@ -9,7 +9,7 @@ x-app-env: &app-env
   - NEXTAUTH_URL=${SERVICE_URL_LANGFUSE}
   - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse-db}
   - SALT=${SERVICE_PASSWORD_SALT}
-  - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_LANGFUSE}
+  - ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTIONKEY}
   - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
   - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
   - CLICKHOUSE_MIGRATION_URL=clickhouse://clickhouse:9000
@@ -61,7 +61,7 @@ x-app-env: &app-env
 
 services:
   langfuse:
-    image: langfuse/langfuse:3
+    image: langfuse/langfuse:4
     depends_on: &langfuse-depends-on
       postgres:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       retries: 3
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:3
+    image: langfuse/langfuse-worker:4
     environment:
       <<: *app-env
     depends_on: *langfuse-depends-on
@@ -124,7 +124,7 @@ services:
       retries: 10
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.2.4.23
+    image: clickhouse/clickhouse-server:26.10.4.207
     user: "101:101"
     environment:
       - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}

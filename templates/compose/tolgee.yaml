@@ -7,7 +7,7 @@
 
 services:
   tolgee:
-    image: tolgee/tolgee
+    image: tolgee/tolgee:v3.243.1
     environment:
       - SERVICE_URL_TOLGEE_8080
       - TOLGEE_AUTHENTICATION_ENABLED=true

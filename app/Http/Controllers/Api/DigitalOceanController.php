@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -21,6 +23,8 @@ use OpenApi\Attributes as OA;
 
 class DigitalOceanController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function getCloudProviderTokenUuid(Request $request): ?string
     {
         return $request->cloud_provider_token_uuid ?? $request->cloud_provider_token_id;
@@ -198,13 +202,16 @@ class DigitalOceanController extends Controller
         path: '/servers/digitalocean',
         operationId: 'create-digitalocean-server',
         summary: 'Create a server on DigitalOcean',
+        description: 'Create a DigitalOcean droplet and link it as a Coolify server. A cloud-init script or extra SSH key IDs need a token with the deploy permission.',
         security: [['bearerAuth' => []]],
         tags: ['DigitalOcean'],
         responses: [
             new OA\Response(response: 201, description: 'DigitalOcean droplet created and linked to a Coolify server.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a cloud-init script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'DigitalOcean rate limit exceeded.'),
+            new OA\Response(response: 502, ref: '#/components/responses/502'),
         ]
     )]
     public function createServer(Request $request): JsonResponse
@@ -264,6 +271,13 @@ class DigitalOceanController extends Controller
             ], 422);
         }
 
+        if (! empty($request->cloud_init_script) || ! empty($request->digitalocean_ssh_key_ids)) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A cloud-init script or extra SSH keys run as root on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
         $team = Team::find($teamId);
         if (Team::serverLimitReached($team)) {
             return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
@@ -273,7 +287,13 @@ class DigitalOceanController extends Controller
         $request->offsetSet('enable_ipv6', $request->boolean('enable_ipv6', true));
         $request->offsetSet('monitoring', $request->boolean('monitoring', true));
         $request->offsetSet('digitalocean_ssh_key_ids', $request->digitalocean_ssh_key_ids ?? []);
-        $request->offsetSet('instant_validate', $request->boolean('instant_validate', false));
+        $request->offsetSet('instant_validate', $request->filled('instant_validate') ? $request->boolean('instant_validate') : $this->hasDeployAbility($request));
+        if ($request->instant_validate) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Instant validation installs Docker and starts the proxy on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
 
         $token = $this->digitalOceanToken($request, $teamId);
         if ($token instanceof JsonResponse) {
@@ -351,7 +371,7 @@ class DigitalOceanController extends Controller
             }
 
             if ($request->instant_validate) {
-                ValidateServer::dispatch($server);
+                ValidateNewCloudServerJob::dispatch($server);
             }
 
             auditLog('api.digitalocean_droplet.created', [
@@ -383,12 +403,13 @@ class DigitalOceanController extends Controller
             }
 
             return $response;
-        } catch (\Throwable $e) {
+        } catch (CloudProviderApiException $e) {
             $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
 
-            logger()->error('Failed to create DigitalOcean server', [
-                'error' => $e->getMessage(),
-            ]);
+            return $e->toJsonResponse('Failed to create DigitalOcean server.');
+        } catch (\Throwable $e) {
+            $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
+            report($e);
 
             return response()->json(['message' => 'Failed to create DigitalOcean server.'], 500);
         }

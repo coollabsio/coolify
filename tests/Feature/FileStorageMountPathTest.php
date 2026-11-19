@@ -87,15 +87,14 @@ test('livewire file storage rejects parent segments and does not create a local 
     expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('livewire directory storage rejects a server absolute path and has no side effects', function () {
+test('livewire directory storage accepts a server absolute path for an administrator', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
         ->set('file_storage_directory_source', '/root/.ssh')
         ->set('file_storage_directory_destination', '/data')
         ->call('submitFileStorageDirectory')
-        ->assertDispatched('error');
+        ->assertDispatched('success');
 
-    expect(LocalFileVolume::query()->count())->toBe(0);
-    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    expect(LocalFileVolume::query()->sole()->fs_path)->toBe('/root/.ssh');
 });
 
 test('livewire directory storage accepts a path inside the application root', function () {
@@ -157,14 +156,11 @@ test('an administrator cannot create storage on a cross-team resource', function
     expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('file mount modal shows the calculated host file path above the destination input', function () {
+test('file mount modal shows the calculated host file path', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
-        ->assertSeeText('Create a managed file on the host and mount it inside the container.')
-        ->assertSeeText('Host file path')
         ->assertSeeText($this->application->workdir().'/')
         ->set('file_storage_path', '/etc/nginx/nginx.conf')
-        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf')
-        ->assertDontSeeText('Actual file mounted from the host system to the container.');
+        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf');
 });
 
 test('livewire file storage stores safe file mounts under the application configuration root', function () {

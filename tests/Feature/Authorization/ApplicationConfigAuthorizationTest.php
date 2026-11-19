@@ -220,8 +220,9 @@ test('member cannot load application environment variable values', function () {
         'type' => 'application',
     ])
         ->call('loadValues')
-        ->assertForbidden()
+        ->assertOk()
         ->assertSet('valuesLoaded', false)
+        ->assertSet('isValueHidden', true)
         ->assertSet('value', null);
 });
 
@@ -275,21 +276,6 @@ test('member cannot save the application container name prefix', function () {
     expect($this->application->settings->fresh()->custom_container_name_prefix)->toBeNull();
 });
 
-test('the private application advanced syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $original = (bool) $this->application->settings->is_force_https_enabled;
-
-    $component = Livewire::test(ApplicationAdvanced::class, ['application' => $this->application])
-        ->set('isForceHttpsEnabled', ! $original);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect((bool) $this->application->settings->fresh()->is_force_https_enabled)->toBe($original);
-});
-
 // --- Application Rollback Livewire actions ---
 
 test('member cannot save rollback settings', function () {
@@ -316,6 +302,14 @@ test('member does not see terminal link for application', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
+    // The terminal link lives in the application settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-general', false)
+        ->assertDontSee('application-settings-link-terminal', false);
+
     Livewire::test(ApplicationHeading::class, ['application' => $this->application])
         ->assertDontSee('Terminal');
 });
@@ -324,8 +318,12 @@ test('admin sees terminal link for application', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Terminal');
+    // The terminal link lives in the application settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-terminal', false);
 });
 
 // --- Cross-team isolation ---

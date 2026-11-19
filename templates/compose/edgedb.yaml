@@ -8,7 +8,7 @@
 
 services:
   edgedb:
-    image: edgedb/edgedb
+    image: edgedb/edgedb:6.2
     environment:
       - SERVICE_URL_EDGEDB_5656
       - EDGEDB_SERVER_ADMIN_UI=${EDGEDB_SERVER_ADMIN_UI:-enabled}

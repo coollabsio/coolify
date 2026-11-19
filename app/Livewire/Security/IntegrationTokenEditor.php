@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Security;
 
+use App\Actions\IntegrationToken\UpdateIntegrationToken;
 use App\Models\IntegrationToken;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class IntegrationTokenEditor extends Component
@@ -30,6 +32,8 @@ class IntegrationTokenEditor extends Component
 
     public bool $automaticDns = true;
 
+    public bool $proxiedDns = false;
+
     public function mount(string $integration_token_uuid): void
     {
         $this->integrationToken = IntegrationToken::ownedByCurrentTeam()
@@ -43,31 +47,29 @@ class IntegrationTokenEditor extends Component
         $this->metadata = $this->integrationToken->metadata ?? [];
         $this->loadZones();
         $this->automaticDns = $this->integrationToken->automaticDnsEnabled();
+        $this->proxiedDns = $this->integrationToken->proxiedDnsEnabled();
+    }
+
+    /**
+     * Cloudflare Tunnel setup also writes DNS records, so selecting `tunnel` also selects `dns`.
+     */
+    public function updatedCapabilities(): void
+    {
+        if (in_array('tunnel', $this->capabilities, true) && ! in_array('dns', $this->capabilities, true)) {
+            $this->capabilities[] = 'dns';
+        }
     }
 
     protected function rules(): array
     {
-        $allowedCapability = $this->integrationToken->provider === 'cloudflare' ? 'dns' : 'secrets';
+        $rules = UpdateIntegrationToken::rules($this->integrationToken->provider);
+        $rules['newToken'] = $rules['token'];
+        unset($rules['name'], $rules['token']);
 
-        $rules = [
-            'name' => ['required', 'string', 'max:255'],
-            'newToken' => ['nullable', 'string'],
-            'capabilities' => ['required', 'array', 'min:1'],
-            'capabilities.*' => ['required', 'in:'.$allowedCapability],
+        return ['name' => ['required', 'string', 'max:255']] + $rules + [
             'automaticDns' => ['boolean'],
+            'proxiedDns' => ['boolean'],
         ];
-
-        if ($this->integrationToken->provider === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url'];
-            $rules['metadata.client_id'] = ['required', 'string'];
-        }
-
-        if ($this->integrationToken->provider === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url'];
-            $rules['metadata.namespace'] = ['nullable', 'string'];
-        }
-
-        return $rules;
     }
 
     protected function messages(): array
@@ -78,83 +80,53 @@ class IntegrationTokenEditor extends Component
         ];
     }
 
-    public function save(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
+    public function save(IntegrationTokenValidator $validator): void
     {
         $this->authorize('update', $this->integrationToken);
         $validated = $this->validate();
-        $provider = $this->integrationToken->provider;
-        $token = filled($validated['newToken']) ? $validated['newToken'] : $this->integrationToken->token;
-        $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
-        if ($provider === 'cloudflare') {
-            if ($validated['automaticDns']) {
-                unset($metadata['automatic_dns']);
-            } else {
-                $metadata['automatic_dns'] = false;
-            }
-        }
-        $capabilitiesChanged = collect($validated['capabilities'])->sort()->values()->all()
-            !== collect($this->integrationToken->capabilities)->sort()->values()->all();
-        $metadataChanged = $metadata != ($this->integrationToken->metadata ?? []);
 
         try {
-            if ((filled($validated['newToken']) || $capabilitiesChanged || $metadataChanged)
-                && ! $validator->validate($provider, $token, $validated['capabilities'], $metadata)) {
-                $this->dispatch('error', $validator->errorMessage($provider));
-
-                return;
-            }
-
-            $updates = [
-                'name' => $validated['name'],
-                'capabilities' => $validated['capabilities'],
-                'metadata' => $metadata ?: null,
-            ];
-
-            if (filled($validated['newToken'])) {
-                $updates['token'] = $validated['newToken'];
-            }
-
-            DB::transaction(function () use ($updates, $provider, $validated, $capabilitiesChanged, $cloudflare): void {
-                $this->integrationToken->update($updates);
-                if ($provider === 'cloudflare' && (filled($validated['newToken']) || $capabilitiesChanged)) {
-                    $cloudflare->syncZones($this->integrationToken);
-                }
-            });
-            $this->newToken = '';
-            $this->loadZones();
-
-            auditLog('ui.integration_token.updated', [
-                'team_id' => currentTeam()->id,
-                'integration_token_uuid' => $this->integrationToken->uuid,
-                'integration_token_name' => $this->integrationToken->name,
-                'provider' => $this->integrationToken->provider,
-                'rotated' => array_key_exists('token', $updates),
-            ]);
-
-            $this->dispatch(
-                'integration-token-updated',
-                uuid: $this->integrationToken->uuid,
-                name: $this->integrationToken->name,
-                capabilities: $this->integrationToken->capabilities,
+            UpdateIntegrationToken::run(
+                $this->integrationToken,
+                $validated['name'],
+                $validated['newToken'],
+                $validated['capabilities'],
+                data_get($validated, 'metadata', []),
+                $validated['automaticDns'],
+                $validated['proxiedDns'],
+                'ui',
             );
-            $this->dispatch('success', 'Integration token updated successfully.');
+        } catch (ValidationException $e) {
+            $this->addError('newToken', $e->validator->errors()->first('token'));
+
+            return;
+        } catch (ConnectionException) {
+            $this->dispatch('error', $validator->connectionErrorMessage($this->integrationToken->provider));
+
+            return;
         } catch (\Throwable $e) {
             handleError($e, $this);
+
+            return;
         }
+
+        $this->newToken = '';
+        $this->loadZones();
+        $this->dispatch(
+            'integration-token-updated',
+            uuid: $this->integrationToken->uuid,
+            name: $this->integrationToken->name,
+            capabilities: $this->integrationToken->capabilities,
+        );
+        $this->dispatch('success', 'Integration token updated successfully.');
     }
 
     public function delete(string $password = ''): void
     {
         $this->authorize('delete', $this->integrationToken);
 
-        if ($this->integrationToken->secretManagerLinks()->exists()) {
-            $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
-
-            return;
-        }
-
-        if ($this->integrationToken->managedDnsRecords()->exists()) {
-            $this->dispatch('error', 'This token manages DNS records. Remove those domains or records first.');
+        if ($blocker = $this->integrationToken->deletionBlocker()) {
+            $this->dispatch('error', $blocker);
 
             return;
         }
@@ -165,7 +137,7 @@ class IntegrationTokenEditor extends Component
         $this->integrationToken->delete();
 
         auditLog('ui.integration_token.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->integrationToken->team_id,
             'integration_token_uuid' => $uuid,
             'integration_token_name' => $name,
             'provider' => $provider,

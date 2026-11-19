@@ -61,6 +61,118 @@ describe('queue_application_deployment commit resolution', function () {
         expect($creationLevel)->toBeGreaterThan($initialLevel);
     });
 
+    test('starts a deployment only while the admission transaction is open', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $initialLevel = DB::transactionLevel();
+        $startLevel = null;
+
+        ApplicationDeploymentQueue::updated(function (ApplicationDeploymentQueue $deployment) use (&$startLevel): void {
+            if ($deployment->status === ApplicationDeploymentStatus::IN_PROGRESS->value) {
+                $startLevel = DB::transactionLevel();
+            }
+        });
+
+        $result = queue_application_deployment($application, 'atomic-start');
+
+        expect($result['status'])->toBe('queued')
+            ->and($startLevel)->toBeGreaterThan($initialLevel);
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
+    });
+
+    test('starts the next queued deployment only while a transaction is open', function (string $trigger) {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $this->server->settings->update(['concurrent_builds' => 0]);
+        queue_application_deployment($application, 'waiting-deployment');
+        $this->server->settings->update(['concurrent_builds' => 1]);
+        $initialLevel = DB::transactionLevel();
+        $startLevel = null;
+
+        ApplicationDeploymentQueue::updated(function (ApplicationDeploymentQueue $deployment) use (&$startLevel): void {
+            if ($deployment->status === ApplicationDeploymentStatus::IN_PROGRESS->value) {
+                $startLevel = DB::transactionLevel();
+            }
+        });
+
+        $trigger === 'queue_next_deployment'
+            ? queue_next_deployment($application)
+            : next_after_cancel($this->server);
+
+        expect($startLevel)->toBeGreaterThan($initialLevel)
+            ->and(ApplicationDeploymentQueue::query()->sole()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
+    })->with(['queue_next_deployment', 'next_after_cancel']);
+
+    test('does not start a queued deployment that another worker already started', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $this->server->settings->update(['concurrent_builds' => 0]);
+        queue_application_deployment($application, 'stale-deployment');
+        $this->server->settings->update(['concurrent_builds' => 5]);
+        $stale = ApplicationDeploymentQueue::query()->sole();
+
+        ApplicationDeploymentQueue::query()->whereKey($stale->id)->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+
+        expect(start_queued_deployment($stale))->toBeFalse();
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+    });
+
+    test('force starts a queued deployment only once when two requests hold the same queued row', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $this->server->settings->update(['concurrent_builds' => 0]);
+        queue_application_deployment($application, 'double-force-start');
+        $firstClick = ApplicationDeploymentQueue::query()->sole();
+        $secondClick = ApplicationDeploymentQueue::query()->sole();
+
+        $firstResult = force_start_deployment($firstClick);
+        $secondResult = force_start_deployment($secondClick);
+
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
+        expect($firstResult)->toBeTrue()
+            ->and($secondResult)->toBeFalse()
+            ->and(ApplicationDeploymentQueue::query()->sole()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+    });
+
+    test('force start bypasses the concurrency limits inside a transaction', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        queue_application_deployment($application, 'running-deployment');
+        queue_application_deployment($application, 'forced-deployment', commit: 'another-commit');
+        $forced = ApplicationDeploymentQueue::query()->where('deployment_uuid', 'forced-deployment')->sole();
+        $initialLevel = DB::transactionLevel();
+        $startLevel = null;
+
+        ApplicationDeploymentQueue::updated(function (ApplicationDeploymentQueue $deployment) use (&$startLevel): void {
+            if ($deployment->status === ApplicationDeploymentStatus::IN_PROGRESS->value) {
+                $startLevel = DB::transactionLevel();
+            }
+        });
+
+        expect($forced->status)->toBe(ApplicationDeploymentStatus::QUEUED->value)
+            ->and(force_start_deployment($forced))->toBeTrue()
+            ->and($startLevel)->toBeGreaterThan($initialLevel)
+            ->and($forced->fresh()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 2);
+    });
+
+    test('force start does not restart a deployment that is no longer queued', function (ApplicationDeploymentStatus $status) {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $this->server->settings->update(['concurrent_builds' => 0]);
+        queue_application_deployment($application, 'not-queued-deployment');
+        $stale = ApplicationDeploymentQueue::query()->sole();
+        ApplicationDeploymentQueue::query()->whereKey($stale->id)->update(['status' => $status->value]);
+
+        $result = force_start_deployment($stale);
+
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+        expect($stale->fresh()->status)->toBe($status->value)
+            ->and($result)->toBeFalse();
+    })->with([
+        ApplicationDeploymentStatus::IN_PROGRESS,
+        ApplicationDeploymentStatus::FINISHED,
+        ApplicationDeploymentStatus::FAILED,
+        ApplicationDeploymentStatus::CANCELLED_BY_USER,
+    ]);
+
     test('skips a matching commit without creating or dispatching a second deployment', function () {
         $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
 

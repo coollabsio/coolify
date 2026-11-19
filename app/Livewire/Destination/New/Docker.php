@@ -72,7 +72,7 @@ class Docker extends Component
     {
         try {
             $isSwarm = $this->selectedServer->isSwarm();
-            $this->authorize('create', $isSwarm ? SwarmDocker::class : StandaloneDocker::class);
+            $this->authorize('update', $this->selectedServer);
             $this->validate();
             if ($isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
@@ -97,6 +97,14 @@ class Docker extends Component
                     ]);
                 }
             }
+
+            auditLog('ui.destination.created', [
+                'team_id' => $this->selectedServer->team_id,
+                'destination_uuid' => $docker->uuid,
+                'destination_name' => $docker->name,
+                'destination_type' => $isSwarm ? 'swarm' : 'standalone',
+                'server_uuid' => $this->selectedServer->uuid,
+            ]);
 
             return redirectRoute($this, 'destination.show', [$docker->uuid]);
         } catch (\Throwable $e) {

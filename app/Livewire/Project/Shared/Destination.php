@@ -5,15 +5,20 @@ namespace App\Livewire\Project\Shared;
 use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class Destination extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $resource;
 
@@ -21,12 +26,12 @@ class Destination extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'mount',
             'refresh' => 'mount',
+            ...$this->teamChannelListeners([
+                'ApplicationStatusChanged' => 'loadData',
+                'ServiceStatusChanged' => 'mount',
+            ]),
         ];
     }
 
@@ -42,9 +47,12 @@ class Destination extends Component
         $all_networks = $all_networks->push($this->resource->destination);
         $all_networks = $all_networks->merge($this->resource->additional_networks);
 
-        $this->networks = Server::isUsable()->get()->map(function ($server) {
-            return $server->standaloneDockers;
-        })->flatten();
+        $this->networks = $this->usableResourceServers()
+            ->get()
+            ->filter(fn (Server $server) => $server->canHostResources() && Gate::allows('placeResource', $server))
+            ->map(function ($server) {
+                return $server->standaloneDockers;
+            })->flatten();
         $this->networks = $this->networks->reject(function ($network) use ($all_networks) {
             return $all_networks->pluck('id')->contains($network->id);
         });
@@ -58,11 +66,76 @@ class Destination extends Component
         }
     }
 
+    private function resourceServers(): Builder
+    {
+        return Server::query()
+            ->where('team_id', $this->resource->team()->id)
+            ->with('settings', 'standaloneDockers')
+            ->orderBy('name');
+    }
+
+    private function usableResourceServers(): Builder
+    {
+        return $this->resourceServers()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    /**
+     * Find a server of the resource team that can take a deployment.
+     * Shows an error toast and returns null when the server is not usable right now.
+     */
+    private function findUsableServer(int $serverId, string $title): ?Server
+    {
+        $server = $this->resourceServers()->findOrFail($serverId);
+        $settings = $server->settings;
+
+        if (! $settings->is_reachable || ! $settings->is_usable) {
+            $this->dispatch('error', $title, "The server {$server->name} is not reachable. Check the connection on the server page and try again.");
+
+            return null;
+        }
+
+        if ($settings->force_disabled || $settings->is_swarm_worker || ! $server->canHostResources()) {
+            $this->dispatch('error', $title, "The server {$server->name} cannot host resources.");
+
+            return null;
+        }
+
+        return $server;
+    }
+
+    /**
+     * Whether the application runs on the server, as its main server or as an additional server.
+     */
+    private function runsOnServer(Server $server): bool
+    {
+        return $this->resource->destination->server_id == $server->id
+            || $this->resource->additional_networks()->wherePivot('server_id', $server->id)->exists();
+    }
+
+    /**
+     * Whether the network is the main destination or an additional network of the application on the server.
+     */
+    private function isAttachedDestination(StandaloneDocker $destination, Server $server): bool
+    {
+        if ($this->resource->destination_type === StandaloneDocker::class && $this->resource->destination_id == $destination->id) {
+            return true;
+        }
+
+        return $this->resource->additional_networks()->wherePivot('server_id', $server->id)->whereKey($destination->id)->exists();
+    }
+
     public function stop($serverId)
     {
         try {
             $this->authorize('deploy', $this->resource);
-            $server = Server::ownedByCurrentTeam()->findOrFail($serverId);
+            $server = $this->resourceServers()->findOrFail((int) $serverId);
+            if (! $this->runsOnServer($server)) {
+                abort(404);
+            }
             StopApplicationOneServer::run($this->resource, $server);
             auditLog('ui.application.destination_stopped', [
                 'team_id' => $this->resource->team()?->id,
@@ -86,9 +159,15 @@ class Destination extends Component
 
                 return;
             }
-            $deployment_uuid = new_public_id();
-            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $server = $this->findUsableServer($server_id, 'Failed to deploy.');
+            if (! $server) {
+                return;
+            }
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
+            if (! $this->isAttachedDestination($destination, $server)) {
+                abort(404);
+            }
+            $deployment_uuid = new_public_id();
             $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->resource,
@@ -122,9 +201,15 @@ class Destination extends Component
     public function promote(int $network_id, int $server_id)
     {
         try {
-            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
-            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $server = $this->findUsableServer($server_id, 'Failed to promote.');
+            if (! $server) {
+                return;
+            }
+            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
+            if (! $this->resource->additional_networks()->wherePivot('server_id', $server->id)->whereKey($network->id)->exists()) {
+                abort(404);
+            }
             $this->resource->getConnection()->transaction(function () use ($network, $server) {
                 $mainDestination = $this->resource->destination;
                 $this->resource->update([
@@ -153,9 +238,21 @@ class Destination extends Component
     public function addServer(int $network_id, int $server_id)
     {
         try {
-            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
-            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $server = $this->findUsableServer($server_id, 'Failed to add server.');
+            if (! $server) {
+                return;
+            }
+            $this->authorize('placeResource', $server);
+            $network = StandaloneDocker::query()->where('server_id', $server->id)->findOrFail($network_id);
+            $reason = $this->resource instanceof Application
+                ? $this->resource->additionalServersUnavailableReason($server)
+                : 'Only applications can use multiple servers.';
+            if ($reason) {
+                $this->dispatch('error', 'Failed to add server.', $reason);
+
+                return;
+            }
 
             $this->resource->additional_networks()->syncWithoutDetaching([
                 $network->id => ['server_id' => $server->id],
@@ -179,7 +276,7 @@ class Destination extends Component
 
                 return;
             }
-            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $server = $this->resourceServers()->findOrFail($server_id);
             StopApplicationOneServer::run($this->resource, $server);
             $this->resource->additional_networks()
                 ->wherePivot('server_id', $server_id)

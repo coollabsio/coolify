@@ -7,10 +7,10 @@
 
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     shm_size: 1g
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -22,7 +22,7 @@ services:
       retries: 5
 
   windmill-server:
-    image: ghcr.io/windmill-labs/windmill:main
+    image: ghcr.io/windmill-labs/windmill:1.875.0
     environment:
       - SERVICE_URL_WINDMILL_8000
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
@@ -40,7 +40,7 @@ services:
       retries: 3
 
   windmill-worker-1:
-    image: ghcr.io/windmill-labs/windmill:main
+    image: ghcr.io/windmill-labs/windmill:1.875.0
     environment:
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
       - MODE=worker
@@ -49,7 +49,6 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - worker-dependency-cache:/tmp/windmill/cache
       - worker-logs:/tmp/windmill/logs
     healthcheck:
@@ -59,7 +58,7 @@ services:
       retries: 3
 
   windmill-worker-2:
-    image: ghcr.io/windmill-labs/windmill:main
+    image: ghcr.io/windmill-labs/windmill:1.875.0
     environment:
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
       - MODE=worker
@@ -67,8 +66,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      windmill-worker-1:
+        condition: service_started
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - worker-dependency-cache:/tmp/windmill/cache
       - worker-logs:/tmp/windmill/logs
     healthcheck:
@@ -78,7 +78,7 @@ services:
       retries: 3
 
   windmill-worker-3:
-    image: ghcr.io/windmill-labs/windmill:main
+    image: ghcr.io/windmill-labs/windmill:1.875.0
     environment:
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
       - MODE=worker
@@ -86,8 +86,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      windmill-worker-2:
+        condition: service_started
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - worker-dependency-cache:/tmp/windmill/cache
       - worker-logs:/tmp/windmill/logs
     healthcheck:
@@ -97,7 +98,7 @@ services:
       retries: 3
 
   windmill-worker-native:
-    image: ghcr.io/windmill-labs/windmill:main
+    image: ghcr.io/windmill-labs/windmill:1.875.0
     environment:
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
       - MODE=worker
@@ -116,7 +117,7 @@ services:
       retries: 3
 
   lsp:
-    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    image: ghcr.io/windmill-labs/windmill-lsp:1.603.4
     volumes:
       - lsp-cache:/root/.cache
     healthcheck:

@@ -7,7 +7,7 @@
 
 services:
   apprise-api:
-    image: linuxserver/apprise-api:latest
+    image: linuxserver/apprise-api:2.1.0
     environment:
       - SERVICE_URL_APPRISE_8000
       - PUID=1000

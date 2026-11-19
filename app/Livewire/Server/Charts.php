@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -22,7 +23,7 @@ class Charts extends Component
 
     public int $interval = 5;
 
-    public bool $poll = true;
+    public bool $live = true;
 
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $sentinelMetricsRefreshRateSeconds;
@@ -54,7 +55,9 @@ class Charts extends Component
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
             $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
             $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSentinelUpdate($changedFields);
 
             $this->dispatch('success', 'Metrics settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
@@ -67,7 +70,9 @@ class Charts extends Component
         try {
             $this->authorize('update', $this->server);
             $this->server->settings->is_metrics_enabled = ! $this->server->settings->is_metrics_enabled;
-            $this->server->settings->save();
+            // Saved quietly: Sentinel is started below, so the settings hook must not start it a second time.
+            $this->server->settings->saveQuietly();
+            $this->auditSentinelUpdate(['is_metrics_enabled']);
             $this->server->refresh();
 
             if ($this->server->isMetricsEnabled()) {
@@ -85,35 +90,112 @@ class Charts extends Component
         }
     }
 
-    public function pollData()
-    {
-        if ($this->poll || $this->interval <= 10) {
-            $this->loadData();
-            if ($this->interval > 10) {
-                $this->poll = false;
-            }
-        }
-    }
-
     public function loadData()
     {
         try {
+            $this->server->prefetchMetrics(['cpu', 'memory', 'disk', 'load', 'network'], $this->interval);
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
+            // Disk/network/load arrived in a later Sentinel; fetch each optionally so an
+            // older Sentinel (which 404s them) still shows CPU and memory.
+            $diskMetrics = $this->optionalMetric(fn () => $this->server->getDiskMetrics($this->interval));
+            $loadMetrics = $this->optionalMetric(fn () => $this->server->getLoadMetrics($this->interval));
+            $networkMetrics = $this->optionalMetric(fn () => $this->server->getNetworkMetrics($this->interval)) ?? [];
             $this->dispatch("refreshChartData-{$this->chartId}-metrics", [
                 'cpuSeries' => $cpuMetrics,
                 'memorySeries' => $memoryMetrics,
+                'diskSeries' => $diskMetrics,
+                'loadSeries' => $loadMetrics,
+                'networkRxSeries' => $networkMetrics['rx'] ?? [],
+                'networkTxSeries' => $networkMetrics['tx'] ?? [],
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
+    /**
+     * Fetch a metric that may not exist on an older Sentinel; a failure yields null
+     * rather than breaking the whole chart refresh.
+     */
+    private function optionalMetric(callable $fetch): mixed
+    {
+        try {
+            return $fetch();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Metrics settings belong to Sentinel, so they use the same event as the Sentinel page and API.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSentinelUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.sentinel.updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
+    }
+
     public function setInterval()
     {
-        if ($this->interval <= 10) {
-            $this->poll = true;
-        }
         $this->loadData();
+    }
+
+    /**
+     * Ranges up to one hour refresh live by default. Longer ranges load once, because each
+     * refresh fetches the full range from Sentinel over SSH; the user can still turn live on.
+     */
+    public function updatedInterval(): void
+    {
+        $this->live = $this->interval <= 60;
+    }
+
+    public function updatedLive(): void
+    {
+        if ($this->live) {
+            $this->pollData();
+        }
+    }
+
+    /**
+     * The poll target. The server decides the refresh rate, so a client cannot fetch faster
+     * than the range allows or while live refresh is off.
+     */
+    public function pollData(): void
+    {
+        $seconds = $this->pollSeconds();
+        if ($seconds === null) {
+            return;
+        }
+
+        // One second of slack, so a poll that fires slightly early is not dropped.
+        if (RateLimiter::attempt('metrics-poll:'.$this->getId(), 1, fn () => true, $seconds - 1) === false) {
+            return;
+        }
+
+        $this->loadData();
+    }
+
+    /**
+     * Seconds between live refreshes, or null when live refresh is off. Short ranges refresh
+     * every 5 seconds; longer ranges change slowly, so they refresh every minute.
+     */
+    public function pollSeconds(): ?int
+    {
+        if (! $this->live) {
+            return null;
+        }
+
+        return $this->interval <= 60 ? 5 : 60;
     }
 }

@@ -53,7 +53,7 @@
                     @foreach ($filteredTags as $tag)
                         <x-forms.button wire:key="available-tag-{{ $tag->id }}"
                             wire:click="addTag('{{ $tag->id }}')">
-                            <x-reicon name="plus" class="size-3.5 text-coollabs dark:text-warning" />
+                            <x-reicon name="plus" class="size-3.5 text-coollabs dark:text-brand-light" />
                             {{ $tag->name }}
                         </x-forms.button>
                     @endforeach

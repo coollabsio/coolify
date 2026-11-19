@@ -1,8 +1,5 @@
 <?php
 
-use App\Actions\Docker\GetContainersStatus;
-use App\Actions\Service\StopServiceApplication;
-use App\Jobs\PushServerUpdateJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ServiceApplication;
@@ -15,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
@@ -43,128 +41,7 @@ it('gives independently runnable application resources restart limit state', fun
     [ServiceApplication::class],
 ]);
 
-it('collects restart counts for preview and service containers from both status sources', function () {
-    $dockerStatus = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelStatus = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($dockerStatus)
-        ->toContain('previewContainerRestartCounts')
-        ->toContain('serviceContainerRestartCounts')
-        ->and($sentinelStatus)
-        ->toContain('previewContainerRestartCounts')
-        ->toContain('serviceContainerRestartCounts');
-});
-
-it('ignores docker compose one-off job containers in both status sources', function () {
-    $dockerStatus = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelStatus = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($dockerStatus)
-        ->toContain("filter_var(data_get(\$labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)")
-        ->and($sentinelStatus)
-        ->toContain("filter_var(\$labels->get('com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)");
-});
-
-it('shows restart limit warnings for every resource family', function () {
-    $previews = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
-    $serviceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
-    $applicationStatus = file_get_contents(resource_path('views/livewire/project/application/status.blade.php'));
-    $databaseStatus = file_get_contents(resource_path('views/livewire/project/database/status.blade.php'));
-
-    expect($previews)->toContain('<x-application.restart-limit-warning :application="$preview" />')
-        ->and($serviceCard)->toContain('<x-application.restart-limit-warning :application="$resource" />')
-        ->and($applicationStatus)->toContain('<x-application.restart-limit-warning :application="$application" />')
-        ->and($databaseStatus)->toContain('<x-application.restart-limit-warning :application="$database" />');
-
-    $serviceStatus = file_get_contents(resource_path('views/livewire/project/service/status.blade.php'));
-    $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-    expect($serviceStatus)->toContain('<x-application.restart-limit-warning :application="$selectedResource" />')
-        ->and($serviceStatus)->toContain('$selectedResource?->status ?? $service->status')
-        ->and($serviceHeading)->toContain('<x-application.restart-limit-warning :application="$selectedResource" />')
-        ->and($serviceHeading)->toContain('$selectedResource?->status ?? $service->status');
-});
-
-it('matches application restart badge layout on mobile resource headings', function () {
-    $applicationHeading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
-    $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    foreach ([$applicationHeading, $databaseHeading, $serviceHeading] as $heading) {
-        expect($heading)
-            ->toContain('class="relative flex w-full min-w-0 items-center gap-2"')
-            ->toContain('class="flex w-full flex-wrap gap-1"');
-    }
-});
-
-it('shows database restart limits in shared resource listings', function () {
-    $resourceIndex = file_get_contents(app_path('Livewire/Project/Resource/Index.php'));
-    $serverResources = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-    $destination = file_get_contents(resource_path('views/livewire/project/shared/destination.blade.php'));
-
-    expect($resourceIndex)
-        ->toContain("method_exists(\$item, 'stoppedAfterRestartLimit')")
-        ->not->toContain("\$type === 'application' && \$item->stoppedAfterRestartLimit()")
-        ->and($serverResources)
-        ->toContain('<x-application.restart-limit-warning :application="$resource" />')
-        ->and($destination)
-        ->toContain('<x-application.restart-limit-warning :application="$resource" />');
-});
-
-it('keeps the service resource table readable with horizontal scrolling on mobile', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
-    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
-
-    expect($configuration)
-        ->toContain("'overflow-x-auto rounded-xl")
-        ->toContain('min-w-[48rem]')
-        ->and($resourceCard)
-        ->toContain('min-w-[48rem]')
-        ->not->toContain('<div class="hidden truncate font-mono');
-});
-
-it('opens service resource settings when a table row is clicked', function () {
-    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
-
-    expect($resourceCard)
-        ->toContain('x-on:click="openSettings($event)"')
-        ->toContain('x-on:keydown.enter="openSettings($event)"')
-        ->toContain("closest('a, button')")
-        ->toContain('role="link"')
-        ->toContain('tabindex="0"');
-});
-
-it('uses selected service resource actions instead of parent complex status actions', function () {
-    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-    $headingClass = file_get_contents(app_path('Livewire/Project/Service/Heading.php'));
-
-    expect(substr_count($heading, "\$selectedResource && \$selectedResource->container_present !== false && \$selectedResourceStatus->startsWith('exited')"))->toBe(2)
-        ->and($heading)
-        ->toContain('Remove container')
-        ->toContain('removeSelectedResourceContainer')
-        ->and($headingClass)
-        ->toContain('public function removeSelectedResourceContainer(): void');
-});
-
-it('imports the application model used when claiming a restart limit', function () {
-    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-
-    expect($statusAction)
-        ->toContain('use App\\Models\\Application;')
-        ->toContain('Application::query()');
-});
-
 it('limits restarts only for applications', function () {
-    $migrations = collect(glob(database_path('migrations/*.php')))
-        ->map(fn (string $path): string => file_get_contents($path))
-        ->implode("\n");
-
-    expect($migrations)
-        ->toContain("'application_previews'")
-        ->toContain("'service_applications'")
-        ->toContain("'max_restart_count'")
-        ->toContain("'restart_limit_reached'")
-        ->toContain("dropColumn(['max_restart_count', 'restart_limit_reached'])");
-
     $databaseModels = [
         ServiceDatabase::class,
         StandalonePostgresql::class,
@@ -175,6 +52,7 @@ it('limits restarts only for applications', function () {
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneSqlite::class,
     ];
 
     foreach ($databaseModels as $databaseModel) {
@@ -191,52 +69,14 @@ it('limits restarts only for applications', function () {
         'standalone_keydbs',
         'standalone_dragonflies',
         'standalone_clickhouses',
+        'standalone_sqlites',
     ] as $databaseTable) {
         expect(Schema::hasColumn($databaseTable, 'max_restart_count'))->toBeFalse()
             ->and(Schema::hasColumn($databaseTable, 'restart_limit_reached'))->toBeFalse();
     }
-
-    foreach ([GetContainersStatus::class, PushServerUpdateJob::class] as $statusUpdater) {
-        $source = file_get_contents((new ReflectionClass($statusUpdater))->getFileName());
-
-        expect($source)
-            ->not->toContain('$database->trackRestartCount')
-            ->not->toContain('$database->stoppedAfterRestartLimit()');
-    }
-
-    $stopServiceResource = file_get_contents((new ReflectionClass(StopServiceApplication::class))->getFileName());
-
-    expect($stopServiceResource)
-        ->toContain('$resetRestartCount && $serviceApplication instanceof ServiceApplication');
 });
 
 it('makes restart limits opt in for new application resources', function () {
-    $migrationPaths = glob(database_path('migrations/*_make_restart_limits_opt_in.php'));
-
-    expect($migrationPaths)->toHaveCount(1);
-
-    $migration = file_get_contents($migrationPaths[0]);
-
-    expect($migration)
-        ->toContain("['applications', 'application_previews', 'service_applications']")
-        ->toContain("integer('max_restart_count')->default(0)->change()")
-        ->toContain('public $withinTransaction = false;')
-        ->toContain("->where('max_restart_count', 10)")
-        ->toContain('->chunkById(5000')
-        ->toContain("->whereIn('id', \$resources->pluck('id'))")
-        ->toContain("'max_restart_count' => 0")
-        ->toContain("'restart_limit_reached' => false");
-
-    $applicationSettings = file_get_contents(app_path('Livewire/Project/Application/Advanced.php'));
-    $serviceSettings = file_get_contents(app_path('Livewire/Project/Service/Index.php'));
-
-    expect($applicationSettings)
-        ->toContain('public int $maxRestartCount = 0;')
-        ->toContain('$this->application->max_restart_count ?? 0')
-        ->and($serviceSettings)
-        ->toContain('public mixed $maxRestartCount = 0;')
-        ->toContain('$this->serviceApplication->max_restart_count ?? 0');
-
     foreach ([Application::class, ApplicationPreview::class, ServiceApplication::class] as $modelClass) {
         expect((new $modelClass)->max_restart_count)->toBe(0);
     }

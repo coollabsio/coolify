@@ -1,45 +1,71 @@
-# documentation: https://docs.useplunk.com/getting-started/introduction
+# documentation: https://docs.useplunk.com/self-hosting/introduction
 # slogan: Plunk, The Open-Source Email Platform for AWS
 # category: email
-# tags: plunk,email,automation,aws
+# tags: plunk,email,automation,aws,ses
 # logo: svgs/plunk.svg
 # port: 3000
 
 services:
   plunk:
-    image: driaug/plunk:latest
+    image: ghcr.io/useplunk/plunk:0.18.0
     depends_on:
       postgresql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     environment:
       - SERVICE_URL_PLUNK_3000
+      - SERVICE=all
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-plunk}
+      - DIRECT_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-plunk}
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk-db?schema=public
-      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
-      - AWS_REGION=${AWS_REGION:?}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:?}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?}
-      - AWS_SES_CONFIGURATION_SET=${AWS_SES_CONFIGURATION_SET:?}
-      - NEXT_PUBLIC_API_URI=${SERVICE_URL_PLUNK}/api
-      - APP_URI=${SERVICE_URL_PLUNK}
-      - API_URI=${SERVICE_URL_PLUNK}/api
-      - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-False}
-      - NODE_OPTIONS=--no-network-family-autoselection
-    entrypoint: [ "/app/entry.sh" ]
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWTSECRET}
+      - API_DOMAIN=${SERVICE_FQDN_API}
+      - API_URI=${SERVICE_URL_API}
+      - DASHBOARD_DOMAIN=${SERVICE_FQDN_PLUNK}
+      - DASHBOARD_URI=${SERVICE_URL_PLUNK}
+      - AWS_SES_REGION=${AWS_SES_REGION:?}
+      - AWS_SES_ACCESS_KEY_ID=${AWS_SES_ACCESS_KEY_ID:?}
+      - AWS_SES_SECRET_ACCESS_KEY=${AWS_SES_SECRET_ACCESS_KEY:?}
+      - SES_CONFIGURATION_SET=${SES_CONFIGURATION_SET:-plunk-configuration-set}
+      - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-false}
+      - AUTO_PROJECT_DISABLE=${AUTO_PROJECT_DISABLE:-false}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_ACCESS_KEY_SECRET=${S3_ACCESS_KEY_SECRET}
+      - S3_BUCKET=${S3_BUCKET:-uploads}
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL}
+    volumes:
+      - plunk-data:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "(wget -S --spider http://127.0.0.1:3000/api/health 2>&1 | grep -q \"HTTP/1.1 [1-3]\")"]
-      interval: 2s
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health && curl -fsS -o /dev/null http://127.0.0.1:3000"]
+      interval: 10s
       timeout: 10s
-      retries: 15
+      retries: 10
+      start_period: 60s
+
+  # The Plunk image serves the dashboard and the API on different ports and expects a separate domain for each.
+  # This proxy gives the API its own domain and forwards the traffic to the API port of the plunk container.
+  plunk-api:
+    image: alpine/socat:1.8.1.3
+    command: tcp-listen:8080,fork,reuseaddr tcp-connect:plunk:8080
+    depends_on:
+      - plunk
+    environment:
+      - SERVICE_URL_API_8080
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
 
   postgresql:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-plunk-db}
+      - POSTGRES_DB=${POSTGRES_DB:-plunk}
     volumes:
       - plunk-postgresql-data:/var/lib/postgresql/data
     healthcheck:
@@ -50,6 +76,7 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    command: redis-server --appendonly yes
     volumes:
       - plunk-redis-data:/data
     healthcheck:

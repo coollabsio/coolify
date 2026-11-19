@@ -7,11 +7,38 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\Team;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    schema: 'SharedEnvironmentVariableCreateRequest',
+    type: 'object',
+    required: ['key'],
+    properties: [
+        new OA\Property(property: 'key', type: 'string'),
+        new OA\Property(property: 'value', type: 'string', nullable: true),
+        new OA\Property(property: 'is_literal', type: 'boolean'),
+        new OA\Property(property: 'is_multiline', type: 'boolean'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'),
+        new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
+    ],
+)]
+#[OA\Schema(
+    schema: 'SharedEnvironmentVariableUpdateRequest',
+    description: 'Send at least one field.',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'key', type: 'string'),
+        new OA\Property(property: 'value', type: 'string', nullable: true),
+        new OA\Property(property: 'is_literal', type: 'boolean'),
+        new OA\Property(property: 'is_multiline', type: 'boolean'),
+        new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'),
+        new OA\Property(property: 'comment', type: 'string', maxLength: 256, nullable: true),
+    ],
+)]
 class SharedEnvironmentVariablesController extends Controller
 {
     private const ALLOWED_FIELDS = ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment'];
@@ -165,7 +192,9 @@ class SharedEnvironmentVariablesController extends Controller
             return $validated;
         }
 
-        $this->authorize('create', SharedEnvironmentVariable::class);
+        if (in_array($type, ['team', 'server'], true)) {
+            $this->authorize('create', SharedEnvironmentVariable::class);
+        }
 
         $scope = array_filter([
             'project_id' => $attributes['project_id'] ?? null,
@@ -335,7 +364,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $teamId;
         }
 
-        $this->authorize('viewAny', SharedEnvironmentVariable::class);
+        $this->authorize('viewSharedVariables', Team::findOrFail($teamId));
 
         return $this->listEnvs($teamId, 'team');
     }
@@ -347,20 +376,7 @@ class SharedEnvironmentVariablesController extends Controller
         operationId: 'create-team-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['key'],
-                properties: [
-                    new OA\Property(property: 'key', type: 'string'),
-                    new OA\Property(property: 'value', type: 'string', nullable: true),
-                    new OA\Property(property: 'is_literal', type: 'boolean'),
-                    new OA\Property(property: 'is_multiline', type: 'boolean'),
-                    new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
-                    new OA\Property(property: 'comment', type: 'string', nullable: true),
-                ],
-            ),
-        ),
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -388,6 +404,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -461,7 +478,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('viewSharedVariables', $project);
 
         return $this->listEnvs($teamId, 'project', ['project_id' => $project->id]);
     }
@@ -476,6 +493,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -496,7 +514,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $project;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('update', $project);
 
         return $this->createEnv($request, $teamId, 'project', ['project_id' => $project->id]);
     }
@@ -512,6 +530,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -617,7 +636,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('viewSharedVariables', $environment);
 
         return $this->listEnvs($teamId, 'environment', ['environment_id' => $environment->id]);
     }
@@ -633,6 +652,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -658,7 +678,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('update', $environment);
 
         return $this->createEnv($request, $teamId, 'environment', ['environment_id' => $environment->id]);
     }
@@ -675,6 +695,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -699,7 +720,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('view', $environment);
 
         return $this->updateEnv(
             $request,
@@ -745,7 +766,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $environment;
         }
 
-        $this->authorize('view', $project);
+        $this->authorize('view', $environment);
 
         return $this->deleteEnv(
             $teamId,
@@ -785,7 +806,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $server;
         }
 
-        $this->authorize('view', $server);
+        $this->authorize('viewSharedVariables', $server);
 
         return $this->listEnvs($teamId, 'server', ['server_id' => $server->id]);
     }
@@ -800,6 +821,7 @@ class SharedEnvironmentVariablesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableCreateRequest')),
         responses: [
             new OA\Response(response: 201, description: 'Environment variable created.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -836,6 +858,7 @@ class SharedEnvironmentVariablesController extends Controller
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/SharedEnvironmentVariableUpdateRequest')),
         responses: [
             new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),

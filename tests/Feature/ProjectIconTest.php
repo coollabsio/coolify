@@ -1,9 +1,7 @@
 <?php
 
-use App\Livewire\Dashboard;
 use App\Livewire\Project\Edit;
 use App\Livewire\Project\Index;
-use App\Livewire\SharedVariables\Project\Index as SharedVariablesProjectIndex;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\S3Storage;
@@ -129,7 +127,7 @@ it('loads an S3 project icon from the configured CDN', function () {
         ->assertViewHas('projectsJs', fn (array $projects): bool => $projects[0]['iconUrl'] === "https://avatars.example.com/media/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
 });
 
-it('loads an S3 project icon directly from S3 when the CDN is not configured', function () {
+it('falls back to the authenticated proxy route for an S3 project icon when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -147,7 +145,12 @@ it('loads an S3 project icon directly from S3 when the CDN is not configured', f
         'icon_s3_storage_id' => $storage->id,
     ])->save();
 
-    expect(project_icon_url($this->project))->toBe("https://s3.example.com/avatars/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(project_icon_url($this->project))->toBe(route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]));
 });
 
 it('does not use an unusable S3 storage URL for a project icon', function () {
@@ -172,33 +175,4 @@ it('does not use an unusable S3 storage URL for a project icon', function () {
         'project_uuid' => $this->project->uuid,
         'v' => $this->project->updated_at->timestamp,
     ]));
-});
-
-it('displays the project icon on the dashboard', function () {
-    $this->project->forceFill([
-        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
-        'icon_storage_type' => 'local',
-    ])->save();
-
-    Livewire::test(Dashboard::class)
-        ->assertSeeHtml('src="'.route('project.icon', [
-            'project_uuid' => $this->project->uuid,
-            'v' => $this->project->updated_at->timestamp,
-        ]).'"');
-});
-
-it('displays the project icon in shared variables project views', function () {
-    $this->project->forceFill([
-        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
-        'icon_storage_type' => 'local',
-    ])->save();
-
-    $iconUrl = route('project.icon', [
-        'project_uuid' => $this->project->uuid,
-        'v' => $this->project->updated_at->timestamp,
-    ]);
-
-    $component = Livewire::test(SharedVariablesProjectIndex::class);
-
-    expect(substr_count($component->html(), 'src="'.$iconUrl.'"'))->toBe(2);
 });

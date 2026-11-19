@@ -304,3 +304,37 @@ it('does not mark a newly provisioned oidc account verified without a verified e
     $user = User::whereEmail('unverified@example.com')->firstOrFail();
     expect($user->email_verified_at)->toBeNull();
 });
+
+it('links an existing account when Microsoft Entra ID sends xms_edov instead of email_verified', function () {
+    $user = User::factory()->create(['email' => 'member@example.com']);
+
+    fakeOidcProvider(['email' => 'member@example.com', 'email_verified' => null, 'xms_edov' => true]);
+
+    $this->get(route('auth.callback', 'oidc'))->assertRedirect('/');
+
+    $this->assertAuthenticatedAs($user);
+    $this->assertDatabaseHas('oauth_identities', ['user_id' => $user->id, 'provider' => 'oidc']);
+});
+
+it('rejects linking an existing account when Microsoft Entra ID sends a false xms_edov', function () {
+    $user = User::factory()->create(['email' => 'member@example.com']);
+
+    fakeOidcProvider(['email' => 'member@example.com', 'email_verified' => null, 'xms_edov' => false]);
+
+    $this->from('/login')->get(route('auth.callback', 'oidc'))->assertRedirect('/login');
+
+    $this->assertGuest();
+    $this->assertDatabaseMissing('oauth_identities', ['user_id' => $user->id]);
+});
+
+it('treats only a boolean true email_verified or xms_edov id token claim as verified', function (array $claims, bool $expected) {
+    $oidcUser = (new OidcUser)->setIdTokenClaims(['iss' => 'https://idp.example.com', 'sub' => 'user-1', ...$claims]);
+
+    expect($oidcUser->emailVerified)->toBe($expected);
+})->with([
+    'email_verified true' => [['email_verified' => true], true],
+    'xms_edov true' => [['xms_edov' => true], true],
+    'xms_edov false' => [['xms_edov' => false], false],
+    'xms_edov string' => [['xms_edov' => 'true'], false],
+    'no claim' => [[], false],
+]);

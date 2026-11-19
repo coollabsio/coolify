@@ -97,7 +97,7 @@ it('drops removed upstream hosts at the next DNS refresh', function () {
 it('collects logs only from its own stack', function () {
     expect(supabaseTemplateFile('./volumes/logs/vector.yml'))
         ->toContain('include_labels:')
-        ->toContain("- 'com.docker.compose.project=\${COOLIFY_RESOURCE_UUID}'");
+        ->toContain("- 'com.docker.compose.project=\${COOLIFY_RESOURCE_UUID?COOLIFY_RESOURCE_UUID is required}'");
 });
 
 it('lets Vector expand the variables its config is written with', function () {

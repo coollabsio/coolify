@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class SlackNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -32,6 +33,7 @@ class SlackNotificationSettings extends Model
         'server_unreachable_slack_notifications',
         'server_patch_slack_notifications',
         'traefik_outdated_slack_notifications',
+        'image_vulnerabilities_slack_notifications',
     ];
 
     protected $hidden = [
@@ -56,6 +58,7 @@ class SlackNotificationSettings extends Model
         'server_unreachable_slack_notifications' => 'boolean',
         'server_patch_slack_notifications' => 'boolean',
         'traefik_outdated_slack_notifications' => 'boolean',
+        'image_vulnerabilities_slack_notifications' => 'boolean',
     ];
 
     public function team()
@@ -66,5 +69,15 @@ class SlackNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->slack_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Slack';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->slack_enabled = false;
     }
 }

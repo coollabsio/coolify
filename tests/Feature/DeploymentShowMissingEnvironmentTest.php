@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -69,11 +71,38 @@ it('returns 404 when the database backup index environment does not exist', func
     ]))->assertNotFound();
 });
 
-it('returns 404 when the database backup execution environment does not exist', function () {
-    $this->get(route('project.database.backup.execution', [
+it('returns 404 when the environment of an old database backup link does not exist', function () {
+    $this->followingRedirects()->get(route('project.database.backup.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => 'fbmlga1tumj9ndoy16lal93d',
         'database_uuid' => 'missing-database',
-        'backup_uuid' => 'missing-backup',
-    ]))->assertNotFound();
+    ]).'/missing-backup')->assertNotFound();
+});
+
+it('does not show a deployment of another application', function () {
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $deployment = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'unowned-deployment-uuid',
+        'application_id' => $otherApplication->id,
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+    ]);
+
+    $this->get(route('project.application.deployment.show', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+        'deployment_uuid' => $deployment->deployment_uuid,
+    ]))->assertRedirect(route('project.application.deployment.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]));
 });

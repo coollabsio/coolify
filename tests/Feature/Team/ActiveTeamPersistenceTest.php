@@ -73,6 +73,24 @@ it('persists current_team_id when the active team changes via refreshSession', f
         ->and(data_get(session('currentTeam'), 'id'))->toBe($second->id);
 });
 
+it('persists the active team after a password login without saving a currentTeam column', function () {
+    config()->set('app.maintenance.store', 'array');
+    $user = User::factory()->create();
+    $team = $user->teams->first();
+    $team->update(['show_boarding' => false]);
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'password'])
+        ->assertRedirect();
+
+    expect(auth()->user()->getAttributes())->not->toHaveKey('currentTeam');
+
+    // The next request persists the restored team through refreshSession(),
+    // which saves the same authenticated user model.
+    $this->get('/')->assertSuccessful();
+
+    expect($user->fresh()->current_team_id)->toBe($team->id);
+});
+
 it('redirects a multi-team user with no stored team to the select screen', function () {
     [$user] = userWithTwoTeams();
 

@@ -7,11 +7,10 @@
 
 services:
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:2025.10.2
+    image: ghcr.io/home-assistant/home-assistant:2026.11.1
     environment:
       - SERVICE_URL_HOMEASSISTANT_8123
       - TZ=${TZ:-UTC}
-      - DISABLE_JEMALLOC=${DISABLE_JEMALLOC:-false}
     volumes:
       - homeassistant-config:/config
       - /run/dbus:/run/dbus:ro
@@ -32,6 +31,7 @@ services:
             ip_ban_enabled: true
             login_attempts_threshold: 5
     privileged: true
+    stop_grace_period: 60s
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123"]
       interval: 30s

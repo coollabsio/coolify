@@ -246,3 +246,11 @@ test('parseEnvFormatToArray handles the user reported case ASD=asd #asdfgg', fun
     expect($result['ASD']['comment'])->toBe('asdfgg');
     expect($result['ASD']['comment'])->not->toBeNull();
 });
+
+test('parseEnvFormatToArray trims unquoted values and keeps the spaces of quoted values', function () {
+    $result = parseEnvFormatToArray("KEY1 = value1  \nKEY2=\" secret \"\nKEY3=' secret'\r");
+
+    expect($result['KEY1 ']['value'])->toBe('value1')
+        ->and($result['KEY2']['value'])->toBe(' secret ')
+        ->and($result['KEY3']['value'])->toBe(' secret');
+});

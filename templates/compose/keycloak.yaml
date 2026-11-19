@@ -7,7 +7,7 @@
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.1
+    image: quay.io/keycloak/keycloak:26.8
     command:
       - start
     environment:

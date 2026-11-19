@@ -5,11 +5,13 @@ namespace App\Actions\Fortify;
 use App\Jobs\SendVerificationEmailJob;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RootSetupWindow;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -32,6 +34,16 @@ class CreateNewUser implements CreatesNewUsers
         $settings = instanceSettings();
         if (! $settings->isPasswordRegistrationAllowed()) {
             abort(403);
+        }
+
+        if (! User::query()->exists() && ! RootSetupWindow::isOpen()) {
+            throw ValidationException::withMessages([
+                'email' => match (true) {
+                    RootSetupWindow::isReservedForPredefinedRootUser() => 'Coolify creates the root account from the ROOT_USER_* values in /data/coolify/source/.env, but it rejected them. Read the reason in docker logs coolify, then run the installer again with corrected values.',
+                    RootSetupWindow::isPending() => 'Coolify has not finished starting. Wait a few seconds, then try again.',
+                    default => 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+                },
+            ]);
         }
 
         $this->ensureRegistrationIsNotRateLimited($input);
@@ -81,7 +93,7 @@ class CreateNewUser implements CreatesNewUsers
             }
         }
         // Set session variable
-        session(['currentTeam' => $user->currentTeam = $team]);
+        session(['currentTeam' => $team]);
 
         return $user;
     }
@@ -93,7 +105,7 @@ class CreateNewUser implements CreatesNewUsers
     {
         $keys = [
             [
-                'key' => 'registration:ip:'.sha1(auth_rate_limit_ip(request())),
+                'key' => 'registration:ip:'.sha1(client_ip(request())),
                 'max' => self::REGISTRATION_IP_MAX_ATTEMPTS,
                 'decay' => self::REGISTRATION_IP_DECAY_SECONDS,
             ],

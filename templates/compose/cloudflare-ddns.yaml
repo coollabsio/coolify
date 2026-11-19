@@ -6,7 +6,7 @@
 
 services:
   cloudflare-ddns:
-    image: favonia/cloudflare-ddns:1.16.2
+    image: favonia/cloudflare-ddns:1.18.0
     network_mode: host
     user: "1000:1000"
     read_only: true
