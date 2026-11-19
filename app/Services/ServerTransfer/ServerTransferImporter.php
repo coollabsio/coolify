@@ -40,6 +40,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -54,6 +55,7 @@ use App\Notifications\Internal\GeneralNotification;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ProjectIconStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
@@ -80,6 +82,7 @@ class ServerTransferImporter
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneInfluxdb' => StandaloneInfluxdb::class,
         'StandaloneSqlite' => StandaloneSqlite::class,
     ];
 
@@ -729,6 +732,8 @@ class ServerTransferImporter
 
         $settingsPayload = data_get($payload, 'settings', []);
         if (is_array($settingsPayload) && $server->settings) {
+            // Bundles of older instances have a flag and columns for each log drain.
+            $settingsPayload = LegacyLogDrainFields::convert($settingsPayload);
             $safe = collect($settingsPayload)
                 ->except([
                     'id', 'server_id', 'created_at', 'updated_at',

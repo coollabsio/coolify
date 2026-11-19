@@ -2,6 +2,7 @@
 
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -11,7 +12,7 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 
 const REDACTED = '<REDACTED>';
-const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'sqlite'];
+const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'influxdb', 'sqlite'];
 const STANDALONE_DATABASE_MODELS = [
     'postgresql' => StandalonePostgresql::class,
     'redis' => StandaloneRedis::class,
@@ -21,6 +22,7 @@ const STANDALONE_DATABASE_MODELS = [
     'keydb' => StandaloneKeydb::class,
     'dragonfly' => StandaloneDragonfly::class,
     'clickhouse' => StandaloneClickhouse::class,
+    'influxdb' => StandaloneInfluxdb::class,
     'sqlite' => StandaloneSqlite::class,
 ];
 // Custom Docker options that Coolify converts to Compose; other options conflict with settings Coolify manages

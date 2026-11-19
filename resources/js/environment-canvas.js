@@ -1,4 +1,4 @@
-// Environment canvas (Beta): pure helpers and constants. The Svelte
+// Environment canvas (experimental): pure helpers and constants. The Svelte
 // components live in canvas/environment/.
 //
 // DOM-free: `node --test` imports this file.

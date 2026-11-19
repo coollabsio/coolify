@@ -347,8 +347,6 @@ class Server extends BaseModel
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
         'server_metadata' => 'array',
-        'logdrain_axiom_api_key' => 'encrypted',
-        'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
@@ -362,8 +360,6 @@ class Server extends BaseModel
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
-        'logdrain_axiom_api_key',
-        'logdrain_newrelic_license_key',
         'proxy_error_page',
     ];
 
@@ -1940,6 +1936,7 @@ $siteAddress {
         $keydbs = StandaloneKeydb::where($destinationCondition)->get();
         $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
         $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+        $influxdbs = StandaloneInfluxdb::where($destinationCondition)->get();
         $sqlites = StandaloneSqlite::where($destinationCondition)->get();
 
         return $postgresqls
@@ -1950,6 +1947,7 @@ $siteAddress {
             ->concat($keydbs)
             ->concat($dragonflies)
             ->concat($clickhouses)
+            ->concat($influxdbs)
             ->concat($sqlites)
             ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
@@ -2291,9 +2289,9 @@ $siteAddress {
         return $this->isFunctional();
     }
 
-    public function isLogDrainEnabled()
+    public function isLogDrainEnabled(): bool
     {
-        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
+        return $this->settings->logdrain_type !== null;
     }
 
     /**
@@ -2301,7 +2299,7 @@ $siteAddress {
      */
     public function isFluentBitLogDrainEnabled(): bool
     {
-        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+        return $this->settings->logdrain_type?->usesFluentBit() ?? false;
     }
 
     public function validateOS(): bool|Stringable

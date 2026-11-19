@@ -3,9 +3,8 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
-use App\Models\ServerSetting;
 use App\Models\Service;
-use App\Rules\ValidFluentBitConfig;
+use App\Services\LogDrain\FluentBitLogDrain;
 use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -19,7 +18,7 @@ class StartLogDrain
      * Bump when the generated files change (image, config, compose, or README), so that the
      * server checks start running log drains again with the new files.
      */
-    public const CONFIG_VERSION = '2';
+    public const CONFIG_VERSION = '3';
 
     public const CONFIG_VERSION_LABEL = 'coolify.logDrainConfigVersion';
 
@@ -38,128 +37,24 @@ class StartLogDrain
 
     public function handle(Server $server)
     {
-        if ($server->settings->is_logdrain_newrelic_enabled) {
-            $type = 'newrelic';
-        } elseif ($server->settings->is_logdrain_axiom_enabled) {
-            $type = 'axiom';
-        } elseif ($server->settings->is_logdrain_custom_enabled) {
-            $type = 'custom';
-        } elseif ($server->settings->is_logdrain_cloudwatch_enabled) {
-            $type = 'cloudwatch';
-        } else {
-            $type = 'none';
+        $type = $server->settings->logdrain_type;
+        if (! $type) {
+            return 'No log drain is enabled.';
         }
-        if ($type === 'cloudwatch') {
-            // Containers ship logs directly via Docker's awslogs driver; no Fluent Bit container is needed.
+        $driver = $type->driver();
+        if (! $driver instanceof FluentBitLogDrain) {
+            // Containers ship logs directly with a Docker logging driver; no Fluent Bit container is needed.
             StopLogDrain::run($server);
+            $loggingDriver = $driver->containerLogging([])['driver'];
 
-            return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
+            return "{$driver->label()} uses the built-in Docker {$loggingDriver} driver.";
         }
-        $serverName = $this->fluentBitValue((string) $server->name);
-        // Rename keeps a key that exists, so the container labels fill a field only when the
-        // Coolify default variables are not on the container. Then the labels are removed.
-        $coolifyFieldsFilter = "[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$serverName}
-    Rename              COOLIFY_APP_NAME coolify.app_name
-    Rename              COOLIFY_PROJECT_NAME coolify.project_name
-    Rename              COOLIFY_SERVER_IP coolify.server_ip
-    Rename              COOLIFY_ENVIRONMENT_NAME coolify.environment_name
-    Rename              coolify.resourceName coolify.app_name
-    Rename              coolify.projectName coolify.project_name
-    Rename              coolify.environmentName coolify.environment_name
-    Rename              coolify.serviceName coolify.service_name
-    Remove              coolify.resourceName
-    Remove              coolify.projectName
-    Remove              coolify.environmentName
-";
+
         try {
-            if ($type === 'none') {
-                return 'No log drain is enabled.';
-            } elseif ($type === 'newrelic') {
-                if (! $server->settings->is_logdrain_newrelic_enabled) {
-                    throw new \Exception('New Relic log drain is not enabled.');
-                }
-                $config = base64_encode("
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Log_Level warn
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[FILTER]
-    Name grep
-    Match *
-    Exclude log 127.0.0.1
-{$coolifyFieldsFilter}[OUTPUT]
-    Name nrlogs
-    Match *
-    license_key \${LICENSE_KEY}
-    # https://log-api.eu.newrelic.com/log/v1 - EU
-    # https://log-api.newrelic.com/log/v1 - US
-    base_uri \${BASE_URI}
-");
-            } elseif ($type === 'axiom') {
-                if (! $server->settings->is_logdrain_axiom_enabled) {
-                    throw new \Exception('Axiom log drain is not enabled.');
-                }
-                $config = base64_encode("
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Log_Level warn
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[FILTER]
-    Name grep
-    Match *
-    Exclude log 127.0.0.1
-{$coolifyFieldsFilter}[OUTPUT]
-    Name            http
-    Match           *
-    Host            \${AXIOM_DOMAIN}
-    Port            443
-    URI             /v1/ingest/\${AXIOM_DATASET_NAME}
-    # Authorization Bearer should be an API token
-    Header Authorization Bearer \${AXIOM_API_KEY}
-    compress gzip
-    format json
-    json_date_key _time
-    json_date_format iso8601
-    tls On
-");
-            } elseif ($type === 'custom') {
-                if (! $server->settings->is_logdrain_custom_enabled) {
-                    throw new \Exception('Custom log drain is not enabled.');
-                }
-                $configError = (new ValidFluentBitConfig)->check($server->settings->logdrain_custom_config);
-                if ($configError !== null) {
-                    throw new \Exception("Custom log drain config is not allowed: {$configError}");
-                }
-                $parsersError = (new ValidFluentBitConfig(parsersOnly: true))->check($server->settings->logdrain_custom_config_parser);
-                if ($parsersError !== null) {
-                    throw new \Exception("Custom log drain parser config is not allowed: {$parsersError}");
-                }
-                $config = base64_encode($server->settings->logdrain_custom_config);
-                $parsers = base64_encode($server->settings->logdrain_custom_config_parser);
-            } else {
-                throw new \Exception('Unknown log drain type.');
-            }
-            if ($type !== 'custom') {
-                $parsers = base64_encode("
-[PARSER]
-    Name        empty_line_skipper
-    Format      regex
-    Regex       /^(?!\s*$).+/
-");
-            }
+            $files = $driver->fluentBitFiles($server->settings->logDrainConfig($type), $this->fluentBitValue((string) $server->name));
+            $config = base64_encode($files['config']);
+            $parsers = base64_encode($files['parsers']);
+            $envEncoded = base64_encode($this->envFile($files['env']));
             $compose = base64_encode('
 services:
   coolify-log-drain:
@@ -178,12 +73,7 @@ services:
       - '.self::CONFIG_VERSION_LABEL.'='.self::CONFIG_VERSION.'
     restart: unless-stopped
 ');
-            $providerName = match ($type) {
-                'newrelic' => 'New Relic',
-                'axiom' => 'Axiom',
-                'custom' => 'Custom',
-            };
-            $readme = base64_encode("# {$providerName} Log Drain
+            $readme = base64_encode("# {$driver->label()} Log Drain
 This log drain is based on [Fluent Bit](https://fluentbit.io/).
 
 Files:
@@ -191,8 +81,6 @@ Files:
 - `docker-compose.yml` - docker-compose file to run Fluent Bit
 - `.env` - environment variables for Fluent Bit
 ");
-            $license_key = $server->settings->logdrain_newrelic_license_key;
-            $base_uri = $server->settings->logdrain_newrelic_base_uri;
             $base_path = config('constants.coolify.base_config_path');
 
             $config_path = $base_path.'/log-drains';
@@ -200,17 +88,6 @@ Files:
             $parsers_config = $config_path.'/parsers.conf';
             $compose_path = $config_path.'/docker-compose.yml';
             $readme_path = $config_path.'/README.md';
-            if ($type === 'newrelic') {
-                $envContent = "LICENSE_KEY={$license_key}\nBASE_URI={$base_uri}\n";
-            } elseif ($type === 'axiom') {
-                $axiomDomain = trim((string) $server->settings->logdrain_axiom_domain) ?: ServerSetting::DEFAULT_AXIOM_DOMAIN;
-                $envContent = "AXIOM_DOMAIN={$axiomDomain}\nAXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\n";
-            } elseif ($type === 'custom') {
-                $envContent = '';
-            } else {
-                throw new \Exception('Unknown log drain type.');
-            }
-            $envEncoded = base64_encode($envContent);
 
             // The running drain is removed only after the checks above and the image pull, so that an
             // invalid custom config or a slow download does not stop log collection.
@@ -234,6 +111,24 @@ Files:
         } catch (\Throwable $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Docker Compose reads one `NAME=value` per line, so a value with a line break could add variables.
+     *
+     * @param  array<string, string>  $env
+     */
+    private function envFile(array $env): string
+    {
+        return collect($env)
+            ->map(function (string $value, string $name) {
+                if (preg_match('/[\r\n\x00]/', $value)) {
+                    throw new \RuntimeException("The log drain value {$name} must be on one line.");
+                }
+
+                return "{$name}={$value}\n";
+            })
+            ->implode('');
     }
 
     /**

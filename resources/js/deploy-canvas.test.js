@@ -191,5 +191,5 @@ test('reads the browser zoom shortcut so the canvas can zoom instead', () => {
 
 test('offers every database engine of the New resource page', () => {
     const engines = TYPES.database.fields.find(f => f.key === 'engine').options.map(([value]) => value);
-    assert.deepEqual(engines, ['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'sqlite']);
+    assert.deepEqual(engines, ['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'influxdb', 'sqlite']);
 });

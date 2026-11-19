@@ -29,6 +29,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -4794,29 +4795,17 @@ function generate_fluentd_configuration(): array
     ];
 }
 
+/**
+ * The `logging` setting of a container on a server with an active log drain.
+ */
 function generate_log_drain_configuration(Server $server): array
 {
-    if ($server->isFluentBitLogDrainEnabled()) {
-        return generate_fluentd_configuration();
+    $type = $server->settings->logdrain_type;
+    if (! $type) {
+        return [];
     }
 
-    $settings = $server->settings;
-    $options = [
-        'awslogs-region' => $settings->logdrain_cloudwatch_region,
-        'awslogs-group' => $settings->logdrain_cloudwatch_group,
-        'awslogs-create-group' => 'true',
-        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
-        'mode' => 'non-blocking',
-        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
-        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
-    ];
-
-    return [
-        'driver' => 'awslogs',
-        'options' => collect($options)
-            ->reject(fn ($value) => blank($value))
-            ->all(),
-    ];
+    return $type->driver()->containerLogging($server->settings->logDrainConfig($type));
 }
 
 function isAssociativeArray($array)
@@ -4845,7 +4834,7 @@ function isAssociativeArray($array)
  * @param  iterable<int, string>  $definedKeys
  * @return Collection<string, string>
  */
-function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
+function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
 {
     // A model created in this request has no column default loaded yet (null), which means on.
     $isEnabled = $resource instanceof Application

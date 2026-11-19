@@ -63,6 +63,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -169,6 +170,7 @@ final class ServerTransferCoverage
         StandaloneKeydb::class => ['projects.*.environments.*.databases.*'],
         StandaloneDragonfly::class => ['projects.*.environments.*.databases.*'],
         StandaloneClickhouse::class => ['projects.*.environments.*.databases.*'],
+        StandaloneInfluxdb::class => ['projects.*.environments.*.databases.*'],
         StandaloneSqlite::class => ['projects.*.environments.*.databases.*'],
     ];
 
@@ -325,6 +327,10 @@ final class ServerTransferCoverage
             'config_hash' => 'Calculated again when the target starts the database.',
         ],
         StandaloneClickhouse::class => [
+            'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
+            'config_hash' => 'Calculated again when the target starts the database.',
+        ],
+        StandaloneInfluxdb::class => [
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
         ],
