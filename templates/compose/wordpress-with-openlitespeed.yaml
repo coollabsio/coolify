@@ -7,7 +7,7 @@
 
 services:
   openlitespeed:
-    image: litespeedtech/openlitespeed:1.9.2-lsphp83
+    image: litespeedtech/openlitespeed:1.9.4-lsphp83
     environment:
       - SERVICE_URL_OPENLITESPEED_80
       - TZ=${TZ:-UTC}
@@ -23,8 +23,10 @@ services:
       retries: 20
 
   wordpress-init:
-    image: wordpress:6.8-php8.3-fpm
+    image: wordpress:7.1-php8.3-fpm
     user: "0:0"
+    restart: "no"
+    exclude_from_hc: true
     environment:
       - WORDPRESS_DB_HOST=mariadb
       - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
