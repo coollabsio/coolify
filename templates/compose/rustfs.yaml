@@ -7,7 +7,7 @@
 
 services:
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.6
     command: /data
     environment:
       - RUSTFS_SERVER_URL=$RUSTFS_SERVER_URL

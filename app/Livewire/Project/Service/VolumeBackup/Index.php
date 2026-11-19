@@ -4,10 +4,12 @@ namespace App\Livewire\Project\Service\VolumeBackup;
 
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\VolumeBackupJob;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -17,6 +19,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Service $service;
 
@@ -37,13 +40,14 @@ class Index extends Component
 
     public function getListeners(): array
     {
-        $teamId = currentTeam()->id;
-
         return [
             'refreshVolumeBackups' => '$refresh',
             'modalClosed' => 'closeScheduleModal',
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-            "echo-private:team.{$teamId},BackupCreated" => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => '$refresh',
+                'ServiceStatusChanged' => '$refresh',
+                'BackupCreated' => '$refresh',
+            ]),
         ];
     }
 
@@ -63,7 +67,10 @@ class Index extends Component
     {
         $this->authorize('update', $this->service);
         $this->loadSelectedSchedule($backupUuid);
-        $this->s3s = currentTeam()->s3s;
+        $this->s3s = S3Storage::query()
+            ->where('team_id', $this->service->team()?->id)
+            ->where('is_usable', true)
+            ->get();
         $this->scheduleModalOpen = true;
     }
 
@@ -112,7 +119,7 @@ class Index extends Component
         );
 
         $databaseBackups = ScheduledDatabaseBackup::query()
-            ->with(['database', 'latest_log', 's3'])
+            ->with(['database', 'latest_log', 's3', 's3Storages'])
             ->withCount('executions')
             ->where('database_type', (new ServiceDatabase)->getMorphClass())
             ->whereHasMorph('database', [ServiceDatabase::class], fn ($query) => $query->where('service_id', $this->service->id))
@@ -120,7 +127,7 @@ class Index extends Component
             ->get();
 
         $backups = ScheduledVolumeBackup::query()
-            ->with(['backupable.resource', 'latestExecution', 's3'])
+            ->with(['backupable.resource', 'latestExecution', 's3', 's3Storages'])
             ->withCount('executions')
             ->forService($this->service)
             ->latest()
@@ -130,6 +137,7 @@ class Index extends Component
             'backups' => $backups,
             'databaseBackups' => $databaseBackups,
             'databaseTargets' => $databaseTargets,
+            'serviceTeamId' => $this->service->team()?->id,
         ]);
     }
 

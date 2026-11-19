@@ -1,0 +1,91 @@
+<?php
+
+use App\Models\InstanceSettings;
+use App\Models\User;
+use App\Support\RootSetupWindow;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
+
+    InstanceSettings::query()->forceCreate([
+        'id' => 0,
+        'is_registration_enabled' => true,
+    ]);
+});
+
+function registerRootAccount(): TestResponse
+{
+    return test()->post('/register', [
+        'name' => 'Root User',
+        'email' => 'root@example.com',
+        'password' => 'Password1!@',
+        'password_confirmation' => 'Password1!@',
+    ]);
+}
+
+it('blocks the root registration when the setup window was never opened', function () {
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+});
+
+it('blocks the root registration after the setup window ends', function () {
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES * 60 + 1)->seconds();
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+});
+
+it('creates the root user during the setup window', function () {
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES - 1)->minutes();
+
+    registerRootAccount()->assertSessionHasNoErrors();
+
+    expect(User::find(0)?->email)->toBe('root@example.com');
+});
+
+it('does not show the registration form when the setup window is closed', function () {
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES * 60 + 1)->seconds();
+
+    $this->get('/register')
+        ->assertOk()
+        ->assertDontSee('Create account');
+});
+
+it('does not open the setup window when a user exists', function () {
+    User::factory()->create(['id' => 0]);
+
+    RootSetupWindow::openIfNoUserExists();
+
+    expect(RootSetupWindow::isOpen())->toBeFalse();
+});
+
+it('shows the installer hint instead of the form for a predefined root user', function () {
+    config()->set('constants.seeder.is_root_user_predefined', true);
+    RootSetupWindow::openIfNoUserExists();
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+    $this->get('/register')
+        ->assertOk()
+        ->assertSee('Root user not created')
+        ->assertDontSee('Create account');
+});
+
+it('uses only the predefined root user when an older setup window is cached', function () {
+    RootSetupWindow::openIfNoUserExists();
+    config()->set('constants.seeder.is_root_user_predefined', true);
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+});

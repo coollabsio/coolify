@@ -7,17 +7,10 @@
 
 services:
   termix:
-    image: ghcr.io/lukegus/termix:2.6.1
+    image: ghcr.io/termix-ssh/termix:26.11.1
     environment:
       - SERVICE_URL_TERMIX_8080
       - PORT=8080
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - GUACD_HOST=guacd
-      - GUACD_RECORDING_PATH=/termix-data/session_recordings/guacamole
-    depends_on:
-      - guacd
     volumes:
       - termix-data:/app/data
-
-  guacd:
-    image: guacamole/guacd:1.6.0

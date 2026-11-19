@@ -26,10 +26,10 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $pushoverEnabled = false;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:pushoverEnabled,true', 'nullable', 'string'])]
     public ?string $pushoverUserKey = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:pushoverEnabled,true', 'nullable', 'string'])]
     public ?string $pushoverApiToken = null;
 
     #[Validate(['boolean'])]
@@ -77,6 +77,9 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $traefikOutdatedPushoverNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesPushoverNotifications = false;
+
     public function mount()
     {
         try {
@@ -112,8 +115,11 @@ class Pushover extends Component
             $this->settings->server_unreachable_pushover_notifications = $this->serverUnreachablePushoverNotifications;
             $this->settings->server_patch_pushover_notifications = $this->serverPatchPushoverNotifications;
             $this->settings->traefik_outdated_pushover_notifications = $this->traefikOutdatedPushoverNotifications;
+            $this->settings->image_vulnerabilities_pushover_notifications = $this->imageVulnerabilitiesPushoverNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->pushoverEnabled = $this->settings->pushover_enabled;
@@ -140,6 +146,7 @@ class Pushover extends Component
             $this->serverUnreachablePushoverNotifications = $this->settings->server_unreachable_pushover_notifications;
             $this->serverPatchPushoverNotifications = $this->settings->server_patch_pushover_notifications;
             $this->traefikOutdatedPushoverNotifications = $this->settings->traefik_outdated_pushover_notifications;
+            $this->imageVulnerabilitiesPushoverNotifications = $this->settings->image_vulnerabilities_pushover_notifications;
         }
     }
 
@@ -155,7 +162,35 @@ class Pushover extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->pushoverEnabled = false;
+            $this->pushoverEnabled = (bool) $this->settings->refresh()->pushover_enabled;
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
+    public function togglePushoverEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->pushoverEnabled) {
+                $this->pushoverEnabled = false;
+            } else {
+                $this->validate([
+                    'pushoverUserKey' => 'required',
+                    'pushoverApiToken' => 'required',
+                ], [
+                    'pushoverUserKey.required' => 'Pushover User Key is required.',
+                    'pushoverApiToken.required' => 'Pushover API Token is required.',
+                ]);
+                $this->pushoverEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {
@@ -210,5 +245,12 @@ class Pushover extends Component
     public function render()
     {
         return view('livewire.notifications.pushover');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.pushover.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

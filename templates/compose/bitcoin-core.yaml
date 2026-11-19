@@ -6,7 +6,7 @@
 
 services:
   bitcoin-core:
-    image: ruimarinho/bitcoin-core:latest
+    image: ruimarinho/bitcoin-core:32
     environment:
       - BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-bitcoinuser}
       - BITCOIN_RPCPASSWORD=${SERVICE_PASSWORD_PASSWORD64}

@@ -37,6 +37,12 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup.index');
+        $schedules = $this->database->scheduledBackups()->withCount('executions')->get();
+
+        return view('livewire.project.database.backup.index', [
+            'scheduleCount' => $schedules->count(),
+            'enabledScheduleCount' => $schedules->where('enabled', true)->count(),
+            'executionCount' => $schedules->sum('executions_count'),
+        ]);
     }
 }

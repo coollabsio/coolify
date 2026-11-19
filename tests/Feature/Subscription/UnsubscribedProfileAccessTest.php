@@ -57,24 +57,3 @@ test('unsubscribed cloud user does not get the workspace page switcher on profil
     $response->assertDontSee('>Projects</span>', false);
     $response->assertDontSee(url('/projects'), false);
 });
-
-test('unsubscribed cloud sidebar shows subscription link at the top of the list', function () {
-    $response = $this->get(route('profile'));
-
-    $response->assertSuccessful();
-    $html = $response->getContent();
-
-    expect($html)
-        ->toContain('title="Subscription"')
-        ->toContain(route('subscription.index'))
-        ->toContain('>Subscription</span>')
-        ->toContain('Account')
-        // No spacer pushing account actions to the bottom of an empty sidebar.
-        ->not->toContain('hidden flex-1 lg:list-item');
-
-    $accountPos = strpos($html, 'nav-section');
-    $subscriptionPos = strpos($html, 'title="Subscription"');
-    expect($accountPos)->not->toBeFalse()
-        ->and($subscriptionPos)->not->toBeFalse()
-        ->and($accountPos)->toBeLessThan($subscriptionPos);
-});

@@ -7,7 +7,7 @@
 
 services:
   app-service:
-    image: budibase.docker.scarf.sh/budibase/apps
+    image: budibase.docker.scarf.sh/budibase/apps:v4.0.1
     environment:
       - SELF_HOSTED=1
       - COUCH_DB_URL=http://$SERVICE_USER_COUCHDB:$SERVICE_PASSWORD_COUCHDB@couchdb-service:5984
@@ -38,7 +38,7 @@ services:
       start_period: 10s
 
   worker-service:
-    image: budibase.docker.scarf.sh/budibase/worker
+    image: budibase.docker.scarf.sh/budibase/worker:v4.0.1
     environment:
       - SELF_HOSTED=1
       - PORT=4003
@@ -66,7 +66,7 @@ services:
       start_period: 10s
 
   minio-service:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z # Released on 15 October 2026
     volumes:
       - minio_data:/data
     environment:
@@ -81,7 +81,7 @@ services:
       retries: 10
 
   proxy-service:
-    image: budibase/proxy
+    image: budibase/proxy:v4.0.1
     environment:
       - SERVICE_URL_BUDIBASE_10000
       - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10
@@ -90,7 +90,6 @@ services:
       - WORKER_UPSTREAM_URL=http://worker-service:4003
       - MINIO_UPSTREAM_URL=http://minio-service:9000
       - COUCHDB_UPSTREAM_URL=http://couchdb-service:5984
-      - WATCHTOWER_UPSTREAM_URL=http://watchtower-service:8080
       - RESOLVER=127.0.0.11
     depends_on:
       - minio-service
@@ -105,7 +104,7 @@ services:
       start_period: 10s
 
   couchdb-service:
-    image: budibase/couchdb
+    image: budibase/database:2.1.0
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
       - COUCHDB_USER=$SERVICE_USER_COUCHDB
@@ -117,10 +116,10 @@ services:
       retries: 5
       start_period: 10s
     volumes:
-      - couchdb3_data:/opt/couchdb/data
+      - couchdb3_data:/data
 
   redis-service:
-    image: redis
+    image: redis:8.10.3
     command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     volumes:
       - redis_data:/data
@@ -131,17 +130,3 @@ services:
       timeout: 15s
       retries: 5
       start_period: 10s
-
-  watchtower-service:
-    restart: always
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --debug --http-api-update bbapps bbworker bbproxy
-    environment:
-      - WATCHTOWER_HTTP_API=true
-      - WATCHTOWER_HTTP_API_TOKEN=$SERVICE_PASSWORD_WATCHTOWER
-      - WATCHTOWER_CLEANUP=true
-    labels:
-      - "com.centurylinklabs.watchtower.enable=false"
-    exclude_from_hc: true

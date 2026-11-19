@@ -45,20 +45,18 @@
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
             $publicUrl = getFqdnWithoutPort($row['url']);
-            $domainParts = $isSuggested ? null : parse_url($publicUrl);
-            $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
+            $serviceApplication = $service->applications->firstWhere('id', $row['service_application_id']);
+            $isNoindexed = $serviceApplication?->isDomainNoindexed($row['url']);
             $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
             $directionLabel = match ($rowDirection) {
                 'www' => 'Redirect to www',
                 'non-www' => 'Redirect to non-www',
                 default => 'Both www and non-www',
             };
-            $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
-                ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
-                : null;
+            $faviconUrl = $isSuggested || $serviceApplication?->hasProxyBasicAuth() ? null : \App\Support\DomainFavicon::url($publicUrl, $row['dns_status'] ?? null, $row['expected_ip'] ?? null);
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
             $editingParts = \App\Support\DomainUrlParts::split($row['url']);
-            if ($row['has_port_override'] ?? false) {
+            if (filled($row['internal_port'] ?? null)) {
                 $editingParts['port'] = (string) $row['internal_port'];
             }
         @endphp
@@ -92,7 +90,7 @@
                                 </span>
                             @endif
                             <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
-                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-brand-light"
                                 title="{{ $publicUrl }}">
                                 {{ $publicUrl }}
                             </a>
@@ -167,13 +165,13 @@
 
                 <div class="service-domain-actions flex items-center justify-end gap-1">
                     @can('update', $service)
-                        <button type="button" wire:click="checkDomainDns({{ $index }})"
-                            wire:loading.attr="disabled"
-                            wire:target="checkDomainDns({{ $index }}),checkAllDns"
-                            class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                            <x-reicon name="refresh" class="size-3.5" />
-                        </button>
                         @if ($isSuggested)
+                            <button type="button" wire:click="checkDomainDns({{ $index }})"
+                                wire:loading.attr="disabled"
+                                wire:target="checkDomainDns({{ $index }}),checkAllDns"
+                                class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
+                                <x-reicon name="refresh" class="size-3.5" />
+                            </button>
                             @if ($row['needs_force_add'] ?? false)
                                 <x-forms.button canGate="update" :canResource="$service"
                                     wire:click="addSuggestedDomain({{ $index }})" isError
@@ -188,25 +186,32 @@
                                 </x-forms.button>
                             @endif
                         @else
-                            <button type="button" class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ $publicUrl }}"
-                                @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js((int) $row['service_application_id']), @js($serviceLabel), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))">
-                                <x-reicon name="settings" class="size-3.5" />
-                            </button>
-                            <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
-                                buttonTitle="Remove" isErrorButton
-                                submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
-                                    'This domain will be removed from the service application.',
-                                    'Redeploy or restart may be required for proxy changes.',
-                                ]" :confirmWithPassword="false" :confirmWithText="false"
-                                step2ButtonText="Remove domain">
-                                <x-slot:trigger>
-                                    <button type="button"
-                                        class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                        title="Remove domain" aria-label="Remove domain">
-                                        <x-reicon name="trash" class="size-3.5" />
-                                    </button>
-                                </x-slot:trigger>
-                            </x-modal-confirmation>
+                            <x-table.row-actions label="Domain actions">
+                                <x-table.row-action wire:click="checkDomainDns({{ $index }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="checkDomainDns({{ $index }}),checkAllDns">
+                                    Check DNS
+                                </x-table.row-action>
+                                <x-table.row-action aria-label="Edit {{ $publicUrl }}"
+                                    x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from((int) $row['service_application_id']) }}, {{ \Illuminate\Support\Js::from($serviceLabel) }}, {{ \Illuminate\Support\Js::from($isNoindexed ? 'noindex' : 'index') }}, {{ \Illuminate\Support\Js::from($rowDirection) }})">
+                                    Edit
+                                </x-table.row-action>
+                                <x-slot:danger>
+                                    <x-modal-confirmation buttonFullWidth title="Remove domain?"
+                                        buttonTitle="Remove" isErrorButton
+                                        canGate="update" :canResource="$service"
+                                        submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
+                                            'This domain will be removed from the service application.',
+                                            'Redeploy or restart may be required for proxy changes.',
+                                        ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
+                                        :confirmWithPassword="false" :confirmWithText="false"
+                                        step2ButtonText="Remove domain">
+                                        <x-slot:trigger>
+                                            <x-table.row-action>Delete</x-table.row-action>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                </x-slot:danger>
+                            </x-table.row-actions>
                         @endif
                     @endcan
                 </div>

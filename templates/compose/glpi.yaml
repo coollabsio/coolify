@@ -7,7 +7,7 @@
 
 services:
   glpi:
-    image: glpi/glpi:11
+    image: glpi/glpi:12
     environment:
       - SERVICE_URL_GLPI_80
       - GLPI_DB_HOST=glpi-db

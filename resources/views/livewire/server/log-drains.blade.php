@@ -34,11 +34,11 @@
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
-                            <x-forms.input canGate="update" :canResource="$server" type="password" required
+                                :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainNewRelicEnabled"
                                 id="logDrainNewRelicLicenseKey" label="License key"
                                 :disabled="$server->isLogDrainEnabled()" />
-                            <x-forms.input canGate="update" :canResource="$server" required
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainNewRelicEnabled"
                                 id="logDrainNewRelicBaseUri" label="Endpoint"
                                 placeholder="https://log-api.eu.newrelic.com/log/v1"
                                 helper="Use the EU or US New Relic Log API endpoint."
@@ -47,34 +47,65 @@
                     </x-application.settings-section>
                     <x-application.settings-section id="server-axiom-drain-section" title="Axiom"
                         helper="Send logs to an Axiom dataset using its ingest API.">
-                        <div class="grid gap-4 lg:grid-cols-3">
+                        <div class="mb-4 max-w-sm">
                             <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainAxiomEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
-                            <x-forms.input canGate="update" :canResource="$server" type="password" required
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomApiKey" label="API key"
                                 :disabled="$server->isLogDrainEnabled()" />
-                            <x-forms.input canGate="update" :canResource="$server" required
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
                                 id="logDrainAxiomDatasetName" label="Dataset name"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
+                                id="logDrainAxiomDomain" label="Edge domain"
+                                placeholder="us-east-1.aws.edge.axiom.co"
+                                helper="Base domain of the edge deployment of your Axiom organization.<br><br>US: <code>us-east-1.aws.edge.axiom.co</code><br>EU: <code>eu-central-1.aws.edge.axiom.co</code>"
+                                :disabled="$server->isLogDrainEnabled()" />
+                        </div>
+                    </x-application.settings-section>
+                    <x-application.settings-section id="server-cloudwatch-drain-section" title="Amazon CloudWatch Logs"
+                        helper="Send container logs directly to CloudWatch Logs using the Docker awslogs logging driver.<br><br>AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM instance role, or configure <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> for the Docker service or in <code>/root/.aws/credentials</code>.<br><br>The credentials need <code>logs:CreateLogStream</code> and <code>logs:PutLogEvents</code>, plus <code>logs:CreateLogGroup</code> if the log group does not exist yet.<br><br>Delivery errors do not stop containers; they appear in the Docker daemon logs (<code>journalctl -u docker</code>). Redeploy or restart resources to apply the logging driver.">
+                        <div class="mb-4 max-w-sm">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCloudwatchEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainCloudwatchEnabled"
+                                id="logDrainCloudwatchGroup" label="Log group" placeholder="/coolify/production"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server"
+                                id="logDrainCloudwatchStreamPrefix" label="Log stream prefix" placeholder="docker/"
+                                helper="Optional. Log streams are named after the container, prefixed with this value (e.g. docker/&lt;container name&gt;)."
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainCloudwatchEnabled"
+                                id="logDrainCloudwatchRegion" label="Region" placeholder="us-east-1"
                                 :disabled="$server->isLogDrainEnabled()" />
                         </div>
                     </x-application.settings-section>
                     <x-application.settings-section id="server-custom-drain-section" title="Custom Fluent Bit"
-                        helper="Provide a custom Fluent Bit output and optional parser configuration.">
+                        helper="Provide the full Fluent Bit configuration and an optional parser configuration. The configuration must have an [INPUT] section with Name forward: containers send their logs to this input on port 24224. To use credential or certificate files, copy them to /data/coolify/log-drains/files on the server. Fluent Bit reads them at /files, for example: google_service_credentials /files/gcp.json">
                         <div class="mb-4 max-w-sm">
                             <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCustomEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || !auth()->user()->can('update', $server)" />
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
                         </div>
                         <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.textarea canGate="update" :canResource="$server" rows="8" required
+                            <x-forms.textarea canGate="update" :canResource="$server" rows="8" :required="$isLogDrainCustomEnabled"
                                 id="logDrainCustomConfig" label="Fluent Bit configuration"
+                                :placeholder="implode(PHP_EOL, ['[INPUT]', '    Name forward', '', '[OUTPUT]', '    Name  stdout', '    Match *'])"
                                 :disabled="$server->isLogDrainEnabled()" />
                             <x-forms.textarea canGate="update" :canResource="$server" rows="8"
                                 id="logDrainCustomConfigParser" label="Parser configuration"

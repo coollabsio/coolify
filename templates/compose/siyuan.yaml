@@ -7,7 +7,7 @@
 
 services:
   siyuan:
-    image: b3log/siyuan:v3.3.5
+    image: b3log/siyuan:v3.8.10
     volumes:
       - 'siyuan_workspace:/siyuan/workspace'
     environment:

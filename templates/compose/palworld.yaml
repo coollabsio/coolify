@@ -1,7 +1,7 @@
 # category: games
 services:
   palworld:
-    image: thijsvanloef/palworld-server-docker:v1.4.6
+    image: thijsvanloef/palworld-server-docker:v2.8.1
     stop_grace_period: 30s
     ports:
       - '8211:8211/udp'
@@ -13,7 +13,7 @@ services:
       - 'PUID=${PUID:?1000}'
       - 'PGID=${PGID:?1000}'
       - 'MULTITHREADING=${MULTITHREADING:?false}'
-      - 'MAX_PLAYERS=${PLAYERS:?16}'
+      - 'PLAYERS=${PLAYERS:?16}'
       - 'SERVER_NAME=${SERVER_NAME:?palworld-server-docker by Thijs van Loef via Coolify}'
       - 'SERVER_DESCRIPTION=${SERVER_DESCRIPTION:?palworld-server-docker by Thijs van Loef via Coolify}'
       - 'SERVER_PASSWORD=${SERVER_PASSWORD:?worldofpals}'
@@ -24,7 +24,7 @@ services:
       - 'PORT=${PORT:?8211}'
       - 'QUERY_PORT=${QUERY_PORT:?27015}'
       - 'UPDATE_ON_BOOT=${UPDATE_ON_BOOT:?true}'
-      - 'RCON_ENABLED=${RCON_ENABLED:?true}'
+      - 'RCON_ENABLED=${RCON_ENABLED:?false}'
       - 'RCON_PORT=${RCON_PORT:?25575}'
       - 'BACKUP_ENABLED=${BACKUP_ENABLED:?true}'
       - 'DELETE_OLD_BACKUPS=${DELETE_OLD_BACKUPS:?false}'
@@ -106,7 +106,7 @@ services:
       - 'REGION=${REGION:-}'
       - 'USEAUTH=${USEAUTH:?True}'
       - 'BAN_LIST_URL=${BAN_LIST_URL:?https://api.palworldgame.com/api/banlist.txt}'
-      - 'REST_API_ENABLED=${REST_API_ENABLED:?False}'
+      - 'REST_API_ENABLED=${REST_API_ENABLED:?true}'
       - 'REST_API_PORT=${REST_API_PORT:?8212}'
       - 'SHOW_PLAYER_LIST=${SHOW_PLAYER_LIST:?True}'
       - 'ENABLE_PREDATOR_BOSS_PAL=${ENABLE_PREDATOR_BOSS_PAL:?True}'

@@ -21,6 +21,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -35,7 +36,7 @@ class MigrateResourceToDestination
      * @return array{async: bool, volume_jobs: int, message: string}
      */
     public function handle(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
         StandaloneDocker|SwarmDocker $destination,
         bool $migrateVolumes = true,
     ): array {
@@ -82,6 +83,12 @@ class MigrateResourceToDestination
         if (! $targetServer->isFunctional()) {
             throw ValidationException::withMessages([
                 'destination_id' => 'Target server is not validated and reachable.',
+            ]);
+        }
+
+        if ($this->hasDomains($resource) && $targetServer->isProxyShouldRun() && $targetServer->proxy->get('status') !== 'running') {
+            throw ValidationException::withMessages([
+                'destination_id' => 'The proxy of the target server is not running. Start it on the server page before you migrate a resource with domains.',
             ]);
         }
 
@@ -133,7 +140,7 @@ class MigrateResourceToDestination
     }
 
     public function applyDestination(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
         StandaloneDocker|SwarmDocker $destination,
     ): void {
         $payload = [
@@ -168,8 +175,22 @@ class MigrateResourceToDestination
         $this->resaveFileStorages($resource->fresh());
     }
 
+    protected function hasDomains(
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+    ): bool {
+        if ($resource instanceof Application) {
+            return $resource->maintenanceDomains()->isNotEmpty();
+        }
+
+        if ($resource instanceof Service) {
+            return $resource->applications()->get()->contains(fn ($application) => filled($application->fqdn));
+        }
+
+        return false;
+    }
+
     protected function stopResource(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
     ): void {
         try {
             if ($resource instanceof Application) {
@@ -191,7 +212,7 @@ class MigrateResourceToDestination
      * @return array<int, VolumeCloneJob|HostPathCloneJob>
      */
     protected function buildVolumeJobs(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
         $sourceServer,
         $targetServer,
     ): array {
@@ -231,7 +252,7 @@ class MigrateResourceToDestination
      * @return Collection<int, LocalPersistentVolume>
      */
     protected function collectPersistentVolumes(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
     ) {
         if ($resource instanceof Service) {
             $volumes = collect();
@@ -265,7 +286,7 @@ class MigrateResourceToDestination
     }
 
     protected function resaveFileStorages(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
     ): void {
         $fileStorages = collect();
 

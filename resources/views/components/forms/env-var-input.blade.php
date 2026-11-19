@@ -1,4 +1,4 @@
-<div class="w-full">
+<div class="w-full" x-data="{ hasEdgeSpace: false }">
     @if ($label)
         <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
             <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
@@ -20,12 +20,34 @@
             cursorPosition: 0,
             currentScope: null,
             availableVars: @js($availableVars),
+            hasVaultSource: @js($hasVaultSource),
+            vaultKeysLoading: false,
+            checkEdgeSpace() {
+                this.hasEdgeSpace = /^\s|\s$/.test(this.$refs.input?.value || '');
+            },
             get availableScopes() {
                 // Only include scopes that have at least one variable
                 const allScopes = ['team', 'project', 'environment', 'server'];
-                return allScopes.filter(scope => {
+                const scopes = allScopes.filter(scope => {
                     const vars = this.availableVars[scope];
                     return vars && vars.length > 0;
+                });
+                // The vault scope is offered whenever a secret manager source is
+                // configured; its keys are fetched lazily on first use.
+                if (this.hasVaultSource) {
+                    scopes.push('vault');
+                }
+                return scopes;
+            },
+            loadVaultKeys() {
+                if (this.vaultKeysLoading) return;
+                this.vaultKeysLoading = true;
+                this.$wire.fetchSecretManagerKeys().then(keys => {
+                    this.availableVars['vault'] = keys || [];
+                    this.vaultKeysLoading = false;
+                    this.handleInput();
+                }).catch(() => {
+                    this.vaultKeysLoading = false;
                 });
             },
             scopeUrls: @js($scopeUrls),
@@ -84,6 +106,15 @@
                     }
 
                     this.currentScope = scope;
+
+                    // Vault keys are fetched from the secret manager on first use.
+                    if (scope === 'vault' && this.availableVars['vault'] === undefined) {
+                        this.loadVaultKeys();
+                        this.suggestions = [];
+                        this.showDropdown = true;
+                        return;
+                    }
+
                     const scopeVars = this.availableVars[scope] || [];
                     const filtered = scopeVars.filter(v =>
                         v.toLowerCase().includes((partial || '').toLowerCase())
@@ -196,11 +227,11 @@
                 }
             }
         }"
-        @click.outside="showDropdown = false">
+        @click.outside="showDropdown = false" x-init="$nextTick(() => checkEdgeSpace())">
 
         <input
             x-ref="input"
-            @input="handleInput()"
+            @input="handleInput(); checkEdgeSpace()"
             @keydown="handleKeydown($event)"
             @click="handleInput()"
             autocomplete="{{ $autocomplete }}"
@@ -214,6 +245,7 @@
                 wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"
             @endif
             wire:loading.attr="disabled"
+            wire:target.except="fetchSecretManagerKeys"
             @disabled($disabled)
             @if ($type !== 'password')
                 type="{{ $type }}"
@@ -236,11 +268,18 @@
         <div x-show="showDropdown" x-cloak x-transition.origin.top
             class="listbox-panel top-full! z-[60]! mt-1! w-full! min-w-0! max-w-full!" role="listbox">
 
-            <template x-if="suggestions.length === 0 && currentScope">
+            <template x-if="suggestions.length === 0 && currentScope === 'vault'">
+                <div class="px-2 py-2 text-sm text-neutral-500 dark:text-fg-dim">
+                    <span x-show="vaultKeysLoading">Loading keys from the secret manager…</span>
+                    <span x-show="!vaultKeysLoading">No matching keys in the secret manager.</span>
+                </div>
+            </template>
+
+            <template x-if="suggestions.length === 0 && currentScope && currentScope !== 'vault'">
                 <div class="px-2 py-2 text-sm text-neutral-500 dark:text-fg-dim">
                     <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
                     <a :href="getScopeUrl(currentScope)"
-                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-warning"
+                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-brand-light"
                        target="_blank">
                         Add <span x-text="currentScope"></span> variables →
                     </a>
@@ -274,6 +313,9 @@
         </div>
     </div>
 
+    <p x-cloak x-show="hasEdgeSpace" class="mt-1 text-xs text-warning">
+        The value starts or ends with a space. Coolify keeps the space.
+    </p>
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif

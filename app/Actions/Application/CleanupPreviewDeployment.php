@@ -4,6 +4,7 @@ namespace App\Actions\Application;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -37,6 +38,13 @@ class CleanupPreviewDeployment
             'status' => 'success',
         ];
 
+        // GitHub must not show a closed pull request as deployed, also when the server is down.
+        try {
+            SyncGithubDeploymentJob::deactivatePullRequest($application, $pull_request_id);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to queue GitHub deployment deactivation for application {$application->id}: {$e->getMessage()}");
+        }
+
         $server = $application->destination->server;
 
         if (! $server->isFunctional()) {
@@ -56,7 +64,7 @@ class CleanupPreviewDeployment
 
         if ($result['cancelled_deployments'] > 0) {
             try {
-                next_after_cancel($server);
+                next_after_cancel($server, $application);
             } catch (\Throwable $e) {
                 \Log::warning("Failed to advance deployment queue after cleaning up preview for application {$application->id}: {$e->getMessage()}");
             }
@@ -157,7 +165,7 @@ class CleanupPreviewDeployment
             } else {
                 $containers = getCurrentApplicationContainerStatus(
                     $server,
-                    $application->id,
+                    $application,
                     $pull_request_id
                 );
 

@@ -12,13 +12,15 @@
     'wireIgnore' => true,
     // Optional Livewire bool property to entangle open state (survives Livewire re-renders).
     'wireOpen' => null,
+    // Livewire event sent when the modal closes. A modal inside another modal sets it to false.
+    'closeEvent' => 'modalClosed',
     'contentClicks' => true,
     'isLarge' => false,
     'fixedHeight' => false,
 ])
 
 <div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
-    x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
+    @if ($closeEvent) x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch(@js($closeEvent)) } })" @endif
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}
     @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>
@@ -60,18 +62,11 @@
                         'sm:h-[40rem]' => $fixedHeight,
                     ])
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header class="flex-wrap! sm:flex-nowrap!">
+                    <header class="shrink-0 flex-wrap! sm:flex-nowrap!">
                         <div class="min-w-0 flex-1 py-0.5">
+                            <h3 class="truncate">{{ $title }}</h3>
                             @if ($subtitle)
-                                <h3>
-                                    <x-helper :helper="$subtitle" :label="'More information about '.$title">
-                                        <x-slot:trigger>
-                                            <span class="underline underline-offset-4">{{ $title }}</span>
-                                        </x-slot:trigger>
-                                    </x-helper>
-                                </h3>
-                            @else
-                                <h3 class="truncate">{{ $title }}</h3>
+                                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
                             @endif
                         </div>
                         @isset($headerActions)
@@ -87,8 +82,7 @@
                     <div @class([
                         'application-settings-section-body min-h-0 flex-1 overflow-y-auto',
                         'mt-2 sm:mt-0' => isset($headerActions),
-                    ])
-                        style="-webkit-overflow-scrolling: touch;">
+                    ])>
                         {{ $slot }}
                     </div>
                     @isset($footer)

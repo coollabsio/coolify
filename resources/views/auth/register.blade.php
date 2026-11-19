@@ -14,10 +14,36 @@ $email = getOldOrLocal('email', 'test3@example.com');
     <x-auth.shell title="Coolify"
         :description="$isFirstUser ? 'Create the root account for this instance.' : 'Create your account to get started.'">
         <div class="flex flex-col gap-4">
-            @if ($isFirstUser)
+            @if ($isRootUserPredefined)
+                <x-auth.alert type="warning">
+                    <p class="font-medium">Root user not created</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">Coolify creates the root account from the
+                        ROOT_USER_* values in /data/coolify/source/.env, but it rejected them. Read the reason in
+                        the logs, then run the installer again with corrected values:</p>
+                    <code class="mt-2 block font-mono text-xs">docker logs coolify</code>
+                </x-auth.alert>
+            @elseif ($isRootSetupWindowPending)
+                <x-auth.alert type="warning">
+                    <p class="font-medium">Coolify is starting</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">Coolify has not finished its start-up tasks.
+                        Wait a few seconds, then reload this page. If this message stays, run this command on the
+                        server:</p>
+                    <code class="mt-2 block font-mono text-xs">docker restart coolify</code>
+                </x-auth.alert>
+            @elseif ($isRootSetupWindowClosed)
+                <x-auth.alert type="warning">
+                    <p class="font-medium">Setup window closed</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">You can create the root account only in the
+                        first {{ \App\Support\RootSetupWindow::MINUTES }} minutes after Coolify
+                        starts. To open the window again, run this command on the server, then reload this page:</p>
+                    <code class="mt-2 block font-mono text-xs">docker restart coolify</code>
+                </x-auth.alert>
+            @elseif ($isFirstUser)
                 <x-auth.alert type="warning">
                     <p class="font-medium">Full instance access</p>
-                    <p class="mt-0.5 text-black/70 dark:text-white/70">This first account becomes the root user.</p>
+                    <p class="mt-0.5 text-black/70 dark:text-white/70">This first account becomes the root user.
+                        Create it within {{ \App\Support\RootSetupWindow::MINUTES }} minutes after
+                        Coolify starts.</p>
                 </x-auth.alert>
             @endif
 
@@ -31,15 +57,16 @@ $email = getOldOrLocal('email', 'test3@example.com');
                 </x-auth.alert>
             @endif
 
+            @unless ($isRootSetupWindowClosed)
             <form action="/register" method="POST" class="flex flex-col gap-4">
                 @csrf
                 <x-forms.input id="name" required type="text" name="name" value="{{ $name }}" autofocus
                     autocomplete="name" label="{{ __('input.name') }}" />
                 <x-forms.input id="email" required type="email" name="email" value="{{ $email }}"
                     autocomplete="email" label="{{ __('input.email') }}" />
-                <x-forms.input id="password" required type="password" name="password" autocomplete="new-password"
+                <x-forms.input id="password" required type="password" :copyable="false" name="password" autocomplete="new-password"
                     label="{{ __('input.password') }}" />
-                <x-forms.input id="password_confirmation" required type="password" name="password_confirmation"
+                <x-forms.input id="password_confirmation" required type="password" :copyable="false" name="password_confirmation"
                     autocomplete="new-password" label="{{ __('input.password.again') }}" />
 
                 <div class="auth-guidance">
@@ -51,6 +78,7 @@ $email = getOldOrLocal('email', 'test3@example.com');
                     Create account
                 </x-forms.button>
             </form>
+            @endunless
         </div>
 
         @if (! $isFirstUser)

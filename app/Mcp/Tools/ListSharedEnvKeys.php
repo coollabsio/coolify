@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\AccessLevel;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Environment;
@@ -11,7 +12,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListSharedEnvKeys extends Tool
 {
     protected string $name = 'list_shared_env_keys';
@@ -44,7 +47,7 @@ class ListSharedEnvKeys extends Tool
 
         if ($scope === 'project') {
             $project = Project::where('team_id', $teamId)->where('uuid', $uuid)->first();
-            if (! $project) {
+            if (! $project || ! $request->user()->canAccess(AccessLevel::Read, $project)) {
                 return $this->mcpError($request, "Project [{$uuid}] not found.", ['resource_uuid' => $uuid]);
             }
 
@@ -76,7 +79,7 @@ class ListSharedEnvKeys extends Tool
                 }
             }
 
-            if (! $environment || (int) $environment->project?->team_id !== $teamId) {
+            if (! $environment || (int) $environment->project?->team_id !== $teamId || ! $request->user()->canAccess(AccessLevel::Read, $environment)) {
                 return $this->mcpError($request, "Environment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
             }
 

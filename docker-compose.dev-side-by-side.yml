@@ -1,0 +1,9 @@
+# Added by scripts/dev for side-by-side instances (COOLIFY_DEV_SIDE_BY_SIDE=1). Two instances of one
+# checkout share storage/, and both have a server with the uuid "localhost", so they would share the
+# SSH key and multiplexing files. This gives the instance its own SSH folder.
+services:
+  coolify:
+    volumes:
+      - ssh_data:/var/www/html/storage/app/ssh
+volumes:
+  ssh_data:

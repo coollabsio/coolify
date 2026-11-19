@@ -16,6 +16,6 @@ class StatusInfo extends Component
 
     protected function databaseLabel(): string
     {
-        return 'Redis';
+        return 'Redis / Valkey';
     }
 }

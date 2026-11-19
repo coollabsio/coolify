@@ -2,6 +2,8 @@
 
 use App\Models\InstanceSettings;
 use App\Rules\SafeWebhookUrl;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
@@ -243,9 +245,7 @@ it('pins every resolved address in a single CURLOPT_RESOLVE entry', function () 
     ]));
 
     if (! defined('CURLOPT_RESOLVE')) {
-        expect(true)->toBeTrue();
-
-        return;
+        $this->markTestSkipped('CURLOPT_RESOLVE is not available.');
     }
 
     $entries = SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook')['curl'][CURLOPT_RESOLVE];
@@ -274,17 +274,16 @@ it('builds MinIO client resolve options for S3 backup uploads', function () {
     expect($options)->toContain('localhost:9000=127.0.0.1');
 });
 
-it('collapses dual-stack S3 hosts to a single bracket-free IPv4 resolve entry', function () {
+it('lists every S3 host IP as a bracket-free resolve entry, IPv4 first', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
         'webhook_allowed_internal_hosts' => ['localhost'],
         'webhook_allow_localhost' => true,
     ]));
 
-    // localhost resolves to both 127.0.0.1 and ::1. The MinIO client keeps one IP per
-    // host and rejects bracketed IPv6, so exactly one bracket-free IPv4 entry is produced.
+    // mc rejects bracketed IPv6, and S3Storage::minioClientResolveOptions() picks the reachable entry.
     $options = SafeWebhookUrl::minioClientResolveOptions('http://localhost:9000');
 
-    expect($options)->toBe(['localhost:9000=127.0.0.1']);
+    expect($options)->toBe(['localhost:9000=127.0.0.1', 'localhost:9000=::1']);
 });
 
 it('rejects trailing-dot hostnames to avoid DNS pinning mismatch', function () {
@@ -325,6 +324,29 @@ it('rejects hostnames that resolve to reserved IPv6 ranges by default', function
 it('redacts webhook URLs for logs', function () {
     expect(SafeWebhookUrl::redactedUrlForLog('https://hooks.slack.com/services/T000/B000/secret-token?foo=bar'))
         ->toBe('https://hooks.slack.com');
+});
+
+it('rejects NAT64 local-use IPv6 literals and DNS answers', function (string $ipv6) {
+    $url = "http://[{$ipv6}]/webhook";
+    $rule = new SafeWebhookUrl(fn (string $host): array => [$ipv6]);
+
+    expect(Validator::make(['url' => $url], ['url' => $rule])->fails())->toBeTrue("Expected literal rejection: {$ipv6}");
+    expect(Validator::make(['url' => 'http://nat64.example.test/webhook'], ['url' => $rule])->fails())->toBeTrue("Expected DNS rejection: {$ipv6}");
+    expect(fn () => SafeWebhookUrl::httpClientOptions($url))->toThrow(RuntimeException::class, 'unsafe IP address');
+    expect(fn () => SafeWebhookUrl::httpClientOptions('http://nat64.example.test/webhook', resolver: fn (string $host): array => [$ipv6]))
+        ->toThrow(RuntimeException::class, 'unsafe IP address');
+})->with([
+    'loopback' => '64:ff9b:1::7f00:1',
+    'private 172.16' => '64:ff9b:1::ac10:1',
+    'private 192.168' => '64:ff9b:1::c0a8:1',
+    'link-local' => '64:ff9b:1::a9fe:a9fe',
+]);
+
+it('keeps public IPv6 allowed and NAT64 well-known prefix blocked', function () {
+    $rule = new SafeWebhookUrl;
+
+    expect(Validator::make(['url' => 'https://[2606:4700:4700::1111]/webhook'], ['url' => $rule])->passes())->toBeTrue();
+    expect(Validator::make(['url' => 'http://[64:ff9b::7f00:1]/webhook'], ['url' => $rule])->fails())->toBeTrue();
 });
 
 it('falls back to system DNS when custom DNS returns no answers', function () {
@@ -425,4 +447,114 @@ it('still rejects private targets after system DNS fallback when host is not all
     );
 
     expect($validator->fails())->toBeTrue('Expected private IP rejection without allowlist after fallback');
+});
+
+it('passes bracketed IPv6 custom dns servers to the dns query', function () {
+    $queriedServers = new ArrayObject;
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queriedServers) {
+        $queriedServers->append($parameters['server']);
+
+        return new class('192.0.2.1') extends DnsResolver
+        {
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): false
+            {
+                return false;
+            }
+
+            public function hasError(): bool
+            {
+                return true;
+            }
+        };
+    });
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+    $method->invoke(new SafeWebhookUrl, 'hooks.example.com', ['2606:4700:4700::1111', '[2001:db8::53]', '192.0.2.1']);
+
+    expect(array_values(array_unique($queriedServers->getArrayCopy())))
+        ->toBe(['[2606:4700:4700::1111]', '[2001:db8::53]', '192.0.2.1']);
+});
+
+it('accepts bracketed IPv6 custom dns servers from instance settings', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['custom_dns_servers' => '1.1.1.1, [2606:4700:4700::1111]']));
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'customDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl))->toBe(['1.1.1.1', '2606:4700:4700::1111']);
+});
+
+/**
+ * Fakes a resolver like 1.1.1.1 that sets the TC bit on the UDP answer for A records.
+ */
+function bindTruncatingDnsResolver(ArrayObject $queries, string $truncatedError = 'Response too big for UDP, retry with TCP'): void
+{
+    app()->bind(DnsResolver::class, function ($app, array $parameters) use ($queries, $truncatedError) {
+        return new class($parameters['udp'], $queries, $truncatedError) extends DnsResolver
+        {
+            private string $fakeError = '';
+
+            public function __construct(
+                private readonly bool $useUdp,
+                private readonly ArrayObject $queries,
+                private readonly string $truncatedError,
+            ) {
+                parent::__construct('192.0.2.1');
+            }
+
+            public function query(string $question, string $typeName = DnsResolver::TYPE_A): array|false
+            {
+                $this->queries->append([$typeName, $this->useUdp ? 'udp' : 'tcp']);
+                $this->fakeError = '';
+
+                if ($typeName === DnsResolver::TYPE_A && $this->useUdp) {
+                    $this->fakeError = $this->truncatedError;
+
+                    return false;
+                }
+
+                $ip = $typeName === DnsResolver::TYPE_A ? '172.64.66.1' : '2606:4700:113::1';
+
+                return [new DnsRecord($typeName, $ip)];
+            }
+
+            public function hasError(): bool
+            {
+                return $this->fakeError !== '';
+            }
+
+            public function getLasterror(): string
+            {
+                return $this->fakeError;
+            }
+        };
+    });
+}
+
+it('retries custom dns lookups over TCP when the UDP answer is truncated', function () {
+    $queries = new ArrayObject;
+    bindTruncatingDnsResolver($queries);
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
+        ->toBe(['172.64.66.1', '2606:4700:113::1'])
+        ->and($queries->getArrayCopy())->toBe([
+            [DnsResolver::TYPE_A, 'udp'],
+            [DnsResolver::TYPE_A, 'tcp'],
+            [DnsResolver::TYPE_AAAA, 'udp'],
+        ]);
+});
+
+it('does not retry custom dns lookups over TCP for other UDP failures', function () {
+    $queries = new ArrayObject;
+    bindTruncatingDnsResolver($queries, 'Failed to read data buffer');
+
+    $method = new ReflectionMethod(SafeWebhookUrl::class, 'resolveHostWithCustomDnsServers');
+
+    expect($method->invoke(new SafeWebhookUrl, 'bucket.r2.cloudflarestorage.com', ['1.1.1.1']))
+        ->toBe(['2606:4700:113::1'])
+        ->and($queries->getArrayCopy())->toBe([
+            [DnsResolver::TYPE_A, 'udp'],
+            [DnsResolver::TYPE_AAAA, 'udp'],
+        ]);
 });

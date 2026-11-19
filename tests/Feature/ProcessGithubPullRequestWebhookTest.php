@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -8,6 +9,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -35,6 +37,24 @@ beforeEach(function () {
     ]);
 });
 
+function expectSkippedPreviewDeployment(Application $application, int $pullRequestId, string $reason): ApplicationDeploymentQueue
+{
+    expect(ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pullRequestId)->exists())->toBeFalse();
+
+    $deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('pull_request_id', $pullRequestId)->get();
+    expect($deployments)->toHaveCount(1);
+
+    $deployment = $deployments->first();
+    expect($deployment->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($deployment->commit_message)->toBe($reason)
+        ->and($deployment->is_webhook)->toBeTruthy()
+        ->and($deployment->finished_at)->not->toBeNull()
+        ->and($deployment->server_id)->toBe($application->destination->server->id)
+        ->and($deployment->logs)->toContain($reason);
+
+    return $deployment;
+}
+
 it('cleans up a closed pull request preview when pull request comment cleanup fails', function () {
     $preview = ApplicationPreview::create([
         'application_id' => $this->application->id,
@@ -53,7 +73,7 @@ it('cleans up a closed pull request preview when pull request comment cleanup fa
             'status' => 'success',
         ]);
 
-    $job = new class(applicationId: $this->application->id, githubAppId: null, action: 'closed', pullRequestId: 42, pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42', pullRequestTitle: null, beforeSha: null, afterSha: null, commitSha: 'HEAD', authorAssociation: 'OWNER', fullName: 'example/repo') extends ProcessGithubPullRequestWebhook
+    $job = new class(applicationId: $this->application->id, githubAppId: null, action: 'closed', pullRequestId: 42, pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42', pullRequestTitle: null, beforeSha: null, afterSha: null, commitSha: 'HEAD', fullName: 'example/repo') extends ProcessGithubPullRequestWebhook
     {
         protected function dispatchPullRequestClosedUpdate(Application $application, ApplicationPreview $preview): void
         {
@@ -97,14 +117,12 @@ it('skips a synchronized GitHub pull request preview when the head commit messag
         beforeSha: 'before-sha',
         afterSha: 'after-sha',
         commitSha: 'after-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse()
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse();
+    expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request title or the head commit message contains a skip marker ([skip ci] or [skip cd]).');
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/commits/after-sha');
 });
@@ -147,7 +165,6 @@ it('deploys a synchronized GitHub pull request preview when the head commit mess
         beforeSha: 'before-sha',
         afterSha: 'after-sha',
         commitSha: 'after-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
@@ -194,15 +211,283 @@ it('skips a GitHub pull request preview when the opened or reopened head commit 
         beforeSha: null,
         afterSha: null,
         commitSha: 'head-sha',
-        authorAssociation: 'OWNER',
         fullName: 'example/repo',
     );
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse()
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse();
+    expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request title or the head commit message contains a skip marker ([skip ci] or [skip cd]).');
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/commits/head-sha');
-    Http::assertNotSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/pulls/42/files');
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/repos/example/repo/pulls/42/files'));
 })->with(['opened', 'reopened']);
+
+it('deploys an opened GitHub pull request preview when a watched file is beyond the first page of changed files', function () {
+    Queue::fake();
+
+    $this->application->update(['watch_paths' => 'apps/app/**']);
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+    ]);
+
+    $githubApp = GithubApp::create([
+        'name' => 'Public GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    $firstPage = collect(range(1, 100))->map(fn (int $i): array => ['filename' => ".github/workflows/workflow-{$i}.yml"])->all();
+
+    Http::fake([
+        'https://api.github.com/repos/example/repo/commits/head-sha' => Http::response([
+            'commit' => ['message' => 'feat: add app'],
+        ]),
+        'https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=1' => Http::response($firstPage),
+        'https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=2' => Http::response([
+            ['filename' => 'apps/app/index.ts'],
+        ]),
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: $githubApp->id,
+        action: 'opened',
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Add feature',
+        beforeSha: null,
+        afterSha: null,
+        commitSha: 'head-sha',
+        fullName: 'example/repo',
+    );
+
+    $job->handle();
+
+    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue()
+        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue();
+
+    Http::assertSentCount(3);
+});
+
+it('deploys a GitHub pull request preview when the full list of changed files is unknown', function (string $action, array $filesResponse) {
+    Queue::fake();
+
+    $this->application->update(['watch_paths' => 'apps/app/**']);
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+    ]);
+
+    $githubApp = GithubApp::create([
+        'name' => 'Public GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/example/repo/commits/*' => Http::response([
+            'commit' => ['message' => 'feat: add app'],
+        ]),
+        ...$filesResponse,
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: $githubApp->id,
+        action: $action,
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Add feature',
+        beforeSha: 'before-sha',
+        afterSha: 'after-sha',
+        commitSha: 'after-sha',
+        fullName: 'example/repo',
+    );
+
+    $job->handle();
+
+    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue()
+        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue();
+})->with([
+    'opened with a GitHub API error' => fn () => ['opened', [
+        'https://api.github.com/repos/example/repo/pulls/42/files*' => Http::response(['message' => 'Server Error'], 500),
+    ]],
+    'synchronize with a GitHub API error' => fn () => ['synchronize', [
+        'https://api.github.com/repos/example/repo/compare/*' => Http::response(['message' => 'Server Error'], 500),
+    ]],
+    'synchronize with a truncated compare file list' => fn () => ['synchronize', [
+        'https://api.github.com/repos/example/repo/compare/*' => Http::response([
+            'files' => collect(range(1, 300))->map(fn (int $i): array => ['filename' => "docs/page-{$i}.md"])->all(),
+        ]),
+    ]],
+]);
+
+it('skips an opened GitHub pull request preview when no changed file matches the watch paths', function () {
+    Queue::fake();
+
+    $this->application->update(['watch_paths' => 'apps/app/**']);
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+    ]);
+
+    $githubApp = GithubApp::create([
+        'name' => 'Public GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/example/repo/commits/head-sha' => Http::response([
+            'commit' => ['message' => 'docs: update readme'],
+        ]),
+        'https://api.github.com/repos/example/repo/pulls/42/files*' => Http::response([
+            ['filename' => 'README.md'],
+        ]),
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: $githubApp->id,
+        action: 'opened',
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Update docs',
+        beforeSha: null,
+        afterSha: null,
+        commitSha: 'head-sha',
+        fullName: 'example/repo',
+    );
+
+    $job->handle();
+
+    $deployment = expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: no changed file matches the watch paths.');
+    expect(collect(json_decode($deployment->logs, true))->pluck('output')->all())->toBe([
+        'Skipped the preview deployment: no changed file matches the watch paths.',
+        'Watch paths: apps/app/**',
+        'Changed files (1): README.md',
+    ]);
+});
+
+it('uses one GitHub App installation token for all GitHub API calls of a pull request job', function () {
+    Queue::fake();
+
+    $this->application->update(['watch_paths' => 'apps/app/**']);
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+    ]);
+
+    openssl_pkey_export(openssl_pkey_new([
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+    ]), $pemKey);
+
+    $githubApp = GithubApp::create([
+        'name' => 'Private GitHub App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'app_id' => 12345,
+        'installation_id' => 67890,
+        'private_key_id' => PrivateKey::create([
+            'name' => 'GitHub App Key',
+            'private_key' => $pemKey,
+            'team_id' => $this->team->id,
+        ])->id,
+        'is_public' => false,
+        'team_id' => $this->team->id,
+    ]);
+
+    $firstPage = collect(range(1, 100))->map(fn (int $i): array => ['filename' => ".github/workflows/workflow-{$i}.yml"])->all();
+
+    Http::fake([
+        'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
+            'token' => 'fake-installation-token',
+        ], 201),
+        'https://api.github.com/repos/example/repo/commits/head-sha' => Http::response([
+            'commit' => ['message' => 'feat: add app'],
+        ]),
+        'https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=1' => Http::response($firstPage),
+        'https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=2' => Http::response([
+            ['filename' => 'apps/app/index.ts'],
+        ]),
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: $githubApp->id,
+        action: 'opened',
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Add feature',
+        beforeSha: null,
+        afterSha: null,
+        commitSha: 'head-sha',
+        fullName: 'example/repo',
+    );
+
+    $job->handle();
+
+    expect(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeTrue();
+
+    $tokenRequests = Http::recorded(fn (Request $request): bool => str_ends_with($request->url(), '/access_tokens'));
+    $repositoryRequests = Http::recorded(fn (Request $request): bool => str_contains($request->url(), '/repos/example/repo/'));
+
+    expect($tokenRequests)->toHaveCount(1)
+        ->and($repositoryRequests)->toHaveCount(3)
+        ->and($repositoryRequests->every(fn (array $pair): bool => $pair[0]->hasHeader('Authorization', 'Bearer fake-installation-token')))->toBeTrue();
+});
+
+it('deploys an opened GitHub pull request preview by fork status, not by author association', function (bool $isForkPullRequest, bool $isPublicEnabled, bool $deploys) {
+    Queue::fake();
+
+    $this->application->settings->update([
+        'is_preview_deployments_enabled' => true,
+        'is_pr_deployments_public_enabled' => $isPublicEnabled,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/example/repo/commits/head-sha' => Http::response([
+            'commit' => ['message' => 'feat: add app'],
+        ]),
+        'https://api.github.com/repos/example/repo/pulls/42/files*' => Http::response([
+            ['filename' => 'README.md'],
+        ]),
+    ]);
+
+    $job = new ProcessGithubPullRequestWebhook(
+        applicationId: $this->application->id,
+        githubAppId: GithubApp::create([
+            'name' => 'Public GitHub',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => true,
+            'team_id' => $this->team->id,
+        ])->id,
+        action: 'opened',
+        pullRequestId: 42,
+        pullRequestHtmlUrl: 'https://github.com/example/repo/pull/42',
+        pullRequestTitle: 'Add feature',
+        beforeSha: null,
+        afterSha: 'head-sha',
+        commitSha: 'head-sha',
+        fullName: 'example/repo',
+        isForkPullRequest: $isForkPullRequest,
+    );
+
+    $job->handle();
+
+    if ($deploys) {
+        expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('is_same_repository'))->toBe(! $isForkPullRequest)
+            ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('status'))->not->toBe(ApplicationDeploymentStatus::SKIPPED->value);
+    } else {
+        expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request comes from a fork and public PR deployments are disabled.');
+    }
+})->with([
+    'same-repository branch with public deployments off' => [false, false, true],
+    'fork with public deployments off' => [true, false, false],
+    'fork with public deployments on' => [true, true, true],
+]);
