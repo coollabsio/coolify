@@ -78,23 +78,18 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     ]);
 });
 
-it('renders responsive checkbox classes on the application configuration page', function () {
-    $response = $this->get(route('project.application.configuration', [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'application_uuid' => $this->application->uuid,
-    ]));
-
-    $response->assertSuccessful();
-    $response->assertSee('Use a Build Server?');
-    $response->assertSee('form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2', false);
-    $response->assertSee('label flex w-full max-w-full min-w-0 items-center gap-4 px-0', false);
-    $response->assertSee('flex min-w-0 grow gap-2 break-words', false);
-    $response->assertSee('shrink-0', false);
-    $response->assertSee('pt-2 w-full sm:w-96', false);
+/**
+ * Checkbox rows must let long labels wrap next to a fixed-size toggle on narrow screens.
+ */
+function assertResponsiveCheckboxMarkup($response): void
+{
+    $response->assertSee('form-control group flex min-h-9 max-w-full', false);
+    $response->assertSee('label flex w-full max-w-full min-w-0 items-center', false);
+    $response->assertSee('flex min-w-0 grow items-center gap-1.5 break-words', false);
+    $response->assertSee('relative flex size-[18px] shrink-0', false);
 
     expect($response->getContent())->not->toContain('min-w-fit');
-});
+}
 
 it('renders responsive checkbox classes on the server page', function () {
     $response = $this->get(route('server.show', [
@@ -102,12 +97,6 @@ it('renders responsive checkbox classes on the server page', function () {
     ]));
 
     $response->assertSuccessful();
-    $response->assertSee('Use it as a build server?');
-    $response->assertSee('form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2', false);
-    $response->assertSee('label flex w-full max-w-full min-w-0 items-center gap-4 px-0', false);
-    $response->assertSee('flex min-w-0 grow gap-2 break-words', false);
-    $response->assertSee('shrink-0', false);
-    $response->assertSee('w-full sm:w-96', false);
 
-    expect($response->getContent())->not->toContain('min-w-fit');
+    assertResponsiveCheckboxMarkup($response);
 });

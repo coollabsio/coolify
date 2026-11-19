@@ -3,20 +3,24 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookContext;
 use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookVariantRegistry;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
-use Visus\Cuid2\Cuid2;
+use Illuminate\Support\Collection;
 
 class Bitbucket extends Controller
 {
     use MatchesManualWebhookApplications;
+    use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request, ?BitbucketWebhookVariantRegistry $registry = null)
     {
@@ -42,32 +46,27 @@ class Bitbucket extends Controller
                 ]);
             }
 
-            $applications = Application::query()
-                ->where('git_branch', $context->branch)
-                ->get()
-                ->filter(function (Application $application) use ($context): bool {
-                    foreach ($context->repositoryIdentifiers as $identifier) {
-                        $normalized = $this->normalizeManualWebhookRepositoryPath($identifier);
-                        if ($this->manualWebhookRepositoryMatches($application->git_repository, $normalized)) {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                })
+            $full_names = collect($context->repositoryIdentifiers)
+                ->map(fn (string $identifier): ?string => $this->manualWebhookRepositoryFullName($identifier))
+                ->filter()
+                ->unique(fn (string $fullName): string => mb_strtolower($fullName))
                 ->values();
-
-            $repositoryLabel = $context->repositoryLabel();
-
-            if ($applications->isEmpty()) {
+            if ($full_names->isEmpty()) {
                 return response([
                     'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '{$context->branch}' and Git Repository name has {$repositoryLabel}.",
+                    'message' => 'Nothing to do. Invalid repository.',
                 ]);
             }
+            $repositoryLabel = $full_names->implode(', ');
 
-            $headers = $request->headers->all();
-            $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
+            $x_bitbucket_token = (string) $request->header('X-Hub-Signature', '');
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_names->first(), $context->branch);
+            // A redelivery of the same signed payload is one guess.
+            $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
+            $applications = $this->bitbucketWebhookApplications($context, $full_names);
+            if ($applications->isEmpty()) {
+                return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
+            }
 
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -82,7 +81,7 @@ class Bitbucket extends Controller
 
                     continue;
                 }
-                $payload = $request->getContent();
+                $rawPayload = $request->getContent();
 
                 $parts = explode('=', $x_bitbucket_token, 2);
                 if (count($parts) !== 2 || $parts[0] !== 'sha256') {
@@ -97,8 +96,8 @@ class Bitbucket extends Controller
                     continue;
                 }
                 $hash = $parts[1];
-                $payloadHash = hash_hmac('sha256', $payload, $webhook_secret);
-                if (! hash_equals($hash, $payloadHash) && ! isDev()) {
+                $payloadHash = hash_hmac('sha256', $rawPayload, $webhook_secret);
+                if (! hash_equals($hash, $payloadHash)) {
                     auditLogWebhookFailure('bitbucket', 'invalid_signature', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
@@ -109,6 +108,7 @@ class Bitbucket extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([
@@ -120,19 +120,52 @@ class Bitbucket extends Controller
                     continue;
                 }
 
-                $return_payloads->push($this->dispatchBitbucketWebhookAction($application, $context, $repositoryLabel));
+                $result = $this->dispatchBitbucketWebhookAction($application, $context, $repositoryLabel);
+                if ($result !== null) {
+                    $return_payloads->push($result);
+                }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
+        } catch (HttpResponseException $e) {
+            return $e->getResponse();
+        } catch (InvalidWebhookPayloadException $e) {
+            return response([
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]);
         } catch (Exception $e) {
             return handleError($e);
         }
     }
 
     /**
-     * @return array<string, mixed>
+     * Applications whose repository matches one of the payload repository names.
+     * A closed pull request matches every branch, so its preview is removed
+     * even when the application branch changed.
+     *
+     * @param  Collection<int, string>  $fullNames
+     * @return Collection<int, Application>
      */
-    private function dispatchBitbucketWebhookAction(Application $application, BitbucketWebhookContext $context, string $repositoryLabel): array
+    private function bitbucketWebhookApplications(BitbucketWebhookContext $context, Collection $fullNames): Collection
+    {
+        return $fullNames
+            ->flatMap(function (string $fullName) use ($context): Collection {
+                $query = Application::query();
+                if ($context->action !== 'preview_close') {
+                    $query->where('git_branch', $context->branch);
+                }
+
+                return $this->manualWebhookApplications($query, $fullName);
+            })
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * @return array<string, mixed>|null Null when the application must not answer.
+     */
+    private function dispatchBitbucketWebhookAction(Application $application, BitbucketWebhookContext $context, string $repositoryLabel): ?array
     {
         return match ($context->action) {
             'push' => $this->handlePush($application, $context, $repositoryLabel),
@@ -169,7 +202,7 @@ class Bitbucket extends Controller
             ];
         }
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
         $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
@@ -195,7 +228,7 @@ class Bitbucket extends Controller
             'mode' => 'manual',
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
-            'deployment_uuid' => $deployment_uuid->toString(),
+            'deployment_uuid' => $deployment_uuid,
             'commit' => $context->commit,
             'repository' => $repositoryLabel,
         ]);
@@ -208,9 +241,9 @@ class Bitbucket extends Controller
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null Null when the pull request comes from an untrusted repository.
      */
-    private function handlePreviewDeploy(Application $application, BitbucketWebhookContext $context): array
+    private function handlePreviewDeploy(Application $application, BitbucketWebhookContext $context): ?array
     {
         if (! $application->isPRDeployable()) {
             return [
@@ -218,6 +251,15 @@ class Bitbucket extends Controller
                 'status' => 'failed',
                 'message' => 'Preview deployments disabled.',
             ];
+        }
+
+        if (! $this->isPreviewDeploymentRepositoryTrusted(
+            $context->sourceRepository,
+            $context->targetRepository,
+            $context->webhookRepository,
+            $application->settings->is_pr_deployments_public_enabled,
+        )) {
+            return null;
         }
 
         if ($context->skipDeployPr) {
@@ -228,7 +270,7 @@ class Bitbucket extends Controller
             ];
         }
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
         $found = ApplicationPreview::where('application_id', $application->id)
             ->where('pull_request_id', $context->pullRequestId)
             ->first();
@@ -239,7 +281,7 @@ class Bitbucket extends Controller
                     'git_type' => 'bitbucket',
                     'application_id' => $application->id,
                     'pull_request_id' => $context->pullRequestId,
-                    'pull_request_html_url' => $context->pullRequestHtmlUrl,
+                    'pull_request_html_url' => $context->pullRequestHtmlUrl ?? '',
                     'docker_compose_domains' => $application->docker_compose_domains,
                 ]);
                 $pr_app->generate_preview_fqdn_compose();
@@ -248,7 +290,7 @@ class Bitbucket extends Controller
                     'git_type' => 'bitbucket',
                     'application_id' => $application->id,
                     'pull_request_id' => $context->pullRequestId,
-                    'pull_request_html_url' => $context->pullRequestHtmlUrl,
+                    'pull_request_html_url' => $context->pullRequestHtmlUrl ?? '',
                 ]);
                 $pr_app->generate_preview_fqdn();
             }

@@ -1,0 +1,28 @@
+# documentation: https://github.com/coollabsio/orbit/blob/main/docs/operations.md
+# slogan: Self-hosted workspace for teams with tasks, docs, chat, and an MCP server for AI clients.
+# category: productivity
+# tags: orbit,tasks,docs,wiki,chat,project-management,kanban,mcp,ai,coollabs
+# logo: svgs/orbit.svg
+# port: 8080
+
+services:
+  orbit:
+    image: ghcr.io/coollabsio/orbit:0.2.0
+    environment:
+      - SERVICE_URL_ORBIT_8080
+      - ORBIT_ENV=production
+      # Orbit requires an HTTPS origin in production. Use an https:// domain.
+      - ORBIT_PUBLIC_ORIGIN=${SERVICE_URL_ORBIT}
+      # The proxy is on a Docker network. Loopback is for the healthcheck.
+      - ORBIT_TRUSTED_PROXIES=${ORBIT_TRUSTED_PROXIES:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      # Keep a copy of this key. Orbit cannot read saved secrets without it.
+      - ORBIT_APP_KEY=${SERVICE_REALBASE64_32_APPKEY}
+    volumes:
+      - orbit-data:/var/lib/orbit
+      - orbit-backups:/var/backups/orbit
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "/orbit", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

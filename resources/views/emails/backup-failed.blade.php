@@ -4,4 +4,8 @@ Database backup for {{ $name }} @if($database_name)(db:{{ $database_name }})@end
 ### Reason
 
 {{ $output }}
+
+@isset($reminder)
+{{ $reminder }}
+@endisset
 </x-emails.layout>

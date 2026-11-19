@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Webhook\Bitbucket;
 
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class BitbucketCloudWebhookVariant implements BitbucketWebhookVariant
 {
     use DetectsSkipDeployCommits;
+    use ReadsWebhookPushPayload;
 
     public function supports(Request $request): bool
     {
@@ -51,27 +53,29 @@ class BitbucketCloudWebhookVariant implements BitbucketWebhookVariant
         $repositoryIdentifiers = BitbucketRepositoryIdentifiers::fromPayload($payload);
 
         if ($rawEvent === 'repo:push') {
-            $branch = data_get($payload, 'push.changes.0.new.name');
-            $commit = data_get($payload, 'push.changes.0.new.target.hash');
+            // A deleted branch has no "new" state, so no branch is found.
+            $branch = $this->webhookString(data_get($payload, 'push.changes.0.new.name'));
+            $commit = $this->webhookCommitSha($payload, 'push.changes.0.new.target.hash');
+            // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
+            // are evaluated only on the visible 5.
+            $changes = data_get($payload, 'push.changes');
             $skipDeployCommits = self::shouldSkipDeploy(
-                collect(data_get($payload, 'push.changes', []))
-                    ->flatMap(fn ($change) => data_get($change, 'commits', []))
-                    ->pluck('message')
-                    ->filter()
+                collect(is_array($changes) ? $changes : [])
+                    ->flatMap(fn (mixed $change): array => $this->webhookPushCommitMessages($change))
                     ->values()
                     ->all()
             );
 
-            if (! filled($branch)) {
+            if ($branch === null) {
                 return null;
             }
 
             return new BitbucketWebhookContext(
                 rawEvent: $rawEvent,
                 action: 'push',
-                branch: (string) $branch,
+                branch: $branch,
                 repositoryIdentifiers: $repositoryIdentifiers,
-                commit: filled($commit) ? (string) $commit : null,
+                commit: $commit,
                 skipDeployCommits: $skipDeployCommits,
             );
         }
@@ -82,13 +86,8 @@ class BitbucketCloudWebhookVariant implements BitbucketWebhookVariant
                 return null;
             }
 
-            $branch = data_get($pullRequest, 'destination.branch.name');
-            $pullRequestTitle = data_get($pullRequest, 'title');
-            $commit = data_get($pullRequest, 'source.commit.hash');
-            $pullRequestId = data_get($pullRequest, 'id');
-            $pullRequestHtmlUrl = data_get($pullRequest, 'links.html.href');
-
-            if (! filled($branch)) {
+            $branch = $this->webhookString(data_get($pullRequest, 'destination.branch.name'));
+            if ($branch === null) {
                 return null;
             }
 
@@ -99,12 +98,15 @@ class BitbucketCloudWebhookVariant implements BitbucketWebhookVariant
             return new BitbucketWebhookContext(
                 rawEvent: $rawEvent,
                 action: $action,
-                branch: (string) $branch,
+                branch: $branch,
                 repositoryIdentifiers: $repositoryIdentifiers,
-                commit: filled($commit) ? (string) $commit : null,
-                skipDeployPr: self::shouldSkipDeployAny([$pullRequestTitle]),
-                pullRequestId: filled($pullRequestId) ? (int) $pullRequestId : null,
-                pullRequestHtmlUrl: filled($pullRequestHtmlUrl) ? (string) $pullRequestHtmlUrl : null,
+                commit: $this->webhookCommitSha($payload, 'pullrequest.source.commit.hash'),
+                skipDeployPr: self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pullrequest.title')]),
+                pullRequestId: $this->webhookPullRequestId($payload, 'pullrequest.id'),
+                pullRequestHtmlUrl: $this->webhookPayloadUrl($payload, 'pullrequest.links.html.href'),
+                sourceRepository: data_get($pullRequest, 'source.repository.uuid'),
+                targetRepository: data_get($pullRequest, 'destination.repository.uuid'),
+                webhookRepository: data_get($payload, 'repository.uuid'),
             );
         }
 

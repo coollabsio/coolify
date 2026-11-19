@@ -4,6 +4,7 @@ namespace App\Livewire\Project;
 
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class DeleteProject extends Component
@@ -12,6 +13,7 @@ class DeleteProject extends Component
 
     public array $parameters;
 
+    #[Locked]
     public int $project_id;
 
     public bool $disabled = false;
@@ -26,18 +28,22 @@ class DeleteProject extends Component
 
     public function delete()
     {
-        $this->validate([
-            'project_id' => 'required|int',
-        ]);
-        $project = Project::ownedByCurrentTeam()->findOrFail($this->project_id);
-        $this->authorize('delete', $project);
+        try {
+            $this->validate([
+                'project_id' => 'required|int',
+            ]);
+            $project = Project::ownedByCurrentTeam()->findOrFail($this->project_id);
+            $this->authorize('delete', $project);
 
-        if ($project->isEmpty()) {
-            $project->delete();
+            if ($project->isEmpty()) {
+                $project->delete();
 
-            return redirectRoute($this, 'project.index');
+                return redirectRoute($this, 'project.index');
+            }
+
+            return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
-        return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");
     }
 }

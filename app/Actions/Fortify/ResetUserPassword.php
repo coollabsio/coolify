@@ -23,6 +23,7 @@ class ResetUserPassword implements ResetsUserPasswords
 
         $user->fill([
             'password' => Hash::make($input['password']),
+            'force_password_reset' => false,
         ])->save();
         $user->deleteAllSessions();
     }

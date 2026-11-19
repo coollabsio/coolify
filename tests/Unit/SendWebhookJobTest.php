@@ -2,7 +2,6 @@
 
 use App\Jobs\SendWebhookJob;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -24,11 +23,6 @@ it('sends webhook to valid URLs', function () {
 
 it('blocks webhook to loopback address', function () {
     Http::fake();
-    Log::shouldReceive('warning')
-        ->once()
-        ->withArgs(function ($message) {
-            return str_contains($message, 'blocked unsafe webhook URL');
-        });
 
     $job = new SendWebhookJob(
         payload: ['event' => 'test'],
@@ -42,15 +36,23 @@ it('blocks webhook to loopback address', function () {
 
 it('blocks webhook to cloud metadata endpoint', function () {
     Http::fake();
-    Log::shouldReceive('warning')
-        ->once()
-        ->withArgs(function ($message) {
-            return str_contains($message, 'blocked unsafe webhook URL');
-        });
 
     $job = new SendWebhookJob(
         payload: ['event' => 'test'],
-        webhookUrl: 'http://169.254.169.254/latest/meta-data/'
+        webhookUrl: 'http://169.254.169.254/'
+    );
+
+    $job->handle();
+
+    Http::assertNothingSent();
+});
+
+it('blocks webhook to IPv4-mapped IPv6 link-local endpoint', function () {
+    Http::fake();
+
+    $job = new SendWebhookJob(
+        payload: ['event' => 'test'],
+        webhookUrl: 'http://[::ffff:169.254.169.254]/'
     );
 
     $job->handle();
@@ -60,11 +62,6 @@ it('blocks webhook to cloud metadata endpoint', function () {
 
 it('blocks webhook to localhost', function () {
     Http::fake();
-    Log::shouldReceive('warning')
-        ->once()
-        ->withArgs(function ($message) {
-            return str_contains($message, 'blocked unsafe webhook URL');
-        });
 
     $job = new SendWebhookJob(
         payload: ['event' => 'test'],

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Webhook\Bitbucket;
 
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class BitbucketDataCenterWebhookVariant implements BitbucketWebhookVariant
 {
     use DetectsSkipDeployCommits;
+    use ReadsWebhookPushPayload;
 
     public function supports(Request $request): bool
     {
@@ -61,19 +63,17 @@ class BitbucketDataCenterWebhookVariant implements BitbucketWebhookVariant
                 return null;
             }
 
-            $branch = data_get($change, 'ref.displayId');
-            $commit = data_get($change, 'toHash');
-
-            if (! filled($branch)) {
+            $branch = $this->webhookString(data_get($change, 'ref.displayId'));
+            if ($branch === null) {
                 return null;
             }
 
             return new BitbucketWebhookContext(
                 rawEvent: $rawEvent,
                 action: 'push',
-                branch: (string) $branch,
+                branch: $branch,
                 repositoryIdentifiers: $repositoryIdentifiers,
-                commit: filled($commit) ? (string) $commit : null,
+                commit: $this->webhookCommitSha($payload, 'changes.0.toHash'),
             );
         }
 
@@ -92,25 +92,25 @@ class BitbucketDataCenterWebhookVariant implements BitbucketWebhookVariant
             return null;
         }
 
-        $branch = data_get($pullRequest, 'toRef.displayId');
-        $pullRequestTitle = data_get($pullRequest, 'title');
-        $commit = data_get($pullRequest, 'fromRef.latestCommit');
-        $pullRequestId = data_get($pullRequest, 'id');
-        $pullRequestHtmlUrl = data_get($pullRequest, 'links.self.0.href');
-
-        if (! filled($branch)) {
+        $branch = $this->webhookString(data_get($pullRequest, 'toRef.displayId'));
+        if ($branch === null) {
             return null;
         }
 
         return new BitbucketWebhookContext(
             rawEvent: $rawEvent,
             action: $action,
-            branch: (string) $branch,
+            branch: $branch,
             repositoryIdentifiers: $repositoryIdentifiers,
-            commit: filled($commit) ? (string) $commit : null,
-            skipDeployPr: self::shouldSkipDeployAny([$pullRequestTitle]),
-            pullRequestId: filled($pullRequestId) ? (int) $pullRequestId : null,
-            pullRequestHtmlUrl: filled($pullRequestHtmlUrl) ? (string) $pullRequestHtmlUrl : null,
+            commit: $this->webhookCommitSha($payload, 'pullRequest.fromRef.latestCommit'),
+            skipDeployPr: self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pullRequest.title')]),
+            pullRequestId: $this->webhookPullRequestId($payload, 'pullRequest.id'),
+            pullRequestHtmlUrl: $this->webhookPayloadUrl($payload, 'pullRequest.links.self.0.href'),
+            // Data Center pull request events have no top-level repository:
+            // the target repository is the one that sends the webhook.
+            sourceRepository: data_get($pullRequest, 'fromRef.repository.id'),
+            targetRepository: data_get($pullRequest, 'toRef.repository.id'),
+            webhookRepository: data_get($pullRequest, 'toRef.repository.id'),
         );
     }
 

@@ -13,7 +13,7 @@ class ServiceDatabasePolicy
      */
     public function view(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        return true;
+        return Gate::allows('view', $serviceDatabase->service);
     }
 
     /**
@@ -21,8 +21,7 @@ class ServiceDatabasePolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -30,9 +29,15 @@ class ServiceDatabasePolicy
      */
     public function update(User $user, ServiceDatabase $serviceDatabase): bool
     {
+        return Gate::allows('update', $serviceDatabase->service);
+    }
 
-        // return Gate::allows('update', $serviceDatabase->service);
-        return true;
+    /**
+     * Determine whether the user can deploy or run lifecycle actions on the parent service stack.
+     */
+    public function deploy(User $user, ServiceDatabase $serviceDatabase): bool
+    {
+        return Gate::allows('deploy', $serviceDatabase->service);
     }
 
     /**
@@ -40,8 +45,7 @@ class ServiceDatabasePolicy
      */
     public function delete(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        // return Gate::allows('delete', $serviceDatabase->service);
-        return true;
+        return Gate::allows('delete', $serviceDatabase->service);
     }
 
     /**
@@ -49,8 +53,7 @@ class ServiceDatabasePolicy
      */
     public function restore(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        // return Gate::allows('update', $serviceDatabase->service);
-        return true;
+        return false;
     }
 
     /**
@@ -58,12 +61,22 @@ class ServiceDatabasePolicy
      */
     public function forceDelete(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        // return Gate::allows('delete', $serviceDatabase->service);
-        return true;
+        return false;
     }
 
+    /**
+     * Determine whether the user can manage database backups.
+     */
     public function manageBackups(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        return true;
+        return Gate::allows('update', $serviceDatabase->service);
+    }
+
+    /**
+     * Determine whether the user can upload a backup archive for this service database.
+     */
+    public function uploadBackup(User $user, ServiceDatabase $serviceDatabase): bool
+    {
+        return $user->can('uploadBackup', $serviceDatabase->service);
     }
 }

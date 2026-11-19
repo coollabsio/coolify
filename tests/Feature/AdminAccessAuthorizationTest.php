@@ -5,9 +5,14 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+});
 
 test('unauthenticated user cannot access admin route', function () {
     $response = $this->get('/admin');
@@ -32,7 +37,7 @@ test('root user can access admin page in cloud mode', function () {
 
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     $rootUser = User::factory()->create(['id' => 0]);
-    $rootTeam->members()->attach($rootUser->id, ['role' => 'admin']);
+    $rootTeam->members()->syncWithoutDetaching([$rootUser->id => ['role' => 'admin']]);
 
     $this->actingAs($rootUser);
     session(['currentTeam' => ['id' => $rootTeam->id]]);
@@ -47,7 +52,7 @@ test('root user gets 403 on admin page in self-hosted non-dev mode', function ()
 
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     $rootUser = User::factory()->create(['id' => 0]);
-    $rootTeam->members()->attach($rootUser->id, ['role' => 'admin']);
+    $rootTeam->members()->syncWithoutDetaching([$rootUser->id => ['role' => 'admin']]);
 
     $this->actingAs($rootUser);
     session(['currentTeam' => ['id' => $rootTeam->id]]);
@@ -71,7 +76,6 @@ test('submitSearch requires admin authorization', function () {
 test('switchUser requires root user id 0', function () {
     config()->set('constants.coolify.self_hosted', false);
 
-    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $rootUser = User::factory()->create(['id' => 0]);
     $rootTeam = Team::find(0);
 
@@ -91,7 +95,6 @@ test('switchUser requires root user id 0', function () {
 test('back() redirects impersonator to admin index and clears session', function () {
     config()->set('constants.coolify.self_hosted', false);
 
-    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $rootUser = User::factory()->create(['id' => 0]);
     $rootTeam = Team::find(0);
 
@@ -99,6 +102,7 @@ test('back() redirects impersonator to admin index and clears session', function
     session([
         'currentTeam' => ['id' => $rootTeam->id],
         'impersonating' => true,
+        'impersonator_id' => 0,
     ]);
 
     Livewire::test(AdminIndex::class)
@@ -106,12 +110,12 @@ test('back() redirects impersonator to admin index and clears session', function
         ->assertRedirect(route('admin.index'));
 
     expect(session('impersonating'))->toBeNull();
+    expect(session('impersonator_id'))->toBeNull();
 });
 
 test('switchUser ignores Referer header and uses dashboard route', function () {
     config()->set('constants.coolify.self_hosted', false);
 
-    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $rootUser = User::factory()->create(['id' => 0]);
     $rootTeam = Team::find(0);
 
@@ -135,7 +139,7 @@ test('switchUser rejects non-root user', function () {
     $user = User::factory()->create();
     $team->members()->attach($user->id, ['role' => 'admin']);
 
-    // Must set impersonating session to bypass mount() check
+    // A forged impersonating flag must not grant admin access.
     $this->actingAs($user);
     session([
         'currentTeam' => ['id' => $team->id],
@@ -143,7 +147,6 @@ test('switchUser rejects non-root user', function () {
     ]);
 
     Livewire::test(AdminIndex::class)
-        ->call('switchUser', 999)
         ->assertForbidden();
 });
 
@@ -156,4 +159,30 @@ test('admin route has auth middleware applied', function () {
     $middleware = $route->gatherMiddleware();
 
     expect($middleware)->toContain('auth');
+});
+
+test('root user sees the admin link in the navbar', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $rootUser = User::factory()->create(['id' => 0]);
+    $this->actingAs($rootUser);
+
+    $navbar = Blade::render('<x-navbar />');
+
+    expect($navbar)
+        ->toContain('href="'.route('admin.index').'"')
+        ->toContain('title="Admin"')
+        ->toContain('nav-admin')
+        ->not->toContain('text-pink-500');
+});
+
+test('non-root user does not see the admin link in the navbar', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $navbar = Blade::render('<x-navbar />');
+
+    expect($navbar)->not->toContain('href="'.route('admin.index').'"');
 });

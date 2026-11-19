@@ -3,13 +3,14 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class Configuration extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $currentRoute;
 
@@ -27,14 +28,15 @@ class Configuration extends Component
 
     public array $parameters;
 
-    public function getListeners()
+    public function getListeners(): array
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
             'refreshServices' => 'refreshServices',
             'refresh' => 'refreshServices',
+            'configurationChanged' => 'refreshServices',
+            ...$this->teamChannelListeners([
+                'ApplicationConfigurationChanged' => 'refreshServices',
+            ]),
         ];
     }
 
@@ -51,7 +53,7 @@ class Configuration extends Component
             $this->query = request()->query();
             $project = currentTeam()
                 ->projects()
-                ->select('id', 'uuid', 'team_id')
+                ->select('id', 'uuid', 'name', 'team_id')
                 ->where('uuid', request()->route('project_uuid'))
                 ->firstOrFail();
             $environment = $project->environments()
@@ -101,20 +103,6 @@ class Configuration extends Component
                 $database->restart();
                 $this->dispatch('success', 'Service database restarted successfully.');
             }
-        } catch (\Exception $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function serviceChecked()
-    {
-        try {
-            $this->service->applications->each(function ($application) {
-                $application->refresh();
-            });
-            $this->service->databases->each(function ($database) {
-                $database->refresh();
-            });
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

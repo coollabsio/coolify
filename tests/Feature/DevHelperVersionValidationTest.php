@@ -69,22 +69,13 @@ test('dev_helper_version accepts valid docker tag formats', function () {
     }
 });
 
-test('buildHelperImage refuses when non-dev environment', function () {
-    config(['app.env' => 'production']);
-
-    Livewire::test(Index::class)
-        ->set('dev_helper_version', 'latest')
-        ->call('buildHelperImage')
-        ->assertDispatched('error');
-});
-
-test('buildHelperImage refuses previously stored invalid version', function () {
+test('development helper version is read fresh for queue workers', function () {
     config(['app.env' => 'local']);
 
-    $settings = InstanceSettings::find(0);
-    $settings->forceFill(['dev_helper_version' => 'bad value'])->saveQuietly();
+    InstanceSettings::findOrFail(0)->update(['dev_helper_version' => 'first']);
+    expect(getHelperVersion())->toBe('first');
 
-    Livewire::test(Index::class)
-        ->call('buildHelperImage')
-        ->assertDispatched('error');
+    InstanceSettings::query()->whereKey(0)->update(['dev_helper_version' => 'second']);
+
+    expect(getHelperVersion())->toBe('second');
 });

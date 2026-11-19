@@ -64,3 +64,35 @@ describe('BitbucketDataCenterWebhookVariant', function () {
         expect($context->repositoryIdentifiers)->toContain('~harrison/fx-data-agents-benchmark-output');
     });
 });
+
+describe('BitbucketDataCenterWebhookVariant pull requests', function () {
+    test('parses a fork pull request with its source and target repositories', function () {
+        $request = Request::create('/webhooks/source/bitbucket/events/manual', 'POST', [
+            'eventKey' => 'pr:opened',
+            'pullRequest' => [
+                'id' => 12,
+                'title' => 'Add feature',
+                'fromRef' => [
+                    'displayId' => 'feature',
+                    'latestCommit' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
+                    'repository' => ['id' => 2, 'slug' => 'repo', 'project' => ['key' => '~FORKER']],
+                ],
+                'toRef' => [
+                    'displayId' => 'main',
+                    'repository' => ['id' => 1, 'slug' => 'repo', 'project' => ['key' => 'PROJ']],
+                ],
+                'links' => ['self' => [['href' => 'https://bitbucket.example.com/projects/PROJ/repos/repo/pull-requests/12']]],
+            ],
+        ]);
+
+        $context = (new BitbucketDataCenterWebhookVariant)->parse($request);
+
+        expect($context->action)->toBe('preview_deploy')
+            ->and($context->branch)->toBe('main')
+            ->and($context->pullRequestId)->toBe(12)
+            ->and($context->repositoryIdentifiers)->toContain('PROJ/repo')
+            ->and($context->sourceRepository)->toBe(2)
+            ->and($context->targetRepository)->toBe(1)
+            ->and($context->webhookRepository)->toBe(1);
+    });
+});

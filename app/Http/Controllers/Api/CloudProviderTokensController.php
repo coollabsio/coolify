@@ -16,8 +16,13 @@ class CloudProviderTokensController extends Controller
     {
         $token->makeHidden([
             'id',
-            'token',
         ]);
+
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $token->makeVisible([
+                'token',
+            ]);
+        }
 
         return serializeApiResponse($token);
     }
@@ -37,6 +42,13 @@ class CloudProviderTokensController extends Controller
                 'digitalocean' => Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.digitalocean.com/v2/account'),
+                'vultr' => Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.vultr.com/v2/account'),
+                'hostinger' => Http::withToken($token)
+                    ->acceptJson()
+                    ->timeout(10)
+                    ->get('https://developers.hostinger.com/api/vps/v1/virtual-machines'),
                 default => null,
             };
 
@@ -82,7 +94,7 @@ class CloudProviderTokensController extends Controller
                                 properties: [
                                     'uuid' => ['type' => 'string'],
                                     'name' => ['type' => 'string'],
-                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean']],
+                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'vultr', 'hostinger']],
                                     'team_id' => ['type' => 'integer'],
                                     'servers_count' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -97,6 +109,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -107,6 +123,9 @@ class CloudProviderTokensController extends Controller
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
+        }
+        if (! $request->user()?->isAdminOfTeam((int) $teamId)) {
+            return response()->json(['message' => 'This action is unauthorized.'], 403);
         }
 
         $tokens = CloudProviderToken::whereTeamId($teamId)
@@ -157,6 +176,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -177,6 +200,7 @@ class CloudProviderTokensController extends Controller
         if (is_null($token)) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $token);
 
         return response()->json($this->removeSensitiveData($token));
     }
@@ -199,7 +223,7 @@ class CloudProviderTokensController extends Controller
                     type: 'object',
                     required: ['provider', 'token', 'name'],
                     properties: [
-                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
+                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'vultr', 'hostinger'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
                         'token' => ['type' => 'string', 'example' => 'your-api-token-here', 'description' => 'The API token for the cloud provider.'],
                         'name' => ['type' => 'string', 'example' => 'My Hetzner Token', 'description' => 'A friendly name for the token.'],
                     ],
@@ -226,6 +250,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -243,6 +271,7 @@ class CloudProviderTokensController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [CloudProviderToken::class]);
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -253,7 +282,7 @@ class CloudProviderTokensController extends Controller
         $body = $request->json()->all();
 
         $validator = customApiValidator($body, [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,vultr,hostinger',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ]);
@@ -344,6 +373,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -394,6 +427,7 @@ class CloudProviderTokensController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('update', $token);
 
         $token->update(array_intersect_key($body, array_flip($allowedFields)));
 
@@ -450,6 +484,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
             ),
@@ -475,6 +513,7 @@ class CloudProviderTokensController extends Controller
         if (! $token) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('delete', $token);
 
         if ($token->hasServers()) {
             return response()->json(['message' => 'Cannot delete token that is used by servers.'], 400);
@@ -528,6 +567,10 @@ class CloudProviderTokensController extends Controller
                 ref: '#/components/responses/401',
             ),
             new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can manage cloud provider tokens.',
+            ),
+            new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
             ),
@@ -545,8 +588,17 @@ class CloudProviderTokensController extends Controller
         if (! $cloudToken) {
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
+        $this->authorize('view', $cloudToken);
 
         $validation = $this->validateProviderToken($cloudToken->provider, $cloudToken->token);
+
+        auditLog('api.cloud_token.validated', [
+            'team_id' => $teamId,
+            'cloud_token_uuid' => $cloudToken->uuid,
+            'cloud_token_name' => $cloudToken->name,
+            'provider' => $cloudToken->provider,
+            'valid' => $validation['valid'],
+        ]);
 
         return response()->json([
             'valid' => $validation['valid'],

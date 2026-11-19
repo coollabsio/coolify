@@ -1,0 +1,198 @@
+<?php
+
+namespace App\Actions\Shared;
+
+use App\Models\Server;
+use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\Dns\DnsResolver;
+use App\Support\DnsRecordHints;
+use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Url\Url;
+
+class CheckDomainDns
+{
+    use AsAction;
+
+    /**
+     * @param  array<string, string>  $entries
+     * @return array<string, array{status: string, message: string, expected_ip: ?string, checked_at: string}>
+     */
+    public function handle(
+        array $entries,
+        ?Server $server,
+        ?string $expectedIp,
+        bool $skipForMultipleServers = false,
+        int $timeoutSeconds = 5,
+    ): array {
+        if (! data_get(instanceSettings(), 'is_dns_validation_enabled')) {
+            return $this->sameResultForAll($entries, 'skipped', 'DNS validation is disabled in instance settings.', $expectedIp);
+        }
+
+        if (! $server) {
+            return $this->sameResultForAll($entries, 'skipped', 'No server available for DNS validation.', null);
+        }
+
+        if ($skipForMultipleServers) {
+            return $this->sameResultForAll($entries, 'skipped', 'DNS check skipped for multi-server applications.', $expectedIp);
+        }
+
+        $deadline = hrtime(true) + ($timeoutSeconds * 1_000_000_000);
+        $dnsServers = str(data_get(instanceSettings(), 'custom_dns_servers'))
+            ->explode(',')
+            ->map(fn ($dnsServer) => trim((string) $dnsServer))
+            ->filter()
+            ->values();
+        $results = [];
+
+        foreach ($entries as $key => $url) {
+            $results[$key] = $this->check($url, $server, $expectedIp, $dnsServers->all(), $deadline);
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param  array<int, string>  $dnsServers
+     * @return array{status: string, message: string, expected_ip: ?string, checked_at: string}
+     */
+    private function check(string $url, Server $server, ?string $expectedIp, array $dnsServers, int $deadline): array
+    {
+        try {
+            $host = Url::fromString($url)->getHost();
+        } catch (\Throwable) {
+            return $this->result('failed', 'Could not validate DNS for this domain.', $expectedIp);
+        }
+        if (str($host)->contains('sslip.io')) {
+            return $this->result('ok', 'DNS looks correct.', $expectedIp);
+        }
+
+        $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DnsResolver::TYPE_AAAA : DnsResolver::TYPE_A;
+        $receivedAddressRecord = false;
+
+        foreach ($dnsServers as $dnsServer) {
+            $remainingNanoseconds = $deadline - hrtime(true);
+            if ($remainingNanoseconds < 1_000_000_000) {
+                return $this->result('failed', 'Could not validate DNS for this domain.', $expectedIp);
+            }
+
+            try {
+                $records = queryDnsServer($dnsServer, $host, $type, min(5, (int) floor($remainingNanoseconds / 1_000_000_000)));
+
+                if ($records === false) {
+                    continue;
+                }
+
+                $addresses = [];
+                foreach ($records as $record) {
+                    if ($record->getType() === $type) {
+                        $addresses[] = $record->getData();
+                    }
+                }
+                if ($addresses === []) {
+                    continue;
+                }
+
+                $receivedAddressRecord = true;
+                $result = $this->resultForAddresses($addresses, $host, $server, $expectedIp, $deadline);
+                if ($result !== null) {
+                    return $result;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        if (! $receivedAddressRecord && hrtime(true) < $deadline) {
+            $result = $this->resultForAddresses($this->resolveWithSystemDns($host, $type), $host, $server, $expectedIp, $deadline);
+            if ($result !== null) {
+                return $result;
+            }
+        }
+
+        return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+    }
+
+    /**
+     * The result for the addresses that DNS returned for the host, or null when none of them matches.
+     * A Cloudflare IP matches unless the Cloudflare records of the team's zone send the host to another server.
+     *
+     * @param  array<int, string>  $addresses
+     * @return array{status: string, message: string, expected_ip: ?string, checked_at: string}|null
+     */
+    private function resultForAddresses(array $addresses, string $host, Server $server, ?string $expectedIp, int $deadline): ?array
+    {
+        $matches = collect($addresses)->contains(fn (string $address): bool => $expectedIp && DnsRecordHints::sameAddress($address, $expectedIp));
+        if (! $matches && collect($addresses)->contains(fn (string $address): bool => isCloudflareIp($address))) {
+            $timeoutSeconds = max(1, intdiv($deadline - hrtime(true), 1_000_000_000));
+            if (app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $expectedIp, $timeoutSeconds)) {
+                return $this->result('failed', "Cloudflare sends {$host} to another server. ".dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+            }
+            $matches = true;
+        }
+
+        return $matches ? $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp) : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveWithSystemDns(string $host, string $type): array
+    {
+        $recordType = $type === DnsResolver::TYPE_AAAA ? DNS_AAAA : DNS_A;
+        $addressKey = $type === DnsResolver::TYPE_AAAA ? 'ipv6' : 'ip';
+
+        try {
+            $records = @dns_get_record($host, $recordType);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        if (! is_array($records)) {
+            return [];
+        }
+
+        return collect($records)
+            ->pluck($addressKey)
+            ->filter(fn ($address) => is_string($address) && filter_var($address, FILTER_VALIDATE_IP) !== false)
+            ->values()
+            ->all();
+    }
+
+    private function successMessage(Server $server, ?string $expectedIp): string
+    {
+        if (
+            filled($expectedIp)
+            && filled($server->ip)
+            && $server->ip !== $expectedIp
+            && filter_var($server->ip, FILTER_VALIDATE_IP) === false
+        ) {
+            return "DNS points to {$expectedIp} ({$server->ip}) (or Cloudflare).";
+        }
+
+        return $expectedIp ? "DNS points to {$expectedIp} (or Cloudflare)." : 'DNS looks correct.';
+    }
+
+    /**
+     * @return array{status: string, message: string, expected_ip: ?string, checked_at: string}
+     */
+    private function result(string $status, string $message, ?string $expectedIp): array
+    {
+        return [
+            'status' => $status,
+            'message' => $message,
+            'expected_ip' => $expectedIp,
+            'checked_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $entries
+     * @return array<string, array{status: string, message: string, expected_ip: ?string, checked_at: string}>
+     */
+    private function sameResultForAll(array $entries, string $status, string $message, ?string $expectedIp): array
+    {
+        $result = $this->result($status, $message, $expectedIp);
+
+        return array_fill_keys(array_keys($entries), $result);
+    }
+}

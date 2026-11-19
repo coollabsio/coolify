@@ -6,32 +6,40 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class ConfigurationChecker extends Component
 {
+    use ListensToTeamChannel;
+
     public bool $isConfigurationChanged = false;
 
     public array $configurationDiff = [];
 
-    public array $groupedConfigurationChanges = [];
+    public int $missingRequiredEnvironmentVariableCount = 0;
 
-    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
+    public array $missingRequiredEnvironmentVariableNames = [];
+
+    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource;
 
     public function getListeners(): array
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'configurationChanged',
             'configurationChanged' => 'configurationChanged',
+            'envsUpdated' => 'configurationChanged',
+            ...$this->teamChannelListeners([
+                'ApplicationConfigurationChanged' => 'configurationChanged',
+            ]),
         ];
     }
 
@@ -45,26 +53,71 @@ class ConfigurationChecker extends Component
         return view('livewire.project.shared.configuration-checker');
     }
 
-    public function refreshConfigurationChanges(): void
+    /**
+     * Members must never see environment variable values, Compose content, commands, or configuration, so redact
+     * those changes before they are serialized to the browser.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     * @return array<int, array<string, mixed>>
+     */
+    private function redactHiddenChanges(array $changes, bool $redact): array
     {
-        $this->configurationChanged();
+        if (! $redact) {
+            return $changes;
+        }
+
+        return collect($changes)
+            ->map(function (array $change): array {
+                $key = str((string) data_get($change, 'key'))->afterLast('.')->value();
+                $isHidden = data_get($change, 'section') === 'environment'
+                    || in_array($key, [...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES, 'docker_compose_raw', 'dockerfile', 'custom_labels'], true);
+                if (! $isHidden) {
+                    return $change;
+                }
+
+                $change['old_display_value'] = data_get($change, 'old_display_value') === '-' ? '-' : '••••••••';
+                $change['new_display_value'] = data_get($change, 'new_display_value') === '-' ? '-' : '••••••••';
+                $change['old_full_value'] = null;
+                $change['new_full_value'] = null;
+                $change['expandable'] = false;
+                $change['display_summary'] = data_get($change, 'type') === 'changed' ? 'Changed' : null;
+
+                return $change;
+            })
+            ->all();
     }
 
     public function configurationChanged(): void
     {
+        $this->loadConfigurationState();
+    }
+
+    private function loadConfigurationState(): void
+    {
         $this->resource->refresh();
+
+        if ($this->resource instanceof Service) {
+            $missingVariables = $this->resource->missingRequiredEnvironmentVariables();
+            $this->missingRequiredEnvironmentVariableCount = $missingVariables->count();
+            $this->missingRequiredEnvironmentVariableNames = $missingVariables->pluck('key')->all();
+        }
 
         if ($this->resource instanceof Application) {
             $diff = $this->resource->pendingDeploymentConfigurationDiff();
             $this->isConfigurationChanged = $diff->isChanged();
-            $this->configurationDiff = $diff->toArray();
-            $this->groupedConfigurationChanges = $diff->groupedChanges();
+
+            $array = $diff->toArray();
+
+            // Fail closed: only owners/admins may see unlocked env values.
+            $teamId = $this->resource->team()?->id;
+            $redactEnvironment = is_null($teamId) || ! (bool) auth()->user()?->isAdminOfTeam($teamId);
+            $array['changes'] = $this->redactHiddenChanges($array['changes'] ?? [], $redactEnvironment);
+            $this->configurationDiff = $array;
 
             return;
         }
 
         $this->isConfigurationChanged = $this->resource->isConfigurationChanged();
         $this->configurationDiff = [];
-        $this->groupedConfigurationChanges = [];
     }
 }

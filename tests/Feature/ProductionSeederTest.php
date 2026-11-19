@@ -1,68 +1,35 @@
 <?php
 
-use App\Actions\Fortify\CreateNewUser;
-use App\Actions\Proxy\StartProxy;
+use App\Jobs\CoolifyTask;
+use App\Models\PrivateKey;
 use App\Models\Server;
-use App\Models\SharedEnvironmentVariable;
-use App\Models\SslCertificate;
-use App\Models\Team;
+use App\Models\User;
 use Database\Seeders\ProductionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
-it('creates the root team before seeding the localhost server and predefined shared variables', function () {
-    config([
-        'broadcasting.default' => 'log',
-        'constants.coolify.is_windows_docker_desktop' => true,
+it('does not contact every server on start to write the CA certificate', function () {
+    DB::table('instance_settings')->insert(['id' => 0]);
+    $user = User::factory()->create();
+    $team = $user->teams()->first();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
     ]);
+
+    config()->set('constants.coolify.self_hosted', false);
+    Process::fake();
     Queue::fake();
-    StartProxy::shouldRun()->andReturn('OK');
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
 
-    Server::creating(function (Server $server) {
-        if ((int) $server->getKey() === 0) {
-            expect(Team::find(0))->not->toBeNull();
-        }
-    });
+    app(ProductionSeeder::class)->run();
 
-    Server::created(function (Server $server) {
-        SslCertificate::create([
-            'server_id' => $server->id,
-            'common_name' => 'Coolify CA Certificate',
-            'ssl_certificate' => 'certificate',
-            'ssl_private_key' => 'private-key',
-            'valid_until' => now()->addYear(),
-            'is_ca_certificate' => true,
-        ]);
-    });
-
-    $this->seed(ProductionSeeder::class);
-
-    $rootTeam = Team::find(0);
-    $localhostServer = Server::find(0);
-
-    expect($rootTeam)->not->toBeNull()
-        ->and($localhostServer)->not->toBeNull()
-        ->and($localhostServer->team_id)->toBe(0);
-
-    expect(SharedEnvironmentVariable::query()
-        ->where('type', 'server')
-        ->where('server_id', 0)
-        ->where('team_id', 0)
-        ->pluck('key')
-        ->all()
-    )->toContain('COOLIFY_SERVER_UUID', 'COOLIFY_SERVER_NAME');
-
-    instanceSettings()->update(['is_registration_enabled' => true]);
-
-    $rootUser = app(CreateNewUser::class)->create([
-        'name' => 'Root User',
-        'email' => 'root@example.com',
-        'password' => 'Password123!',
-        'password_confirmation' => 'Password123!',
-    ]);
-
-    expect(Team::whereKey(0)->count())->toBe(1)
-        ->and($rootUser->teams()->where('team_id', 0)->exists())->toBeTrue();
+    expect($server->sslCertificates()->where('is_ca_certificate', true)->exists())->toBeFalse();
+    Queue::assertNotPushed(CoolifyTask::class);
 });

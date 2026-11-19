@@ -3,12 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
 
 class OtherController extends Controller
 {
+    public function post_required(): JsonResponse
+    {
+        return response()
+            ->json(['message' => 'This endpoint has changed to a POST request.'], 405)
+            ->header('Allow', 'POST');
+    }
+
     #[OA\Get(
         summary: 'Version',
         description: 'Get Coolify version.',
@@ -41,63 +50,7 @@ class OtherController extends Controller
         return response(config('constants.coolify.version'));
     }
 
-    #[OA\Get(
-        summary: 'Enable API',
-        description: 'Enable API (only with root permissions).',
-        path: '/enable',
-        operationId: 'enable-api',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Enable API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'API enabled.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 403,
-                description: 'You are not allowed to enable the API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the API.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function enable_api(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            auditLog('api.instance.enable_denied', ['team_id' => $teamId], 'warning');
-
-            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
-        }
-        $settings = instanceSettings();
-        $settings->update(['is_api_enabled' => true]);
-
-        auditLog('api.instance.enabled', ['team_id' => $teamId]);
-
-        return response()->json(['message' => 'API enabled.'], 200);
-    }
-
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Disable API',
         description: 'Disable API (only with root permissions).',
         path: '/disable',
@@ -140,7 +93,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
@@ -196,7 +149,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.enable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to enable the MCP server.'], 403);
@@ -252,7 +205,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the MCP server.'], 403);
@@ -273,10 +226,17 @@ class OtherController extends Controller
 
         $webhook_url = config('constants.webhooks.feedback_discord_webhook');
         if ($webhook_url) {
-            Http::timeout(5)->post($webhook_url, [
-                'content' => $data['content'],
-                'allowed_mentions' => ['parse' => []],
-            ]);
+            try {
+                $response = Http::timeout(5)->post($webhook_url, [
+                    'content' => $data['content'],
+                    'allowed_mentions' => ['parse' => []],
+                ]);
+            } catch (ConnectionException) {
+                $response = null;
+            }
+            if (! $response?->successful()) {
+                return response()->json(['message' => 'Feedback could not be delivered.'], 502);
+            }
         }
 
         return response()->json(['message' => 'Feedback sent.'], 200);
@@ -308,6 +268,6 @@ class OtherController extends Controller
     )]
     public function healthcheck(Request $request)
     {
-        return 'OK';
+        return response('OK');
     }
 }

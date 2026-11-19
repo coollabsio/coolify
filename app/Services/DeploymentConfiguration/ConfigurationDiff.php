@@ -2,8 +2,6 @@
 
 namespace App\Services\DeploymentConfiguration;
 
-use Illuminate\Support\Collection;
-
 class ConfigurationDiff
 {
     /**
@@ -19,25 +17,13 @@ class ConfigurationDiff
         return new self;
     }
 
-    public static function legacy(bool $changed): self
+    /**
+     * The last deployment stored no configuration snapshot (it ran before v4.1), so the
+     * deployed configuration is unknown. Report no changes, but build on the next deployment.
+     */
+    public static function legacy(): self
     {
-        if (! $changed) {
-            return self::unchanged();
-        }
-
-        return new self([
-            [
-                'key' => 'legacy.configuration',
-                'section' => 'configuration',
-                'section_label' => 'Configuration',
-                'label' => 'Configuration',
-                'type' => 'changed',
-                'impact' => 'build',
-                'sensitive' => false,
-                'old_display_value' => 'Previously deployed configuration',
-                'new_display_value' => 'Current configuration',
-            ],
-        ], true);
+        return new self(legacyFallback: true);
     }
 
     /**
@@ -65,7 +51,7 @@ class ConfigurationDiff
 
     public function requiresBuild(): bool
     {
-        return collect($this->changes)->contains(fn (array $change): bool => $change['impact'] === 'build');
+        return $this->legacyFallback || collect($this->changes)->contains(fn (array $change): bool => $change['impact'] === 'build');
     }
 
     public function requiresRedeploy(): bool
@@ -79,20 +65,6 @@ class ConfigurationDiff
     public function changes(): array
     {
         return $this->changes;
-    }
-
-    /**
-     * @return array<string, array{label: string, changes: array<int, array<string, mixed>>}>
-     */
-    public function groupedChanges(): array
-    {
-        return collect($this->changes)
-            ->groupBy('section')
-            ->map(fn (Collection $changes): array => [
-                'label' => (string) data_get($changes->first(), 'section_label', str((string) $changes->keys()->first())->headline()),
-                'changes' => $changes->values()->all(),
-            ])
-            ->all();
     }
 
     /**

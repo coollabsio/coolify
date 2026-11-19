@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
 describe('GitHub Manual Webhook', function () {
     test('ping event returns pong', function () {
         $response = $this->postJson('/webhooks/source/github/events/manual', [], [

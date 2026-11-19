@@ -14,7 +14,7 @@ class BitbucketRepositoryIdentifiers
         $identifiers = collect();
 
         $fullName = data_get($payload, 'repository.full_name');
-        if (filled($fullName)) {
+        if (is_string($fullName) && $fullName !== '') {
             $identifiers->push($fullName);
         }
 
@@ -31,16 +31,12 @@ class BitbucketRepositoryIdentifiers
         $projectKey = data_get($repository, 'project.key');
         $slug = data_get($repository, 'slug');
 
-        if (filled($projectKey) && filled($slug)) {
+        if (is_string($projectKey) && $projectKey !== '' && is_string($slug) && $slug !== '') {
             $identifiers->push("{$projectKey}/{$slug}");
-            $identifiers->push(strtolower((string) $projectKey).'/'.$slug);
         }
 
-        if (filled($slug)) {
-            $identifiers->push($slug);
-        }
-
-        foreach (data_get($repository, 'links.clone', []) as $clone) {
+        $clones = data_get($repository, 'links.clone');
+        foreach (is_array($clones) ? $clones : [] as $clone) {
             $href = data_get($clone, 'href');
             if (! is_string($href) || $href === '') {
                 continue;
@@ -60,7 +56,6 @@ class BitbucketRepositoryIdentifiers
             if (count($segments) >= 2) {
                 $identifiers->push(implode('/', array_slice($segments, -2)));
             }
-            $identifiers->push(end($segments));
         }
 
         return $identifiers->unique()->filter()->values()->all();

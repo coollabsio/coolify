@@ -47,10 +47,19 @@ class ForcePasswordReset extends Component
         try {
             $this->rateLimit(10);
             $this->validate();
-            auth()->user()->fill([
+            $user = auth()->user();
+            // Changing the password invalidates the session, which clears the current team.
+            $teamId = $user->currentTeam()?->id;
+            $user->fill([
                 'password' => Hash::make($this->password),
                 'force_password_reset' => false,
             ])->save();
+            auditLog('ui.user.password_changed', [
+                'team_id' => $teamId,
+                'resource' => 'user',
+                'user_name' => $user->name,
+                'reason' => 'forced_reset',
+            ]);
 
             return redirect()->route('dashboard');
         } catch (\Throwable $e) {

@@ -70,7 +70,7 @@ class DeleteUserResources
 
         return [
             'applications' => $applications->unique('id'),
-            'databases' => $databases->unique('id'),
+            'databases' => $databases->unique(fn ($database) => $database::class.':'.$database->id),
             'services' => $services->unique('id'),
         ];
     }

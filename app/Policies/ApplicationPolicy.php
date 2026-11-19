@@ -2,7 +2,9 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
@@ -13,10 +15,6 @@ class ApplicationPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
         return true;
     }
 
@@ -25,27 +23,15 @@ class ApplicationPolicy
      */
     public function view(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
-        return true;
+        return $user->canAccess(AccessLevel::Read, $application);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        return false;
-        */
-        return true;
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
@@ -53,15 +39,11 @@ class ApplicationPolicy
      */
     public function update(User $user, Application $application): Response
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
+        if ($user->canAccess(AccessLevel::Write, $application)) {
             return Response::allow();
         }
 
-        return Response::deny('As a member, you cannot update this application.<br/><br/>You need at least admin or owner permissions.');
-        */
-        return Response::allow();
+        return Response::deny('You need at least admin or owner permissions to update this application.');
     }
 
     /**
@@ -69,15 +51,7 @@ class ApplicationPolicy
      */
     public function delete(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        return false;
-        */
-        return true;
+        return $user->canAccess(AccessLevel::Delete, $application);
     }
 
     /**
@@ -85,11 +59,7 @@ class ApplicationPolicy
      */
     public function restore(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return true;
-        */
-        return true;
+        return false;
     }
 
     /**
@@ -97,35 +67,35 @@ class ApplicationPolicy
      */
     public function forceDelete(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        return false;
     }
 
     /**
-     * Determine whether the user can deploy the application.
+     * Determine whether the user can upload a backup archive for this application.
+     */
+    public function uploadBackup(User $user, Application $application): Response
+    {
+        if ($user->canAccess(AccessLevel::Write, $application)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need at least admin or owner permissions to upload backups for this application.');
+    }
+
+    /**
+     * Determine whether the user can deploy, restart, or stop the application.
      */
     public function deploy(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        return $user->canAccess(AccessLevel::Deploy, $application);
     }
 
     /**
-     * Determine whether the user can manage deployments.
+     * Determine whether the user can read secret values, such as environment variable values.
      */
-    public function manageDeployments(User $user, Application $application): bool
+    public function viewSensitive(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
+        return $user->canAccess(AccessLevel::ReadSensitive, $application);
     }
 
     /**
@@ -133,22 +103,6 @@ class ApplicationPolicy
      */
     public function manageEnvironment(User $user, Application $application): bool
     {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
-        */
-        return true;
-    }
-
-    /**
-     * Determine whether the user can cleanup deployment queue.
-     */
-    public function cleanupDeploymentQueue(User $user): bool
-    {
-        // Authorization temporarily disabled
-        /*
-        return $user->isAdmin();
-        */
-        return true;
+        return $user->canAccess(AccessLevel::Write, $application);
     }
 }

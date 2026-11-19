@@ -19,7 +19,7 @@ class StopApplicationOneServer
             return 'Server is not functional';
         }
         try {
-            $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            $containers = getCurrentApplicationContainerStatus($server, $application, 0);
             $timeout = $application->settings->stopGracePeriodSeconds();
 
             if ($containers->count() > 0) {
@@ -28,8 +28,8 @@ class StopApplicationOneServer
                     if ($containerName) {
                         instant_remote_process(
                             [
-                                "docker stop --time=$timeout $containerName",
-                                "docker rm -f $containerName",
+                                dockerStopCommand($timeout, escapeshellarg($containerName), $server),
+                                dockerRemoveCommand($containerName),
                             ],
                             $server
                         );

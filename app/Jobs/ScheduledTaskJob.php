@@ -5,13 +5,17 @@ namespace App\Jobs;
 use App\Events\ScheduledTaskDone;
 use App\Exceptions\NonReportableException;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
+use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
+use App\Services\ScheduledJobDeliveryService;
+use App\Services\Security\SensitiveDataRedactor;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -24,6 +28,13 @@ use Illuminate\Support\Facades\Log;
 class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
+
+    /**
+     * Lets a task that runs too long fail inside handle() before the worker times out.
+     */
+    public const WORKER_TIMEOUT_MARGIN_SECONDS = 120;
 
     /**
      * The number of times the job may be attempted.
@@ -38,7 +49,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The number of seconds the job can run before timing out.
      */
-    public $timeout = 300;
+    public $timeout = 300 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?Team $team = null;
 
@@ -51,24 +62,39 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     public ?ScheduledTaskExecution $task_log = null;
 
     /**
-     * Store execution ID to survive job serialization for timeout handling.
+     * Queued with the payload, so failed() finds this run's execution after a worker timeout.
      */
-    protected ?int $executionId = null;
+    public ?string $executionUuid = null;
 
     public string $task_status = 'failed';
 
     public ?string $task_output = null;
 
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
+    private ?array $logRedactionSecrets = null;
+
     public array $containers = [];
 
     public string $server_timezone = 'UTC';
 
-    public function __construct(ScheduledTask $task)
+    public function __construct(ScheduledTask $task, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
 
         $this->task = $task;
-        $this->timeout = $this->task->timeout ?? 300;
+        $this->timeout = ($this->task->timeout ?? 300) + self::WORKER_TIMEOUT_MARGIN_SECONDS;
+        $this->executionUuid = new_public_id();
+    }
+
+    /**
+     * The lock outlives the worker timeout, so a run killed at the timeout still blocks a new run
+     * while its remote command can still be running.
+     */
+    public function middleware(): array
+    {
+        $expireAfter = ($this->task->timeout ?? 300) + 300;
+
+        return [ScheduledJobDeliveryService::withoutOverlapping('scheduled-task-'.$this->task->id, $this->occurrenceUuid)->expireAfter($expireAfter)->dontRelease()];
     }
 
     private function initializeExecutionContext(): void
@@ -104,27 +130,43 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        // maxExceptions = 1 fails the job on its first error, so a second attempt only happens
+        // when Redis hands the job out again after its worker was killed (retry_after, about a
+        // day later). The command may have run already, so it is not run again late.
+        if ($this->attempts() > 1) {
+            $this->fail(new \RuntimeException('The worker stopped while this task was running. The task is not run again late.'));
+
+            return;
+        }
+
+        if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
         $startTime = Carbon::now();
+        $failed = false;
 
         try {
             $this->initializeExecutionContext();
 
-            $this->task_log = ScheduledTaskExecution::create([
+            // A retried job reuses the queued payload and its execution uuid.
+            if ($this->executionUuid === null || ScheduledTaskExecution::query()->where('uuid', $this->executionUuid)->exists()) {
+                $this->executionUuid = new_public_id();
+            }
+            $this->task_log = ScheduledTaskExecution::forceCreate([
+                'uuid' => $this->executionUuid,
                 'scheduled_task_id' => $this->task->id,
                 'started_at' => $startTime,
                 'retry_count' => $this->attempts() - 1,
             ]);
 
-            // Store execution ID for timeout handling
-            $this->executionId = $this->task_log->id;
-
             if ($this->resource->type() === 'application') {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
-                if ($containers->count() > 0) {
-                    $containers->each(function ($container) {
+                // `docker ps -a` also lists stopped containers, for example the old container of a rolling update.
+                getCurrentApplicationContainerStatus($this->server, $this->resource, 0)
+                    ->filter(fn ($container) => data_get($container, 'State') === 'running')
+                    ->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);
                     });
-                }
             } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
@@ -137,8 +179,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 });
             }
+            // A stopped resource is not a task failure: it sends no notification and does not count toward auto-disable.
             if (count($this->containers) == 0) {
-                throw new \Exception('ScheduledTaskJob failed: No containers running.');
+                $this->task_log->update([
+                    'status' => 'skipped',
+                    'message' => 'Skipped: the resource has no running container.',
+                ]);
+
+                return;
             }
 
             if (count($this->containers) > 1 && empty($this->task->container)) {
@@ -146,18 +194,28 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
-                    $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $exec = "docker exec {$containerName} {$cmd}";
+                if (count($this->containers) == 1 || $containerName === $this->task->container || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                    $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
+                    $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName).' '.$this->task->containerCommand();
+                    $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $this->task_output = $this->redact(instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->task->timeout ?? 300, disableMultiplexing: true) ?? '');
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
                     ]);
 
                     $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
+                    if ($this->task->recordSuccess()) {
+                        $this->team?->notify(new ScheduledJobRecovered(
+                            failureEvent: 'scheduled_task_failure',
+                            title: "Scheduled task ({$this->task->name}) works again.",
+                            webhookEvent: 'task_recovered',
+                            url: $this->task->url(),
+                            webhookData: ['task_name' => $this->task->name, 'task_uuid' => $this->task->uuid],
+                        ));
+                    }
 
                     return;
                 }
@@ -166,10 +224,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // No valid container was found.
             throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
         } catch (\Throwable $e) {
+            $failed = true;
+            $safeErrorMessage = $this->redact($e->getMessage());
             if ($this->task_log) {
                 $this->task_log->update([
                     'status' => 'failed',
-                    'message' => $this->task_output ?? $e->getMessage(),
+                    'message' => $this->task_output ?? $safeErrorMessage,
                 ]);
             }
 
@@ -180,14 +240,18 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 'task_name' => $this->task->name,
                 'server' => $this->server?->name ?? 'unknown',
                 'attempt' => $this->attempts(),
-                'error' => $e->getMessage(),
+                'error' => $safeErrorMessage,
             ]);
 
             // Only notify and throw on final failure
 
             // Re-throw to trigger Laravel's retry mechanism with backoff
-            throw $e;
+            throw $this->redactedException($e, $safeErrorMessage);
         } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
             if ($this->team) {
                 ScheduledTaskDone::dispatch($this->team->id);
             }
@@ -204,6 +268,40 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function boundedTaskCommand(string $command): string
+    {
+        $maxOutputBytes = self::MAX_OUTPUT_SIZE_BYTES;
+        $readLimit = $maxOutputBytes + 1;
+
+        return "output_file=\$(mktemp); trap 'rm -f \"\$output_file\"' EXIT; set +e; set -o pipefail; {$command} 2>&1 | { head -c {$readLimit} > \"\$output_file\"; cat > /dev/null; }; exit_code=\${PIPESTATUS[0]}; if [ \"\$(wc -c < \"\$output_file\")\" -gt {$maxOutputBytes} ]; then truncate -s {$maxOutputBytes} \"\$output_file\"; printf '\n\n[... Output truncated at 5MB limit ...]' >> \"\$output_file\"; fi; if [ \"\$exit_code\" -eq 0 ]; then cat \"\$output_file\"; else cat \"\$output_file\" >&2; fi; exit \$exit_code";
+    }
+
+    private function redact(string $value): string
+    {
+        try {
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor($this->resource);
+        } catch (\Throwable) {
+            return REDACTED;
+        }
+
+        return resolve(SensitiveDataRedactor::class)->redactText($value, $this->logRedactionSecrets['known'], $this->logRedactionSecrets['locked']);
+    }
+
+    /**
+     * Keep the original exception when redaction did not change its message.
+     * Otherwise, drop the original (and its trace) so the secret is not stored in failed_jobs.
+     */
+    private function redactedException(\Throwable $exception, string $safeMessage): \Throwable
+    {
+        if ($safeMessage === $exception->getMessage()) {
+            return $exception;
+        }
+
+        return $exception instanceof NonReportableException
+            ? new NonReportableException($safeMessage, (int) $exception->getCode())
+            : new \RuntimeException($safeMessage, (int) $exception->getCode());
+    }
+
     /**
      * Calculate the number of seconds to wait before retrying the job.
      */
@@ -217,7 +315,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function failed(?\Throwable $exception): void
     {
+        if ($this->occurrenceUuid) {
+            app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
         $this->team ??= Team::find($this->task->team_id);
+        $this->resource ??= $this->task->application ?? $this->task->service;
+        $safeErrorMessage = $this->redact($exception?->getMessage() ?? 'Unknown error');
+        $safeTrace = $this->redact($exception?->getTraceAsString() ?? '');
 
         Log::channel('scheduled-errors')->error('ScheduledTask permanently failed', [
             'job' => 'ScheduledTaskJob',
@@ -225,53 +330,45 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             'task_name' => $this->task->name,
             'server' => $this->server?->name ?? 'unknown',
             'total_attempts' => $this->attempts(),
-            'error' => $exception?->getMessage(),
-            'trace' => $exception?->getTraceAsString(),
+            'error' => $safeErrorMessage,
+            'trace' => $safeTrace,
         ]);
 
-        // Reload execution log from database
-        // When a job times out, failed() is called in a fresh process with the original
-        // queue payload, so $executionId will be null. We need to query for the latest execution.
-        $execution = null;
-
-        // Try to find execution using stored ID first (works for non-timeout failures)
-        if ($this->executionId) {
-            $execution = ScheduledTaskExecution::find($this->executionId);
-        }
-
-        // If no stored ID or not found, query for the most recent execution log for this task
-        if (! $execution) {
-            $execution = ScheduledTaskExecution::query()
-                ->where('scheduled_task_id', $this->task->id)
-                ->orderBy('created_at', 'desc')
-                ->first();
-        }
-
-        // Last resort: check task_log property
-        if (! $execution && $this->task_log) {
-            $execution = $this->task_log;
-        }
+        // After a worker timeout only the queued uuid identifies this run's execution.
+        $execution = $this->executionUuid === null ? null : ScheduledTaskExecution::query()
+            ->where('uuid', $this->executionUuid)
+            ->whereNull('finished_at')
+            ->first();
 
         if ($execution) {
             $errorMessage = 'Job permanently failed after '.$this->attempts().' attempts';
             if ($exception) {
-                $errorMessage .= ': '.$exception->getMessage();
+                $errorMessage .= ': '.$safeErrorMessage;
             }
 
             $execution->update([
                 'status' => 'failed',
                 'message' => $errorMessage,
-                'error_details' => $exception?->getTraceAsString(),
+                'error_details' => $safeTrace,
                 'finished_at' => Carbon::now()->toImmutable(),
             ]);
         } else {
             Log::channel('scheduled-errors')->warning('Could not find execution log to update', [
-                'execution_id' => $this->executionId,
+                'execution_uuid' => $this->executionUuid,
                 'task_id' => $this->task->uuid,
             ]);
         }
 
-        // Notify team about permanent failure
-        $this->team?->notify(new TaskFailed($this->task, $exception?->getMessage() ?? 'Unknown error'));
+        try {
+            $disabled = $this->task->recordFailure();
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Could not record the scheduled task failure', [
+                'task_id' => $this->task->uuid,
+                'error' => $e->getMessage(),
+            ]);
+            $disabled = false;
+        }
+
+        $this->team?->notify(new TaskFailed($this->task, $safeErrorMessage, disabled: $disabled));
     }
 }

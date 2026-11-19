@@ -13,6 +13,12 @@ class TeamInvitation extends Model
         'role',
         'link',
         'via',
+        'access',
+    ];
+
+    protected $casts = [
+        'link' => 'encrypted',
+        'access' => 'array',
     ];
 
     /**
@@ -21,6 +27,19 @@ class TeamInvitation extends Model
     public function setEmailAttribute(string $value): void
     {
         $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Pivot attributes for the new `team_user` row. Grants apply only to the member role.
+     *
+     * @return array{role: string, access: string|null}
+     */
+    public function membershipAttributes(): array
+    {
+        return [
+            'role' => $this->role,
+            'access' => $this->role === 'member' && $this->access !== null ? json_encode($this->access) : null,
+        ];
     }
 
     public function team()
@@ -33,11 +52,9 @@ class TeamInvitation extends Model
         return TeamInvitation::whereTeamId(currentTeam()->id);
     }
 
-    public function isValid()
+    public function isValid(): bool
     {
-        $createdAt = $this->created_at;
-        $diff = $createdAt->diffInDays(now());
-        if ($diff <= config('constants.invitation.link.expiration_days')) {
+        if (! $this->hasExpired()) {
             return true;
         } else {
             $this->delete();
@@ -48,5 +65,10 @@ class TeamInvitation extends Model
 
             return false;
         }
+    }
+
+    public function hasExpired(): bool
+    {
+        return $this->created_at->diffInDays(now()) > config('constants.invitation.link.expiration_days');
     }
 }
