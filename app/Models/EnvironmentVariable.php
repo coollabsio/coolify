@@ -586,7 +586,7 @@ class EnvironmentVariable extends BaseModel
         $secrets = ['known' => [], 'locked' => []];
         if ($isDatabase) {
             foreach (array_keys($resource->getAttributes()) as $attribute) {
-                if (str_contains($attribute, 'password')) {
+                if (str_contains($attribute, 'password') || str_ends_with($attribute, '_token')) {
                     $value = $resource->getAttribute($attribute);
                     if (is_string($value) && $value !== '') {
                         $secrets['locked'][] = $value;
