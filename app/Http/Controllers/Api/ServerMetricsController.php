@@ -7,12 +7,13 @@ use App\Models\Server;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class ServerMetricsController extends Controller
 {
     #[OA\Get(
         summary: 'Get server metrics',
-        description: 'Get CPU and memory metrics collected by Sentinel for a server owned by the authenticated team.',
+        description: 'Get CPU and memory usage history collected by Sentinel for a server owned by the authenticated team. Each data point is [unix_timestamp_ms, used_percent]. cpu and memory are null when metrics are disabled for the server.',
         path: '/servers/{uuid}/metrics',
         operationId: 'get-server-metrics',
         security: [['bearerAuth' => []]],
@@ -69,6 +70,16 @@ class ServerMetricsController extends Controller
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(
+                response: 502,
+                description: 'Sentinel did not return metrics.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Failed to fetch metrics from Sentinel.'),
+                    ],
+                    type: 'object',
+                ),
+            ),
         ],
     )]
     public function show(Request $request): JsonResponse
@@ -118,9 +129,17 @@ class ServerMetricsController extends Controller
             ], 422);
         }
 
-        return response()->json([
-            'cpu' => $server->getCpuMetrics($minutes),
-            'memory' => $server->getMemoryMetrics($minutes),
-        ]);
+        try {
+            return response()->json([
+                'cpu' => $server->getCpuMetrics($minutes),
+                'memory' => $server->getMemoryMetrics($minutes),
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Failed to fetch metrics from Sentinel.',
+            ], 502);
+        }
     }
 }

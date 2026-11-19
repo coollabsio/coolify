@@ -38,9 +38,10 @@ beforeEach(function () {
         'private_key_id' => $this->privateKey->id,
     ]);
 
-    $this->server->settings->update([
+    // Saved quietly: a metrics change restarts Sentinel, which needs SSH.
+    $this->server->settings->forceFill([
         'is_metrics_enabled' => false,
-    ]);
+    ])->saveQuietly();
 
     $this->readToken = $this->user
         ->createToken('server-metrics-read', ['read'])
@@ -78,7 +79,7 @@ describe('Server metrics API', function () {
 
         $this->server->settings->refresh();
 
-        Process::fake([
+        fakeRemoteProcesses([
             '*cpu/history*' => Process::result(
                 output: json_encode([
                     [
@@ -122,14 +123,40 @@ describe('Server metrics API', function () {
             ]);
 
         Process::assertRan(
-            fn ($process) => str_contains($process->command, '/cpu/history') &&
-                str_contains($process->command, 'Authorization: Bearer server-metrics-test-token'),
+            fn ($process) => str_contains(remoteProcessScript($process), '/cpu/history') &&
+                str_contains(remoteProcessScript($process), 'Authorization: Bearer server-metrics-test-token'),
         );
 
         Process::assertRan(
-            fn ($process) => str_contains($process->command, '/memory/history') &&
-                str_contains($process->command, 'Authorization: Bearer server-metrics-test-token'),
+            fn ($process) => str_contains(remoteProcessScript($process), '/memory/history') &&
+                str_contains(remoteProcessScript($process), 'Authorization: Bearer server-metrics-test-token'),
         );
+    });
+
+    test('sentinel error returns 502 without internal details', function () {
+        ServerSetting::withoutEvents(function () {
+            $this->server->settings->update([
+                'is_metrics_enabled' => true,
+                'sentinel_token' => 'server-metrics-test-token',
+            ]);
+        });
+
+        $this->server->settings->refresh();
+
+        Process::fake([
+            '*' => Process::result(
+                output: json_encode(['error' => 'Unauthorized']),
+            ),
+        ]);
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson(
+                "/api/v1/servers/{$this->server->uuid}/metrics",
+            )
+            ->assertStatus(502)
+            ->assertExactJson([
+                'message' => 'Failed to fetch metrics from Sentinel.',
+            ]);
     });
 
     test('metrics disabled returns null cpu and memory', function () {

@@ -86,9 +86,9 @@
                                 "properties": {
                                     "pull_request_id": {
                                         "type": "integer",
-                                        "example": 42,
                                         "maximum": 2147483647,
-                                        "minimum": 1
+                                        "minimum": 1,
+                                        "example": 42
                                     },
                                     "pull_request_html_url": {
                                         "type": [
@@ -12095,8 +12095,8 @@
                                     "network": {
                                         "description": "Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.",
                                         "type": "string",
-                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
-                                        "maxLength": 255
+                                        "maxLength": 255,
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
                                     },
                                     "type": {
                                         "type": "string",
@@ -20163,6 +20163,109 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Get server metrics",
+                "description": "Get CPU and memory usage history collected by Sentinel for a server owned by the authenticated team. Each data point is [unix_timestamp_ms, used_percent]. cpu and memory are null when metrics are disabled for the server.",
+                "operationId": "get-server-metrics",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "minutes",
+                        "in": "query",
+                        "description": "Number of minutes of metric history to return. Cannot exceed the server configured Sentinel metrics retention period.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Server CPU and memory metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "cpu": {
+                                            "type": [
+                                                "array",
+                                                "null"
+                                            ],
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        },
+                                        "memory": {
+                                            "type": [
+                                                "array",
+                                                "null"
+                                            ],
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -28658,8 +28761,8 @@
                 "properties": {
                     "frequency": {
                         "type": "string",
-                        "example": "0 2 * * *",
-                        "maxLength": 255
+                        "maxLength": 255,
+                        "example": "0 2 * * *"
                     },
                     "enabled": {
                         "type": "boolean",
