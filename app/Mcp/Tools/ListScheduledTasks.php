@@ -10,7 +10,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListScheduledTasks extends Tool
 {
     protected string $name = 'list_scheduled_tasks';
@@ -67,6 +69,7 @@ class ListScheduledTasks extends Tool
                 'frequency' => $task->frequency,
                 'container' => $task->container,
                 'timeout' => $task->timeout,
+                'use_shell' => $task->use_shell,
                 'command_included' => $includeCommand,
             ];
             if ($includeCommand) {

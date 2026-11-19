@@ -75,7 +75,6 @@ class Index extends Component
             'resource' => 'user',
             'user_name' => $user->name,
             'target_user_id' => $user->id,
-            'target_user_email' => $user->email,
             'target_team_id' => $team_to_switch_to?->id,
         ]);
         Auth::login($user);

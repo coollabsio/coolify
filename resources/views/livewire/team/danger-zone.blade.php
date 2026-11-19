@@ -30,7 +30,7 @@
                                 </p>
                             @elseif(currentTeam()->subscription)
                                 <p>
-                                    Cancel your <a class="font-medium text-coollabs hover:underline dark:text-warning"
+                                    Cancel your <a class="font-medium text-coollabs hover:underline dark:text-brand-light"
                                         {{ wireNavigate() }} href="{{ route('subscription.show') }}">subscription</a>
                                     before deleting this team.
                                 </p>
@@ -50,7 +50,7 @@
                                 <ul class="space-y-1">
                                     @foreach ($deletionBlockers as $type => $count)
                                         <li>
-                                            <a class="font-medium text-coollabs hover:underline dark:text-warning"
+                                            <a class="font-medium text-coollabs hover:underline dark:text-brand-light"
                                                 {{ wireNavigate() }} href="{{ route($blockerDetails[$type]['route']) }}">
                                                 {{ $count }} {{ str($blockerDetails[$type]['label'])->plural($count) }}
                                             </a>

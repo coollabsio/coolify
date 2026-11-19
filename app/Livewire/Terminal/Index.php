@@ -3,11 +3,14 @@
 namespace App\Livewire\Terminal;
 
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public $selected_uuid = 'default';
 
     public $servers = [];
@@ -18,6 +21,7 @@ class Index extends Component
 
     public function mount()
     {
+        $this->authorize('canAccessTerminal');
         $this->servers = Server::isReachable()->get()->filter(function ($server) {
             return $server->isTerminalEnabled();
         });
@@ -26,6 +30,7 @@ class Index extends Component
     public function loadContainers()
     {
         try {
+            $this->authorize('canAccessTerminal');
             $this->containers = $this->getAllActiveContainers();
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -71,6 +76,7 @@ class Index extends Component
     #[On('connectToContainer')]
     public function connectToContainer()
     {
+        $this->authorize('canAccessTerminal');
         if ($this->selected_uuid === 'default') {
             $this->dispatch('error', 'Please select a server or a container.');
 

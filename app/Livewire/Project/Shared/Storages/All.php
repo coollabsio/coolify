@@ -24,7 +24,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
      */
     public array $forms = [];
 
@@ -46,6 +46,13 @@ class All extends Component
     public bool $canUpdate = false;
 
     public bool $deleteDockerVolume = false;
+
+    /**
+     * Volume rename that waits for confirmation. A new name mounts another Docker volume, and the data stays in the old one.
+     *
+     * @var array{storageId: int, from: string, to: string}|null
+     */
+    public ?array $pendingRename = null;
 
     protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
@@ -80,11 +87,13 @@ class All extends Component
             $this->resource->loadMissing('environment.project');
         }
 
+        $this->pendingRename = null;
         $this->rebuildForms();
+        $this->rebuildStaleVolumeContainers();
         $this->rebuildVolumeBackupMeta();
     }
 
-    public function submit(int $storageId): void
+    public function submit(int $storageId, bool $renameConfirmed = false): void
     {
         $this->authorize('update', $this->resource);
         $this->validateStorage($storageId);
@@ -97,7 +106,16 @@ class All extends Component
         }
 
         $form = $this->forms[$storageId];
-        if (! $storage->isSharedWithAnotherResource()) {
+        $isRename = ! $storage->isSharedWithAnotherResource() && $form['name'] !== $storage->name;
+        $rename = ['storageId' => $storageId, 'from' => $storage->name, 'to' => $form['name']];
+        if ($isRename && ! ($renameConfirmed && $this->pendingRename === $rename)) {
+            $this->pendingRename = $rename;
+
+            return;
+        }
+        $this->pendingRename = null;
+
+        if ($isRename) {
             $storage->name = $form['name'];
         }
         $storage->mount_path = $form['mountPath'];
@@ -110,6 +128,14 @@ class All extends Component
         }
 
         $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    public function cancelRename(int $storageId): void
+    {
+        $this->authorize('view', $this->resource);
+        $storage = $this->findStorageOrFail($storageId);
+        $this->forms[$storageId]['name'] = $storage->name;
+        $this->pendingRename = null;
     }
 
     public function instantSave(int $storageId): void
@@ -134,7 +160,7 @@ class All extends Component
 
     public function delete(int $storageId, $password = '', $selectedActions = [])
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -222,9 +248,45 @@ class All extends Component
                 'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
                 'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
                 'ignoresDriverOptions' => $ignoresDriverOptions,
+                'usedByContainers' => [],
             ];
         }
         $this->forms = $forms;
+    }
+
+    /**
+     * Finds the containers that still use a stale volume. Docker Compose can keep such a volume
+     * in a container after the line was removed from the Compose file. After the entry is
+     * deleted, the next deployment starts that container without the data (#6875).
+     */
+    private function rebuildStaleVolumeContainers(): void
+    {
+        $staleNames = collect($this->forms)->filter(fn (array $form) => $form['canDeleteStale'])->pluck('name');
+        if ($staleNames->isEmpty()) {
+            return;
+        }
+        $server = $this->resource instanceof Application
+            ? $this->resource->destination->server
+            : $this->resource->service->server;
+        try {
+            $output = (string) instant_remote_process(["docker ps -a --no-trunc --format '{{.Names}} {{.Mounts}}'"], $server, false, maxAttempts: 1);
+        } catch (\Throwable) {
+            return;
+        }
+        $containers = collect(preg_split('/\R/', trim($output)))->filter()->mapWithKeys(function (string $line) {
+            [$name, $mounts] = array_pad(explode(' ', $line, 2), 2, '');
+
+            return [$name => explode(',', $mounts)];
+        });
+        foreach ($this->forms as $id => $form) {
+            if ($form['canDeleteStale']) {
+                $this->forms[$id]['usedByContainers'] = $containers
+                    ->filter(fn (array $mounts) => in_array($form['name'], $mounts, true))
+                    ->keys()
+                    ->values()
+                    ->all();
+            }
+        }
     }
 
     private function rebuildVolumeBackupMeta(): void

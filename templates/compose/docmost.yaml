@@ -7,7 +7,7 @@
 
 services:
   docmost:
-    image: "docmost/docmost:latest"
+    image: "docmost/docmost:0.97.0"
     depends_on:
       postgresql:
         condition: service_healthy
@@ -40,13 +40,13 @@ services:
       timeout: 10s
       retries: 20
   postgresql:
-    image: "postgres:16-alpine"
+    image: "postgres:18-alpine"
     environment:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_DB=docmost
     volumes:
-      - "postgresql-data:/var/lib/postgresql/data"
+      - "postgresql-data:/var/lib/postgresql"
     healthcheck:
       test:
         - CMD-SHELL
@@ -55,7 +55,7 @@ services:
       timeout: 10s
       retries: 20
   redis:
-    image: "redis:7.2-alpine"
+    image: "redis:8.10-alpine"
     volumes:
       - "redis-data:/data"
     healthcheck:

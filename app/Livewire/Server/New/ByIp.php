@@ -4,6 +4,7 @@ namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -17,6 +18,7 @@ use Livewire\Component;
 class ByIp extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     #[Locked]
     public $private_keys;
@@ -144,9 +146,8 @@ class ByIp extends Component
         try {
             $this->authorize('create', Server::class);
             $this->ip = Server::normalizeIp($this->ip);
-            $foundServer = Server::whereIp($this->ip)->first();
-            if ($foundServer) {
-                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
+            if (Server::sshEndpointInUse($this->ip, $this->port)) {
+                return $this->dispatch('error', 'A server with this IP/Domain and SSH port already exists.');
             }
 
             if (is_null($this->private_key_id)) {
@@ -174,6 +175,7 @@ class ByIp extends Component
             $server->settings->server_role = ServerRole::from($this->server_role);
             $server->settings->is_build_server = $this->server_role === ServerRole::BUILD->value;
             $server->settings->save();
+            $this->applyImageScanning($server);
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {

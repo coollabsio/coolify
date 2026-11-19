@@ -140,7 +140,8 @@ describe('Application Rollback', function () {
         );
 
         expect($result)
-            ->toContain('GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull')
+            ->toContain('GIT_SSH_COMMAND="ssh -F /root/.ssh/coolify_git_test-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o LogLevel=ERROR" git lfs pull')
+            ->not->toContain('StrictHostKeyChecking=no')
             ->not->toContain('-i /root/.ssh/id_rsa');
     });
 });

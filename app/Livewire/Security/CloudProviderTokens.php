@@ -59,6 +59,13 @@ class CloudProviderTokens extends Component
                 } else {
                     $this->dispatch('error', 'Vultr token validation failed. Please check the token.');
                 }
+            } elseif ($token->provider === 'hostinger') {
+                $isValid = $this->validateHostingerToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Hostinger token is valid.');
+                } else {
+                    $this->dispatch('error', 'Hostinger token validation failed. Please check the token.');
+                }
             } else {
                 $this->dispatch('error', 'Unknown provider.');
             }
@@ -110,6 +117,19 @@ class CloudProviderTokens extends Component
 
             return $response->successful();
         } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateHostingerToken(string $token): bool
+    {
+        try {
+            return Http::withToken($token)
+                ->acceptJson()
+                ->timeout(10)
+                ->get('https://developers.hostinger.com/api/vps/v1/virtual-machines')
+                ->successful();
+        } catch (\Throwable) {
             return false;
         }
     }

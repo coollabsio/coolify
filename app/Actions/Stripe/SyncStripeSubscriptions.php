@@ -18,16 +18,16 @@ class SyncStripeSubscriptions
             return ['error' => 'Not running on Cloud or Stripe not configured'];
         }
 
-        $subscriptions = Subscription::whereNotNull('stripe_subscription_id')
-            ->where('stripe_invoice_paid', true)
-            ->get();
+        // Paid rows without a subscription ID are included: no webhook can end them.
+        $subscriptions = Subscription::where('stripe_invoice_paid', true)->get();
 
         $stripe = app()->bound(StripeClient::class)
             ? app(StripeClient::class)
             : new StripeClient(config('subscription.stripe_api_key'));
 
-        // Bulk fetch all valid subscription IDs from Stripe (active + past_due)
-        $validStripeIds = $this->fetchValidStripeSubscriptionIds($stripe, $onProgress);
+        // Bulk fetch all valid subscriptions from Stripe (active + past_due)
+        $validStripeCustomers = $this->fetchValidStripeSubscriptions($stripe, $onProgress);
+        $validStripeIds = array_keys($validStripeCustomers);
 
         // Find DB subscriptions not in the valid set
         $staleSubscriptions = $subscriptions->filter(
@@ -47,27 +47,51 @@ class SyncStripeSubscriptions
         foreach ($staleSubscriptions->values() as $index => $subscription) {
             $onProgress?->__invoke('checking', $index + 1, $staleSubscriptionCount);
 
-            try {
-                $stripeSubscription = $stripe->subscriptions->retrieve(
-                    $subscription->stripe_subscription_id
-                );
-                $stripeStatus = $stripeSubscription->status;
+            if (! $subscription->stripe_subscription_id) {
+                $customerId = $subscription->stripe_customer_id;
+                $stripeStatus = 'missing';
+                $liveSubscriptionId = $customerId ? array_search($customerId, $validStripeCustomers, true) : false;
 
-                usleep(100000); // 100ms rate limit delay
-            } catch (\Exception $e) {
-                $errors[] = [
-                    'subscription_id' => $subscription->id,
-                    'error' => $e->getMessage(),
-                ];
+                if ($liveSubscriptionId !== false && ! Subscription::where('stripe_subscription_id', $liveSubscriptionId)->exists()) {
+                    $discrepancies[] = [
+                        'subscription_id' => $subscription->id,
+                        'team_id' => $subscription->team_id,
+                        'stripe_subscription_id' => $liveSubscriptionId,
+                        'stripe_status' => $stripeStatus,
+                        'resolution' => 'link_subscription',
+                    ];
 
-                continue;
+                    if ($fix) {
+                        $subscription->update(['stripe_subscription_id' => $liveSubscriptionId]);
+                        $fixedCount++;
+                    }
+
+                    continue;
+                }
+            } else {
+                try {
+                    $stripeSubscription = $stripe->subscriptions->retrieve(
+                        $subscription->stripe_subscription_id
+                    );
+                    $stripeStatus = $stripeSubscription->status;
+                    $customerId = $stripeSubscription->customer;
+
+                    usleep(100000); // 100ms rate limit delay
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'subscription_id' => $subscription->id,
+                        'error' => $e->getMessage(),
+                    ];
+
+                    continue;
+                }
+
+                if (in_array($stripeStatus, self::VALID_STRIPE_STATUSES, true)) {
+                    continue;
+                }
             }
 
-            if (in_array($stripeStatus, self::VALID_STRIPE_STATUSES, true)) {
-                continue;
-            }
-
-            $activeSub = $this->findActiveSubscriptionByEmail($stripe, $stripeSubscription->customer);
+            $activeSub = $customerId ? $this->findActiveSubscriptionByEmail($stripe, $customerId) : null;
             $validReplacement = Subscription::query()
                 ->where('team_id', $subscription->team_id)
                 ->where('id', '!=', $subscription->id)
@@ -81,7 +105,7 @@ class SyncStripeSubscriptions
                     'team_id' => $subscription->team_id,
                     'email' => $activeSub['email'],
                     'old_stripe_subscription_id' => $subscription->stripe_subscription_id,
-                    'old_stripe_customer_id' => $stripeSubscription->customer,
+                    'old_stripe_customer_id' => $customerId,
                     'new_stripe_subscription_id' => $activeSub['subscription_id'],
                     'new_stripe_customer_id' => $activeSub['customer_id'],
                     'new_status' => $activeSub['status'],
@@ -220,18 +244,18 @@ class SyncStripeSubscriptions
     }
 
     /**
-     * Bulk fetch all active and past_due subscription IDs from Stripe.
+     * Bulk fetch all active and past_due subscriptions from Stripe.
      *
-     * @return array<string>
+     * @return array<string, ?string> Stripe customer ID by subscription ID
      */
-    private function fetchValidStripeSubscriptionIds(StripeClient $stripe, ?\Closure $onProgress = null): array
+    private function fetchValidStripeSubscriptions(StripeClient $stripe, ?\Closure $onProgress = null): array
     {
         $validIds = [];
         $fetched = 0;
 
         foreach (self::VALID_STRIPE_STATUSES as $status) {
             foreach ($stripe->subscriptions->all(['status' => $status, 'limit' => 100])->autoPagingIterator() as $sub) {
-                $validIds[] = $sub->id;
+                $validIds[$sub->id] = $sub->customer ?? null;
                 $fetched++;
 
                 if ($onProgress) {

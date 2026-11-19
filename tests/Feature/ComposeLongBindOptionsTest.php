@@ -224,3 +224,60 @@ it('uses the value that the resource sets for a ${VAR:-default} long-form bind s
 it('rejects an unsafe value for a ${VAR:-default} long-form bind source', function (string $kind) {
     parseLongBind($kind, longBindCompose("'\${AO_CONFIG_FILE:-./agent-orchestrator.yaml}'", LONG_BIND_READ_ONLY_OPTIONS), ['AO_CONFIG_FILE' => '/opt/x;touch /tmp/pwned']);
 })->with(['service', 'application'])->throws(Exception::class, 'the value of AO_CONFIG_FILE is not a safe path');
+
+it('keeps a ${VAR:-default} long-form bind source for Docker Compose when the value of the variable is not a plain path', function (string $kind, string $value) {
+    $source = '${AO_CONFIG_FILE:-./agent-orchestrator.yaml}';
+    $result = parseLongBind($kind, longBindCompose("'{$source}'", LONG_BIND_READ_ONLY_OPTIONS), ['BASE_DIR' => '/srv', 'AO_CONFIG_FILE' => $value]);
+
+    expect($result['volume']['source'])->toBe($source);
+})->with(['service', 'application'])->with([
+    'braced variable reference' => ['${BASE_DIR}/ao.yaml'],
+    'variable reference' => ['$BASE_DIR/ao.yaml'],
+    'vault reference' => ['{{vault.AO_CONFIG_FILE}}'],
+]);
+
+it('moves a mode suffix from the target of a long-form bind to read_only', function (string $kind, string $mode, bool $readOnly) {
+    $result = parseLongBind($kind, <<<YAML
+services:
+  probe:
+    image: alpine:3.22
+    volumes:
+      - type: bind
+        source: ./data/users.yml
+        target: /fixture:{$mode}
+        content: 'users: {}'
+YAML);
+
+    expect($result['volume']['target'])->toBe('/fixture')
+        ->and($result['volume']['read_only'])->toBe($readOnly);
+})->with(['service', 'application'])->with([
+    'read-only' => ['ro', true],
+    'read-write' => ['rw', false],
+]);
+
+it('keeps a long-form bind with is_directory false as a file', function (string $kind, string $key) {
+    $result = parseLongBind($kind, longBindCompose('./config/prometheus.yml', "        {$key}: false"));
+
+    expect($result['storages'])->toHaveCount(1)
+        ->and($result['storages']->first()->is_directory)->toBeFalse()
+        ->and($result['storages']->first()->content)->toBeNull();
+})->with(['service', 'application'])->with(['is_directory', 'isDirectory']);
+
+it('treats a long-form bind without is_directory or content as a directory', function (string $kind) {
+    $result = parseLongBind($kind, longBindCompose('./data', LONG_BIND_READ_ONLY_OPTIONS));
+
+    expect($result['storages']->first()->is_directory)->toBeTrue();
+})->with(['service', 'application']);
+
+it('keeps the stored type of an existing bind storage when the Compose file sets is_directory false', function (string $kind) {
+    $first = parseLongBind($kind, longBindCompose('./config/prometheus.yml', LONG_BIND_READ_ONLY_OPTIONS));
+    $storage = $first['storages']->first();
+    expect($storage->is_directory)->toBeTrue();
+
+    $owner = $storage->resource;
+    $resource = $kind === 'service' ? $owner->service : $owner;
+    $resource->update(['docker_compose_raw' => longBindCompose('./config/prometheus.yml', '        is_directory: false')]);
+    $kind === 'service' ? serviceParser($resource->fresh()) : applicationParser($resource->fresh());
+
+    expect($storage->fresh()->is_directory)->toBeTrue();
+})->with(['service', 'application']);

@@ -13,13 +13,25 @@ class DockerCleanupDone implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public DockerCleanupExecution $execution) {}
+    public ?int $teamId;
 
+    public function __construct(public DockerCleanupExecution $execution)
+    {
+        $this->teamId = $execution->server?->team_id;
+    }
+
+    /**
+     * A deleted server has no team to tell, so nothing is broadcast.
+     *
+     * @return array<int, PrivateChannel>
+     */
     public function broadcastOn(): array
     {
-        return [
-            new PrivateChannel('team.'.$this->execution->server->team->id),
-        ];
+        if (is_null($this->teamId)) {
+            return [];
+        }
+
+        return [new PrivateChannel("team.{$this->teamId}")];
     }
 
     /**

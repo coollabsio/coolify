@@ -192,3 +192,33 @@ describe('update', function () {
         expect($task->fresh()->command)->toBe('id');
     });
 });
+
+test('a task can be created and updated to run without a shell', function () {
+    $headers = scheduledTaskAbilityHeaders($this->user, $this->team->id, ['write', 'deploy']);
+
+    $created = $this->withHeaders($headers)
+        ->postJson("/api/v1/applications/{$this->application->uuid}/scheduled-tasks", [
+            'name' => 'export',
+            'command' => '/surreal export',
+            'frequency' => 'daily',
+            'use_shell' => false,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('use_shell', false);
+    $task = ScheduledTask::where('uuid', $created->json('uuid'))->sole();
+    expect($task->use_shell)->toBeFalse();
+
+    $this->withHeaders($headers)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}/scheduled-tasks/{$task->uuid}", ['use_shell' => true])
+        ->assertOk();
+    expect($task->refresh()->use_shell)->toBeTrue();
+
+    $default = $this->withHeaders($headers)
+        ->postJson("/api/v1/applications/{$this->application->uuid}/scheduled-tasks", [
+            'name' => 'cleanup',
+            'command' => 'echo done',
+            'frequency' => 'daily',
+        ])
+        ->assertCreated();
+    expect(ScheduledTask::where('uuid', $default->json('uuid'))->sole()->use_shell)->toBeTrue();
+});

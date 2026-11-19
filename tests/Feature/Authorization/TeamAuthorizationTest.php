@@ -385,3 +385,24 @@ test('member cannot update an existing team at model level', function () {
     expect(fn () => $this->team->update(['name' => 'Hacked']))
         ->toThrow(Exception::class, 'You are not allowed to update this team.');
 });
+
+test('member cannot update a team at model level while the session is on a team they own', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    expect(fn () => $this->team->update(['name' => 'Hacked']))
+        ->toThrow(Exception::class, 'You are not allowed to update this team.');
+});
+
+test('owner can update their team at model level while the session is on a team where they are a member', function () {
+    $otherTeam = Team::factory()->create();
+    $this->owner->teams()->attach($otherTeam, ['role' => 'member']);
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->team->update(['name' => 'Renamed']);
+
+    expect($this->team->fresh()->name)->toBe('Renamed');
+});

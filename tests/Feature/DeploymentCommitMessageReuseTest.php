@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -79,6 +80,17 @@ test('does not look up a commit message for an unresolved HEAD commit', function
     $deployment = createCommitMessageDeployment($this->application, $this->server, 'HEAD');
 
     reuseCommitMessage($deployment, $this->application, 'HEAD');
+
+    expect($deployment->fresh()->commit_message)->toBeNull();
+});
+
+test('does not copy the reason of a skipped deployment as the commit message', function () {
+    $commit = str_repeat('a', 40);
+    createCommitMessageDeployment($this->application, $this->server, $commit, 'Skipped the preview deployment: no changed file matches the watch paths.')
+        ->update(['status' => ApplicationDeploymentStatus::SKIPPED->value]);
+    $deployment = createCommitMessageDeployment($this->application, $this->server, $commit);
+
+    reuseCommitMessage($deployment, $this->application, $commit);
 
     expect($deployment->fresh()->commit_message)->toBeNull();
 });

@@ -7,7 +7,7 @@
 
 services:
   typesense:
-    image: typesense/typesense:28.0
+    image: typesense/typesense:30.2
     environment:
       - SERVICE_URL_TYPESENSE_8108
       - TYPESENSE_ENABLE_CORS=${TYPESENSE_ENABLE_CORS:-true}

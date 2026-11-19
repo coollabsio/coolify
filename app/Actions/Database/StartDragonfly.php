@@ -130,7 +130,7 @@ class StartDragonfly
         }
 
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
 
         if (count($this->database->ports_mappings_array) > 0) {
@@ -186,11 +186,11 @@ class StartDragonfly
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";

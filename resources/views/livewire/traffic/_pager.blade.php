@@ -1,7 +1,7 @@
 {{--
     Client-side "top 10" pager footer for traffic lists. Expects an enclosing
     Alpine scope that defines reactive `page` (0-based), `per` (page size) and
-    `total` (row count). Rows themselves are toggled with x-show on their index;
+    `total` (row count). Rows themselves are toggled with x-show by their scope;
     this partial only renders the summary + prev/next controls, and hides itself
     when everything fits on one page.
 --}}

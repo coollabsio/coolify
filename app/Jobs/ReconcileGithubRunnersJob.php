@@ -43,11 +43,7 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        // Disabling keeps running jobs, so a disabled server is reconciled until its last runner is done.
-        Server::query()
-            ->where(fn (Builder $query) => $query
-                ->whereHas('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true))
-                ->orWhereHas('githubRunnerExecutions', fn (Builder $execution) => $execution->whereIn('status', GithubRunnerStatus::occupying())))
+        $this->serversToReconcile()
             ->with('settings')
             ->get()
             ->filter(fn (Server $server) => $server->isFunctional())
@@ -55,6 +51,24 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
         $this->removeRunnersOfDeletedServers();
         $this->reconcileQueued();
+    }
+
+    /**
+     * Servers with enabled runners or with executions that still occupy a runner. Disabling keeps
+     * running jobs, so a disabled server is reconciled until its last runner is done. The server ids
+     * come from one UNION: an OR of two EXISTS subqueries makes Postgres estimate a per-server scan
+     * of the executions and spend most of the query time on JIT compilation.
+     *
+     * @return Builder<Server>
+     */
+    public function serversToReconcile(): Builder
+    {
+        return Server::query()->whereIn('id', GithubRunnerConfig::query()
+            ->select('server_id')
+            ->where('is_enabled', true)
+            ->union(GithubRunnerExecution::query()
+                ->select('server_id')
+                ->whereIn('status', GithubRunnerStatus::occupying())));
     }
 
     /**

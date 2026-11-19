@@ -28,34 +28,49 @@
             </x-slot:actions>
         @endcan
         @if ($view === 'normal')
-            <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+            <div class="flex w-full flex-col gap-4">
                 @if ($resourceClass === 'App\Models\Application')
-                    @if (data_get($resource, 'build_pack') !== 'dockercompose')
-                        <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
-                            onChange="instantSave"
-                            helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                            <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
+                                onChange="instantSave"
+                                helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+                                :options="[
+                                    ['value' => false, 'label' => 'Creation order'],
+                                    ['value' => true, 'label' => 'Alphabetical'],
+                                ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                        @endif
+                        <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
+                            helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
                             :options="[
-                                ['value' => false, 'label' => 'Creation order'],
-                                ['value' => true, 'label' => 'Alphabetical'],
+                                ['value' => false, 'label' => 'Standard build arguments'],
+                                ['value' => true, 'label' => 'Docker BuildKit secrets'],
                             ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                    @endif
-                    <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
-                        helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
-                        :options="[
-                            ['value' => false, 'label' => 'Standard build arguments'],
-                            ['value' => true, 'label' => 'Docker BuildKit secrets'],
-                        ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    </div>
                 @endif
                 <x-forms.checkbox instantSave="saveCoolifyDefaultVariables" id="include_coolify_default_variables"
                     label="Include Coolify default variables"
                     helper="Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart."
                     :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                @if ($this->hasLogRedactionSetting())
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="redact_all_env_values_in_logs" label="Environment values in logs"
+                            onChange="saveLogRedactionSetting"
+                            helper="Hide every environment variable value in deployment logs, scheduled task output, copied or downloaded logs, and logs from the API and MCP. Live log streaming is not changed. Locked variables and known secret formats are always hidden."
+                            :options="[
+                                ['value' => true, 'label' => 'Hide all values'],
+                                ['value' => false, 'label' => 'Hide locked values only'],
+                            ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    </div>
+                @endif
             </div>
         @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)
                     <x-callout type="info" title="Note">
                         Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
+                        To set flags, put <code class="font-mono"># coolify: literal buildtime=false runtime=false</code>
+                        directly above a variable line. Without this line, the flags of a variable do not change.
                     </x-callout>
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
                         wire:model="variables" label="Production"></x-forms.textarea>
@@ -101,7 +116,7 @@
                                 @endphp
                                 <span @class([
                                     'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                    'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $selected,
                                     'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
                                 ])>
                                     @if ($selected)
@@ -119,7 +134,7 @@
                                     <span>{{ $label }}</span>
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $environmentFilter === $value,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $environmentFilter === $value,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => $environmentFilter !== $value,
                                     ])>
                                         @if ($environmentFilter === $value)
@@ -142,7 +157,7 @@
                                     @endphp
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $serviceSelected,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $serviceSelected,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $serviceSelected,
                                     ])>
                                         @if ($serviceSelected)
@@ -155,14 +170,17 @@
                             @endforeach
                         @endif
             </x-table.filter>
-            <x-table.sort>
-                        @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
-                            <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
-                                <span>{{ $label }}</span>
-                                @if ($tableSort === $value)<span>✓</span>@endif
-                            </button>
-                        @endforeach
-            </x-table.sort>
+            {{-- The table header, with its Name sort, is hidden on small screens (app.css, max-width: 768px). --}}
+            <div class="min-[769px]:hidden">
+                <x-table.sort>
+                            @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
+                                <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
+                                    <span>{{ $label }}</span>
+                                    @if ($tableSort === $value)<span>✓</span>@endif
+                                </button>
+                            @endforeach
+                </x-table.sort>
+            </div>
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
@@ -207,7 +225,8 @@
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
                                 wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
                             <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
-                            <span>Name</span>
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc"
+                                action="setTableSort" :current="$tableSort" />
                             <span class="text-center">Managed</span>
                             @if ($showEnvironmentType)
                                 <span>Type</span>
@@ -216,7 +235,7 @@
                             <span class="text-center">Multiline</span>
                             <span class="text-center">Buildtime</span>
                             <span class="text-center">Runtime</span>
-                            <span></span>
+                            <span class="text-right">Actions</span>
                         </div>
                             @php $renderedScope = null; @endphp
                             @foreach ($this->environmentVariablePageRows as $row)

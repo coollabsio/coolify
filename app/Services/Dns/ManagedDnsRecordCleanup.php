@@ -150,6 +150,71 @@ class ManagedDnsRecordCleanup
     }
 
     /**
+     * Stops tracking the records of these resources without touching the provider. Used when another Coolify
+     * instance takes over the resources: their records still serve live traffic there. A record that another
+     * resource of this instance still uses keeps that resource's references.
+     *
+     * @param  iterable<int, Model>  $resources
+     */
+    public function forgetResources(iterable $resources): void
+    {
+        $keys = collect($resources)
+            ->flatMap(fn (Model $resource) => $this->resourceKeys($resource->getMorphClass(), $resource->getKey()))
+            ->all();
+        if ($keys === []) {
+            return;
+        }
+
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, $keys))
+            ->get();
+
+        foreach ($records as $record) {
+            $this->deleteReferences($record, $keys);
+            if (! $record->references()->exists()) {
+                $this->forget($record, 'The resource was transferred to another Coolify instance, which uses the record now.', 'info');
+            }
+        }
+    }
+
+    /**
+     * Keeps the records of resources that another Coolify instance manages now, for a later take back, but marks
+     * them not owned, so this instance never changes or deletes them at the provider. A record that another
+     * resource of this instance also uses only loses the references of these resources.
+     *
+     * @param  iterable<int, Model>  $resources
+     * @return list<int> ids of the records that were owned before
+     */
+    public function parkResources(iterable $resources): array
+    {
+        $keys = collect($resources)
+            ->flatMap(fn (Model $resource) => $this->resourceKeys($resource->getMorphClass(), $resource->getKey()))
+            ->all();
+        if ($keys === []) {
+            return [];
+        }
+
+        $parked = [];
+        $records = ManagedDnsRecord::query()
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, $keys))
+            ->get();
+        foreach ($records as $record) {
+            $sharedWithOthers = $record->references()->whereNot(fn (Builder $query) => $this->whereResourceKeys($query, $keys))->exists();
+            if ($sharedWithOthers) {
+                $this->deleteReferences($record, $keys);
+
+                continue;
+            }
+            if ($record->owned) {
+                $record->update(['owned' => false]);
+                $parked[] = $record->id;
+            }
+        }
+
+        return $parked;
+    }
+
+    /**
      * Releases orphaned records: records whose references all point to deleted (or soft-deleted) resources, and
      * records without references that are older than the grace period. Records with a live reference are not touched.
      * Each orphan goes through release(), so a hostname that a live resource uses again keeps its record, and
@@ -335,10 +400,11 @@ class ManagedDnsRecordCleanup
     private function worseResult(?ManagedDnsDeletionResult $current, ?ManagedDnsDeletionResult $next): ?ManagedDnsDeletionResult
     {
         $rank = fn (?ManagedDnsDeletionResult $result): int => match ($result) {
-            ManagedDnsDeletionResult::Failed => 3,
-            ManagedDnsDeletionResult::Busy => 2,
-            ManagedDnsDeletionResult::ChangedExternally => 1,
-            default => 0,
+            ManagedDnsDeletionResult::Failed => 4,
+            ManagedDnsDeletionResult::Busy => 3,
+            ManagedDnsDeletionResult::ChangedExternally => 2,
+            null => 0,
+            default => 1,
         };
 
         return $rank($next) > $rank($current) ? $next : $current;
@@ -408,7 +474,11 @@ class ManagedDnsRecordCleanup
 
     private function auditSkipped(ManagedDnsRecord $record, string $reason, string $level = 'warning'): void
     {
-        $source = auth()->check() ? 'ui' : 'system';
+        $source = match (true) {
+            auth()->user()?->currentAccessToken() !== null => 'api',
+            auth()->check() => 'ui',
+            default => 'system',
+        };
         auditLog("{$source}.dns_record.delete_skipped", [
             'team_id' => $record->team_id,
             'hostname' => $record->name,

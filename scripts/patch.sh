@@ -49,8 +49,9 @@ check_installation() {
 }
 
 read_version() {
-	current_version="$(docker exec -w /var/www/html coolify php bootstrap/getVersion.php 2> /dev/null)" || die "the coolify container is not running"
-	ok "Coolify $BOLD$current_version$RESET is running"
+	# Copy the file out of the container, because this also works when the mitigation advice was followed and the container is stopped
+	current_version="$(docker cp coolify:/var/www/html/config/constants.php - 2> /dev/null | tar -xO 2> /dev/null | awk -F "'" "/'version' =>/ && !found { print \$(NF - 1); found = 1 }")" && [ -n "$current_version" ] || die "could not read the Coolify version from the coolify container"
+	ok "Coolify $BOLD$current_version$RESET is installed"
 }
 
 select_patch_version() {
@@ -70,7 +71,7 @@ check_compose_files() {
 	if [[ "$patch_version" == 4.4.* ]]; then
 		needs_realtime=false
 	fi
-	[ "$has_realtime" = "$needs_realtime" ] || die "the compose files in $SOURCE_DIR do not belong to Coolify $current_version, upgrade to the latest version from the dashboard instead"
+	[ "$has_realtime" = "$needs_realtime" ] || die "the compose files in $SOURCE_DIR do not belong to Coolify $current_version, update to ${PATCH_VERSIONS[4]} instead: curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh | sudo bash -s ${PATCH_VERSIONS[4]}"
 	ok "the compose files belong to Coolify $current_version"
 }
 

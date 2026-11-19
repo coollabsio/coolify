@@ -4,10 +4,11 @@
 # tags: rss, feed
 # logo: svgs/linkding.svg
 # port: 9090
+# outdated: true
 
 services:
   linkding-plus:
-    image: sissbruecker/linkding:latest-plus
+    image: sissbruecker/linkding:1.47.0-plus
     volumes:
       - 'linkding_data:/etc/linkding/data'
     environment:

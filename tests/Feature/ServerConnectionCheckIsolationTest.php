@@ -5,6 +5,7 @@ use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +40,7 @@ it('never attempts SSH to a placeholder address', function (string $placeholderI
 
     Process::fake();
 
-    (new ServerConnectionCheckJob($server, disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server))->handle();
 
     Process::assertNothingRan();
     expect($server->fresh()->unreachable_count)->toBe(0)
@@ -70,14 +71,14 @@ it('does not call cloud provider APIs during an SSH connection check', function 
             'instance' => ['id' => 'instance-1', 'status' => 'active'],
         ]),
     ]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(
             output: '{"Server":{"Version":"27.0.0"}}',
             exitCode: 0,
         ),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     Http::assertNothingSent();
 });
@@ -88,14 +89,14 @@ it('resets unreachable_count after a successful connection check', function () {
     $server->unreachable_count = 5;
     $server->save();
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(
             output: '{"Server":{"Version":"27.0.0"}}',
             exitCode: 0,
         ),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     expect($server->fresh()->unreachable_count)->toBe(0);
 });
@@ -106,12 +107,12 @@ it('logs the checking node and ssh error only when the connection state changes'
     $logPath = tempnam(sys_get_temp_dir(), 'coolify-scheduled-log-');
     config(['logging.channels.scheduled' => ['driver' => 'single', 'path' => $logPath, 'level' => 'debug']]);
     Log::forgetChannel('scheduled');
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(errorOutput: 'ssh: connect to host 203.0.113.10 port 22: Connection refused', exitCode: 255),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     $log = file_get_contents($logPath);
     @unlink($logPath);
@@ -126,11 +127,11 @@ it('logs the checking node and ssh error only when the connection state changes'
 it('keeps the server online after one failed SSH check', function () {
     $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     expect($server->fresh()->unreachable_count)->toBe(1)
         ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
@@ -140,12 +141,12 @@ it('keeps the server online after one failed SSH check', function () {
 it('marks the server offline after consecutive failed SSH checks', function () {
     $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
     ]);
 
     for ($attempt = 0; $attempt < ServerConnectionCheckJob::UNREACHABLE_THRESHOLD; $attempt++) {
-        (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+        (new ServerConnectionCheckJob($server->fresh()))->handle();
     }
 
     expect($server->fresh()->unreachable_count)->toBe(ServerConnectionCheckJob::UNREACHABLE_THRESHOLD)
@@ -158,13 +159,13 @@ it('does not mark the server offline when the check fails for a reason other tha
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
     $server->unreachable_count = 1;
     $server->save();
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(output: '{"Server":{"Version":"27.0.0"}}', exitCode: 0),
     ]);
     // Fails the unreachable_count reset, after SSH and Docker checks passed.
     Server::saving(fn () => throw new RuntimeException('database connection lost'));
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     Server::flushEventListeners();
     expect($server->fresh()->unreachable_count)->toBe(1)
@@ -177,7 +178,7 @@ it('retries a failed SSH attempt once within the same check', function () {
     $server->settings->update(['is_reachable' => false, 'is_usable' => false]);
     $server->unreachable_count = 3;
     $server->save();
-    Process::fake([
+    fakeRemoteProcesses([
         '*ls -la /*' => Process::sequence()
             ->push(Process::result(errorOutput: 'Connection timed out', exitCode: 255))
             ->push(Process::result(exitCode: 0)),
@@ -185,10 +186,10 @@ it('retries a failed SSH attempt once within the same check', function () {
         '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     Sleep::assertSleptTimes(1);
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ls -la /'), 2);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'ls -la /'), 2);
     expect($server->fresh()->unreachable_count)->toBe(0)
         ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
         ->and((bool) $server->settings->fresh()->is_usable)->toBeTrue();
@@ -197,14 +198,14 @@ it('retries a failed SSH attempt once within the same check', function () {
 it('counts one failed check when both SSH attempts fail', function () {
     $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*' => Process::result(errorOutput: 'Connection timed out', exitCode: 255),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     Sleep::assertSleptTimes(1);
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'ls -la /'), 2);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'ls -la /'), 2);
     expect($server->fresh()->unreachable_count)->toBe(1)
         ->and((bool) $server->settings->fresh()->is_reachable)->toBeTrue();
 });
@@ -212,26 +213,26 @@ it('counts one failed check when both SSH attempts fail', function () {
 it('does not retry the Docker check within the same check', function () {
     $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
     $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker version*' => Process::result(errorOutput: 'Cannot connect to the Docker daemon', exitCode: 1),
         '*' => Process::result(exitCode: 0),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
-    Process::assertRanTimes(fn ($process) => str_contains($process->command, 'docker version'), 1);
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker version'), 1);
     expect((bool) $server->settings->fresh()->is_reachable)->toBeTrue()
         ->and((bool) $server->settings->fresh()->is_usable)->toBeFalse();
 });
 
 it('keeps the server usable when only the compose version check fails', function () {
     $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
-    Process::fake([
+    fakeRemoteProcesses([
         '*compose*' => Process::result(errorOutput: 'docker: compose is not a docker command', exitCode: 1),
         '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
     ]);
 
-    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
 
     expect((bool) $server->settings->fresh()->is_usable)->toBeTrue();
 });
@@ -242,4 +243,76 @@ it('gives the job enough time for every connection check step', function () {
 
     expect($job->timeout)->toBeGreaterThanOrEqual(ServerConnectionCheckJob::maximumCheckSeconds())
         ->and($lock->expiresAfter)->toBeGreaterThan($job->timeout);
+});
+
+it('stops managing a server when its owner marker names a newer claim of another instance', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance', 'claimed_at' => '2026-01-01T00:00:00+00:00']]],
+    ]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    fakeRemoteProcesses([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-instance-b","instance_url":"https://8.8.8.8","claimed_at":"2026-02-01T00:00:00+00:00"}', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeTrue()
+        ->and(data_get($server->server_metadata, 'transfer.target_instance_url'))->toBe('https://8.8.8.8')
+        ->and((bool) $server->settings->force_disabled)->toBeTrue();
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'docker version'));
+});
+
+it('keeps managing a server when its owner marker is its own claim', function () {
+    $server = createServerForConnectionIsolationTest([
+        'ip' => '203.0.113.10',
+        'server_metadata' => ['transfer' => ['status' => 'claimed', 'claim' => ['claim_id' => 'claim-of-this-instance']]],
+    ]);
+    fakeRemoteProcesses([
+        '*ls -la /*' => Process::result(output: '{"claim_id":"claim-of-this-instance"}', exitCode: 0),
+        '*compose*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $server->refresh();
+    expect($server->isTransferredAway())->toBeFalse()
+        ->and((bool) $server->settings->is_usable)->toBeTrue();
+});
+
+it('passes the SSH probe on a server without an owner marker', function () {
+    // The remote shell runs the probe with `set -e`, like this.
+    $result = Process::input(ServerConnectionCheckJob::probeCommand())->run(['sh', '-se']);
+
+    expect(file_exists(ServerTransferClaimer::OWNER_MARKER_PATH))->toBeFalse()
+        ->and($result->exitCode())->toBe(0);
+});
+
+it('keeps the owner marker read elevated in the SSH probe on a non-root server', function () {
+    $server = createServerForConnectionIsolationTest(['user' => 'ubuntu']);
+
+    expect(parseCommandsByLineForSudo(collect([ServerConnectionCheckJob::probeCommand()]), $server))->toBe([
+        'sudo cat '.ServerTransferClaimer::OWNER_MARKER_PATH.' 2>/dev/null || sudo true; ls -la / > /dev/null',
+    ]);
+});
+
+it('runs the Docker checks through the multiplexed connection and only the probe as a new login', function () {
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    fakeRemoteProcesses([
+        '*compose version*' => Process::result(output: 'v2.32.4', exitCode: 0),
+        '*' => Process::result(output: '{"Server":{"Version":"29.4.3"}}', exitCode: 0),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh()))->handle();
+
+    $usesMux = fn (string $remoteCommand) => fn ($process) => str_contains(remoteProcessScript($process), $remoteCommand)
+        && str_contains(remoteProcessScript($process), 'ControlPath=');
+    Process::assertDidntRun($usesMux('ls -la /'));
+    Process::assertRan($usesMux('docker version --format json'));
+    Process::assertRan($usesMux('docker compose version --short'));
+    expect((bool) $server->settings->fresh()->is_usable)->toBeTrue();
 });

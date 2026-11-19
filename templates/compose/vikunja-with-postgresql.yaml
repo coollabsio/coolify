@@ -7,7 +7,7 @@
 
 services:
   vikunja:
-    image: vikunja/vikunja
+    image: vikunja/vikunja:2.8.0
     environment:
       - SERVICE_URL_VIKUNJA
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_URL_VIKUNJA
@@ -17,9 +17,9 @@ services:
       - VIKUNJA_DATABASE_HOST=postgresql
       - VIKUNJA_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - VIKUNJA_DATABASE_USER=${SERVICE_USER_POSTGRESQL}
-      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}
+      - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE:-vikunja}
     volumes:
-      - vikunja-data:/app/vikunja/
+      - vikunja-data:/app/vikunja/files
     healthcheck:
       test: [ "CMD", "/app/vikunja/vikunja", "healthcheck" ]
       interval: 30s
@@ -29,17 +29,26 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
+      init:
+        condition: service_completed_successfully
 
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - vikunja-postgresql-data:/var/lib/postgresql/data
+      - vikunja-postgresql-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRESQL_DATABASE}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-vikunja}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 20s
       retries: 10
+
+  init:
+    image: busybox:1.38.0
+    restart: no
+    volumes:
+      - vikunja-data:/app/vikunja/files
+    command: ["sh", "-c", "chown -R 1000 /app/vikunja/files"]

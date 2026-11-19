@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\HasS3Destinations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledVolumeBackup extends BaseModel
 {
+    use HasS3Destinations;
+
     public const int DEFAULT_TIMEOUT = 36000;
 
     protected $fillable = [
@@ -123,6 +127,11 @@ class ScheduledVolumeBackup extends BaseModel
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
     }
 
+    public function s3Storages(): BelongsToMany
+    {
+        return $this->belongsToMany(S3Storage::class, 'scheduled_volume_backup_s3_storage')->withTimestamps();
+    }
+
     public function executions(): HasMany
     {
         return $this->hasMany(ScheduledVolumeBackupExecution::class)->latest();
@@ -147,6 +156,20 @@ class ScheduledVolumeBackup extends BaseModel
     public function targetResource(): ?Model
     {
         return $this->backupable?->resource;
+    }
+
+    /**
+     * Link to the resource in the Coolify UI. Built from base_url(), because queued notifications have no request and route() would use APP_URL.
+     */
+    public function resourceUrl(): ?string
+    {
+        $resource = $this->targetResource();
+        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
+        if (! $linkable || ! method_exists($linkable, 'link') || ! $link = $linkable->link()) {
+            return null;
+        }
+
+        return rtrim(base_url(), '/').parse_url($link, PHP_URL_PATH);
     }
 
     public function targetType(): string

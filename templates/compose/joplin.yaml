@@ -25,7 +25,7 @@ services:
       retries: 5
 
   joplin:
-    image: 'joplin/server:latest'
+    image: 'joplin/server:3.7.5'
     platform: 'linux/amd64'
     depends_on:
       postgres:

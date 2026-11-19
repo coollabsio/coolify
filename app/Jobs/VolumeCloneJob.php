@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -28,6 +30,22 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         protected LocalPersistentVolume $persistentVolume
     ) {
         $this->onQueue('high');
+    }
+
+    /**
+     * Explicit tags, so Horizon does not compare the models of the job. In a chain, the job is restored
+     * with two copies of one server for a clone on the same server, and comparing them fails on PHP 8.4
+     * ("Nesting level too deep"), which stops the chain before the copy.
+     *
+     * @return array<int, string>
+     */
+    public function tags(): array
+    {
+        return array_values(array_unique([
+            Server::class.':'.$this->sourceServer->id,
+            ...($this->targetServer ? [Server::class.':'.$this->targetServer->id] : []),
+            LocalPersistentVolume::class.':'.$this->persistentVolume->id,
+        ]));
     }
 
     public function handle(): void
@@ -69,7 +87,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
         instant_remote_process([
             $createTargetVolume,
-            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
+            "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/'",
         ], $this->sourceServer);
         $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
     }
@@ -123,7 +141,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
             instant_remote_process([
                 $createTargetVolume,
-                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
+                "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz'",
             ], $this->targetServer);
             $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
         } catch (\Exception $e) {
@@ -186,9 +204,38 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($configuration['options'] as $key => $value) {
             $command .= ' --opt '.escapeshellarg("{$key}={$value}");
         }
+        foreach ($this->composeVolumeLabels() as $key => $value) {
+            $command .= ' --label '.escapeshellarg("{$key}={$value}");
+        }
         $command .= ' '.escapeshellarg($this->targetVolume);
 
         return 'sh -c '.escapeshellarg($command);
+    }
+
+    /**
+     * The labels that Docker Compose puts on a volume it creates. Without the project label, every
+     * `docker compose up` of the resource warns that the volume "was not created by Docker Compose".
+     * The project is the `--project-name` of the resource: the service UUID for a service, else the
+     * resource UUID (a standalone database uses its configuration directory, which is its UUID).
+     * The volume key in the generated Compose file is the volume name.
+     *
+     * @return array<string, string>
+     */
+    protected function composeVolumeLabels(): array
+    {
+        $resource = $this->persistentVolume->resource;
+        $project = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase
+            ? $resource->service?->uuid
+            : $resource?->uuid;
+
+        if (blank($project)) {
+            return [];
+        }
+
+        return [
+            'com.docker.compose.project' => (string) $project,
+            'com.docker.compose.volume' => $this->targetVolume,
+        ];
     }
 
     /**

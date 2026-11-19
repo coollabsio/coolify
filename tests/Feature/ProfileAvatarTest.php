@@ -47,6 +47,21 @@ it('compresses and stores an uploaded profile picture on the configured local st
         ->and(Storage::disk('images')->size($user->avatar_path))->toBeLessThan(100_000);
 })->skip(! extension_loaded('gd'), 'Requires the GD extension to generate and compress the test image.');
 
+it('changes the profile picture URL when an existing picture is replaced', function () {
+    Storage::fake('images');
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    $upload = fn () => UploadedFile::fake()->createWithContent('avatar.jpg', file_get_contents(base_path('tests/Fixtures/project-icon.jpg')));
+
+    app(AvatarStorageService::class)->store($user, $upload());
+    $oldUrl = profile_avatar_url($user->fresh());
+
+    $this->travel(1)->minutes();
+    app(AvatarStorageService::class)->store($user->fresh(), $upload());
+
+    expect(profile_avatar_url($user->fresh()))->not->toBe($oldUrl);
+});
+
 it('stores an already compressed browser JPEG without server image extensions', function () {
     Storage::fake('images');
     $user = User::factory()->create(['name' => 'Test User']);
@@ -171,5 +186,43 @@ it('falls back cleanly when the avatars S3 storage no longer exists', function (
 
     $this->withoutMiddleware()->actingAs($user)
         ->get(route('profile.avatar'))
+        ->assertNotFound();
+});
+
+it('serves a team members profile picture to other members of the same team', function () {
+    Storage::fake('images');
+    $team = Team::factory()->create();
+    $viewer = User::factory()->create();
+    $member = User::factory()->create([
+        'avatar_path' => 'avatars/2/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $team->members()->attach($viewer->id, ['role' => 'member']);
+    $team->members()->attach($member->id, ['role' => 'member']);
+    Storage::disk('images')->put($member->avatar_path, 'avatar-content');
+
+    $this->actingAs($viewer);
+
+    expect(profile_avatar_url($member))->toBe(route('team.member.avatar', ['user_id' => $member->id, 'v' => $member->updated_at->timestamp]));
+
+    $this->withoutMiddleware()
+        ->get(route('team.member.avatar', ['user_id' => $member->id]))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'image/jpeg');
+});
+
+it('does not serve the profile picture of a user who shares no team', function () {
+    Storage::fake('images');
+    $viewer = User::factory()->create();
+    $viewer->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    $stranger = User::factory()->create([
+        'avatar_path' => 'avatars/3/avatar.jpg',
+        'avatar_storage_type' => 'local',
+    ]);
+    $stranger->teams()->attach(Team::factory()->create()->id, ['role' => 'owner']);
+    Storage::disk('images')->put($stranger->avatar_path, 'avatar-content');
+
+    $this->withoutMiddleware()->actingAs($viewer)
+        ->get(route('team.member.avatar', ['user_id' => $stranger->id]))
         ->assertNotFound();
 });

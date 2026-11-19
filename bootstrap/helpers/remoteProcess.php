@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\RemoteProcessCommand;
 use Carbon\Carbon;
 use Illuminate\Contracts\Process\ProcessResult;
@@ -90,6 +91,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
         function () use ($source, $dest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -119,6 +121,7 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
         function () use ($remoteSource, $localDest, $server) {
             $scp_command = SshMultiplexingHelper::generateScpDownloadCommand($server, $remoteSource, $localDest);
             $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -160,13 +163,23 @@ function runSshProcess(string $sshCommand, int $timeout, ?string $input = null):
  */
 function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
 {
-    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    instant_remote_process_with_input($server, ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null', $content, $throwError);
+}
+
+/**
+ * Run one command on a server with content on its stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. The command is not passed
+ * through the sudo parser: add `sudo` for non-root servers yourself.
+ */
+function instant_remote_process_with_input(Server $server, string $remoteCommand, string $input, bool $throwError = true): void
+{
     $timeout = (int) config('constants.ssh.command_timeout');
 
     SshRetryHandler::retry(
-        function () use ($server, $remoteCommand, $content, $timeout) {
+        function () use ($server, $remoteCommand, $input, $timeout) {
             $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
-            $process = runSshProcess($sshCommand, $timeout, $content);
+            $process = runSshProcess($sshCommand, $timeout, $input);
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             if ($process->exitCode() !== 0) {
                 excludeCertainErrors($process->errorOutput(), $process->exitCode());
@@ -174,8 +187,8 @@ function instant_remote_write_file(Server $server, string $path, string $content
         },
         [
             'server' => $server->ip,
-            'dest' => $path,
-            'function' => 'instant_remote_write_file',
+            'command_preview' => substr($remoteCommand, 0, 100),
+            'function' => 'instant_remote_process_with_input',
         ],
         $throwError
     );
@@ -191,8 +204,9 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-            $process = runSshProcess($sshCommand, 30);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server);
+            $process = runSshProcess($sshCommand, 30, SshMultiplexingHelper::sshBatchInput($command_string));
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -215,7 +229,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
+function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false, ?int $maxAttempts = null): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -227,8 +241,9 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
-            $process = runSshProcess($sshCommand, (int) $effectiveTimeout);
+            $sshCommand = SshMultiplexingHelper::generateSshBatchCommand($server, $disableMultiplexing, (int) $effectiveTimeout);
+            $process = runSshProcess($sshCommand, (int) $effectiveTimeout, SshMultiplexingHelper::sshBatchInput($command_string));
+            SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             $output = trim($process->output());
             $exitCode = $process->exitCode();
@@ -247,7 +262,8 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
             'command_preview' => substr($command_string, 0, 100),
             'function' => 'instant_remote_process',
         ],
-        $throwError
+        $throwError,
+        $maxAttempts
     );
 }
 
@@ -260,6 +276,10 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
     }
+    if ($exitCode === 255 && str_contains($errorMessage, 'Host key verification failed')) {
+        $errorMessage = SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE;
+    }
+    $errorMessage = trim(SshMultiplexingHelper::stripHostKeyChangedWarning($errorMessage)) ?: "SSH command failed with exit code: $exitCode";
 
     throw new RuntimeException($errorMessage, $exitCode);
 }
@@ -370,46 +390,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 
 function remove_iip($text)
 {
-    // Ensure the input is valid UTF-8 before processing
-    $text = sanitize_utf8_text($text);
-
-    // Git access tokens
-    $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
-    $text = preg_replace('/oauth2:.*?(?=@)/', 'oauth2:'.REDACTED, $text);
-
-    // ANSI color codes
-    $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);
-
-    // Generic URLs with passwords (covers database URLs, ftp, amqp, ssh, git basic auth, etc.)
-    // (protocol://user:password@host → protocol://user:<REDACTED>@host)
-    // User and password cannot contain whitespace, so a match never spans log lines.
-    $text = preg_replace('/((?:https?|postgres|mysql|mongodb|rediss?|mariadb|ftp|sftp|ssh|amqp|amqps|ldap|ldaps|s3):\/\/[^:\s@\/]+:)[^@\s]+(@)/i', '$1'.REDACTED.'$2', $text);
-
-    // Email addresses
-    $text = preg_replace('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', REDACTED, $text);
-
-    // Bearer/JWT tokens
-    $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
-
-    // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
-    $text = preg_replace('/\bgh[pousr]_[A-Za-z0-9.\-_]{36,}(?![A-Za-z0-9.\-_])/', REDACTED, $text);
-
-    // GitLab tokens (glpat- = personal access token, glcbt- = CI build token, glrt- = runner token)
-    $text = preg_replace('/\b(gl(?:pat|cbt|rt)-[A-Za-z0-9\-_]{20,})\b/', REDACTED, $text);
-
-    // AWS credentials (Access Key ID starts with AKIA, ABIA, ACCA, ASIA)
-    $text = preg_replace('/\b(A(?:KIA|BIA|CCA|SIA)[A-Z0-9]{16})\b/', REDACTED, $text);
-
-    // AWS Secret Access Key (40 character base64-ish string, typically follows access key)
-    $text = preg_replace('/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[=:]\s*[\'"]?([A-Za-z0-9\/+=]{40})[\'"]?/i', '$1='.REDACTED, $text);
-
-    // API keys (common patterns)
-    $text = preg_replace('/(api[_-]?key|apikey|api[_-]?secret|secret[_-]?key)[=:]\s*[\'"]?[A-Za-z0-9\-_]{16,}[\'"]?/i', '$1='.REDACTED, $text);
-
-    // Private key blocks
-    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
-
-    return $text;
+    return app(SensitiveDataRedactor::class)->redactText((string) $text);
 }
 
 /**

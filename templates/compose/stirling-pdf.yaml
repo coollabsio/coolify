@@ -7,7 +7,7 @@
 
 services:
   stirling-pdf:
-    image: stirlingtools/stirling-pdf:latest
+    image: stirlingtools/stirling-pdf:3.3.0
     volumes:
       - stirling-training-data:/usr/share/tesseract-ocr/5/tessdata
       - stirling-configs:/configs

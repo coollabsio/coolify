@@ -7,7 +7,7 @@
 
 services:
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:v1.33.1
     ports:
       - 1025:1025
     volumes:

@@ -28,11 +28,10 @@ class SettingsBackup extends Component
     #[Locked]
     public $s3s;
 
-    #[Locked]
-    public $executions = [];
-
     #[Validate(['nullable'])]
     public ?string $description = null;
+
+    public bool $is_backup_before_update_enabled;
 
     public function mount()
     {
@@ -56,9 +55,9 @@ class SettingsBackup extends Component
                 $this->backup->enabled = false;
                 $this->backup->save();
             }
-            $this->executions = $this->backup?->executions ?? [];
         }
         $this->settings = $settings;
+        $this->is_backup_before_update_enabled = $settings->is_backup_before_update_enabled;
         $this->s3s = $s3s;
     }
 
@@ -109,9 +108,29 @@ class SettingsBackup extends Component
             $this->s3s = S3Storage::whereTeamId(0)->get();
 
             $this->description = $this->database->description;
-            $this->executions = $this->backup->executions;
 
         } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->settings->is_backup_before_update_enabled = $this->is_backup_before_update_enabled;
+            $changedFields = auditChangedFields($this->settings);
+            $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'backup',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

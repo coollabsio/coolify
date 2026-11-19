@@ -76,6 +76,26 @@ test('shared variable with spaces resolves correctly', function () {
     expect($realValue)->toBe('test-value-123');
 });
 
+test('spaced shared variable inside a longer value resolves for the container (#7202)', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'DOMAIN',
+        'value' => 'example.com',
+        'type' => 'project',
+        'project_id' => $this->project->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    $env = EnvironmentVariable::create([
+        'key' => 'PUBLIC_APIURL',
+        'value' => 'https://{{ project.DOMAIN }}/api',
+        'resourceable_id' => $this->application->id,
+        'resourceable_type' => $this->application->getMorphClass(),
+    ]);
+
+    expect($env->real_value)->toBe('https://example.com/api')
+        ->and($env->getResolvedValueWithServer())->toBe('https://example.com/api');
+});
+
 test('shared variable without spaces resolves correctly', function () {
     // Create shared variable
     $shared = SharedEnvironmentVariable::create([
@@ -197,7 +217,7 @@ test('multiple shared variables preserve individual spacing', function () {
     expect($env->value)->toBe('{{ project.a }} and {{team.b}}');
 });
 
-test('leading and trailing spaces are trimmed', function () {
+test('leading and trailing spaces are kept (#4734)', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TRIMMED',
         'value' => '   {{ project.aaa }}   ',
@@ -206,6 +226,5 @@ test('leading and trailing spaces are trimmed', function () {
     ]);
 
     $env->refresh();
-    // External spaces trimmed, internal preserved
-    expect($env->value)->toBe('{{ project.aaa }}');
+    expect($env->value)->toBe('   {{ project.aaa }}   ');
 });

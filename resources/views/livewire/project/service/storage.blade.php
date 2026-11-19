@@ -120,7 +120,9 @@
                                             <form class="flex w-full flex-col gap-4"
                                                 wire:submit='submitPersistentVolume'>
                                                 <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
-                                                    Mount a Docker volume inside the container.
+                                                    Mount a Docker volume inside the container. Coolify adds the
+                                                    prefix <code class="break-all">{{ $resource->uuid }}-</code> to the
+                                                    name, so that the volume name is unique on the server.
                                                 </p>
                                                 <div class="flex flex-col gap-4">
                                                     <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"

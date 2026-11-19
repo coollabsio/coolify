@@ -7,7 +7,7 @@
 
 services:
   code-server:
-    image: lscr.io/linuxserver/code-server:latest
+    image: lscr.io/linuxserver/code-server:4.145.2
     environment:
       - SERVICE_URL_CODESERVER_8443
       - PUID=1000
