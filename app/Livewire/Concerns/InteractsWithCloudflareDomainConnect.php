@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DnsRecordHints;
 use App\Support\DomainConnect\CloudflareDomainConnect;
 use Illuminate\Support\Js;
@@ -29,6 +30,12 @@ trait InteractsWithCloudflareDomainConnect
 
         if ($this->allDomainHostnames() === []) {
             $this->dispatch('error', 'Add at least one domain before configuring DNS on Cloudflare.');
+
+            return;
+        }
+
+        if ($this->publicServerIpForDomainConnect() === null) {
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
 
             return;
         }
@@ -62,6 +69,14 @@ trait InteractsWithCloudflareDomainConnect
                 'error',
                 'A resolvable server IP is required before autoconfiguring DNS. Set a public IP on the server (or instance settings for localhost).'
             );
+
+            return;
+        }
+
+        $ip = $this->publicServerIpForDomainConnect();
+        if ($ip === null) {
+            $this->showCloudflareAutoconfigureModal = false;
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
 
             return;
         }
@@ -197,34 +212,12 @@ trait InteractsWithCloudflareDomainConnect
      */
     protected function serverIpsForDnsHints(): array
     {
-        $ipv4 = null;
-        $ipv6 = null;
+        return $this->serverDnsAddresses()->addresses();
+    }
 
-        $ip = $this->serverIpForDomainConnect();
-        if (filled($ip)) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                $ipv4 = $ip;
-            } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
-                $ipv6 = $ip;
-            }
-        }
-
-        // Prefer instance public IPv6 when the destination IP is IPv4-only (and vice versa).
-        try {
-            $settings = instanceSettings();
-            $publicV4 = data_get($settings, 'public_ipv4');
-            $publicV6 = data_get($settings, 'public_ipv6');
-            if ($ipv4 === null && is_string($publicV4) && filter_var($publicV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                $ipv4 = $publicV4;
-            }
-            if ($ipv6 === null && is_string($publicV6) && filter_var($publicV6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-                $ipv6 = $publicV6;
-            }
-        } catch (\Throwable) {
-            //
-        }
-
-        return [$ipv4, $ipv6];
+    protected function serverDnsAddresses(): ServerDnsAddresses
+    {
+        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, $this->usesInstanceNetworkAddressesForDnsHints());
     }
 
     protected function defaultDnsHostname(): string
@@ -244,6 +237,15 @@ trait InteractsWithCloudflareDomainConnect
         return rtrim($hostname, '.');
     }
 
+    /**
+     * Address that Domain Connect may publish at Cloudflare: the first public server address (IPv4 first).
+     * Private, reserved, CGNAT, and link-local addresses are never sent to Cloudflare.
+     */
+    protected function publicServerIpForDomainConnect(): ?string
+    {
+        return $this->serverDnsAddresses()->publicAddresses()[0] ?? null;
+    }
+
     protected function serverIpForDomainConnect(): ?string
     {
         if (filled($this->serverIp) && filter_var($this->serverIp, FILTER_VALIDATE_IP) !== false) {
@@ -252,6 +254,8 @@ trait InteractsWithCloudflareDomainConnect
 
         return null;
     }
+
+    abstract protected function usesInstanceNetworkAddressesForDnsHints(): bool;
 
     abstract protected function authorizeUpdateForDomainConnect(): void;
 }

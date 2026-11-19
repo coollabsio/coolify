@@ -6,13 +6,18 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\RestartServiceApplication;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Service\UpdateServiceApplicationFromApi;
+use App\Enums\RedirectTypes;
 use App\Http\Controllers\Controller;
+use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
 class ServiceApplicationsController extends Controller
@@ -24,6 +29,7 @@ class ServiceApplicationsController extends Controller
             'resourceable',
             'resourceable_id',
             'resourceable_type',
+            'service',
         ]);
 
         $serialized = serializeApiResponse($serviceApplication);
@@ -255,8 +261,12 @@ class ServiceApplicationsController extends Controller
                         'exclude_from_status' => new OA\Property(property: 'exclude_from_status', type: 'boolean', nullable: true),
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
+                        'traefik_certificate_resolver' => new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for this service application. Null uses the server setting, "none" uses no resolver.'),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
+                        'is_permanent_redirect_enabled' => new OA\Property(property: 'is_permanent_redirect_enabled', type: 'boolean', nullable: true, description: 'Use permanent redirects (301/308) instead of temporary (302/307) for the HTTP to HTTPS and www redirects. Defaults to false.'),
+                        'redirect' => new OA\Property(property: 'redirect', type: 'string', enum: ['both', 'www', 'non-www'], description: 'How to handle www and non-www domains. "www" redirects non-www to www, "non-www" redirects www to non-www. Both need a www and a non-www domain in url.'),
+                        'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
                     ]
                 )
             )
@@ -328,12 +338,16 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status',
             'is_log_drain_enabled',
             'is_gzip_enabled',
+            'traefik_certificate_resolver',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
+            'is_permanent_redirect_enabled',
+            'redirect',
+            'max_restart_count',
         ];
 
         $validationRules = [
-            'url' => 'nullable|string',
+            'url' => ValidationPatterns::applicationDomainRules(),
             'noindex_domains' => 'sometimes|array|nullable',
             'noindex_domains.*' => 'string',
             'human_name' => 'nullable|string|max:255',
@@ -342,8 +356,12 @@ class ServiceApplicationsController extends Controller
             'exclude_from_status' => 'sometimes|boolean',
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
+            'traefik_certificate_resolver' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
+            'is_permanent_redirect_enabled' => 'sometimes|boolean',
+            'redirect' => ['sometimes', Rule::enum(RedirectTypes::class)],
+            'max_restart_count' => 'sometimes|integer|min:0',
         ];
 
         $validator = Validator::make($payload, $validationRules);
@@ -368,12 +386,19 @@ class ServiceApplicationsController extends Controller
 
         $serviceApplication->refresh();
 
+        auditLog('api.service_application.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_application_uuid' => $serviceApplication->uuid,
+            'changed_fields' => array_keys($payload),
+        ]);
+
         return response()->json($this->removeSensitiveData($serviceApplication));
     }
 
     #[OA\Get(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'get-service-application-logs-by-service-and-app-uuid',
         security: [
@@ -398,9 +423,12 @@ class ServiceApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
         ],
         responses: [
@@ -439,7 +467,7 @@ class ServiceApplicationsController extends Controller
     )]
     #[OA\Post(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'post-service-application-logs-by-service-and-app-uuid',
         security: [['bearerAuth' => []]],
@@ -447,7 +475,16 @@ class ServiceApplicationsController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'lines', in: 'query', required: false, schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ]),
+            ),
         ],
         responses: [
             new OA\Response(
@@ -496,15 +533,17 @@ class ServiceApplicationsController extends Controller
 
         $containerName = $serviceApplication->name.'-'.$serviceApplication->service->uuid;
 
-        $status = getContainerStatus($server, $containerName);
-        if ($status !== 'running') {
+        if (! is_array(getContainerStatus($server, $containerName, all_data: true))) {
             return response()->json([
                 'message' => 'Service application container is not running.',
             ], 400);
         }
 
         $lines = normalizeLogLines($request->query('lines'));
-        $logs = getContainerLogs($server, $containerName, $lines);
+        $logs = sanitizeLogsForExport(
+            getContainerLogs($server, $containerName, $lines),
+            EnvironmentVariable::logRedactionSecretsFor($serviceApplication->service),
+        );
 
         return response()->json([
             'logs' => $logs,

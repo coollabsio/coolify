@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Security;
 
+use App\Actions\IntegrationToken\CreateIntegrationToken;
 use App\Models\IntegrationToken;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Client\ConnectionException;
 use Livewire\Component;
 
 class IntegrationTokenForm extends Component
@@ -23,6 +25,10 @@ class IntegrationTokenForm extends Component
 
     public array $metadata = [];
 
+    public bool $automaticDns = true;
+
+    public bool $proxiedDns = false;
+
     public function mount(): void
     {
         $this->authorize('create', IntegrationToken::class);
@@ -33,6 +39,8 @@ class IntegrationTokenForm extends Component
         if ($this->provider === 'cloudflare') {
             $this->capabilities = ['dns'];
             $this->metadata = [];
+            $this->automaticDns = true;
+            $this->proxiedDns = false;
         } else {
             $this->capabilities = ['secrets'];
             $this->metadata = $this->provider === 'infisical'
@@ -41,33 +49,22 @@ class IntegrationTokenForm extends Component
         }
     }
 
+    /**
+     * Cloudflare Tunnel setup also writes DNS records, so selecting `tunnel` also selects `dns`.
+     */
+    public function updatedCapabilities(): void
+    {
+        if (in_array('tunnel', $this->capabilities, true) && ! in_array('dns', $this->capabilities, true)) {
+            $this->capabilities[] = 'dns';
+        }
+    }
+
     protected function rules(): array
     {
-        $allowedCapability = $this->provider === 'cloudflare' ? 'dns' : 'secrets';
-
-        $rules = [
-            'provider' => ['required', 'in:'.implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))],
-            'name' => ['required', 'string', 'max:255'],
-            'token' => ['required', 'string'],
-            'capabilities' => ['required', 'array', 'min:1'],
-            'capabilities.*' => ['required', 'in:'.$allowedCapability],
+        return CreateIntegrationToken::rules($this->provider) + [
+            'automaticDns' => ['boolean'],
+            'proxiedDns' => ['boolean'],
         ];
-
-        if ($this->provider === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url:http,https'];
-            $rules['metadata.client_id'] = ['required', 'string'];
-        }
-
-        if ($this->provider === 'doppler') {
-            $rules['token'][] = 'regex:/^dp\.(st|sa)\./';
-        }
-
-        if ($this->provider === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url:http,https'];
-            $rules['metadata.namespace'] = ['nullable', 'string'];
-        }
-
-        return $rules;
     }
 
     protected function messages(): array
@@ -81,24 +78,21 @@ class IntegrationTokenForm extends Component
 
     public function addToken(IntegrationTokenValidator $validator): void
     {
+        $this->authorize('create', IntegrationToken::class);
+
         $validated = $this->validate();
-        $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
 
         try {
-            if (! $validator->validate($validated['provider'], $validated['token'], $validated['capabilities'], $metadata)) {
-                $this->dispatch('error', $validator->errorMessage($validated['provider']));
-
-                return;
-            }
-
-            $integrationToken = IntegrationToken::query()->create([
-                'provider' => $validated['provider'],
-                'name' => $validated['name'],
-                'token' => $validated['token'],
-                'capabilities' => $validated['capabilities'],
-                'metadata' => $metadata ?: null,
-                'team_id' => currentTeam()->id,
-            ]);
+            $integrationToken = CreateIntegrationToken::run(
+                currentTeam()->id,
+                $validated['provider'],
+                $validated['name'],
+                $validated['token'],
+                $validated['capabilities'],
+                data_get($validated, 'metadata', []),
+                $validated['automaticDns'],
+                $validated['proxiedDns'],
+            );
 
             auditLog('ui.integration_token.created', [
                 'team_id' => currentTeam()->id,
@@ -108,13 +102,15 @@ class IntegrationTokenForm extends Component
             ]);
 
             $this->reset(['name', 'token']);
-            $this->dispatch('integrationTokenAdded')->to(IntegrationTokens::class);
+            $this->dispatch('integrationTokenAdded');
 
             if ($this->modal_mode) {
                 $this->dispatch('close-modal');
             }
 
             $this->dispatch('success', 'Integration token added successfully.');
+        } catch (ConnectionException) {
+            $this->dispatch('error', $validator->connectionErrorMessage($validated['provider']));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

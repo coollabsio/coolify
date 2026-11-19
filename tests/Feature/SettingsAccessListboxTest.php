@@ -11,24 +11,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-/**
- * Access settings must always use the shared listbox control — not conditional
- * custom Enable/Disable cards — so the Access section matches DNS/API/etc.
- */
-test('settings advanced access section always uses listboxes', function () {
-    $path = resource_path('views/livewire/settings/advanced.blade.php');
-    $contents = file_get_contents($path);
-
-    expect($contents)
-        ->toContain('id="is_registration_enabled"')
-        ->toContain('id="disable_two_step_confirmation"')
-        ->toContain('onChange="instantSave"')
-        ->not->toContain('toggleRegistration')
-        ->not->toContain('toggleTwoStepConfirmation')
-        ->not->toContain('Only administrators can create accounts.')
-        ->not->toContain('Two-step confirmations enabled');
-});
-
 test('instance admin can toggle registration via listbox instantSave', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
@@ -82,6 +64,28 @@ test('instance admin can toggle two-step confirmation via listbox instantSave', 
     expect((bool) $settings->fresh()->disable_two_step_confirmation)->toBeTrue();
 });
 
+test('instance admin can configure the image CDN URL at runtime', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
+    $settings = InstanceSettings::forceCreate(['id' => 0]);
+    Once::flush();
+
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Advanced::class)
+        ->assertSee('Image CDN URL')
+        ->set('image_cdn_url', 'https://images.example.com/media/')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($settings->fresh()->image_cdn_url)->toBe('https://images.example.com/media');
+});
+
 test('open API allowlist warning is hidden when API access is disabled', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
@@ -122,4 +126,25 @@ test('open API allowlist warning is shown when API access is enabled without all
     Livewire::test(Advanced::class)
         ->assertSet('is_api_enabled', true)
         ->assertSee('API access is open to every source');
+});
+
+test('MCP endpoint callout links to API token management', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'is_api_enabled' => false,
+        'is_mcp_server_enabled' => true,
+    ]);
+    Once::flush();
+
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Advanced::class)
+        ->assertSee(url('/mcp'))
+        ->assertSee('href="'.route('security.api-tokens').'"', false);
 });

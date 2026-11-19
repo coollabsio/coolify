@@ -61,7 +61,8 @@ it('serves a project icon only to a member of its team', function () {
 
     $this->withoutMiddleware()->get(route('project.icon', ['project_uuid' => $this->project->uuid]))
         ->assertSuccessful()
-        ->assertHeader('content-type', 'image/jpeg');
+        ->assertHeader('content-type', 'image/jpeg')
+        ->assertHeader('cache-control', 'immutable, max-age=31536000, private');
 
     $otherUser = User::factory()->create();
     $otherTeam = Team::factory()->create();
@@ -104,7 +105,9 @@ it('exposes the icon URL on the projects index', function () {
 });
 
 it('loads an S3 project icon from the configured CDN', function () {
-    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com/media/');
+    InstanceSettings::findOrFail(0)->update([
+        'image_cdn_url' => 'https://avatars.example.com/media',
+    ]);
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -126,8 +129,7 @@ it('loads an S3 project icon from the configured CDN', function () {
         ->assertViewHas('projectsJs', fn (array $projects): bool => $projects[0]['iconUrl'] === "https://avatars.example.com/media/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
 });
 
-it('loads an S3 project icon directly from S3 when the CDN is not configured', function () {
-    config()->set('constants.coolify.avatar_cdn_url');
+it('falls back to the authenticated proxy route for an S3 project icon when the CDN is not configured', function () {
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -145,11 +147,15 @@ it('loads an S3 project icon directly from S3 when the CDN is not configured', f
         'icon_s3_storage_id' => $storage->id,
     ])->save();
 
-    expect(project_icon_url($this->project))->toBe("https://s3.example.com/avatars/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
+    // Direct S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests,
+    // so without a CDN the browser must use the app's authenticated proxy route.
+    expect(project_icon_url($this->project))->toBe(route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]));
 });
 
 it('does not use an unusable S3 storage URL for a project icon', function () {
-    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com');
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,

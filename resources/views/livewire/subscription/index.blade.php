@@ -8,8 +8,8 @@
 
     @if (auth()->user()->isAdminFromSession())
         @if ($loading)
-            <div class="flex min-h-80 items-center justify-center" wire:init="getStripeStatus">
-                <x-loading text="Loading your subscription status..." />
+            <div wire:init="getStripeStatus">
+                <x-skeleton.settings-sections :count="2" label="Loading your subscription status" />
             </div>
         @else
             @if ($isUnpaid)

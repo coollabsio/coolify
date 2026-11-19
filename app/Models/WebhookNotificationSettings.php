@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class WebhookNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -31,7 +32,9 @@ class WebhookNotificationSettings extends Model
         'server_reachable_webhook_notifications',
         'server_unreachable_webhook_notifications',
         'server_patch_webhook_notifications',
+        'server_auto_update_webhook_notifications',
         'traefik_outdated_webhook_notifications',
+        'image_vulnerabilities_webhook_notifications',
     ];
 
     protected $hidden = [
@@ -58,7 +61,9 @@ class WebhookNotificationSettings extends Model
             'server_reachable_webhook_notifications' => 'boolean',
             'server_unreachable_webhook_notifications' => 'boolean',
             'server_patch_webhook_notifications' => 'boolean',
+            'server_auto_update_webhook_notifications' => 'boolean',
             'traefik_outdated_webhook_notifications' => 'boolean',
+            'image_vulnerabilities_webhook_notifications' => 'boolean',
         ];
     }
 
@@ -70,5 +75,15 @@ class WebhookNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->webhook_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Webhook';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->webhook_enabled = false;
     }
 }

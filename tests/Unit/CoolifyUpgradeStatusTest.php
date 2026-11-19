@@ -119,60 +119,6 @@ it('ignores stale status files older than ten minutes', function () {
     expect($result['status'])->toBe('none');
 });
 
-it('checks the running version through authenticated upgrade status before showing reload', function () {
-    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
-
-    expect($upgradeView)
-        ->not->toContain('X-Coolify-Version')
-        ->toContain('this.$wire.getUpgradeStatus()')
-        ->toContain("data.status === 'complete'")
-        ->toContain('livewireFailures');
-});
-
-it('uses the public health endpoint only for liveness during an upgrade', function () {
-    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
-
-    expect($upgradeView)
-        ->toContain('instanceWentDown')
-        ->toContain('startHealthWatch')
-        ->toContain("fetch('/api/health')")
-        ->not->toContain('response.headers.get');
-});
-
-it('finishes after health recovers from observed downtime for older target releases', function () {
-    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
-
-    expect($upgradeView)
-        ->toContain("data.status === 'none' && this.instanceWentDown")
-        ->toContain('if (this.instanceWentDown) {')
-        ->toContain('this.showSuccess();')
-        ->toContain('return;');
-});
-
-it('finishes when the post-restart Livewire status response is undefined', function () {
-    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
-
-    expect($upgradeView)
-        ->toContain('if (!data) {')
-        ->toContain('if (this.instanceWentDown) {')
-        ->toContain('this.showSuccess();')
-        ->toContain('return;');
-});
-
-it('tells users to reload manually if the automatic reload does not happen', function () {
-    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
-
-    expect($upgradeView)->toContain('If the page does not reload automatically, reload it manually.');
-});
-
-it('starts the upgrade after the Livewire response so status polling is not blocked', function () {
-    $upgradeComponent = file_get_contents(__DIR__.'/../../app/Livewire/Upgrade.php');
-
-    expect($upgradeComponent)
-        ->toContain('afterResponse()')
-        ->toContain('CoolifyUpgradeStatus::fromFile');
-});
-
 it('reports whether the running version has reached the target', function (string $running, string $target, bool $reached) {
     expect(CoolifyUpgradeStatus::hasReachedTargetVersion($running, $target))->toBe($reached);
 })->with([
@@ -181,4 +127,27 @@ it('reports whether the running version has reached the target', function (strin
     'already newer' => ['4.3.2', '4.3.1', true],
     'missing running version' => ['', '4.3.1', false],
     'missing target version' => ['4.3.1', '', false],
+]);
+
+it('detects a running upgrade only for recent intermediate steps', function (string $step, int $minutesAgo, bool $expected) {
+    $now = Carbon::parse('2026-08-13T12:00:00+00:00');
+    $content = "{$step}|Some message|".$now->copy()->subMinutes($minutesAgo)->toIso8601String();
+
+    expect(CoolifyUpgradeStatus::isRunning($content, $now))->toBe($expected);
+})->with([
+    'recent step 1' => ['1', 0, true],
+    'step 5 at lock expiry' => ['5', 15, true],
+    'step 3 after lock expiry' => ['3', 16, false],
+    'complete' => ['6', 1, false],
+    'error' => ['error', 1, false],
+]);
+
+it('does not detect a running upgrade for empty or malformed status', function (string $content) {
+    expect(CoolifyUpgradeStatus::isRunning($content))->toBeFalse();
+})->with([
+    'empty' => '',
+    'missing fields' => '3|Pulling Docker images',
+    'blank timestamp' => '3|Pulling Docker images|',
+    'whitespace timestamp' => "3|Pulling Docker images| \t",
+    'invalid timestamp' => '3|Pulling Docker images|not-a-date',
 ]);

@@ -17,25 +17,13 @@ class ConfigurationDiff
         return new self;
     }
 
-    public static function legacy(bool $changed): self
+    /**
+     * The last deployment stored no configuration snapshot (it ran before v4.1), so the
+     * deployed configuration is unknown. Report no changes, but build on the next deployment.
+     */
+    public static function legacy(): self
     {
-        if (! $changed) {
-            return self::unchanged();
-        }
-
-        return new self([
-            [
-                'key' => 'legacy.configuration',
-                'section' => 'configuration',
-                'section_label' => 'Configuration',
-                'label' => 'Configuration',
-                'type' => 'changed',
-                'impact' => 'build',
-                'sensitive' => false,
-                'old_display_value' => 'Previously deployed configuration',
-                'new_display_value' => 'Current configuration',
-            ],
-        ], true);
+        return new self(legacyFallback: true);
     }
 
     /**
@@ -63,7 +51,7 @@ class ConfigurationDiff
 
     public function requiresBuild(): bool
     {
-        return collect($this->changes)->contains(fn (array $change): bool => $change['impact'] === 'build');
+        return $this->legacyFallback || collect($this->changes)->contains(fn (array $change): bool => $change['impact'] === 'build');
     }
 
     public function requiresRedeploy(): bool

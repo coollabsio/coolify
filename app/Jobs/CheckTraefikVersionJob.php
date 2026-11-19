@@ -19,6 +19,20 @@ class CheckTraefikVersionJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        Server::query()
+            ->where(function ($query) {
+                $query->whereNull('proxy')
+                    ->orWhere('proxy->type', '!=', ProxyTypes::TRAEFIK->value);
+            })
+            ->where(function ($query) {
+                $query->whereNotNull('detected_traefik_version')
+                    ->orWhereNotNull('traefik_outdated_info');
+            })
+            ->update([
+                'detected_traefik_version' => null,
+                'traefik_outdated_info' => null,
+            ]);
+
         // Load versions from cached data
         $traefikVersions = get_traefik_versions();
 

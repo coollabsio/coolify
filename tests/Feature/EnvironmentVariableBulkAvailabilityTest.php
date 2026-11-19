@@ -79,7 +79,8 @@ it('turns build time availability off for the selected variables only', function
         ->call('loadEnvironmentVariables')
         ->call('bulkUpdateAvailability', 'is_buildtime', false, [$this->first->id, (string) $this->second->id])
         ->assertDispatched('success', 'Build time availability updated for 2 environment variables.')
-        ->assertDispatched('refreshEnvs')
+        ->assertDispatched('refresh')
+        ->assertNotDispatched('refreshEnvs')
         ->assertDispatched('envsUpdated')
         ->assertDispatched('configurationChanged')
         ->assertDispatched(All::SELECTION_RESET_EVENT);
@@ -176,7 +177,7 @@ it('does not refresh rows that the build time filter hides after the update', fu
         ->call('toggleVariableFilter', 'buildtime')
         ->call('bulkUpdateAvailability', 'is_buildtime', false, [$this->first->id, $this->second->id])
         ->assertDispatched('success')
-        ->assertNotDispatched('refreshEnvs');
+        ->assertNotDispatched('refresh');
 
     expect($this->first->fresh()->is_buildtime)->toBeFalse()
         ->and($this->second->fresh()->is_buildtime)->toBeFalse();
@@ -188,7 +189,18 @@ it('refreshes rows that stay visible under an active flag filter', function () {
         ->call('toggleVariableFilter', 'buildtime')
         ->call('bulkUpdateAvailability', 'is_runtime', false, [$this->first->id])
         ->assertDispatched('success')
-        ->assertDispatched('refreshEnvs');
+        ->assertDispatched('refresh');
+});
+
+it('shows the new availability in a row after the refresh event', function () {
+    $row = Livewire::test(Show::class, ['env' => $this->first, 'type' => 'application', 'selectable' => true])
+        ->assertSet('is_buildtime', true);
+
+    Livewire::test(All::class, ['resource' => $this->application])
+        ->call('loadEnvironmentVariables')
+        ->call('bulkUpdateAvailability', 'is_buildtime', false, [$this->first->id]);
+
+    $row->dispatch('refresh')->assertSet('is_buildtime', false);
 });
 
 it('tells the browser to drop the selection whenever the row set changes', function () {

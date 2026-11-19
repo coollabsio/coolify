@@ -36,8 +36,10 @@
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                        <x-callout type="warning" title="Configuration out of sync">
-                            Restart the proxy to apply the saved configuration.
+                        <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to apply TLS certificate changes.
                         </x-callout>
                     @else
                         <div class="flex items-start gap-3">
@@ -67,7 +69,7 @@
                                 ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
                         <x-forms.listbox id="redirectEnabled" label="Unknown requests"
-                            helper="Override the default 503 response for unknown hosts and stopped services."
+                            helper="Control the 503 response for unknown hosts and stopped services. Custom request handling shows an error page or redirects to a URL."
                             onChange="instantSaveRedirect" :options="[
                                 ['value' => false, 'label' => 'Return the default 503 response'],
                                 ['value' => true, 'label' => 'Use custom request handling'],
@@ -76,9 +78,28 @@
                             <x-forms.input canGate="update" :canResource="$server"
                                 placeholder="https://app.coolify.io" id="redirectUrl"
                                 label="Redirect URL"
-                                helper="Leave empty to keep a custom 503 response without redirecting." />
+                                helper="Leave empty to return a 503 response instead of redirecting." />
+                        @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="letsencrypt"
+                                id="certificateResolver" label="Certificate resolver"
+                                helper="Traefik certificate resolver for generated HTTPS routes. Leave empty if Traefik uses your own certificates (for example Cloudflare Origin CA certificates in a dynamic configuration). Redeploy resources to apply the change." />
                         @endif
                     </div>
+                    @if ($redirectEnabled && ! $server->isSwarm())
+                        <div class="mt-4 flex flex-col gap-2">
+                            <x-forms.textarea canGate="update" :canResource="$server" id="customErrorPage" rows="10"
+                                monospace label="Custom error page (HTML)"
+                                placeholder="Leave empty to use the Coolify default error page."
+                                helper="One self-contained HTML file (max {{ \App\Models\Server::PROXY_ERROR_PAGE_MAX_BYTES / 1024 }} KB) with inline CSS and images. Visitors see it with a 503 status for unknown domains and for stopped, deploying or unhealthy resources. A Redirect URL takes priority over this page." />
+                            @can('update', $server)
+                                <div class="flex gap-2">
+                                    <x-forms.button type="button" wire:click="resetCustomErrorPage">Reset to
+                                        default</x-forms.button>
+                                </div>
+                            @endcan
+                        </div>
+                    @endif
                 </x-application.settings-section>
 
                 @php
@@ -90,6 +111,7 @@
 
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
                     <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
+                        x-init="$wire.loadProxyConfiguration()"
                         helper="Edit the generated proxy compose configuration used on this server.">
                         <x-slot:actions>
                             @can('update', $server)
@@ -109,24 +131,44 @@
                         </x-slot:actions>
 
                         @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                            @if ($server->detected_traefik_version === 'latest')
+                            @if ($this->traefikVersionForWarning === 'latest')
                                 <x-callout type="warning" title="Unpinned Traefik version">
                                     The proxy uses the <span class="font-mono">latest</span> tag. Pin
                                     <span class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>
                                     for predictable updates.
                                 </x-callout>
-                            @elseif($this->isTraefikOutdated)
+                            @endif
+                            @if ($this->isTraefikOutdated)
                                 <x-callout type="warning" title="Traefik patch update available">
-                                    Version {{ $this->latestTraefikVersion }} is available. Test the update before
-                                    applying it to production servers.
-                                </x-callout>
-                            @elseif($this->newerTraefikBranchAvailable)
-                                <x-callout type="info" title="New Traefik minor version available">
-                                    {{ $this->newerTraefikBranchAvailable }} is available. Review the Traefik
-                                    changelog for breaking changes before upgrading.
+                                    {{ $server->detected_traefik_version ? 'Running version' : 'Configured image' }}
+                                    v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
+                                    for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
+                                    to production servers.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
+                            @if ($this->newerTraefikBranchAvailable)
+                                <x-callout type="info" title="New Traefik minor version available">
+                                    {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
+                                    {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
+                                    changes before upgrading.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
+                                </x-callout>
+                            @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
+
+                        <div wire:loading.flex wire:target="loadProxyConfiguration" role="status"
+                            class="mt-4 hidden flex-col gap-2">
+                            <span class="sr-only">Loading proxy configuration</span>
+                            <x-skeleton class="h-2.5 w-56 rounded-full" />
+                            <x-skeleton class="h-96 w-full rounded-lg" />
+                        </div>
 
                         @if ($proxySettings)
                             <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"

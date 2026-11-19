@@ -12,6 +12,7 @@ use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -30,12 +31,14 @@ use App\Models\SlackNotificationSettings;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
@@ -50,6 +53,7 @@ use App\Policies\CloudProviderTokenPolicy;
 use App\Policies\DatabasePolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
+use App\Policies\GiteaAppPolicy;
 use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
@@ -104,6 +108,8 @@ class AuthServiceProvider extends ServiceProvider
         StandaloneKeydb::class => DatabasePolicy::class,
         StandaloneDragonfly::class => DatabasePolicy::class,
         StandaloneClickhouse::class => DatabasePolicy::class,
+        StandaloneInfluxdb::class => DatabasePolicy::class,
+        StandaloneSqlite::class => DatabasePolicy::class,
 
         // Notification policies - all use the shared NotificationPolicy
         EmailNotificationSettings::class => NotificationPolicy::class,
@@ -131,6 +137,7 @@ class AuthServiceProvider extends ServiceProvider
         // Git source policies
         GithubApp::class => GithubAppPolicy::class,
         GitlabApp::class => GitlabAppPolicy::class,
+        GiteaApp::class => GiteaAppPolicy::class,
 
         // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
@@ -147,6 +154,7 @@ class AuthServiceProvider extends ServiceProvider
     {
         // Register gates for resource creation policy
         Gate::define('createAnyResource', [ResourceCreatePolicy::class, 'createAny']);
+        Gate::define('useTeamCredentials', [ResourceCreatePolicy::class, 'useTeamCredentials']);
 
         // Register gate for terminal access
         Gate::define('canAccessTerminal', function ($user) {

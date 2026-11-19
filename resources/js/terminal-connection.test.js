@@ -1,0 +1,97 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+    TERMINAL_CLOSE_CODES,
+    TERMINAL_CONNECT_TIMEOUT_MS,
+    TERMINAL_CONNECTION_ERRORS,
+    TERMINAL_SESSION_START_TIMEOUT_MS,
+    isTerminalAuthRejectionCode,
+    isTerminalOutputFrame,
+    isTerminalSessionEndedNotice,
+    isTerminalStartupRejection,
+    resolveTerminalCloseOutcome,
+} from './terminal-connection.js';
+
+const closeOutcome = (overrides = {}) => resolveTerminalCloseOutcome({
+    code: 1006,
+    sessionPending: false,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 10,
+    ...overrides,
+});
+
+test('terminal close codes match the codes sent by the terminal server', () => {
+    assert.equal(TERMINAL_CLOSE_CODES.AUTH_REJECTED, 4401);
+    assert.equal(TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 4403);
+    assert.equal(isTerminalAuthRejectionCode(4401), true);
+    assert.equal(isTerminalAuthRejectionCode(4403), true);
+    assert.equal(isTerminalAuthRejectionCode(1006), false);
+    assert.equal(isTerminalAuthRejectionCode(4000), false);
+});
+
+test('auth rejection closes stop reconnecting and show the reload message', () => {
+    for (const code of [4401, 4403]) {
+        for (const sessionPending of [true, false]) {
+            assert.deepEqual(closeOutcome({ code, sessionPending }), {
+                authRejected: true,
+                reconnect: false,
+                error: 'Terminal access was rejected. Reload the page and try again.',
+            });
+        }
+    }
+});
+
+test('a clean close neither reconnects nor reports an error', () => {
+    assert.deepEqual(closeOutcome({ code: 1000, sessionPending: true }), {
+        authRejected: false,
+        reconnect: false,
+        error: null,
+    });
+});
+
+test('a close before the session is ready leaves the connecting state with a generic error', () => {
+    for (const code of [1006, 1011, 1001, 4000]) {
+        assert.deepEqual(closeOutcome({ code, sessionPending: true }), {
+            authRejected: false,
+            reconnect: true,
+            error: TERMINAL_CONNECTION_ERRORS.connectionFailed,
+        });
+    }
+});
+
+test('an idle close reconnects silently until the retry limit, then reports an error', () => {
+    assert.deepEqual(closeOutcome({ reconnectAttempts: 9 }), {
+        authRejected: false,
+        reconnect: true,
+        error: null,
+    });
+    assert.deepEqual(closeOutcome({ reconnectAttempts: 10 }), {
+        authRejected: false,
+        reconnect: false,
+        error: TERMINAL_CONNECTION_ERRORS.connectionFailed,
+    });
+});
+
+test('session start rejections from the terminal server are detected', () => {
+    assert.equal(isTerminalStartupRejection('Unauthorized: Target host 10.0.0.5 not in authorized list'), true);
+    assert.equal(isTerminalStartupRejection('Invalid SSH command: No target host found'), true);
+    assert.equal(isTerminalStartupRejection('pty-ready'), false);
+    assert.equal(isTerminalStartupRejection('root@host:~# '), false);
+    assert.equal(isTerminalStartupRejection(new Blob([])), false);
+});
+
+test('connection timeouts stay within a bounded window', () => {
+    assert.equal(TERMINAL_CONNECT_TIMEOUT_MS, 15000);
+    assert.ok(TERMINAL_SESSION_START_TIMEOUT_MS >= TERMINAL_CONNECT_TIMEOUT_MS);
+    assert.ok(TERMINAL_SESSION_START_TIMEOUT_MS <= 30000);
+    assert.equal(TERMINAL_CONNECTION_ERRORS.timeout, 'Timed out while connecting to the terminal. Reload the page and try again.');
+});
+
+test('only binary frames are PTY output, so output cannot look like a session notice', () => {
+    const spoofed = 'Terminal session ended: access to this terminal was revoked.';
+
+    assert.equal(isTerminalOutputFrame(new TextEncoder().encode(spoofed).buffer), true);
+    assert.equal(isTerminalSessionEndedNotice(new TextEncoder().encode(spoofed).buffer), false);
+    assert.equal(isTerminalOutputFrame(spoofed), false);
+    assert.equal(isTerminalOutputFrame('pty-ready'), false);
+});

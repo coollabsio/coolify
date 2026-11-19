@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 class All extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableProtection;
+    use AuditsApplicationSettings, AuthorizesRequests, EnvironmentVariableProtection;
 
     public $resource;
 
@@ -56,6 +57,10 @@ class All extends Component
 
     public bool $use_build_secrets = false;
 
+    public bool $include_coolify_default_variables = true;
+
+    public bool $redact_all_env_values_in_logs = true;
+
     /**
      * Environment variable rows are loaded after first paint via wire:init
      * so the surrounding configuration page can render immediately.
@@ -66,6 +71,10 @@ class All extends Component
 
     private const BULK_AVAILABILITY_FIELDS = ['is_buildtime', 'is_runtime'];
 
+    private ?Collection $composeEnvironmentAssignments = null;
+
+    private ?bool $canViewComposeContent = null;
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -74,6 +83,20 @@ class All extends Component
 
     public function updatedSearch(): void
     {
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function focusComposeEnvironmentVariable(string $key): void
+    {
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1) {
+            return;
+        }
+
+        $this->search = $key;
+        $this->variableFilters = [];
+        $this->serviceFilters = [];
+        $this->environmentFilter = 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
@@ -98,6 +121,11 @@ class All extends Component
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
+        $coolifyDefaultVariablesOwner = $this->resource instanceof Application ? $this->resource->settings : $this->resource;
+        $this->include_coolify_default_variables = data_get($coolifyDefaultVariablesOwner, 'include_coolify_default_variables') !== false;
+        if ($this->hasLogRedactionSetting()) {
+            $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+        }
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -126,6 +154,41 @@ class All extends Component
         }
     }
 
+    /**
+     * Applications, services, and standalone databases have the "Environment values in logs" setting.
+     */
+    public function hasLogRedactionSetting(): bool
+    {
+        return method_exists($this->resource, 'redactsAllEnvValuesInLogs');
+    }
+
+    public function saveLogRedactionSetting()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } elseif ($this->hasLogRedactionSetting()) {
+                // Services and databases use the Auditable trait, so saving records the changed field.
+                $this->resource->redact_all_env_values_in_logs = $this->redact_all_env_values_in_logs;
+                $this->resource->save();
+            } else {
+                return;
+            }
+
+            $this->dispatch('success', 'Log redaction setting updated.');
+        } catch (\Throwable $e) {
+            if ($this->hasLogRedactionSetting()) {
+                $this->resource->refresh();
+                $this->redact_all_env_values_in_logs = $this->resource->redactsAllEnvValuesInLogs();
+            }
+
+            return handleError($e, $this);
+        }
+    }
+
     public function instantSave()
     {
         try {
@@ -134,10 +197,33 @@ class All extends Component
             $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
             $this->resource->settings->use_build_secrets = $this->use_build_secrets;
-            $this->resource->settings->save();
+            if ($this->resource instanceof Application) {
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } else {
+                $this->resource->settings->save();
+            }
             $this->clearEnvironmentVariableCaches();
             if ($this->readyToLoad && $this->view === 'dev') {
                 $this->getDevView();
+            }
+            $this->dispatch('success', 'Environment variable settings updated.');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveCoolifyDefaultVariables()
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if ($this->resource instanceof Application) {
+                $this->resource->settings->include_coolify_default_variables = $this->include_coolify_default_variables;
+                $this->saveApplicationSettingsWithAudit($this->resource);
+            } else {
+                $this->resource->include_coolify_default_variables = $this->include_coolify_default_variables;
+                $this->resource->save();
             }
             $this->dispatch('success', 'Environment variable settings updated.');
             $this->dispatch('configurationChanged');
@@ -220,12 +306,17 @@ class All extends Component
         return $this->environmentVariableRowCount > 0;
     }
 
+    private function canViewEnvironmentValues(): bool
+    {
+        return auth()->user()?->can('viewSensitive', $this->resource) ?? false;
+    }
+
     private function nullLockedValues($envs)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
-        $envs->each(function ($env) use ($isMember) {
-            if ($env->is_shown_once || $isMember) {
+        $envs->each(function ($env) use ($hideValues) {
+            if ($env->is_shown_once || $hideValues) {
                 $env->value = null;
                 $env->real_value = null;
             }
@@ -271,8 +362,10 @@ class All extends Component
 
         foreach ($this->environmentVariableSegments() as $segment) {
             if ($segment['kind'] === 'managed') {
-                foreach ($this->fetchManagedEnvironmentVariables($segment['is_preview'], null, null) as $environmentVariable) {
-                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable));
+                $variables = $this->fetchManagedEnvironmentVariables($segment['is_preview'], null, null);
+                $sameAsProductionIds = $this->previewVariableIdsWithProductionValues($variables);
+                foreach ($variables as $environmentVariable) {
+                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable, $sameAsProductionIds));
                 }
 
                 continue;
@@ -322,8 +415,9 @@ class All extends Component
 
             if ($segment['kind'] === 'managed') {
                 $variables = $this->fetchManagedEnvironmentVariables($segment['is_preview'], $offset, $take);
+                $sameAsProductionIds = $this->previewVariableIdsWithProductionValues($variables);
                 foreach ($variables as $environmentVariable) {
-                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable));
+                    $rows->push($this->managedEnvironmentVariableRow($environmentVariable, $sameAsProductionIds));
                 }
             } else {
                 $hardcoded = $segment['is_preview']
@@ -458,6 +552,7 @@ class All extends Component
             }
 
             $this->ensureEnvironmentVariablesLoaded();
+            $visibleIdsBefore = $this->visibleManagedRowIds();
 
             $updatedIds = EnvironmentVariable::query()
                 ->where('resourceable_type', $this->resource->getMorphClass())
@@ -482,8 +577,10 @@ class All extends Component
                 return;
             }
 
-            if ($this->updatedRowsRemainVisible($updatedIds)) {
-                $this->dispatch('refreshEnvs')->to(Show::class);
+            // Rows do not listen to refreshEnvs. Refresh them only when the update keeps the same rows
+            // on the page: a row that a filter now hides must not get an update (snapshot race).
+            if ($this->visibleManagedRowIds() === $visibleIdsBefore) {
+                $this->dispatch('refresh')->to(Show::class);
             }
 
             $label = $field === 'is_buildtime' ? 'Build time' : 'Runtime';
@@ -511,14 +608,14 @@ class All extends Component
             && in_array($environmentVariable->key, ['REDIS_PASSWORD', 'REDIS_USERNAME'], true);
     }
 
-    private function updatedRowsRemainVisible(array $updatedIds): bool
+    /** @return list<int> */
+    private function visibleManagedRowIds(): array
     {
-        $visibleIds = $this->environmentVariablePageRows
+        return $this->environmentVariablePageRows
             ->filter(fn (array $row): bool => $row['kind'] === 'managed')
             ->map(fn (array $row): int => (int) $row['environmentVariable']->id)
+            ->values()
             ->all();
-
-        return array_intersect($updatedIds, $visibleIds) !== [];
     }
 
     public function getServiceFilterOptionsProperty(): array
@@ -758,19 +855,47 @@ class All extends Component
             : $variables;
     }
 
-    private function managedEnvironmentVariableRow(EnvironmentVariable $environmentVariable): array
+    /** @param  array<int, int>  $sameAsProductionIds */
+    private function managedEnvironmentVariableRow(EnvironmentVariable $environmentVariable, array $sameAsProductionIds): array
     {
         return [
             'id' => 'environment-'.$environmentVariable->id,
             'kind' => 'managed',
             'scope' => $environmentVariable->is_preview ? 'preview' : 'production',
             'environmentVariable' => $environmentVariable,
+            'composeInfo' => $this->composeInfoFor($environmentVariable->key),
+            'sameAsProduction' => $environmentVariable->is_preview
+                && in_array($environmentVariable->id, $sameAsProductionIds, true),
         ];
+    }
+
+    /**
+     * Compared on the server, so the "Production value" badge sends no values to the browser.
+     * Only the given (visible) preview variables are compared.
+     *
+     * @return array<int, int>
+     */
+    private function previewVariableIdsWithProductionValues(Collection $variables): array
+    {
+        if (! $this->supportsPreviewEnvironmentVariables()) {
+            return [];
+        }
+
+        $previewIds = $variables
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_preview)
+            ->map(fn (EnvironmentVariable $environmentVariable): int => (int) $environmentVariable->id)
+            ->values()
+            ->all();
+
+        return $this->resource->previewEnvironmentVariableIdsWithProductionValues($previewIds);
     }
 
     private function hardcodedEnvironmentVariableRow(array $environmentVariable, bool $isPreview, int $index): array
     {
         $scope = $isPreview ? 'preview' : 'production';
+        $references = $this->composeReferences($environmentVariable['value'] ?? null);
+        $environmentVariable['compose_type'] = $references === [] ? 'literal' : 'derived';
+        $environmentVariable['references'] = $references;
 
         return [
             'id' => 'hardcoded-'.$scope.'-'.$environmentVariable['key'].'-'.($environmentVariable['service_name'] ?? 'default').'-'.$index,
@@ -844,7 +969,13 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        return $hardcodedVars;
+        $canViewValues = $this->canViewEnvironmentValues();
+
+        return $hardcodedVars->map(fn (array $variable): array => [
+            ...$variable,
+            'value' => $canViewValues ? $variable['value'] : null,
+            'is_value_hidden' => ! $canViewValues,
+        ]);
     }
 
     /** @return list<string> */
@@ -877,24 +1008,93 @@ class All extends Component
 
     private function isSelfReferencingComposeVariable(array $variable): bool
     {
-        $value = $variable['value'] ?? null;
-        if (! is_string($value)) {
-            return false;
-        }
-
-        if ($value === '$'.$variable['key']) {
+        if ($variable['is_passthrough'] ?? false) {
             return true;
         }
 
-        $reference = extractBalancedBraceContent($value);
-        if ($reference === null || $reference['start'] !== 1 || $reference['end'] !== strlen($value) - 1) {
-            return false;
+        $reference = $this->directComposeReference($variable['value'] ?? null);
+
+        return $reference !== null && $reference['key'] === $variable['key'];
+    }
+
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function composeInfoFor(string $key): ?array
+    {
+        $composeInfo = dockerComposeEnvironmentVariableInfo(
+            $this->resource->docker_compose_raw ?? $this->resource->docker_compose,
+            $key
+        );
+
+        if ($composeInfo !== null && ! $this->canViewComposeContent()) {
+            $composeInfo['default'] = null;
         }
 
-        $splitReference = splitOnOperatorOutsideNested($reference['content']);
-        $referencedKey = $splitReference['variable'] ?? $reference['content'];
+        return $composeInfo;
+    }
 
-        return $referencedKey === $variable['key'];
+    /**
+     * Compose defaults are compose content, which only users who can update the resource may see.
+     */
+    private function canViewComposeContent(): bool
+    {
+        return $this->canViewComposeContent ??= auth()->user()?->can('update', $this->resource) ?? false;
+    }
+
+    private function composeEnvironmentAssignments(): Collection
+    {
+        if ($this->composeEnvironmentAssignments !== null) {
+            return $this->composeEnvironmentAssignments;
+        }
+
+        $dockerCompose = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
+
+        return $this->composeEnvironmentAssignments = blank($dockerCompose)
+            ? collect()
+            : extractHardcodedEnvironmentVariables($dockerCompose);
+    }
+
+    /** @return list<string> */
+    private function composeReferences(mixed $value): array
+    {
+        if (! is_string($value) || ! str_contains($value, '$')) {
+            return [];
+        }
+
+        return extractDockerComposeEnvironmentVariableReferences($value)->all();
+    }
+
+    /** @return array{key: string, default: ?string, operator: ?string, required: bool}|null */
+    private function directComposeReference(mixed $value): ?array
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        if (preg_match('/^\$([A-Za-z_][A-Za-z0-9_]*)$/', $value, $bareMatch) === 1) {
+            return ['key' => $bareMatch[1], 'default' => null, 'operator' => null, 'required' => false];
+        }
+
+        $balancedReference = extractBalancedBraceContent($value);
+        if ($balancedReference === null || $balancedReference['start'] !== 1 || $balancedReference['end'] !== strlen($value) - 1) {
+            return null;
+        }
+
+        $splitReference = splitOnOperatorOutsideNested($balancedReference['content']);
+        if ($splitReference === null) {
+            return [
+                'key' => $balancedReference['content'],
+                'default' => null,
+                'operator' => null,
+                'required' => false,
+            ];
+        }
+
+        return [
+            'key' => $splitReference['variable'],
+            'default' => str_contains($splitReference['operator'], '-') ? $splitReference['default'] : null,
+            'operator' => $splitReference['operator'],
+            'required' => str_contains($splitReference['operator'], '?'),
+        ];
     }
 
     public function getDevView()
@@ -907,25 +1107,34 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $canViewValues = $this->canViewEnvironmentValues();
 
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
+        return $variables
+            ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
+            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues))
+            ->join("\n");
+    }
 
-            return "$item->key=$item->value";
-        })->join("\n");
+    /**
+     * An empty value makes the deployment use the Compose default, so show that default above the line.
+     */
+    private function composeDefaultHint(EnvironmentVariable $variable): string
+    {
+        if (filled($variable->value) || ! $this->showsHardcodedEnvironmentVariables()) {
+            return '';
+        }
+
+        $default = $this->composeInfoFor($variable->key)['default'] ?? null;
+        if (blank($default) || str_contains($default, "\n")) {
+            return '';
+        }
+
+        return "# Compose default: {$default}\n";
     }
 
     public function switch()
     {
+        $this->authorize('view', $this->resource);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         if ($this->view === 'dev') {
             $this->ensureEnvironmentVariablesLoaded();
@@ -935,11 +1144,28 @@ class All extends Component
 
     public function submit($data = null)
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $this->handleBulkSubmit();
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $previewVariables = [];
+                if ($this->showPreview) {
+                    try {
+                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                    } catch (\InvalidArgumentException $e) {
+                        throw new \InvalidArgumentException('Preview deployments: '.$e->getMessage(), previous: $e);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            if ($data === null) {
+                $this->handleBulkSubmit($variables, $previewVariables);
             } else {
                 $this->handleSingleSubmit($data);
             }
@@ -989,9 +1215,8 @@ class All extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables, array $previewVariables)
     {
-        $variables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variables));
         $changesMade = false;
         $errorOccurred = false;
 
@@ -999,8 +1224,7 @@ class All extends Component
         $deletedCount = $this->deleteRemovedVariables(false, $variables);
         if ($deletedCount > 0) {
             $changesMade = true;
-        } elseif ($deletedCount === 0 && $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->exists()) {
-            // If we tried to delete but couldn't (due to Docker Compose), mark as error
+        } elseif ($deletedCount < 0) {
             $errorOccurred = true;
         }
 
@@ -1011,14 +1235,11 @@ class All extends Component
         }
 
         if ($this->showPreview) {
-            $previewVariables = $this->normalizeEnvironmentVariables(parseEnvFormatToArray($this->variablesPreview));
-
             // Try to delete removed preview variables
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
             if ($deletedPreviewCount > 0) {
                 $changesMade = true;
-            } elseif ($deletedPreviewCount === 0 && $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($previewVariables))->exists()) {
-                // If we tried to delete but couldn't (due to Docker Compose), mark as error
+            } elseif ($deletedPreviewCount < 0) {
                 $errorOccurred = true;
             }
 
@@ -1038,7 +1259,9 @@ class All extends Component
     private function handleSingleSubmit($data)
     {
         $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
-        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
+        $found = EnvironmentVariable::query()
+            ->forResourceKey($this->resource->getMorphClass(), $this->resource->id, (bool) ($data['is_preview'] ?? false), $data['key'])
+            ->exists();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
 
@@ -1066,6 +1289,7 @@ class All extends Component
         $environment->is_buildtime = $data['is_buildtime'] ?? true;
         $environment->is_preview = $data['is_preview'] ?? false;
         $environment->comment = $data['comment'] ?? null;
+        $environment->copyValueToPreview = isset($data['copy_value_to_preview']) ? (bool) $data['copy_value_to_preview'] : null;
         $environment->resourceable_id = $this->resource->id;
         $environment->resourceable_type = $this->resource->getMorphClass();
 
@@ -1078,6 +1302,12 @@ class All extends Component
 
         // Get all environment variables that will be deleted
         $variablesToDelete = $this->resource->$method()->whereNotIn('key', array_keys($variables))->get();
+
+        // Generated Compose variables are managed by Coolify and must survive a bulk
+        // replacement even when they are omitted from the pasted environment file.
+        $variablesToDelete = $variablesToDelete->reject(
+            fn (EnvironmentVariable $environmentVariable): bool => $this->isProtectedEnvironmentVariable($environmentVariable->key)
+        );
 
         // If there are no variables to delete, return 0
         if ($variablesToDelete->isEmpty()) {
@@ -1092,13 +1322,13 @@ class All extends Component
                 if ($isUsed) {
                     $this->dispatch('error', "Cannot delete environment variable '{$envVar->key}' <br><br>Please remove it from the Docker Compose file first.");
 
-                    return 0;
+                    return -1;
                 }
             }
         }
 
         // If we get here, no variables are used in Docker Compose, so we can delete them
-        $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
+        $this->resource->$method()->whereKey($variablesToDelete->modelKeys())->delete();
 
         return $variablesToDelete->count();
     }
@@ -1134,10 +1364,12 @@ class All extends Component
             $comment = is_array($data) ? ($data['comment'] ?? null) : null;
 
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
-            $found = $this->resource->$method()->where('key', $key)->first();
+            // A key can have copies from earlier duplicate saves. Each copy gets the saved value,
+            // so that a deployment uses this value whichever copy it reads last.
+            $copies = $this->resource->$method()->where('key', $key)->get();
 
-            if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+            foreach ($copies as $found) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     $changed = false;
 
                     // Update value if it changed
@@ -1153,17 +1385,23 @@ class All extends Component
                         $changed = true;
                     }
 
-                    if ($changed) {
+                    // Flags change only when a "# coolify:" line sets them
+                    $found->fill($data['settings']);
+
+                    if ($changed || $found->isDirty()) {
                         $found->save();
                         $count++;
                     }
                 }
-            } else {
+            }
+
+            if ($copies->isEmpty()) {
                 $environment = new EnvironmentVariable;
                 $environment->key = $key;
                 $environment->value = $value;
                 $environment->comment = $comment; // Set comment from inline comment
                 $environment->is_multiline = false;
+                $environment->fill($data['settings']);
                 $environment->is_preview = $isPreview;
                 $environment->resourceable_id = $this->resource->id;
                 $environment->resourceable_type = $this->resource->getMorphClass();

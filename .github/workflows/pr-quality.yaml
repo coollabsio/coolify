@@ -1,19 +1,31 @@
-name: PR Quality
-
-permissions:
-  contents: read
-  issues: read
-  pull-requests: write
+name: PR quality
 
 on:
+  # Checks pull requests from forks too, it checks out and runs no code of the pull request
+  # jactionlint ignore=dangerous-triggers
   pull_request_target:
     types: [opened, reopened]
 
+permissions: {}
+
+cache-mode: none
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
-  pr-quality:
-    runs-on: ubuntu-latest
+  check:
+    name: Check pull request
+    permissions:
+      contents: read
+      issues: read # read the linked issues
+      pull-requests: write # comment on, label and close the pull request
+    runs-on: ubuntu-26.04 # https://github.com/actions/runner-images
+    timeout-minutes: 10
     steps:
-      - uses: peakoss/anti-slop@v0
+      - name: Check the pull request
+        uses: peakoss/anti-slop@v0.3.0
         with:
           # General Settings
           max-failures: 4
@@ -37,7 +49,7 @@ jobs:
           max-emoji-count: 2
           max-code-references: 5
           require-linked-issue: false
-          blocked-terms:  |
+          blocked-terms: |
             STRAWBERRY
             🤖 Generated with Claude Code
             Generated with Claude Code

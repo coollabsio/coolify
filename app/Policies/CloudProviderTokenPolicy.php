@@ -8,7 +8,7 @@ use App\Models\User;
 class CloudProviderTokenPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Listing and creating happen on the session team's security pages.
      */
     public function viewAny(User $user): bool
     {
@@ -16,11 +16,11 @@ class CloudProviderTokenPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * A loaded resource is checked against its own team: the session team can differ.
      */
     public function view(User $user, CloudProviderToken $cloudProviderToken): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudProviderToken->team_id);
     }
 
     /**
@@ -36,7 +36,7 @@ class CloudProviderTokenPolicy
      */
     public function update(User $user, CloudProviderToken $cloudProviderToken): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudProviderToken->team_id);
     }
 
     /**
@@ -44,7 +44,7 @@ class CloudProviderTokenPolicy
      */
     public function delete(User $user, CloudProviderToken $cloudProviderToken): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudProviderToken->team_id);
     }
 
     /**
@@ -52,7 +52,7 @@ class CloudProviderTokenPolicy
      */
     public function restore(User $user, CloudProviderToken $cloudProviderToken): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudProviderToken->team_id);
     }
 
     /**
@@ -60,6 +60,6 @@ class CloudProviderTokenPolicy
      */
     public function forceDelete(User $user, CloudProviderToken $cloudProviderToken): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminOfTeam((int) $cloudProviderToken->team_id);
     }
 }

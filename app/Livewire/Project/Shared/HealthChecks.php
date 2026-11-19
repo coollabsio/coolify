@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Support\ValidationPatterns;
+use Closure;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -28,7 +30,6 @@ class HealthChecks extends Component
     #[Validate(['required', 'string', 'in:http,https'])]
     public string $healthCheckScheme;
 
-    #[Validate(['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'])]
     public string $healthCheckHost;
 
     #[Validate(['nullable', 'integer', 'min:1', 'max:65535'])]
@@ -58,23 +59,30 @@ class HealthChecks extends Component
     #[Validate(['boolean'])]
     public bool $customHealthcheckFound = false;
 
-    protected $rules = [
-        'healthCheckEnabled' => 'boolean',
-        'healthCheckType' => 'string|in:http,cmd',
-        'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
-        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
-        'healthCheckPort' => 'nullable|integer|min:1|max:65535',
-        'healthCheckHost' => ['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
-        'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
-        'healthCheckReturnCode' => 'integer',
-        'healthCheckScheme' => 'required|string|in:http,https',
-        'healthCheckResponseText' => 'nullable|string',
-        'healthCheckInterval' => 'integer|min:1',
-        'healthCheckTimeout' => 'integer|min:1',
-        'healthCheckRetries' => 'integer|min:1',
-        'healthCheckStartPeriod' => 'integer',
-        'customHealthcheckFound' => 'boolean',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'healthCheckEnabled' => 'boolean',
+            'healthCheckType' => 'string|in:http,cmd',
+            'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
+            'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
+            'healthCheckPort' => 'nullable|integer|min:1|max:65535',
+            'healthCheckHost' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail): void {
+                if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                    $fail('The health check host must be a hostname, an IPv4 address, or an IPv6 address.');
+                }
+            }],
+            'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
+            'healthCheckReturnCode' => 'integer',
+            'healthCheckScheme' => 'required|string|in:http,https',
+            'healthCheckResponseText' => 'nullable|string',
+            'healthCheckInterval' => 'integer|min:1',
+            'healthCheckTimeout' => 'integer|min:1',
+            'healthCheckRetries' => 'integer|min:1',
+            'healthCheckStartPeriod' => 'integer',
+            'customHealthcheckFound' => 'boolean',
+        ];
+    }
 
     public function mount()
     {
@@ -110,17 +118,18 @@ class HealthChecks extends Component
 
             $this->resource->save();
         } else {
-            // Sync from model
+            // Sync from model. The command and response text can embed credentials, so only users who can update the resource get them.
+            $canViewSecrets = auth()->user()?->can('update', $this->resource) ?? false;
             $this->healthCheckEnabled = $this->resource->health_check_enabled;
             $this->healthCheckType = $this->resource->health_check_type ?? 'http';
-            $this->healthCheckCommand = $this->resource->health_check_command;
+            $this->healthCheckCommand = $canViewSecrets ? $this->resource->health_check_command : null;
             $this->healthCheckMethod = $this->resource->health_check_method;
             $this->healthCheckScheme = $this->resource->health_check_scheme;
             $this->healthCheckHost = $this->resource->health_check_host;
             $this->healthCheckPort = $this->resource->health_check_port;
             $this->healthCheckPath = $this->resource->health_check_path;
             $this->healthCheckReturnCode = $this->resource->health_check_return_code;
-            $this->healthCheckResponseText = $this->resource->health_check_response_text;
+            $this->healthCheckResponseText = $canViewSecrets ? $this->resource->health_check_response_text : null;
             $this->healthCheckInterval = $this->resource->health_check_interval;
             $this->healthCheckTimeout = $this->resource->health_check_timeout;
             $this->healthCheckRetries = $this->resource->health_check_retries;

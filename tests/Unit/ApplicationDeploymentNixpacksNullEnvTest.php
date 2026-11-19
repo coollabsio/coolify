@@ -4,6 +4,22 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
+use App\Models\Server;
+use Tests\TestCase;
+
+uses(TestCase::class);
+
+/**
+ * Build an environment variable whose resolved value is fixed, without touching the database.
+ */
+function nixpacksEnvVariable(string $key, ?string $resolvedValue): EnvironmentVariable
+{
+    $env = Mockery::mock(EnvironmentVariable::class)->makePartial();
+    $env->key = $key;
+    $env->shouldReceive('getResolvedValueWithServer')->andReturn($resolvedValue);
+
+    return $env;
+}
 
 /**
  * Test to verify that null and empty environment variables are filtered out
@@ -24,24 +40,15 @@ it('filters out null environment variables from nixpacks build command', functio
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables - some with null/empty values
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'VALID_VAR';
-    $envVar1->real_value = 'valid_value';
+    $envVar1 = nixpacksEnvVariable('VALID_VAR', 'valid_value');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'NULL_VAR';
-    $envVar2->real_value = null;
+    $envVar2 = nixpacksEnvVariable('NULL_VAR', null);
 
-    $envVar3 = Mockery::mock(EnvironmentVariable::class);
-    $envVar3->key = 'EMPTY_VAR';
-    $envVar3->real_value = '';
+    $envVar3 = nixpacksEnvVariable('EMPTY_VAR', '');
 
-    $envVar4 = Mockery::mock(EnvironmentVariable::class);
-    $envVar4->key = 'ANOTHER_VALID_VAR';
-    $envVar4->real_value = 'another_value';
+    $envVar4 = nixpacksEnvVariable('ANOTHER_VALID_VAR', 'another_value');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2, $envVar3, $envVar4]);
 
@@ -52,7 +59,6 @@ it('filters out null environment variables from nixpacks build command', functio
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -64,6 +70,10 @@ it('filters out null environment variables from nixpacks build command', functio
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -111,16 +121,11 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock preview environment variables - some with null/empty values
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'PREVIEW_VAR';
-    $envVar1->real_value = 'preview_value';
+    $envVar1 = nixpacksEnvVariable('PREVIEW_VAR', 'preview_value');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'NULL_PREVIEW_VAR';
-    $envVar2->real_value = null;
+    $envVar2 = nixpacksEnvVariable('NULL_PREVIEW_VAR', null);
 
     $previewEnvVars = collect([$envVar1, $envVar2]);
 
@@ -131,7 +136,6 @@ it('filters out null environment variables from nixpacks preview deployments', f
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -143,6 +147,10 @@ it('filters out null environment variables from nixpacks preview deployments', f
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -178,16 +186,11 @@ it('handles all environment variables being null or empty', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables - all null or empty
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'NULL_VAR';
-    $envVar1->real_value = null;
+    $envVar1 = nixpacksEnvVariable('NULL_VAR', null);
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'EMPTY_VAR';
-    $envVar2->real_value = '';
+    $envVar2 = nixpacksEnvVariable('EMPTY_VAR', '');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2]);
 
@@ -198,7 +201,6 @@ it('handles all environment variables being null or empty', function () {
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -210,6 +212,10 @@ it('handles all environment variables being null or empty', function () {
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);
@@ -284,16 +290,11 @@ it('preserves environment variables with zero values', function () {
     $mockApplication->shouldReceive('getAttribute')
         ->with('build_pack')
         ->andReturn('nixpacks');
-    $mockApplication->build_pack = 'nixpacks';
 
     // Mock environment variables with zero values (which should NOT be filtered)
-    $envVar1 = Mockery::mock(EnvironmentVariable::class);
-    $envVar1->key = 'ZERO_VALUE';
-    $envVar1->real_value = '0';
+    $envVar1 = nixpacksEnvVariable('ZERO_VALUE', '0');
 
-    $envVar2 = Mockery::mock(EnvironmentVariable::class);
-    $envVar2->key = 'FALSE_VALUE';
-    $envVar2->real_value = 'false';
+    $envVar2 = nixpacksEnvVariable('FALSE_VALUE', 'false');
 
     $nixpacksEnvVars = collect([$envVar1, $envVar2]);
 
@@ -304,7 +305,6 @@ it('preserves environment variables with zero values', function () {
     // Mock application deployment queue
     $mockQueue = Mockery::mock(ApplicationDeploymentQueue::class);
     $mockQueue->shouldReceive('getAttribute')->with('application_id')->andReturn(1);
-    $mockQueue->application_id = 1;
 
     // Mock the job
     $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial();
@@ -316,6 +316,10 @@ it('preserves environment variables with zero values', function () {
     $applicationProperty = $reflection->getProperty('application');
     $applicationProperty->setAccessible(true);
     $applicationProperty->setValue($job, $mockApplication);
+
+    $mainServerProperty = $reflection->getProperty('mainServer');
+    $mainServerProperty->setAccessible(true);
+    $mainServerProperty->setValue($job, new Server);
 
     $pullRequestProperty = $reflection->getProperty('pull_request_id');
     $pullRequestProperty->setAccessible(true);

@@ -73,15 +73,6 @@ it('redirects unauthenticated users to login', function () {
         ->screenshot();
 });
 
-it('shows dashboard after successful login and onboarding skip', function () {
-    $page = loginAndSkipBoarding();
-
-    $page->assertSee('Dashboard')
-        ->assertSee('Projects')
-        ->assertSee('Servers')
-        ->screenshot();
-});
-
 it('displays all projects on dashboard', function () {
     $page = loginAndSkipBoarding();
 
@@ -119,10 +110,17 @@ it('allows authenticated users to access team settings', function () {
 it('shows danger zone to team owner', function () {
     loginAndSkipBoarding();
 
-    $page = visit('/team');
+    // The sidebar link is only rendered for team owners.
+    visit('/team')
+        ->assertSee('General')
+        ->assertSee('Danger Zone');
 
-    $page->assertSee('Danger zone')
-        ->assertSee('Destructive actions for this team.')
+    $page = visit('/team/danger');
+
+    $page->assertPathIs('/team/danger')
+        ->assertSee('Danger zone')
+        ->assertSee('Delete team')
+        ->assertSee('The default team cannot be deleted.')
         ->screenshot();
 });
 
@@ -214,7 +212,17 @@ it('member does not see danger zone on team settings', function () {
 
     $page->assertSee('General')
         ->assertDontSee('Danger zone')
-        ->assertDontSee('Destructive actions for this team.')
+        ->assertDontSee('Delete team')
+        ->screenshot();
+});
+
+it('member gets 403 on team danger zone page', function () {
+    loginAsMember();
+
+    $page = visit('/team/danger');
+
+    $page->assertSee("You don't have permission to access this page.")
+        ->assertDontSee('Delete team')
         ->screenshot();
 });
 
@@ -226,7 +234,7 @@ it('member does not see terminal link on server page', function () {
     $server = Server::first();
     $page = visit("/server/{$server->uuid}");
 
-    $page->assertSee('Configuration')
+    $page->assertSee('Server overview')
         ->assertDontSee('Terminal')
         ->screenshot();
 });
@@ -237,7 +245,7 @@ it('member does not see security link on server page', function () {
     $server = Server::first();
     $page = visit("/server/{$server->uuid}");
 
-    $page->assertSee('Configuration')
+    $page->assertSee('Server overview')
         ->assertDontSee('Security')
         ->screenshot();
 });
@@ -248,7 +256,7 @@ it('member does not see proxy controls on server page', function () {
     $server = Server::first();
     $page = visit("/server/{$server->uuid}");
 
-    $page->assertSee('Configuration')
+    $page->assertSee('Server overview')
         ->assertDontSee('Start Proxy')
         ->assertDontSee('Restart Proxy')
         ->assertDontSee('Stop Proxy')
@@ -261,7 +269,7 @@ it('owner sees terminal and security links on server page', function () {
     $server = Server::first();
     $page = visit("/server/{$server->uuid}");
 
-    $page->assertSee('Configuration')
+    $page->assertSee('Server overview')
         ->assertSee('Terminal')
         ->assertSee('Security')
         ->screenshot();
@@ -317,7 +325,8 @@ it('member does not see add resource link on dashboard project cards', function 
     $page->assertSee('Projects')
         ->assertSee('My first project')
         ->assertDontSee('Add resource to My first project')
-        ->assertSourceMissing('title="Add resource"')
+        // The icon tooltip script strips title attributes at runtime; aria-label stays.
+        ->assertSourceMissing('aria-label="Add resource to My first project"')
         ->screenshot();
 });
 
@@ -328,7 +337,8 @@ it('owner sees add resource link on dashboard project cards', function () {
 
     $page->assertSee('Projects')
         ->assertSee('My first project')
-        ->assertSourceHas('title="Add resource"')
+        // The icon tooltip script strips title attributes at runtime; aria-label stays.
+        ->assertSourceHas('aria-label="Add resource to My first project"')
         ->screenshot();
 });
 

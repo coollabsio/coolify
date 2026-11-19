@@ -25,3 +25,9 @@ YAML,
 
     expect($app->getRequiredPort())->toBe(80);
 });
+
+it('does not infer a template port from a custom display name', function () {
+    $service = new Service(['name' => 'grafana-custom', 'service_type' => null]);
+
+    expect($service->getRequiredPort())->toBeNull();
+});

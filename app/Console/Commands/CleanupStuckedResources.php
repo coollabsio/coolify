@@ -15,12 +15,14 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use Illuminate\Console\Command;
 
@@ -69,7 +71,9 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
         }
         try {
-            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()->lazyById();
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()
+                ->select(['id', 'application_id'])
+                ->lazyById();
             foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
                 if (is_null($applicationDeploymentQueue->application)) {
                     echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
@@ -154,6 +158,15 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
         }
         try {
+            $influxdbs = StandaloneInfluxdb::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($influxdbs as $influxdb) {
+                echo "Deleting stuck influxdb: {$influxdb->name}\n";
+                DeleteResourceJob::dispatch($influxdb);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck influxdb: {$e->getMessage()}\n";
+        }
+        try {
             $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($mongodbs as $mongodb) {
                 echo "Deleting stuck mongodb: {$mongodb->name}\n";
@@ -179,6 +192,15 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mariadb: {$e->getMessage()}\n";
+        }
+        try {
+            $sqlites = StandaloneSqlite::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($sqlites as $sqlite) {
+                echo "Deleting stuck sqlite: {$sqlite->name}\n";
+                DeleteResourceJob::dispatch($sqlite);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck sqlite: {$e->getMessage()}\n";
         }
         try {
             $services = Service::withTrashed()->whereNotNull('deleted_at')->lazyById();

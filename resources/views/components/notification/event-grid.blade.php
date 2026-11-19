@@ -14,12 +14,17 @@
             [
                 'key' => 'statusChange',
                 'label' => 'Resource status changes',
-                'helper' => 'Notify when a resource stops or Coolify automatically restarts it.',
+                'helper' => 'Notify when a resource stops unexpectedly (for example a crash) or Coolify automatically restarts it. Stops from Coolify send no notification.',
             ],
             [
                 'key' => 'restartLimitReached',
                 'label' => 'Restart limit reached',
                 'helper' => 'Notify when a resource is stopped after reaching its restart limit.',
+            ],
+            [
+                'key' => 'imageVulnerabilities',
+                'label' => 'Image vulnerabilities',
+                'helper' => 'A daily summary of new vulnerabilities with a fix, and an alert for known exploited ones.',
             ],
         ],
         'Backups' => [
@@ -37,6 +42,11 @@
             ['key' => 'serverReachable', 'label' => 'Server reachable'],
             ['key' => 'serverUnreachable', 'label' => 'Server unreachable'],
             ['key' => 'serverPatch', 'label' => 'Server patching'],
+            [
+                'key' => 'serverAutoUpdate',
+                'label' => 'Automatic security updates',
+                'helper' => 'Notify when automatic security updates install packages or fail on a server.',
+            ],
             ['key' => 'traefikOutdated', 'label' => 'Traefik proxy outdated'],
         ],
     ];
