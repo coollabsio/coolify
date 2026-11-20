@@ -17,6 +17,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -256,4 +257,42 @@ it('does not rename or delete the Docker volume of an external storage', functio
 
     expect(LocalPersistentVolume::query()->find($storage->id))->toBeNull();
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm'));
+});
+
+it('returns 422 when the API clones an application to a server without its external volume', function () {
+    InstanceSettings::query()->whereKey(0)->update(['is_api_enabled' => true]);
+    LocalPersistentVolume::create([
+        'name' => 'shared-app-data',
+        'mount_path' => '/app/data',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_external' => true,
+    ]);
+    $targetServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+    ]);
+    $targetDestination = StandaloneDocker::factory()->create([
+        'server_id' => $targetServer->id,
+        'network' => 'clone-target',
+    ]);
+    Process::fake(['*' => Process::result(output: "__COOLIFY_VOLUME_ABSENT__\n")]);
+    $plainTextToken = Str::random(40);
+    $token = $this->user->tokens()->create([
+        'name' => 'clone-test',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['write'],
+        'team_id' => $this->team->id,
+    ]);
+    $applicationCount = Application::query()->count();
+    $this->app['auth']->forgetGuards();
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token->getKey().'|'.$plainTextToken])
+        ->postJson("/api/v1/applications/{$this->application->uuid}/clone", [
+            'destination_uuid' => $targetDestination->uuid,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Volume shared-app-data does not exist on the target server.');
+
+    expect(Application::query()->count())->toBe($applicationCount);
 });

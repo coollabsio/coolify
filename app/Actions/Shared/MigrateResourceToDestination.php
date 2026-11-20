@@ -109,6 +109,14 @@ class MigrateResourceToDestination
             }
         }
 
+        try {
+            foreach ($this->collectPersistentVolumes($resource) as $volume) {
+                $volume->ensureCloneTargetIsAvailable($sourceServer, $targetServer);
+            }
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['destination_id' => $e->getMessage()]);
+        }
+
         $this->stopResource($resource);
 
         $jobs = [];
@@ -222,7 +230,7 @@ class MigrateResourceToDestination
         $seenHostPaths = [];
 
         foreach ($this->collectPersistentVolumes($resource) as $volume) {
-            if (! $volume instanceof LocalPersistentVolume) {
+            if (! $volume instanceof LocalPersistentVolume || $volume->is_external) {
                 continue;
             }
 
