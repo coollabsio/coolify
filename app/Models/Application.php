@@ -114,6 +114,7 @@ use Symfony\Component\Yaml\Yaml;
         'docker_compose_domains' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose domains.'],
         'docker_compose_custom_start_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom start command.'],
         'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom build command.'],
+        'replicas' => ['type' => 'integer', 'description' => 'Number of containers on one server. Not used by the dockercompose build pack.'],
         'swarm_replicas' => ['type' => 'integer', 'nullable' => true, 'description' => 'Swarm replicas. Only used for swarm deployments.'],
         'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true, 'description' => 'Swarm placement constraints. Only used for swarm deployments.'],
         'custom_docker_run_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom docker run options.'],
@@ -142,6 +143,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
+    public const MAX_REPLICAS = 10;
+
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
@@ -223,6 +226,7 @@ class Application extends BaseModel
         'domain_dns_statuses',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
+        'replicas',
         'swarm_replicas',
         'swarm_placement_constraints',
         'watch_paths',
@@ -317,6 +321,7 @@ class Application extends BaseModel
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
             'docker_compose_image_overrides' => 'array',
+            'replicas' => 'integer',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'restart_limit_reached' => 'boolean',
@@ -693,6 +698,33 @@ class Application extends BaseModel
     }
 
     /**
+     * The reason why this application cannot run more than one replica, or null if it can.
+     */
+    public function replicasUnavailableReason(): ?string
+    {
+        if ($this->build_pack === 'dockercompose') {
+            return 'Set deploy.replicas for a service in the Compose file.';
+        }
+        if ($this->destination?->server?->isSwarm()) {
+            return 'Set the replicas of a Swarm server on the Swarm page.';
+        }
+        if ($this->additional_servers()->exists()) {
+            return 'Replicas run on one server. Remove the additional servers to use replicas.';
+        }
+        if (count($this->ports_mappings_array) > 0) {
+            return 'Only one container can publish a host port. Remove the port mappings to use replicas.';
+        }
+        if ($this->settings?->is_consistent_container_name_enabled) {
+            return 'Replicas cannot share one container name. Turn off the consistent container name to use replicas.';
+        }
+        if (str($this->custom_docker_run_options)->contains('--ip')) {
+            return 'Replicas cannot share one IP address. Remove the custom IP address to use replicas.';
+        }
+
+        return null;
+    }
+
+    /**
      * The reason why this application cannot deploy to additional servers, or null if it can.
      * When a server is given, also check that the server can route the application like the primary server.
      */
@@ -703,6 +735,9 @@ class Application extends BaseModel
         }
         if ($this->persistentStorages()->exists()) {
             return 'Applications with persistent storage cannot use multiple servers because volumes are not shared between servers.';
+        }
+        if ($this->replicas > 1) {
+            return 'Replicas run on one server. Set the replicas to 1 to use multiple servers.';
         }
         if ($server) {
             return $this->proxyMismatchReason($server);

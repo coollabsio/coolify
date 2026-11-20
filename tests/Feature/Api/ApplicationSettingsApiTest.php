@@ -593,6 +593,43 @@ test('rejects swarm fields on application update', function (string $field, mixe
     'is_swarm_only_worker_nodes' => ['is_swarm_only_worker_nodes', true],
 ]);
 
+function createApplicationWithReplicasThroughApi(array $payload = [])
+{
+    Queue::fake();
+
+    return test()->withHeaders(applicationSettingsApiHeaders(test()->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => test()->project->uuid,
+            'environment_uuid' => test()->environment->uuid,
+            'server_uuid' => test()->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/replicas-test',
+            'git_branch' => 'main',
+            'build_pack' => 'dockerfile',
+            'ports_exposes' => '3000',
+            'replicas' => 3,
+            ...$payload,
+        ]);
+}
+
+test('the applications API saves the replicas on create and on update', function () {
+    $uuid = createApplicationWithReplicasThroughApi()->assertCreated()->json('uuid');
+    expect(Application::where('uuid', $uuid)->firstOrFail()->replicas)->toBe(3);
+
+    $this->patchJson("/api/v1/applications/{$uuid}", ['replicas' => 2])->assertOk();
+    expect(Application::where('uuid', $uuid)->firstOrFail()->replicas)->toBe(2);
+});
+
+test('the applications API rejects replicas together with a setting that needs one container', function () {
+    createApplicationWithReplicasThroughApi(['ports_mappings' => '8080:80'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('replicas');
+
+    $this->application->update(['ports_mappings' => '8080:80']);
+    $this->patchJson("/api/v1/applications/{$this->application->uuid}", ['replicas' => 3])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('replicas');
+});
+
 test('PATCH /api/v1/applications/{uuid} saves a slugged container name prefix', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'My API'])

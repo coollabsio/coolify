@@ -296,6 +296,7 @@ function sharedDataApplications(?Application $application = null): array
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
         'ports_mappings' => ValidationPatterns::portMappingRules(),
         'custom_network_aliases' => 'string|nullable',
+        'replicas' => 'integer|min:1|max:'.Application::MAX_REPLICAS,
         'base_directory' => ValidationPatterns::directoryPathRules(),
         'publish_directory' => ValidationPatterns::directoryPathRules(),
         'health_check_enabled' => 'boolean',

@@ -59,6 +59,7 @@ it('ignores the custom container name when consistent naming is disabled', funct
 it('recognises generated container names in both timestamp formats', function () {
     expect(isGeneratedContainerName('application-uuid-20260908T141530'))->toBeTrue()
         ->and(isGeneratedContainerName('my-api-20260908T141530'))->toBeTrue()
+        ->and(isGeneratedContainerName('application-uuid-my-api-20260908T141530-2'))->toBeTrue()
         ->and(isGeneratedContainerName('application-uuid-192238854305'))->toBeTrue()
         ->and(isGeneratedContainerName('application-uuid'))->toBeFalse()
         ->and(isGeneratedContainerName('application-uuid-pr-42'))->toBeFalse()

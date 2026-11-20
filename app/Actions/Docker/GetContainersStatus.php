@@ -208,6 +208,7 @@ class GetContainersStatus implements ShouldBeUnique
                                 ?? data_get($labels, 'com.docker.stack.namespace');
                         }
                         if ($containerName) {
+                            $containerName = composeContainerStatusKey($containerName, data_get($labels, 'com.docker.compose.container-number'));
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
                         }
 

@@ -126,6 +126,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -203,6 +204,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         ports:
           - '3001:3001'
           -
@@ -271,6 +273,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         container_name: my-app-referenceapplication0001-20260102T030405
         restart: unless-stopped
         labels:
@@ -340,6 +343,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
       admin:
@@ -373,6 +377,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         networks:
           internal:
             ipv4_address: 172.30.0.10
@@ -432,6 +437,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         container_name: blog-referenceapplication0001-20260102T030405
         restart: unless-stopped
         labels:
@@ -489,6 +495,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         volumes:
           - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
         networks:
@@ -559,6 +566,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
       worker:
@@ -596,6 +604,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         depends_on:
           - db
         container_name: worker-referenceapplication0001-20260102T030405
@@ -613,6 +622,54 @@
           - coolify.pullRequestId=0
         networks:
           referenceapplication0001: null
+        env_file:
+          - .env
+      scaled:
+        image: 'nginx:alpine'
+        deploy:
+          replicas: 3
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=scaled-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        networks:
+          referenceapplication0001: null
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: scaled-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
     volumes:
@@ -780,6 +837,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -859,6 +917,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         ports:
           - '3001:3001'
           -
@@ -930,6 +989,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         container_name: my-app-referenceapplication0001-20260102T030405
         restart: unless-stopped
         labels:
@@ -1011,6 +1071,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
       admin:
@@ -1046,6 +1107,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         networks:
           internal:
             ipv4_address: 172.30.0.10
@@ -1107,6 +1169,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         container_name: blog-referenceapplication0001-20260102T030405
         restart: unless-stopped
         labels:
@@ -1166,6 +1229,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         volumes:
           - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
         networks:
@@ -1238,6 +1302,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
       worker:
@@ -1277,6 +1342,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         depends_on:
           - db
         container_name: worker-referenceapplication0001-20260102T030405
@@ -1294,6 +1360,56 @@
           - coolify.pullRequestId=0
         networks:
           referenceapplication0001: null
+        env_file:
+          - .env
+      scaled:
+        image: 'nginx:alpine'
+        deploy:
+          replicas: 3
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=scaled-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        networks:
+          referenceapplication0001: null
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: scaled-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCALED: scaled
         env_file:
           - .env
     volumes:
@@ -1360,6 +1476,8 @@
         sidecar:
           domain: ''
         worker:
+          domain: ''
+        scaled:
           domain: ''
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
@@ -1484,6 +1602,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -1566,6 +1685,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         ports:
           - '3001:3001'
           -
@@ -1639,6 +1759,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         container_name: my-app-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1726,6 +1847,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         env_file:
           - .env
       admin-pr-7:
@@ -1761,6 +1883,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         networks:
           internal:
             ipv4_address: 172.30.0.10
@@ -1825,6 +1948,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         container_name: blog-referenceapplication0001-pr-7
         restart: unless-stopped
         labels:
@@ -1887,6 +2011,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         volumes:
           - 'referenceapplication0001_db-data-pr-7:/var/lib/postgresql/data'
         networks:
@@ -1961,6 +2086,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         env_file:
           - .env
       worker-pr-7:
@@ -2000,6 +2126,7 @@
           SERVICE_NAME_DB: db-pr-7
           SERVICE_NAME_SIDECAR: sidecar-pr-7
           SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         depends_on:
           - db-pr-7
         container_name: worker-referenceapplication0001-pr-7
@@ -2019,6 +2146,59 @@
           referenceapplication0001-7:
             aliases:
               - worker
+        env_file:
+          - .env
+      scaled-pr-7:
+        image: 'nginx:alpine'
+        deploy:
+          replicas: 1
+        container_name: scaled-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=scaled-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+        networks:
+          referenceapplication0001-7:
+            aliases:
+              - scaled
+        environment:
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: scaled-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-7
+          SERVICE_NAME_API: api-pr-7
+          SERVICE_NAME_MY_APP: my-app-pr-7
+          SERVICE_NAME_API_V2: api.v2-pr-7
+          SERVICE_NAME_ADMIN: admin-pr-7
+          SERVICE_NAME_BLOG: blog-pr-7
+          SERVICE_NAME_DB: db-pr-7
+          SERVICE_NAME_SIDECAR: sidecar-pr-7
+          SERVICE_NAME_WORKER: worker-pr-7
+          SERVICE_NAME_SCALED: scaled-pr-7
         env_file:
           - .env
     volumes:
@@ -2079,6 +2259,8 @@
         sidecar:
           domain: ''
         worker:
+          domain: ''
+        scaled:
           domain: ''
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
@@ -2193,6 +2375,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -2252,6 +2435,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         ports:
           - '3001:3001'
           -
@@ -2302,6 +2486,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         container_name: my-app-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2357,6 +2542,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         env_file:
           - .env
       admin-pr-8:
@@ -2378,6 +2564,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         networks:
           internal:
             ipv4_address: 172.30.0.10
@@ -2419,6 +2606,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         container_name: blog-referenceapplication0001-pr-8
         restart: unless-stopped
         labels:
@@ -2460,6 +2648,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         volumes:
           - 'referenceapplication0001_db-data-pr-8:/var/lib/postgresql/data'
         networks:
@@ -2522,6 +2711,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         env_file:
           - .env
       worker-pr-8:
@@ -2549,6 +2739,7 @@
           SERVICE_NAME_DB: db-pr-8
           SERVICE_NAME_SIDECAR: sidecar-pr-8
           SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         depends_on:
           - db-pr-8
         container_name: worker-referenceapplication0001-pr-8
@@ -2568,6 +2759,47 @@
           referenceapplication0001-8:
             aliases:
               - worker
+        env_file:
+          - .env
+      scaled-pr-8:
+        image: 'nginx:alpine'
+        deploy:
+          replicas: 1
+        container_name: scaled-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=scaled-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        networks:
+          referenceapplication0001-8:
+            aliases:
+              - scaled
+        environment:
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: scaled-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web-pr-8
+          SERVICE_NAME_API: api-pr-8
+          SERVICE_NAME_MY_APP: my-app-pr-8
+          SERVICE_NAME_API_V2: api.v2-pr-8
+          SERVICE_NAME_ADMIN: admin-pr-8
+          SERVICE_NAME_BLOG: blog-pr-8
+          SERVICE_NAME_DB: db-pr-8
+          SERVICE_NAME_SIDECAR: sidecar-pr-8
+          SERVICE_NAME_WORKER: worker-pr-8
+          SERVICE_NAME_SCALED: scaled-pr-8
         env_file:
           - .env
     volumes:

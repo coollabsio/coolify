@@ -183,6 +183,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $currently_running_container_name = null;
 
+    private ?int $replicas = null;
+
     /**
      * Containers that ran before the rolling update started its new container. Only these are
      * removed after it, so the new container of another deployment of the application stays.
@@ -3095,6 +3097,30 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return [$nixpacks_php_fallback_path, $nixpacks_php_root_dir];
     }
 
+    /**
+     * A preview runs one container, and a setting that needs one container wins over the replicas.
+     */
+    private function replicas(): int
+    {
+        return $this->replicas ??= $this->application->replicas > 1 && $this->pull_request_id === 0 && $this->application->replicasUnavailableReason() === null
+            ? $this->application->replicas
+            : 1;
+    }
+
+    /**
+     * Docker Compose names the replicas `{project}-{service}-{number}`.
+     *
+     * @return array<int, string>
+     */
+    private function newContainerNames(): array
+    {
+        if ($this->replicas() === 1) {
+            return [$this->container_name];
+        }
+
+        return array_map(fn (int $number): string => "{$this->composeProjectName()}-{$this->container_name}-{$number}", range(1, $this->replicas()));
+    }
+
     private function rolling_update()
     {
         $this->imageScan()->applyStartPin();
@@ -3192,7 +3218,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         $oldContainerNames = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
-            ->filter(fn ($container) => data_get($container, 'State') === 'running' && data_get($container, 'Names') !== $this->container_name)
+            ->filter(fn ($container) => data_get($container, 'State') === 'running' && ! in_array(data_get($container, 'Names'), $this->newContainerNames(), true))
             ->pluck('Names');
         if ($oldContainerNames->isEmpty()) {
             return;
@@ -3209,7 +3235,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function proxyLabelsChanged(Collection $oldContainerNames): bool
     {
-        $containerNames = $oldContainerNames->prepend($this->container_name)->map(fn (string $name) => escapeshellarg($name))->implode(' ');
+        $containerNames = $oldContainerNames->prepend($this->newContainerNames()[0])->map(fn (string $name) => escapeshellarg($name))->implode(' ');
         $output = instant_remote_process(["docker inspect --format '{{json .Config.Labels}}' {$containerNames}"], $this->server, false);
 
         return collect(preg_split('/\R/', trim((string) $output)))
@@ -3236,7 +3262,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Using the custom healthcheck from the Dockerfile.');
                 }
                 if ($this->container_name) {
-                    $escapedContainerName = escapeshellarg($this->container_name);
+                    $pendingContainers = $this->newContainerNames();
+                    $escapedContainerName = escapeshellarg($pendingContainers[0]);
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                     if ($this->full_healthcheck_url) {
@@ -3275,6 +3302,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         }
 
                         $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
+                        if ($healthCheckStatus === 'healthy' && count($pendingContainers) > 1) {
+                            array_shift($pendingContainers);
+                            $escapedContainerName = escapeshellarg($pendingContainers[0]);
+
+                            continue;
+                        }
                         if ($healthCheckStatus === 'healthy') {
                             $this->markNewVersionHealthy(true);
                             $this->application->update(['status' => 'running']);
@@ -3283,7 +3316,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         } elseif ($healthCheckStatus === 'unhealthy') {
                             $this->markNewVersionHealthy(false);
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
-                            $this->query_logs();
+                            $this->query_logs($pendingContainers[0]);
                             break;
                         }
                         $counter++;
@@ -3294,7 +3327,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     }
                     if ($this->trimmedSavedOutput('health_check')->replace('"', '')->value() === 'starting') {
-                        $this->query_logs();
+                        $this->query_logs($pendingContainers[0]);
                     }
                 }
             }
@@ -3321,9 +3354,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return Cache::has("deployment-new-version-healthy:{$this->deployment_uuid}");
     }
 
-    private function query_logs()
+    private function query_logs(string $containerName)
     {
-        $escapedContainerName = escapeshellarg($this->container_name);
+        $escapedContainerName = escapeshellarg($containerName);
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Container logs:');
         $this->execute_remote_command(
@@ -4942,6 +4975,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         } else {
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
+            if ($this->replicas() > 1) {
+                unset($docker_compose['services'][$this->container_name]['container_name']);
+                $docker_compose['services'][$this->container_name]['deploy']['replicas'] = $this->replicas();
+                $this->application_deployment_queue->addLogEntry("Starting {$this->replicas()} replicas.");
+            } elseif ($this->pull_request_id === 0 && $this->application->replicas > 1) {
+                $this->application_deployment_queue->addLogEntry("Starting one container instead of {$this->application->replicas} replicas. {$this->application->replicasUnavailableReason()}");
+            }
         }
         if ($this->mainServer->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = generate_log_drain_configuration($this->mainServer);
@@ -5658,7 +5698,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
                 $this->application_deployment_queue->addLogEntry('New container is not healthy, rolling back to the old container.');
                 $this->failDeployment();
-                $this->graceful_shutdown_container($this->container_name);
+                foreach ($this->newContainerNames() as $containerName) {
+                    $this->graceful_shutdown_container($containerName);
+                }
             }
         } catch (Exception $e) {
             // If new version is healthy, this is just cleanup - don't fail the deployment
@@ -5685,7 +5727,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $names = $containers->pluck('Names')->filter();
         if ($this->pull_request_id === 0) {
-            $names = $names->reject(fn (string $name) => $name === $this->container_name || $name === addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id));
+            $names = $names->reject(fn (string $name) => in_array($name, $this->newContainerNames(), true) || $name === addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id));
         }
         if ($this->containerNamesBeforeRollingUpdate !== null) {
             $names = $names->filter(fn (string $name) => in_array($name, $this->containerNamesBeforeRollingUpdate, true));
@@ -6543,6 +6585,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function resolveCommandContainer(Collection $containers, ?string $specifiedContainerName, string $commandType): ?array
     {
+        $containers = oneContainerPerComposeService($containers);
+
         if ($containers->count() === 0) {
             return null;
         }
@@ -6562,10 +6606,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         // Multi-container: match by specified name prefix
-        $prefix = $specifiedContainerName.'-'.$this->application->uuid;
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
-            if (str_starts_with($containerName, $prefix)) {
+            if (containerNameMatchesComposeService($containerName, $specifiedContainerName, $this->application->uuid)) {
                 return $container;
             }
         }
@@ -6969,7 +7012,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->application_deployment_queue->addLogEntry('Deployment failed after the new version became healthy. Keeping the new version of your application running.', 'stderr');
                 } else {
                     $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
-                    $this->removeContainerWithTimeout($this->container_name);
+                    foreach ($this->newContainerNames() as $containerName) {
+                        $this->removeContainerWithTimeout($containerName);
+                    }
                 }
             }
         }
