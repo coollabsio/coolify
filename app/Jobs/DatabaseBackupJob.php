@@ -23,6 +23,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Notifications\ScheduledJobRecovered;
+use App\Services\HorizonNodeDrainer;
 use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
@@ -496,6 +497,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             's3_uploaded' => null,
                             'finished_at' => Carbon::now()->toImmutable(),
                         ]);
+                    }
+                    if (HorizonNodeDrainer::wasMoved(HorizonNodeDrainer::DATABASE_BACKUP, $this->backup->id)) {
+                        return;
                     }
                     try {
                         $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database));

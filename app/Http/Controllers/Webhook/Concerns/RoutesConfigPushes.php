@@ -34,18 +34,22 @@ trait RoutesConfigPushes
     }
 
     /**
+     * @param  mixed  $fullName  One repository name, or a list of names that identify the same repository (Bitbucket Data Center).
      * @param  Closure(string): bool|null  $verifySecret  For manual webhooks: checks the signature with a link secret.
      */
     protected function beginConfigPush(?Model $source, mixed $fullName, ?string $branch, ?string $commit, ?Closure $verifySecret = null): void
     {
-        $fullName = $this->manualWebhookRepositoryFullName($fullName);
-        if ($fullName === null || blank($branch)) {
+        $fullNames = collect(is_array($fullName) ? $fullName : [$fullName])
+            ->map(fn (mixed $name): ?string => $this->manualWebhookRepositoryFullName($name))
+            ->filter()
+            ->values();
+        if ($fullNames->isEmpty() || blank($branch)) {
             return;
         }
 
         app(ConfigPushRouter::class)->beginPush(
             $source,
-            fn (?string $repository): bool => $this->manualWebhookRepositoryMatches($repository, $fullName),
+            fn (?string $repository): bool => $fullNames->contains(fn (string $name): bool => $this->manualWebhookRepositoryMatches($repository, $name)),
             $branch,
             $commit,
             $verifySecret,
