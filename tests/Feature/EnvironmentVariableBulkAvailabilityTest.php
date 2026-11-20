@@ -255,12 +255,12 @@ it('wires the bulk availability controls into the environment variables table', 
         ->toContain('this.$wire.bulkUpdateAvailability(field, value, this.selectedIds)')
         ->toContain('<x-table.checkbox label="Select all environment variables on this page"')
         ->toContain('x-effect="$el.indeterminate = someSelected"')
-        ->toContain('<span>Availability</span>')
+        ->toContain('<span>Mass update</span>')
         ->toContain("applyAvailability('is_buildtime', true)")
         ->toContain("applyAvailability('is_buildtime', false)")
         ->toContain("applyAvailability('is_runtime', true)")
         ->toContain("applyAvailability('is_runtime', false)")
-        ->toContain('x-bind:disabled="selectedIds.length === 0"')
+        ->toContain('x-show="selectedIds.length > 0"')
         ->toContain(':selectable="$canBulkEdit"')
         ->toContain('nextEnvironmentVariablePage,bulkUpdateAvailability"');
 

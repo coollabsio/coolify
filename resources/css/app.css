@@ -3298,6 +3298,18 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 55.25rem;
 }
 
+/* Selection checkboxes show when the table is hovered or focused, or a row is selected.
+   Devices without hover always show them. */
+.env-table-grid-selectable > :first-child {
+    transition: opacity 150ms;
+}
+
+@media (hover: hover) {
+    .data-table:not(:hover, :focus-within, .env-table-has-selection) .env-table-grid-selectable > :first-child {
+        opacity: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .environment-table-scroll .env-table-grid {
         min-width: 0;

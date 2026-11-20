@@ -121,7 +121,7 @@
         @endif
     </x-application.settings-section>
 
-    {{-- Toolbar: search left; filter and add right --}}
+    {{-- Toolbar: search left; mass update (selected rows), filter, and add right --}}
     @if ($view === 'normal')
         <x-table.toolbar class="mt-2" aria-busy="{{ ! $readyToLoad ? 'true' : 'false' }}">
             <x-slot:search>
@@ -129,6 +129,37 @@
                     loading-target="search,loadEnvironmentVariables" wire:model.live.debounce.300ms="search"
                     :disabled="! $readyToLoad" />
             </x-slot:search>
+            @can('manageEnvironment', $resource)
+                <div class="table-availability" x-cloak x-show="selectedIds.length > 0">
+                    <x-table.dropdown panel-class="w-60!">
+                        <x-slot:trigger>
+                            <button type="button" aria-haspopup="listbox" :aria-expanded="open"
+                                x-bind:title="`Change build time / runtime availability of ${selectedIds.length} selected ${selectedIds.length === 1 ? 'variable' : 'variables'}`"
+                                class="button button-highlighted">
+                                <x-reicon name="sliders" class="size-3.5 shrink-0" />
+                                <span>Mass update</span>
+                                <span x-text="selectedIds.length"
+                                    class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"></span>
+                            </button>
+                        </x-slot:trigger>
+                        <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Build time</span>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', true); open = false">
+                            <span>Available during build</span>
+                        </button>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', false); open = false">
+                            <span>Not available during build</span>
+                        </button>
+                        <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+                        <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Runtime</span>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', true); open = false">
+                            <span>Available in the container</span>
+                        </button>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', false); open = false">
+                            <span>Not available in the container</span>
+                        </button>
+                    </x-table.dropdown>
+                </div>
+            @endcan
             <x-table.filter :active-count="$activeFilterCount" :active-text="$activeFilterText"
                 reset-action="clearFilters">
                         @foreach ([
@@ -212,39 +243,6 @@
                 </x-table.sort>
             </div>
                 @can('manageEnvironment', $resource)
-                    <div class="table-availability">
-                        <x-table.dropdown panel-class="w-60!">
-                            <x-slot:trigger>
-                                <button type="button" aria-haspopup="listbox" :aria-expanded="open"
-                                    x-bind:disabled="selectedIds.length === 0"
-                                    x-bind:class="{ 'button-highlighted': selectedIds.length > 0 }"
-                                    x-bind:title="selectedIds.length > 0
-                                        ? `Change build time / runtime availability of ${selectedIds.length} selected ${selectedIds.length === 1 ? 'variable' : 'variables'}`
-                                        : 'Select environment variables to change their availability'"
-                                    class="button">
-                                    <x-reicon name="sliders" class="size-3.5 shrink-0" />
-                                    <span>Availability</span>
-                                    <span x-show="selectedIds.length > 0" x-text="selectedIds.length"
-                                        class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"></span>
-                                </button>
-                            </x-slot:trigger>
-                            <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Build time</span>
-                            <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', true); open = false">
-                                <span>Available during build</span>
-                            </button>
-                            <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', false); open = false">
-                                <span>Not available during build</span>
-                            </button>
-                            <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
-                            <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Runtime</span>
-                            <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', true); open = false">
-                                <span>Available in the container</span>
-                            </button>
-                            <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', false); open = false">
-                                <span>Not available in the container</span>
-                            </button>
-                        </x-table.dropdown>
-                    </div>
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
                     <x-modal-input title="New Environment Variable" :closeOutside="false">
@@ -282,7 +280,7 @@
                     <x-empty size="sm" title="No environment variables found"
                         description="No variables match your search." />
                 @elseif ($totalRows > 0)
-                    <div class="data-table w-full">
+                    <div class="data-table w-full" x-bind:class="{ 'env-table-has-selection': selectedIds.length > 0 }">
                         <div class="environment-table-scroll relative">
                             <div class="transition-all"
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
