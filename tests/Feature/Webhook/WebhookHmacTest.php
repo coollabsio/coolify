@@ -693,6 +693,30 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         'https' => 'https://bitbucket.example.com/scm/~user/repo.git',
         'https with context path' => 'https://example.com/bitbucket/scm/~user/repo.git',
     ]);
+
+    test('returns 429 when the deployment queue is full', function () {
+        $app = createApplicationWithWebhook();
+        $server = $app->destination->server;
+        $server->update(['ip' => '10.0.0.10']);
+        $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false, 'deployment_queue_limit' => 0]);
+        $app->settings->update(['is_auto_deploy_enabled' => true]);
+
+        $payload = json_encode([
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => str_repeat('a', 40)]]]]],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:push',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertStatus(429)
+            ->assertHeader('Retry-After', 60)
+            ->assertSee('Deployment queue is full.');
+    });
 });
 
 describe('Gitea Manual Webhook HMAC', function () {
