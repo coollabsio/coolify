@@ -427,3 +427,37 @@ it('restores the volume name when the rename is cancelled', function () {
 
     expect($volume->refresh()->name)->toBe($oldName);
 });
+
+it('saves every changed volume from the unsaved changes bar', function () {
+    [$application, $volume] = createApplicationWithVolume();
+    $second = LocalPersistentVolume::create([
+        'name' => $application->uuid.'-cache',
+        'mount_path' => '/cache',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.mountPath", '/new-data')
+        ->set("forms.{$second->id}.mountPath", '/new-cache')
+        ->call('submit')
+        ->assertDispatched('success')
+        ->assertSet("forms.{$volume->id}.savedMountPath", '/new-data')
+        ->assertSet("forms.{$second->id}.savedMountPath", '/new-cache');
+
+    expect($volume->refresh()->mount_path)->toBe('/new-data')
+        ->and($second->refresh()->mount_path)->toBe('/new-cache');
+});
+
+it('autosaves the PR suffix without saving other unsaved volume edits', function () {
+    [$application, $volume] = createApplicationWithVolume();
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.mountPath", '/unsaved')
+        ->set("forms.{$volume->id}.isPreviewSuffixEnabled", false)
+        ->assertDispatched('success');
+
+    $volume->refresh();
+    expect($volume->is_preview_suffix_enabled)->toBeFalse()
+        ->and($volume->mount_path)->toBe('/data');
+});
