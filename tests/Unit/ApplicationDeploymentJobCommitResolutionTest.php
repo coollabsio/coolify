@@ -65,6 +65,8 @@ function makeDeploymentJobForCommitCheck(string $pinnedSha, string $branchHeadSh
         }
     };
     $deploymentQueue->commit = $pinnedSha;
+    // A stored message skips the database lookup in reuse_commit_message().
+    $deploymentQueue->commit_message = 'Pinned commit';
 
     setDeploymentJobProperty($job, 'application', $application);
     setDeploymentJobProperty($job, 'application_deployment_queue', $deploymentQueue);

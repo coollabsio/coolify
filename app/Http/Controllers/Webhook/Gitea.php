@@ -314,6 +314,11 @@ class Gitea extends Controller
                             }
                         }
 
+                        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                            data_get($payload, 'pull_request.head.repo.id'),
+                            data_get($payload, 'pull_request.base.repo.id'),
+                        ));
+
                         $result = queue_application_deployment(
                             application: $application,
                             pull_request_id: $pull_request_id,
@@ -580,6 +585,11 @@ class Gitea extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
+                            ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                                data_get($payload, 'pull_request.head.repo.id'),
+                                data_get($payload, 'pull_request.base.repo.id'),
+                            ));
+
                             $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,

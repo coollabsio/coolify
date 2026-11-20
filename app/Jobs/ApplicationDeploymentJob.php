@@ -10,6 +10,7 @@ use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
+use App\Exceptions\PreviewApprovalRequiredException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -23,6 +24,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\PreviewApprovalRequired;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\ImageScan\DeploymentImageScan;
 use App\Support\RemoteSecretReferences;
@@ -492,6 +494,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        $waitsForApproval = false;
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
@@ -510,6 +513,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->addHosts = $this->networkHostFlags();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
+        } catch (PreviewApprovalRequiredException) {
+            // The status changes after the cleanup below: commands stop when the deployment is cancelled.
+            $waitsForApproval = true;
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->isGithubAppSource()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
@@ -552,6 +558,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } catch (Exception $e) {
                 // Log but don't fail - event dispatch errors shouldn't prevent status updates
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+
+            if ($waitsForApproval) {
+                $this->transitionToStatus(ApplicationDeploymentStatus::CANCELLED_BY_USER);
             }
         }
     }
@@ -3845,6 +3855,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->withGitHostKeyHint(fn () => $this->import_repository());
         $this->save_git_ssh_known_hosts();
+        $this->ensureForkPreviewCommitIsApproved();
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -3860,6 +3871,54 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ['commit_message' => $commit_message->value()]
             );
         }
+    }
+
+    /**
+     * A fork pull request can change everything that the build and the containers run. Coolify
+     * reads the commit that the clone checked out (the pull request can get new commits after the
+     * webhook) and deploys it only when an admin approved that commit.
+     *
+     * @throws PreviewApprovalRequiredException
+     */
+    private function ensureForkPreviewCommitIsApproved(): void
+    {
+        if ($this->pull_request_id === 0 || ! $this->preview?->refresh()->is_fork_pull_request) {
+            return;
+        }
+
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'git -C '.escapeshellarg($this->basedir).' rev-parse HEAD'),
+            'hidden' => true,
+            'save' => 'checked_out_commit',
+        ]);
+        $commit = $this->trimmedSavedOutput('checked_out_commit')->value();
+        if (! preg_match('/\A[0-9a-f]{40}([0-9a-f]{24})?\z/', $commit)) {
+            throw new DeploymentException('Coolify cannot read the commit of this fork pull request, so it cannot check the approval.');
+        }
+
+        if (! $this->preview->forkCommitNeedsApproval($commit)) {
+            if (filled($this->preview->approved_commit)) {
+                $this->application_deployment_queue->addLogEntry("An admin approved commit {$commit} of this fork pull request.");
+            }
+
+            return;
+        }
+
+        $this->preview->markWaitingForApproval($commit);
+        $this->commit = $commit;
+        $this->application_deployment_queue->update(['commit' => $commit]);
+        $this->application_deployment_queue->addLogEntry("Commit {$commit} of this pull request comes from a fork. An admin must approve it on the Preview Deployments page before Coolify deploys it.", 'stderr');
+
+        try {
+            $this->application->environment->project->team?->notify(new PreviewApprovalRequired($this->application, $this->preview, $this->deployment_uuid));
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Sending the approval notification failed', $e);
+        }
+        if ($this->application->isGithubAppSource()) {
+            ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::WAITING_FOR_APPROVAL);
+        }
+
+        throw new PreviewApprovalRequiredException('The commit of this fork pull request waits for an admin approval.');
     }
 
     /**
