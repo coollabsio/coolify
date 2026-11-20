@@ -141,9 +141,9 @@
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($isDeploymentProgress)
-                        <x-deploying-indicator class="mr-1" />
+                        <x-deploying-indicator size="md" />
                     @endif
                     @if ($service->isDeployable)
                         <div class="resource-heading-menus shrink-0">

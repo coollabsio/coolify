@@ -5418,6 +5418,14 @@ class DatabasesController extends Controller
         }
         $this->authorize('placeResource', $destination->server);
 
+        try {
+            foreach ($database->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($database->destination->server, $destination->server);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
@@ -5450,6 +5458,7 @@ class DatabasesController extends Controller
         foreach ($database->persistentStorages()->get() as $volume) {
             $originalName = $volume->name;
             $newName = match (true) {
+                $volume->is_external => $originalName,
                 str_starts_with($originalName, 'postgres-data-') => 'postgres-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'mysql-data-') => 'mysql-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'redis-data-') => 'redis-data-'.$newDatabase->uuid,
@@ -5476,7 +5485,7 @@ class DatabasesController extends Controller
             ]);
             $newPersistentVolume->save();
 
-            if ($cloneVolumeData) {
+            if ($volume->shouldCopyDataWhenCloning($cloneVolumeData)) {
                 $pendingVolumeClones[] = [
                     'source' => $volume->name,
                     'target' => $newPersistentVolume->name,

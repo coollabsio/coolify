@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
+use App\Services\TemplateFingerprint;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -543,6 +544,7 @@ class ServicesController extends Controller
                     'docker_compose_raw' => $dockerComposeRaw,
                     'environment_id' => $environment->id,
                     'service_type' => $oneClickServiceName,
+                    'template_reference_hash' => TemplateFingerprint::forTemplate(data_get($services, $oneClickServiceName, [])),
                     'server_id' => $server->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination->getMorphClass(),
