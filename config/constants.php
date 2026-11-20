@@ -10,7 +10,6 @@ return [
     'coolify' => [
         'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
         'helper_version' => current($upstream['helper'])['version'],
-        'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
