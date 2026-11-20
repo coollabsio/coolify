@@ -1,0 +1,40 @@
+# documentation: https://github.com/garethgeorge/backrest
+# slogan: Backrest is a web UI and orchestrator for restic backup.
+# category: backup
+# tags: backup,restic,backrest,storage,recovery
+# logo: svgs/backrest.svg
+# port: 9898
+
+services:
+  backrest:
+    image: ghcr.io/garethgeorge/backrest:v1.14.1-alpine
+    environment:
+      - SERVICE_URL_BACKREST_9898
+      - BACKREST_DATA=/data
+      - BACKREST_CONFIG=/config/config.json
+      - XDG_CACHE_HOME=/cache
+      - TMPDIR=/tmp
+      - BACKREST_PORT=0.0.0.0:9898
+      - TZ=${TZ:-UTC}
+    volumes:
+      - backrest-data:/data
+      - backrest-config:/config
+      - backrest-cache:/cache
+      - backrest-tmp:/tmp
+      - ${BACKUP_SOURCE_PATH:-/srv/data}:/userdata:ro
+      - ${LOCAL_REPOS_PATH:-/srv/backrest-repos}:/repos
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9898/"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  backrest-data:
+  backrest-config:
+  backrest-cache:
+  backrest-tmp:
