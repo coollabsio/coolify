@@ -1,0 +1,247 @@
+# documentation: https://docs.zammad.org/en/latest/install/docker-compose.html
+# slogan: A web-based, open-source helpdesk and customer support platform.
+# category: helpdesk
+# tags: zammad,helpdesk,ticketing,customer-support,customer-service,support
+# logo: svgs/zammad.svg
+# port: 8080
+---
+x-shared:
+  zammad-service: &zammad-service
+    environment: &zammad-environment
+      MEMCACHE_SERVERS: ${MEMCACHE_SERVERS:-zammad-memcached:11211}
+      POSTGRESQL_DB: ${POSTGRES_DB:-zammad_production}
+      POSTGRESQL_HOST: ${POSTGRES_HOST:-zammad-postgresql}
+      POSTGRESQL_USER: ${POSTGRES_USER:-zammad}
+      POSTGRESQL_PASS: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRESQL_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRESQL_OPTIONS: ${POSTGRESQL_OPTIONS:-?pool=50}
+      POSTGRESQL_DB_CREATE: ${POSTGRESQL_DB_CREATE:-}
+
+      REDIS_URL: ${REDIS_URL:-redis://zammad-redis:6379}
+      REDIS_SENTINELS: ${REDIS_SENTINELS:-}
+      REDIS_SENTINEL_NAME: ${REDIS_SENTINEL_NAME:-}
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_SENTINEL_USERNAME: ${REDIS_SENTINEL_USERNAME:-}
+      REDIS_SENTINEL_PASSWORD: ${REDIS_SENTINEL_PASSWORD:-}
+
+      S3_URL:
+      # Backup settings
+      BACKUP_DIR: "${BACKUP_DIR:-/var/tmp/zammad}"
+      BACKUP_TIME: "${BACKUP_TIME:-03:00}"
+      BACKUP_ON_START: "${BACKUP_ON_START:-false}"
+      HOLD_DAYS: "${HOLD_DAYS:-10}"
+      TZ: "${TZ:-Europe/Berlin}"
+      AUTOWIZARD_JSON: ${AUTOWIZARD_JSON:-}
+      AUTOWIZARD_RELATIVE_PATH: ${AUTOWIZARD_RELATIVE_PATH:-}
+      ELASTICSEARCH_ENABLED: ${ELASTICSEARCH_ENABLED:-true}
+      ELASTICSEARCH_SCHEMA: ${ELASTICSEARCH_SCHEMA:-http}
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-zammad-elasticsearch}
+      ELASTICSEARCH_PORT: ${ELASTICSEARCH_PORT:-9200}
+      ELASTICSEARCH_USER: ${ELASTICSEARCH_USER:-elastic}
+      ELASTICSEARCH_PASS: ${ELASTICSEARCH_PASS:-zammad}
+      ELASTICSEARCH_NAMESPACE: ${ELASTICSEARCH_NAMESPACE:-zammad}
+      ELASTICSEARCH_REINDEX: ${ELASTICSEARCH_REINDEX:-true}
+      NGINX_PORT: ${NGINX_PORT:-8080}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-50M}
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
+      NGINX_SERVER_SCHEME: ${NGINX_SERVER_SCHEME:-http}
+      RAILS_TRUSTED_PROXIES: ${RAILS_TRUSTED_PROXIES:-172.16.0.0/12}
+      ZAMMAD_HTTP_TYPE: ${ZAMMAD_HTTP_TYPE:-https}
+      ZAMMAD_FQDN: ${SERVICE_FQDN_ZAMMAD}
+      ZAMMAD_WEB_CONCURRENCY: ${ZAMMAD_WEB_CONCURRENCY:-}
+      ZAMMAD_MANAGE_SESSIONS_JOBS_WORKERS: ${ZAMMAD_MANAGE_SESSIONS_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_SESSIONS_JOBS_WORKERS: ${ZAMMAD_PROCESS_SESSIONS_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_SCHEDULED_JOBS_WORKERS: ${ZAMMAD_PROCESS_SCHEDULED_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_DELAYED_JOBS_WORKERS: ${ZAMMAD_PROCESS_DELAYED_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_DELAYED_JOBS_WORKER_THREADS: ${ZAMMAD_PROCESS_DELAYED_JOBS_WORKER_THREADS:-}
+      ZAMMAD_PROCESS_DELAYED_AI_JOBS_WORKERS: ${ZAMMAD_PROCESS_DELAYED_AI_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_DELAYED_AI_JOBS_WORKER_THREADS: ${ZAMMAD_PROCESS_DELAYED_AI_JOBS_WORKER_THREADS:-}
+      ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_WORKERS: ${ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_WORKERS:-}
+      ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_WORKER_THREADS: ${ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_WORKER_THREADS:-}
+      ZAMMAD_OTRS_IMPORT_READ_TIMEOUT: ${ZAMMAD_OTRS_IMPORT_READ_TIMEOUT:-}
+      ZAMMAD_OTRS_IMPORT_TOTAL_TIMEOUT: ${ZAMMAD_OTRS_IMPORT_TOTAL_TIMEOUT:-}
+      ZAMMAD_HTTP_OPEN_TIMEOUT: ${ZAMMAD_HTTP_OPEN_TIMEOUT:-30}
+      ZAMMAD_HTTP_READ_TIMEOUT: ${ZAMMAD_HTTP_READ_TIMEOUT:-60}
+      ZAMMAD_HTTP_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_TOTAL_TIMEOUT:-60}
+      ZAMMAD_HTTP_AI_READ_TIMEOUT: ${ZAMMAD_HTTP_AI_READ_TIMEOUT:-}
+      ZAMMAD_HTTP_AI_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_AI_TOTAL_TIMEOUT:-}
+      ZAMMAD_HTTP_ELASTICSEARCH_READ_TIMEOUT: ${ZAMMAD_HTTP_ELASTICSEARCH_READ_TIMEOUT:-}
+      ZAMMAD_HTTP_ELASTICSEARCH_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_ELASTICSEARCH_TOTAL_TIMEOUT:-}
+      ZAMMAD_HTTP_ELASTICSEARCH_REINDEX_READ_TIMEOUT: ${ZAMMAD_HTTP_ELASTICSEARCH_REINDEX_READ_TIMEOUT:-}
+      ZAMMAD_HTTP_ELASTICSEARCH_REINDEX_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_ELASTICSEARCH_REINDEX_TOTAL_TIMEOUT:-}
+      ZAMMAD_HTTP_IMPORT_ATTACHMENT_READ_TIMEOUT: ${ZAMMAD_HTTP_IMPORT_ATTACHMENT_READ_TIMEOUT:-}
+      ZAMMAD_HTTP_IMPORT_ATTACHMENT_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_IMPORT_ATTACHMENT_TOTAL_TIMEOUT:-}
+      ZAMMAD_HTTP_WEBHOOK_READ_TIMEOUT: ${ZAMMAD_HTTP_WEBHOOK_READ_TIMEOUT:-}
+      ZAMMAD_HTTP_WEBHOOK_TOTAL_TIMEOUT: ${ZAMMAD_HTTP_WEBHOOK_TOTAL_TIMEOUT:-}
+
+      # Allow disabling individual background services in the scheduler container.
+      ZAMMAD_PROCESS_SESSIONS_JOBS_DISABLE: ${ZAMMAD_PROCESS_SESSIONS_JOBS_DISABLE:-}
+      ZAMMAD_MANAGE_SESSIONS_JOBS_DISABLE: ${ZAMMAD_MANAGE_SESSIONS_JOBS_DISABLE:-}
+      ZAMMAD_PROCESS_SCHEDULED_JOBS_DISABLE: ${ZAMMAD_PROCESS_SCHEDULED_JOBS_DISABLE:-}
+      ZAMMAD_PROCESS_DELAYED_JOBS_DISABLE: ${ZAMMAD_PROCESS_DELAYED_JOBS_DISABLE:-}
+      ZAMMAD_PROCESS_DELAYED_AI_JOBS_DISABLE: ${ZAMMAD_PROCESS_DELAYED_AI_JOBS_DISABLE:-}
+      ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_DISABLE: ${ZAMMAD_PROCESS_DELAYED_COMMUNICATION_INBOUND_JOBS_DISABLE:-}
+
+      ZAMMAD_GRAPHQL_INTROSPECTION: ${ZAMMAD_GRAPHQL_INTROSPECTION:-false}
+      ZAMMAD_AI_API_URL: ${ZAMMAD_AI_API_URL:-}
+      ZAMMAD_AI_TOKEN: ${ZAMMAD_AI_TOKEN:-}
+      ZAMMAD_UI_BULK_BACKGROUND_UPDATE_THRESHOLD: ${ZAMMAD_UI_BULK_BACKGROUND_UPDATE_THRESHOLD:-}
+      ZAMMAD_SETTING_TTL: ${ZAMMAD_SETTING_TTL:-}
+      ZAMMAD_SAFE_MODE: ${ZAMMAD_SAFE_MODE:-}
+      ZAMMAD_WEBSOCKET_SESSION_STORE_FORCE_FS_BACKEND: ${ZAMMAD_WEBSOCKET_SESSION_STORE_FORCE_FS_BACKEND:-}
+      ZAMMAD_RAILSSERVER_PORT: ${ZAMMAD_RAILSSERVER_PORT:-3000}
+
+    image: ghcr.io/zammad/zammad:7.1.3-0006
+    init: true
+    restart: always
+    volumes:
+      - zammad-backup:/var/tmp/zammad:ro # needed for waiting on restore operations
+      - zammad-storage:/opt/zammad/storage
+    depends_on:
+      zammad-memcached:
+        condition: service_healthy
+      zammad-postgresql:
+        condition: service_healthy
+      zammad-redis:
+        condition: service_healthy
+
+services:
+  zammad-backup:
+    <<: *zammad-service
+    command: ["zammad-backup"]
+    volumes:
+      - zammad-backup:/var/tmp/zammad
+      - zammad-storage:/opt/zammad/storage
+    user: 0:0
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "backup.sh"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  zammad-elasticsearch:
+    image: elasticsearch:9.5.2
+    restart: always
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms1g -Xmx1g}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  zammad-init:
+    <<: *zammad-service
+    command: ["zammad-init"]
+    exclude_from_hc: true
+    restart: on-failure
+    user: 0:0
+
+  zammad-memcached:
+    command: memcached -m 256M
+    image: memcached:1.6.45-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "11211"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  zammad:
+    <<: *zammad-service
+    environment:
+      <<: *zammad-environment
+      NGINX_PORT: "8080"
+      NGINX_SERVER_SCHEME: "https"
+      SERVICE_URL_ZAMMAD_8080:
+    command: ["zammad-nginx"]
+    init: false
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    depends_on:
+      zammad-railsserver:
+        condition: service_healthy
+
+  zammad-postgresql:
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zammad_production}
+      POSTGRES_USER: ${POSTGRES_USER:-zammad}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    image: postgres:17.11-alpine
+    restart: always
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  zammad-railsserver:
+    <<: *zammad-service
+    command: ["zammad-railsserver"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:${ZAMMAD_RAILSSERVER_PORT:-3000}"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+  zammad-redis:
+    image: redis:8.10.1-alpine
+    restart: always
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  zammad-scheduler:
+    <<: *zammad-service
+    command: ["zammad-scheduler"]
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "background-worker"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+  zammad-websocket:
+    <<: *zammad-service
+    command: ["zammad-websocket"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6042"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  postgresql-data:
+    driver: local
+  redis-data:
+    driver: local
+  zammad-backup:
+    driver: local
+  zammad-storage:
+    driver: local
