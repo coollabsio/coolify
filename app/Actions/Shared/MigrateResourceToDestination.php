@@ -15,6 +15,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -36,7 +37,7 @@ class MigrateResourceToDestination
      * @return array{async: bool, volume_jobs: int, message: string}
      */
     public function handle(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
         StandaloneDocker|SwarmDocker $destination,
         bool $migrateVolumes = true,
     ): array {
@@ -140,7 +141,7 @@ class MigrateResourceToDestination
     }
 
     public function applyDestination(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
         StandaloneDocker|SwarmDocker $destination,
     ): void {
         $payload = [
@@ -176,7 +177,7 @@ class MigrateResourceToDestination
     }
 
     protected function hasDomains(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
     ): bool {
         if ($resource instanceof Application) {
             return $resource->maintenanceDomains()->isNotEmpty();
@@ -190,7 +191,7 @@ class MigrateResourceToDestination
     }
 
     protected function stopResource(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
     ): void {
         try {
             if ($resource instanceof Application) {
@@ -212,7 +213,7 @@ class MigrateResourceToDestination
      * @return array<int, VolumeCloneJob|HostPathCloneJob>
      */
     protected function buildVolumeJobs(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
         $sourceServer,
         $targetServer,
     ): array {
@@ -252,7 +253,7 @@ class MigrateResourceToDestination
      * @return Collection<int, LocalPersistentVolume>
      */
     protected function collectPersistentVolumes(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
     ) {
         if ($resource instanceof Service) {
             $volumes = collect();
@@ -286,7 +287,7 @@ class MigrateResourceToDestination
     }
 
     protected function resaveFileStorages(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
     ): void {
         $fileStorages = collect();
 

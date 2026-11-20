@@ -53,19 +53,19 @@ it('validates metrics collection settings on the server metrics page', function 
         ]);
 });
 
-it('refreshes server metrics live for every time range until paused', function () {
+it('refreshes short server metric ranges live and starts long ranges paused', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $server->settings->is_sentinel_enabled = true;
     $server->settings->is_metrics_enabled = true;
     $server->settings->saveQuietly();
 
-    Livewire::test(Charts::class, ['server_uuid' => $server->uuid])
-        ->assertSet('live', true)
-        ->assertSeeHtml('wire:poll.5s="loadData"')
-        ->set('interval', 43200)
-        ->assertSet('live', true)
-        ->assertSeeHtml('wire:poll.60s="loadData"')
-        ->set('live', false)
-        ->assertDontSeeHtml('wire:poll')
-        ->assertSee('Paused');
+    $component = Livewire::test(Charts::class, ['server_uuid' => $server->uuid])
+        ->assertSet('live', true);
+    expect($component->instance()->pollSeconds())->toBe(5);
+
+    $component->set('interval', 43200)->assertSet('live', false);
+    expect($component->instance()->pollSeconds())->toBeNull();
+
+    $component->set('live', true);
+    expect($component->instance()->pollSeconds())->toBe(60);
 });

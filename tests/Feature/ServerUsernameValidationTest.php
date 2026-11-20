@@ -191,6 +191,6 @@ it('does not disclose another team through the duplicate server IP message', fun
         Livewire::test(ByIp::class, ['private_keys' => collect([$this->privateKey])])
             ->set('ip', $ip)
             ->call('submit')
-            ->assertDispatched('error', 'A server with this IP/Domain already exists.');
+            ->assertDispatched('error', 'A server with this IP/Domain and SSH port already exists.');
     }
 });

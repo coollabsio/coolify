@@ -1,17 +1,21 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     Http::preventStrayRequests();
 
     InstanceSettings::query()->whereKey(0)->delete();
@@ -164,6 +168,7 @@ it('creates a Hostinger VPS server through the API', function () {
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
         && $request['setup']['enable_backups'] === true);
+    Bus::assertDispatched(ValidateNewCloudServerJob::class);
 });
 
 it('turns paid Hostinger backups off when the API request does not enable them', function () {

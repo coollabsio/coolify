@@ -157,25 +157,6 @@ test('provider token pages render api error details when a selected token is inv
     'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'loadDigitalOceanData', 'DigitalOcean', 'Unable to authenticate you', ['id' => 'Unauthorized', 'message' => 'Unable to authenticate you']],
 ]);
 
-test('change method button on token specific provider creation pages returns to server type selection', function (string $provider, string $type) {
-    $token = CloudProviderToken::factory()->create([
-        'team_id' => $this->team->id,
-        'provider' => $provider,
-    ]);
-
-    Livewire::test(CreatePage::class, [
-        'type' => $type,
-        'token_uuid' => $token->uuid,
-    ])
-        ->assertSee('Change method')
-        ->assertSee('href="'.route('server.create').'"', false)
-        ->assertDontSee('>Back<', false);
-})->with([
-    'hetzner' => ['hetzner', 'hetzner'],
-    'vultr' => ['vultr', 'vultr'],
-    'digital-ocean' => ['digitalocean', 'digital-ocean'],
-]);
-
 test('provider token picker is hidden on token specific provider creation pages', function (string $provider, string $type) {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,

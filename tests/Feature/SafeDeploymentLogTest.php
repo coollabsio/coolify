@@ -241,6 +241,8 @@ it('keeps corrupted stored logs and warns once instead of overwriting them', fun
  */
 function runDeploymentCommandWithChunks(ApplicationDeploymentQueue $deployment, array $chunks, bool $hidden = false): void
 {
+    // The mocked Process facade cannot answer the host key scan.
+    config(['constants.ssh.host_key_checking' => 'off']);
     $team = $deployment->application->team();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -318,6 +320,34 @@ it('redacts a private key that is split across deployment output chunks', functi
         ->and($outputs->all())->toBe(['before', REDACTED."\nafter"]);
 });
 
+it('leaves the changed host key warning of ssh out of the deployment log', function () {
+    [, $deployment] = makeSafeDeploymentLogFixture();
+    $warning = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n"
+        ."@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n"
+        ."@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n"
+        ."IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\r\n"
+        ."The fingerprint for the ED25519 key sent by the remote host is\n"
+        ."SHA256:HwD7uwuyJ8Nns/3ORRZ1nTRNABjxDxOjt16LpPM22kE.\r\n"
+        ."Offending ED25519 key in /data/known_hosts_x:1\r\n"
+        ."  remove with:\r\n"
+        ."  ssh-keygen -f '/data/known_hosts_x' -R 'coolify-x'\r\n"
+        ."Password authentication is disabled to avoid man-in-the-middle attacks.\r\n";
+
+    runDeploymentCommandWithChunks($deployment, [
+        ['err', substr($warning, 0, 150)],
+        ['err', substr($warning, 150)],
+        ['out', "built\n"],
+        ['err', "npm warn deprecated\n"],
+    ]);
+
+    $logs = collect(json_decode($deployment->refresh()->logs, true));
+
+    expect($logs->map(fn (array $entry) => [$entry['type'], $entry['output']])->all())->toBe([
+        ['stdout', 'built'],
+        ['stderr', 'npm warn deprecated'],
+    ]);
+});
+
 /**
  * A team with an API token, a functional server, and running containers whose logs print an environment value
  * and a pattern secret. Returns the endpoint path for the requested resource.
@@ -391,14 +421,14 @@ function makeRestLogRedactionEndpoint(string $resource, string $envSecret): arra
 
     Process::fake(function ($process) use ($containerName, $envSecret) {
         return match (true) {
-            str_contains($process->command, 'docker ps') => Process::result(output: json_encode([
+            str_contains(remoteProcessScript($process), 'docker ps') => Process::result(output: json_encode([
                 'ID' => 'abc123',
                 'Names' => $containerName,
                 'Labels' => "coolify.name={$containerName}",
                 'State' => 'running',
             ])),
-            str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
-            str_contains($process->command, 'docker logs') => Process::result(output: "booted with {$envSecret}\npassword=coolify-canary-pattern-secret"),
+            str_contains(remoteProcessScript($process), 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+            str_contains(remoteProcessScript($process), 'docker logs') => Process::result(output: "booted with {$envSecret}\npassword=coolify-canary-pattern-secret"),
             default => Process::result(output: ''),
         };
     });

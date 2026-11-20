@@ -84,9 +84,9 @@ function mcpLogRedactionCall(array $abilities, string $tool, array $arguments): 
 function fakeMcpApplicationContainer(Closure $logs): void
 {
     Process::fake(fn ($process) => match (true) {
-        str_contains($process->command, 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => 'app', 'Labels' => '', 'State' => 'running'])),
-        str_contains($process->command, 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
-        str_contains($process->command, 'docker logs') => $logs(),
+        str_contains(remoteProcessScript($process), 'docker ps') => Process::result(output: json_encode(['ID' => 'abc123', 'Names' => 'app', 'Labels' => '', 'State' => 'running'])),
+        str_contains(remoteProcessScript($process), 'docker inspect') => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+        str_contains(remoteProcessScript($process), 'docker logs') => $logs(),
         default => Process::result(output: ''),
     });
 }

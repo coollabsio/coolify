@@ -74,7 +74,7 @@ test('reloading the compose file refreshes only the environment variable list', 
         'docker_compose_location' => '/docker-compose.yml',
     ]);
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'git cat-file blob')) {
             return Process::result(output: "services:\n  web:\n    image: nginx:alpine\n");
         }

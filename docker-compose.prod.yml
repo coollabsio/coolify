@@ -3,8 +3,9 @@ services:
   # Realtime runs inside the coolify container now. Without this entry, such an override is an
   # incomplete service and every upgrade fails. Zero replicas means it never starts, and
   # "docker compose up" removes the old coolify-realtime container (an inactive profile keeps it).
+  # It uses the coolify image, so install and upgrade do not pull another image.
   soketi:
-    image: busybox:1.37
+    image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     deploy:
       replicas: 0
   coolify:

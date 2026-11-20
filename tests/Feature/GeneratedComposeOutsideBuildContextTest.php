@@ -56,7 +56,7 @@ beforeEach(function () {
 
     $this->commands = collect();
     Process::fake(function (PendingProcess $process) {
-        $command = (string) $process->command;
+        $command = remoteProcessScript($process);
         $this->commands->push($command);
 
         return Process::result(output: match (true) {

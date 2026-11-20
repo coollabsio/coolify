@@ -348,9 +348,14 @@ class Analytics extends Component
         $appRows = [];
         $hostTotals = [];
 
+        $clients = $servers->mapWithKeys(fn (Server $server) => [$server->uuid => $this->trafficClient($server)]);
+        if ($resource === null) {
+            SentinelTrafficClient::prefetchServerWideConcurrently($clients, $from, $to, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
+        }
+
         foreach ($servers as $server) {
             try {
-                $client = $this->trafficClient($server);
+                $client = $clients[$server->uuid];
 
                 if ($resource !== null) {
                     // One server in Sentinel's resource scope is exact; a merge across servers

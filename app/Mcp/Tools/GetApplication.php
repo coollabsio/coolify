@@ -16,7 +16,7 @@ class GetApplication extends Tool
 {
     protected string $name = 'get_application';
 
-    protected string $description = 'Get full details for a single application by UUID.';
+    protected string $description = 'Get full details for a single application by UUID. Commands and custom configuration (build, start, deployment, and healthcheck commands, docker run options, nginx configuration) need read:sensitive.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -47,8 +47,11 @@ class GetApplication extends Tool
         $application->setRelations([]);
         $application->makeHidden(['destination', 'source', 'additional_servers', 'environment', 'tags', 'environmentVariables']);
 
+        $visibleSensitiveKeys = $this->canReadSensitiveData($request) ? Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES : [];
+        $application->makeVisible($visibleSensitiveKeys);
+
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($application->toArray()),
+            $this->scrubSensitive($application->toArray(), $visibleSensitiveKeys),
             $this->actionsForApplication($uuid, $application->status),
         ), ['resource_uuid' => $uuid]);
     }

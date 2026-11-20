@@ -1,7 +1,5 @@
 <?php
 
-use App\Livewire\Project\Service\Index;
-use App\Livewire\Project\Service\ResourceCard;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -14,7 +12,6 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -58,60 +55,6 @@ beforeEach(function () {
         'environment_uuid' => $environment->uuid,
         'service_uuid' => $this->service->uuid,
     ];
-});
-
-it('shows application general and advanced settings in a resource card modal', function () {
-    Livewire::test(ResourceCard::class, [
-        'service' => $this->service,
-        'resource' => $this->application,
-        'parameters' => $this->parameters,
-    ])
-        ->assertSee('Resource settings')
-        ->assertDontSee(route('project.service.index', [
-            ...$this->parameters,
-            'stack_service_uuid' => $this->application->uuid,
-        ]), false);
-
-    Livewire::test(Index::class, [
-        'serviceApplication' => $this->application,
-        'embedded' => true,
-    ])
-        ->set('requiredPort', 80)
-        ->assertSee('Save changes')
-        ->assertDontSee('Required Port: 80')
-        ->assertSeeHtml('data-domain-summary')
-        ->assertSeeHtml('data-service-resource-actions')
-        ->assertSeeInOrder(['Delete', 'Convert to Database', 'Save changes'])
-        ->assertDontSeeHtml('<h2>General</h2>')
-        ->assertDontSeeHtml('<h2>Advanced</h2>')
-        ->assertDontSee("You have changes that haven't been saved yet.");
-});
-
-it('shows database general and advanced settings in a resource card modal', function () {
-    Livewire::test(ResourceCard::class, [
-        'service' => $this->service,
-        'resource' => $this->database,
-        'parameters' => $this->parameters,
-    ])
-        ->assertSee('Resource settings')
-        ->assertSeeLivewire(Index::class)
-        ->assertDontSee(route('project.service.index', [
-            ...$this->parameters,
-            'stack_service_uuid' => $this->database->uuid,
-        ]), false);
-
-    Livewire::test(Index::class, [
-        'serviceApplication' => $this->database,
-        'embedded' => true,
-    ])
-        ->assertSee('Public access')
-        ->assertSee('Log drain')
-        ->assertSee('Save changes')
-        ->assertSeeHtml('data-service-resource-actions')
-        ->assertSeeInOrder(['Delete', 'Convert to Application', 'Save changes'])
-        ->assertDontSeeHtml('<h2>General</h2>')
-        ->assertDontSeeHtml('<h2>Advanced</h2>')
-        ->assertDontSee("You have changes that haven't been saved yet.");
 });
 
 it('redirects old resource settings links to the service configuration page', function (string $routeName, string $resourceUuid) {

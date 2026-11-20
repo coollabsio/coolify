@@ -7,6 +7,7 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
@@ -36,7 +37,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
@@ -247,29 +247,22 @@ class DatabasesController extends Controller
                 'mongo_initdb_root_password',
                 'keydb_password',
                 'clickhouse_admin_password',
+                'influxdb_admin_password',
+                'influxdb_admin_token',
                 'mysql_password',
                 'mysql_root_password',
                 'mariadb_password',
                 'mariadb_root_password',
+                ...$database::CONFIGURATION_ATTRIBUTES,
             ]);
+        }
+        if (canReadServerSecretsFromApi()) {
             $this->exposeNestedServerSecrets($database);
         } else {
             $this->hideNestedServerSecrets($database, $loadNestedServerSecrets);
         }
 
-        $payload = serializeApiResponse($database);
-
-        // A locked password variable is never shown again, also not inside the connection URLs.
-        if (request()->attributes->get('can_read_sensitive', false) === true
-            && method_exists($database, 'isCredentialLocked') && $database->isCredentialLocked()) {
-            foreach (['internal_db_url', 'external_db_url'] as $key) {
-                if ($payload->has($key)) {
-                    $payload->put($key, null);
-                }
-            }
-        }
-
-        return $payload;
+        return redactLockedApiResourceValues($database, serializeApiResponse($database));
     }
 
     private function hideNestedServerSecrets(Model $model, bool $loadRelations = false): void
@@ -293,26 +286,18 @@ class DatabasesController extends Controller
             return;
         }
 
-        $server->makeHidden([
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
-        ]);
-
         if ($loadRelations || $server->relationLoaded('settings')) {
             $server->settings->makeHidden([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
     }
 
     /**
      * Expose sensitive fields on eager-loaded nested Server + ServerSetting
-     * relations for callers with the `read:sensitive` or `root` token ability.
+     * relations for tokens that can read server secrets (`canReadServerSecretsFromApi()`).
      */
     private function exposeNestedServerSecrets(Model $model): void
     {
@@ -321,19 +306,11 @@ class DatabasesController extends Controller
             return;
         }
 
-        $server->makeVisible([
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
-        ]);
-
         if ($server->settings !== null) {
             $server->settings->makeVisible([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
     }
@@ -352,8 +329,8 @@ class DatabasesController extends Controller
                 response: 200,
                 description: 'Get all databases',
                 content: new OA\JsonContent(
-                    type: 'string',
-                    example: 'Content is very complex. Will be implemented later.',
+                    type: 'array',
+                    items: new OA\Items(ref: '#/components/schemas/Database'),
                 ),
             ),
             new OA\Response(
@@ -374,7 +351,7 @@ class DatabasesController extends Controller
         }
         $projects = Project::where('team_id', $teamId)->get();
         $databases = collect();
-        $databaseRelations = $request->attributes->get('can_read_sensitive', false) === true
+        $databaseRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
@@ -511,11 +488,8 @@ class DatabasesController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all databases',
-                content: new OA\JsonContent(
-                    type: 'string',
-                    example: 'Content is very complex. Will be implemented later.',
-                ),
+                description: 'Get database by UUID',
+                content: new OA\JsonContent(ref: '#/components/schemas/Database'),
             ),
             new OA\Response(
                 response: 401,
@@ -600,6 +574,11 @@ class DatabasesController extends Controller
                         'postgres_conf' => ['type' => 'string', 'description' => 'PostgreSQL conf'],
                         'clickhouse_admin_user' => ['type' => 'string', 'description' => 'Clickhouse admin user'],
                         'clickhouse_admin_password' => ['type' => 'string', 'description' => 'Clickhouse admin password'],
+                        'influxdb_admin_user' => ['type' => 'string', 'description' => 'InfluxDB admin user. Only before the first start.'],
+                        'influxdb_admin_password' => ['type' => 'string', 'description' => 'InfluxDB admin password. Only before the first start.'],
+                        'influxdb_admin_token' => ['type' => 'string', 'description' => 'InfluxDB admin API token. Only before the first start.'],
+                        'influxdb_org' => ['type' => 'string', 'description' => 'InfluxDB initial organization. Only before the first start.'],
+                        'influxdb_bucket' => ['type' => 'string', 'description' => 'InfluxDB initial bucket. Only before the first start.'],
                         'dragonfly_password' => ['type' => 'string', 'description' => 'DragonFly password'],
                         'redis_password' => ['type' => 'string', 'description' => 'Redis password'],
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
@@ -661,7 +640,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'influxdb_admin_user', 'influxdb_admin_password', 'influxdb_admin_token', 'influxdb_org', 'influxdb_bucket', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -673,8 +652,8 @@ class DatabasesController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'is_public' => 'boolean',
             'public_port' => 'numeric|nullable|between:1024,65535',
@@ -690,7 +669,7 @@ class DatabasesController extends Controller
             'redact_all_env_values_in_logs' => 'boolean',
             'include_coolify_default_variables' => 'boolean',
             'is_log_drain_enabled' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
 
         if ($validator->fails()) {
             return response()->json([
@@ -777,6 +756,26 @@ class DatabasesController extends Controller
                     'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
                     'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
                 ]);
+                break;
+            case 'standalone-influxdb':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'influxdb_admin_user', 'influxdb_admin_password', 'influxdb_admin_token', 'influxdb_org', 'influxdb_bucket'];
+                $validator = customApiValidator($request->all(), [
+                    'influxdb_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'influxdb_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'influxdb_admin_token' => ValidationPatterns::databasePasswordRules(required: false),
+                    'influxdb_org' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'influxdb_bucket' => ValidationPatterns::databaseIdentifierRules(required: false),
+                ]);
+                // InfluxDB applies these values only on the first start.
+                if ($database->started_at) {
+                    $validator->after(function ($validator) use ($request) {
+                        foreach (['influxdb_admin_user', 'influxdb_admin_password', 'influxdb_admin_token', 'influxdb_org', 'influxdb_bucket'] as $field) {
+                            if ($request->has($field)) {
+                                $validator->errors()->add($field, 'This value can only be changed before the first start.');
+                            }
+                        }
+                    });
+                }
                 break;
             case 'standalone-dragonfly':
                 $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'dragonfly_password'];
@@ -1234,6 +1233,8 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $backupData['databases_to_backup'] = $database->clickhouse_db;
+            } elseif ($database->type() === 'standalone-influxdb') {
+                $backupData['databases_to_backup'] = $database->influxdb_bucket;
             }
         }
 
@@ -1257,6 +1258,11 @@ class DatabasesController extends Controller
         // Set defaults
         if (! isset($backupData['enabled'])) {
             $backupData['enabled'] = true;
+        }
+        $backupData['save_s3'] ??= false;
+
+        if ($s3Storages?->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
         }
 
         $backupConfig = ScheduledDatabaseBackup::create($backupData);
@@ -1511,6 +1517,10 @@ class DatabasesController extends Controller
             }
         }
 
+        if ($storageIds !== null && $backupConfig->newS3StorageIds($storageIds)->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $database);
+        }
+
         $backupConfig->update($backupData);
         if ($storageIds !== null) {
             $backupConfig->syncS3Storages($storageIds->all());
@@ -1550,7 +1560,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1623,7 +1633,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1676,6 +1686,78 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
+        summary: 'Create (InfluxDB)',
+        description: 'Create a new InfluxDB 2.x database.',
+        path: '/databases/influxdb',
+        operationId: 'create-database-influxdb',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'destination_uuid' => ['type' => 'string',  'description' => 'UUID of the destination if the server has multiple destinations'],
+                        'influxdb_admin_user' => ['type' => 'string', 'description' => 'InfluxDB admin user.'],
+                        'influxdb_admin_password' => ['type' => 'string', 'description' => 'InfluxDB admin password.'],
+                        'influxdb_admin_token' => ['type' => 'string', 'description' => 'InfluxDB admin API token.'],
+                        'influxdb_org' => ['type' => 'string', 'description' => 'InfluxDB initial organization.'],
+                        'influxdb_bucket' => ['type' => 'string', 'description' => 'InfluxDB initial bucket.'],
+                        'name' => ['type' => 'string', 'description' => 'Name of the database'],
+                        'description' => ['type' => 'string', 'description' => 'Description of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
+                        'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
+                        'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
+                        'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
+                        'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
+                        'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation of the database'],
+                        'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit of the database'],
+                        'limits_cpuset' => ['type' => 'string', 'description' => 'CPU set of the database'],
+                        'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares of the database'],
+                        'instant_deploy' => ['type' => 'boolean', 'description' => 'Instant deploy the database'],
+                        'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the database.'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_database_influxdb(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::INFLUXDB);
+    }
+
+    #[OA\Post(
         summary: 'Create (DragonFly)',
         description: 'Create a new DragonFly database.',
         path: '/databases/dragonfly',
@@ -1692,7 +1774,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1744,8 +1826,8 @@ class DatabasesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (Redis)',
-        description: 'Create a new Redis database.',
+        summary: 'Create (Redis / Valkey)',
+        description: 'Create a new Redis or Valkey database. Valkey (valkey/valkey:9-alpine) is the default. Set image to a Redis image (for example redis:8) for Redis.',
         path: '/databases/redis',
         operationId: 'create-database-redis',
         security: [
@@ -1760,7 +1842,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1771,7 +1853,7 @@ class DatabasesController extends Controller
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
-                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker image of the database. Default: valkey/valkey:9-alpine. For Redis, use a Redis image, for example redis:8.'],
                         'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
                         'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
                         'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
@@ -1829,7 +1911,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1898,7 +1980,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -1970,7 +2052,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2042,7 +2124,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2111,7 +2193,7 @@ class DatabasesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
                         'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
@@ -2161,7 +2243,7 @@ class DatabasesController extends Controller
 
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases', 'tags'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'influxdb_admin_user', 'influxdb_admin_password', 'influxdb_admin_token', 'influxdb_org', 'influxdb_bucket', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases', 'tags'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -2218,6 +2300,7 @@ class DatabasesController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        $this->authorize('placeResource', $server);
         if (! $server->canHostResources()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2251,8 +2334,8 @@ class DatabasesController extends Controller
         }
         $this->normalizeNumericLimits($request);
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ValidationPatterns::nameRules(required: false, nullable: false),
+            'description' => ValidationPatterns::descriptionRules(),
             'image' => 'string',
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
@@ -2272,7 +2355,7 @@ class DatabasesController extends Controller
             'instant_deploy' => 'boolean',
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -2696,6 +2779,52 @@ class DatabasesController extends Controller
             ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::INFLUXDB) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'influxdb_admin_user', 'influxdb_admin_password', 'influxdb_admin_token', 'influxdb_org', 'influxdb_bucket', 'tags'];
+            $validator = customApiValidator($request->all(), [
+                'influxdb_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'influxdb_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
+                'influxdb_admin_token' => ValidationPatterns::databasePasswordRules(required: false),
+                'influxdb_org' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'influxdb_bucket' => ValidationPatterns::databaseIdentifierRules(required: false),
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            removeUnnecessaryFieldsFromRequest($request);
+            $database = create_standalone_influxdb($environment->id, $destination, $request->only($allowedFields));
+            if ($instantDeploy) {
+                StartDatabase::dispatch($database);
+            }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($database, $tagNames, $teamId);
+            }
+
+            $database->refresh();
+            $payload = $this->createdDatabasePayload($request, $database);
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::MONGODB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'tags'];
             $validator = customApiValidator($request->all(), [
@@ -2900,13 +3029,6 @@ class DatabasesController extends Controller
 
         $container = $containers->first();
 
-        $status = getContainerStatus($database->destination->server, $container['Names']);
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Database is not running.',
-            ], 400);
-        }
-
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
         $logs = sanitizeLogsForExport(
@@ -3090,7 +3212,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3226,7 +3348,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)->where('database_type', $database->getMorphClass())
@@ -3945,7 +4067,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -4022,7 +4144,9 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
-        $env->value = $request->value;
+        if ($request->has('value')) {
+            $env->value = $request->value;
+        }
         if ($request->has('is_literal')) {
             $env->is_literal = $request->is_literal;
         }
@@ -4035,14 +4159,19 @@ class DatabasesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->save();
+        // One audit row with the database context, instead of a second row from the model.
+        $env->withoutAuditLogging(fn () => $env->save());
+        $changedFields = auditSavedFields($env);
 
-        auditLog('api.database.env_updated', [
-            'team_id' => $teamId,
-            'database_uuid' => $database->uuid,
-            'env_uuid' => $env->uuid,
-            'env_key' => $env->key,
-        ]);
+        if ($changedFields !== []) {
+            auditLog('api.database.env_updated', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'env_uuid' => $env->uuid,
+                'env_key' => $env->key,
+                'changed_fields' => $changedFields,
+            ]);
+        }
 
         return response()->json($this->removeSensitiveEnvData($env))->setStatusCode(201);
     }
@@ -4086,7 +4215,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4148,6 +4277,7 @@ class DatabasesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
@@ -4217,7 +4347,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -4758,7 +4888,7 @@ class DatabasesController extends Controller
 
     #[OA\Patch(
         summary: 'Update Storage',
-        description: 'Update a persistent storage or file storage by database UUID.',
+        description: 'Update a persistent storage or file storage by database UUID. Changed file content is saved right away and written to the server in the background, so a failed write does not change the response.',
         path: '/databases/{uuid}/storages',
         operationId: 'update-storage-by-database-uuid',
         security: [
@@ -5017,7 +5147,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $this->authorize('update', $database);
+        $this->authorize('delete', $database);
 
         $storageUuid = $request->route('storage_uuid');
 
@@ -5251,9 +5381,9 @@ class DatabasesController extends Controller
 
         $validator = customApiValidator($request->all(), [
             'destination_uuid' => 'required|string',
-            'name' => 'string|max:255|nullable',
+            'name' => ValidationPatterns::nameRules(required: false),
             'clone_volumes' => 'boolean',
-        ]);
+        ], ValidationPatterns::combinedMessages());
         $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -5286,11 +5416,12 @@ class DatabasesController extends Controller
         if (! $destination || ! $destination->server?->canHostResources()) {
             return response()->json(['message' => 'Destination not found.'], 404);
         }
+        $this->authorize('placeResource', $destination->server);
 
         $uuid = new_public_id();
         $name = $request->filled('name')
             ? $request->string('name')->toString()
-            : $database->name.'-clone-'.$uuid;
+            : clone_resource_name($database->name, $uuid);
         $cloneVolumeData = $request->boolean('clone_volumes', false);
 
         $newDatabase = $database->replicate([
@@ -5323,6 +5454,8 @@ class DatabasesController extends Controller
                 str_starts_with($originalName, 'mysql-data-') => 'mysql-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'redis-data-') => 'redis-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'clickhouse-data-') => 'clickhouse-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'influxdb-data-') => 'influxdb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'influxdb-config-') => 'influxdb-config-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'mariadb-data-') => 'mariadb-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'mongodb-data-') => 'mongodb-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'keydb-data-') => 'keydb-data-'.$newDatabase->uuid,
@@ -5352,33 +5485,11 @@ class DatabasesController extends Controller
             }
         }
 
-        // Stop once, clone all volumes, then start once — avoids per-volume stop/start races.
-        if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
-            try {
-                $chain = [
-                    function () use ($database) {
-                        StopDatabase::run($database);
-                    },
-                ];
-
-                foreach ($pendingVolumeClones as $clone) {
-                    $chain[] = new VolumeCloneJob(
-                        $clone['source'],
-                        $clone['target'],
-                        $sourceServer,
-                        $targetServer,
-                        $clone['model'],
-                    );
-                }
-
-                $chain[] = function () use ($database) {
-                    StartDatabase::run($database);
-                };
-
-                Bus::chain($chain)->onQueue('high')->dispatch();
-            } catch (\Exception $e) {
-                \Log::error('Failed to queue database volume clone for '.$database->uuid.': '.$e->getMessage());
-            }
+        if ($sourceServer && $targetServer) {
+            CloneVolumeDataWithSourceStopped::run($database, array_map(
+                fn (array $clone) => new VolumeCloneJob($clone['source'], $clone['target'], $sourceServer, $targetServer, $clone['model']),
+                $pendingVolumeClones,
+            ));
         }
 
         foreach ($database->fileStorages()->get() as $storage) {

@@ -30,7 +30,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
      * race. Such processes are not masters, so ControlPersist never reaps them
      * and they hold an authenticated session until the container restarts.
      *
-     * Every `ssh -fN` for a server carries the same ControlPath, so the socket
+     * Every master for a server carries the same ControlPath, so the socket
      * file existing says nothing about which process owns it. Ownership is read
      * from the socket itself (`ssh -O check` reports the master pid); every
      * other process for that ControlPath is an orphan. When the socket file is
@@ -48,18 +48,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         $socketOwners = [];
 
         foreach ($this->listProcesses() as $process) {
-            // Backgrounded ssh master: current `ssh -fN` or legacy `ssh -fNM`.
-            if (! preg_match('#(^|/)ssh -fN#', $process['args'])) {
-                continue;
-            }
-
-            // Only ever touch ssh processes pointing at Coolify's mux directory.
-            if (! preg_match('#ControlPath=('.preg_quote($muxDir, '#').'/\S+)#', $process['args'], $pathMatch)) {
-                continue;
-            }
-
-            $muxSocket = $pathMatch[1];
-            if ($process['etimes'] < $minAge
+            $muxSocket = $this->masterMuxSocket($process['args'], $muxDir);
+            if ($muxSocket === null
+                || $process['etimes'] < $minAge
                 || SshMultiplexingHelper::isMuxProcessRetiring($process['pid'], $muxSocket)) {
                 continue;
             }
@@ -69,6 +60,24 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
                 $this->reapOrphan('ssh', $process);
             }
         }
+    }
+
+    /**
+     * ControlPath of a backgrounded ssh master in Coolify's mux directory, or
+     * null for any other process. ControlPersist retitles a master to
+     * `ssh: <ControlPath> [mux]`; masters started before the upgrade still run
+     * as `ssh -fN` or `ssh -fNM` with the ControlPath in their arguments.
+     */
+    private function masterMuxSocket(string $args, string $muxDir): ?string
+    {
+        $socket = preg_quote($muxDir, '#').'/\S+';
+
+        if (preg_match('#^ssh: ('.$socket.') \[mux\]#', $args, $matches)
+            || (preg_match('#(^|/)ssh -fN#', $args) && preg_match('#ControlPath=('.$socket.')#', $args, $matches))) {
+            return $matches[1];
+        }
+
+        return null;
     }
 
     /**
@@ -109,7 +118,8 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         $sshPids = [];
         foreach ($processes as $process) {
             // The ssh binary itself, not `cloudflared access ssh` (space before ssh).
-            if (preg_match('#(^|/)ssh\s#', $process['args'])) {
+            // A ControlPersist master is titled `ssh: <ControlPath> [mux]`.
+            if (preg_match('#(^|/)ssh[\s:]#', $process['args'])) {
                 $sshPids[$process['pid']] = true;
             }
         }

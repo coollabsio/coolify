@@ -1102,11 +1102,11 @@ it('fails only its own execution and notifies the team when the worker timeout s
     $commands = collect();
     $atTimeout = null;
     Process::fake(function ($process) use ($application, $task, $queuedCopy, $team, $commands, &$atTimeout) {
-        $commands->push($process->command);
-        if (str_contains($process->command, 'docker ps')) {
+        $commands->push(remoteProcessScript($process));
+        if (str_contains(remoteProcessScript($process), 'docker ps')) {
             return Process::result(output: json_encode(['Names' => 'app-'.$application->uuid, 'Labels' => "coolify.applicationUuid={$application->uuid}", 'State' => 'running']));
         }
-        if (str_contains($process->command, 'docker exec')) {
+        if (str_contains(remoteProcessScript($process), 'docker exec')) {
             Carbon::setTestNow(now()->addMinute());
             $newerRun = ScheduledTaskExecution::create(['scheduled_task_id' => $task->id, 'status' => 'running', 'started_at' => now()]);
             $ownRun = ScheduledTaskExecution::query()->whereKeyNot([$newerRun->id])->where('status', 'running')->sole();

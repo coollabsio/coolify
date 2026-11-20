@@ -258,6 +258,38 @@ describe('POST /api/v1/servers/import', function () {
         Queue::assertNotPushed(ValidateAndInstallServerJob::class);
     });
 
+    test('rejects a database entry that names a model outside the database types', function () {
+        $otherTeam = Team::factory()->create();
+        $otherKey = PrivateKey::factory()->create(['team_id' => $otherTeam->id]);
+
+        $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/export")
+            ->json();
+
+        $this->application->forceDelete();
+        $this->server->forceDelete();
+        $this->privateKey->delete();
+
+        data_set($export, 'projects.0.environments.0.databases', [[
+            'type' => 'NotADatabase',
+            'model' => Application::class,
+            'attributes' => [
+                'name' => 'injected-app',
+                'git_repository' => 'git@github.com:victim/private.git',
+                'git_branch' => 'main',
+                'build_pack' => 'nixpacks',
+                'ports_exposes' => '80',
+                'private_key_id' => $otherKey->id,
+            ],
+        ]]);
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export, 'dry_run' => false])
+            ->assertStatus(422);
+
+        expect(Application::where('name', 'injected-app')->exists())->toBeFalse();
+    });
+
     test('rejects import when the destination team is at its cloud server limit', function () {
         config()->set('constants.coolify.self_hosted', false);
         $this->team->update(['custom_server_limit' => 1]);
@@ -602,7 +634,7 @@ describe('GET /api/v1/servers/import/check', function () {
     test('lists every check with its result when a server already exists on this instance', function () {
         $listener = stream_socket_server('tcp://127.0.0.1:0');
         $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
-        $this->server->forceFill(['ip' => '127.0.0.1'])->save();
+        $this->server->forceFill(['ip' => '127.0.0.1', 'port' => $port])->save();
 
         $checks = $this->withHeaders(transferHeaders($this->importToken))
             ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
@@ -613,9 +645,23 @@ describe('GET /api/v1/servers/import/check', function () {
         expect(collect($checks)->pluck('ok', 'label')->all())->toMatchArray([
             'the transfer bundle version is supported' => true,
             'no server with the same UUID exists' => true,
-            'no server with the same IP exists' => false,
+            'no server with the same IP and SSH port exists' => false,
             "the target can reach the SSH port of the server (127.0.0.1:{$port})" => true,
         ]);
+        fclose($listener);
+    });
+
+    test('accepts a server with the IP of an existing server and a different SSH port', function () {
+        $listener = stream_socket_server('tcp://127.0.0.1:0');
+        $port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
+        $this->server->forceFill(['ip' => '127.0.0.1', 'port' => 22])->save();
+
+        $checks = $this->withHeaders(transferHeaders($this->importToken))
+            ->getJson("/api/v1/servers/import/check?server_uuid=new-server-uuid&ip=127.0.0.1&port={$port}")
+            ->assertOk()
+            ->json('checks');
+
+        expect(collect($checks)->pluck('ok', 'label')->get('no server with the same IP and SSH port exists'))->toBeTrue();
         fclose($listener);
     });
 

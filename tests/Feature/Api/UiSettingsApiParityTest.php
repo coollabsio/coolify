@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LogDrainType;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -121,7 +122,7 @@ describe('applications', function () {
 
 describe('databases', function () {
     test('PATCH saves is_log_drain_enabled when the server has a log drain', function () {
-        $this->server->settings->update(['is_logdrain_newrelic_enabled' => true]);
+        $this->server->settings->update(['logdrain_type' => LogDrainType::NewRelic]);
 
         $this->withHeaders($this->headers)
             ->patchJson("/api/v1/databases/{$this->database->uuid}", ['is_log_drain_enabled' => true])
@@ -271,6 +272,9 @@ describe('servers', function () {
     })->with([
         'wildcard domain' => ['wildcard_domain', 'not a url'],
         'timezone' => ['server_timezone', 'Mars/Olympus'],
+        'null timezone' => ['server_timezone', null],
+        'empty timezone' => ['server_timezone', ''],
+        'array timezone' => ['server_timezone', ['Europe/Berlin']],
         'compression' => ['backup_compression_cpu_percentage', 30],
     ]);
 

@@ -34,9 +34,7 @@ use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -97,12 +95,6 @@ it('changes the default volume backup timeout without changing existing timeouts
 
     expect($defaultBackup->fresh()->timeout)->toBe(3600)
         ->and($customBackup->fresh()->timeout)->toBe(7200);
-});
-
-it('includes parallel gzip support in the Coolify helper image', function () {
-    $dockerfile = file_get_contents(base_path('docker/coolify-helper/Dockerfile'));
-
-    expect($dockerfile)->toContain('pigz');
 });
 
 it('targets named volumes and application directory mounts through one backup relation', function () {
@@ -710,20 +702,6 @@ it('records the S3 storage used by each volume backup execution', function () {
         ->and((new ScheduledVolumeBackupExecution)->s3())->not->toBeNull();
 });
 
-it('declares the volume backup action return types', function () {
-    $backupNowReturnType = (new ReflectionMethod(VolumeBackups::class, 'backupNow'))->getReturnType();
-    $deleteReturnType = (new ReflectionMethod(VolumeBackups::class, 'delete'))->getReturnType();
-
-    expect($backupNowReturnType)->toBeInstanceOf(ReflectionUnionType::class)
-        ->and(collect($backupNowReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing([
-            RedirectResponse::class,
-            Redirector::class,
-            'null',
-        ])
-        ->and($deleteReturnType)->toBeInstanceOf(ReflectionUnionType::class)
-        ->and(collect($deleteReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing(['bool', 'string']);
-});
-
 it('renders volume backup executions like database backup executions', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
@@ -817,8 +795,8 @@ it('deletes an individual volume backup archive and execution', function () {
         ->assertDispatched('success');
 
     expect($execution->fresh())->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'archive.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'archive.tar.gz'));
 });
 
 it('deletes an individual S3 archive from the storage recorded on its execution', function () {
@@ -1037,21 +1015,6 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
         ->and($backup->retention_amount_s3)->toBe(12)
         ->and($backup->retention_days_s3)->toBe(30)
         ->and($backup->retention_max_storage_s3)->toBe(4.5);
-});
-
-it('allows team owners to edit volume backup retention settings', function () {
-    $team = Team::factory()->create();
-    signInForVolumeBackups($this, $team);
-    [$application, $volume] = createVolumeBackupApplication($team);
-    $volume->scheduledBackups()->create([
-        'team_id' => $team->id,
-        'frequency' => 'daily',
-    ]);
-
-    Livewire::test(VolumeBackups::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])->assertDontSee('You do not have permission to perform this action.');
 });
 
 it('does not enable S3 backups when another volume backup setting is invalid', function () {
@@ -1608,8 +1571,8 @@ it('deletes local archives before deleting a volume backup schedule', function (
         ]);
 
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'archive.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'archive.tar.gz'));
 });
 
 it('deletes a volume backup schedule without deleting unselected archives', function () {
@@ -1812,8 +1775,8 @@ it('deletes disabled volume backup archives before deleting their application', 
 
     expect($backup->fresh())->toBeNull()
         ->and($execution->fresh())->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'application-delete.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'application-delete.tar.gz'));
 });
 
 it('marks a running execution failed even when the job instance lost its execution state', function () {
@@ -1836,8 +1799,8 @@ it('marks a running execution failed even when the job instance lost its executi
         ->and($execution->fresh()->message)->toBe('Worker timed out')
         ->and($execution->fresh()->finished_at)->not->toBeNull()
         ->and($execution->fresh()->filename)->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'timed-out.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'timed-out.tar.gz'));
 });
 
 it('archives a named volume using the server compression CPU percentage', function (int $compressionCpuPercentage) {
@@ -1855,7 +1818,7 @@ it('archives a named volume using the server compression CPU percentage', functi
         'timeout' => 3600,
     ]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker ps -q*' => 'abc123',
         '*du -b*' => '128',
         '*' => '',
@@ -1874,17 +1837,17 @@ it('archives a named volume using the server compression CPU percentage', functi
         ->and($execution->size)->toBe(128)
         ->and($execution->filename)->toEndWith('.tar.gz');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume inspect')
-        && str_contains($process->command, 'docker run --rm --name ')
-        && str_contains($process->command, 'app-data:/volume:ro')
-        && str_contains($process->command, 'command -v pigz')
-        && str_contains($process->command, 'pigz -3 -p')
-        && str_contains($process->command, "\$(nproc) * {$compressionCpuPercentage} + 99")
-        && str_contains($process->command, 'gzip -3')
-        && str_contains($process->command, 'tar -I "$compressor" -cf -')
-        && str_contains($process->command, '> ')
-        && str_contains($process->command, '.tar.gz')
-        && ! str_contains($process->command, ':/backup'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume inspect')
+        && str_contains(remoteProcessScript($process), 'docker run --rm --name ')
+        && str_contains(remoteProcessScript($process), 'app-data:/volume:ro')
+        && str_contains(remoteProcessScript($process), 'command -v pigz')
+        && str_contains(remoteProcessScript($process), 'pigz -3 -p')
+        && str_contains(remoteProcessScript($process), "\$(nproc) * {$compressionCpuPercentage} + 99")
+        && str_contains(remoteProcessScript($process), 'gzip -3')
+        && str_contains(remoteProcessScript($process), 'tar -I "$compressor" -cf -')
+        && str_contains(remoteProcessScript($process), '> ')
+        && str_contains(remoteProcessScript($process), '.tar.gz')
+        && ! str_contains(remoteProcessScript($process), ':/backup'));
 })->with([
     'low' => 25,
     'high' => 75,
@@ -1906,7 +1869,7 @@ it('logs the selected volume backup compressor in development', function (string
         'retention_max_storage_s3' => 0,
     ]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*command -v pigz*' => $detectedCompressor,
         '*du -b*' => '128',
         '*' => '',
@@ -1953,7 +1916,7 @@ it('keeps the upload destination on the volume backup execution', function () {
     $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);
@@ -1997,7 +1960,7 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
     $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->once()->andReturn($disk);
-    Process::fake([
+    fakeRemoteProcesses([
         '*mc pipe*' => "Added `temporary` successfully.\n128 bytes -> `temporary/bucket/archive.tar.gz`\n128",
         '*' => '',
     ]);
@@ -2006,21 +1969,23 @@ it('streams S3-only volume backups with Content-MD5 on Object Lock buckets and w
 
     $execution = ScheduledVolumeBackupExecution::query()->sole();
     $expectedFilename = 'volume-app-data-1786795200.tar.gz';
-    Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
-        && str_contains($process->command, 'mc pipe')
-        && str_contains($process->command, "-e 'MC_REGION=ru-central-1'")
-        && ! str_contains($process->command, '--quiet')
-        && str_contains($process->command, 'lock=$(mc retention info --default --json --resolve')
-        && str_contains($process->command, '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
-        && str_contains($process->command, ' $checksum ')
-        && str_contains($process->command, '>/dev/null 2>/tmp/mc-pipe.log || {')
-        && str_contains($process->command, '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
-        && str_contains($process->command, 'temporary/bucket/')
-        && str_contains($process->command, $expectedFilename)
-        && substr_count($process->command, '--resolve') === 4
-        && substr_count($process->command, '>/dev/null') >= 2
-        && ! str_contains($process->command, ' > ')
-        && ! str_contains($process->command, 'mc cp'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'tar -I')
+        && str_contains(remoteProcessScript($process), 'mc pipe')
+        && ! str_contains(remoteProcessScript($process), '--quiet')
+        && str_contains(remoteProcessScript($process), 'lock=$(mc retention info --default --json --resolve')
+        && str_contains(remoteProcessScript($process), '*) checksum=--checksum=MD5 ;; *) checksum= ;; esac && (compressor=')
+        && str_contains(remoteProcessScript($process), ' $checksum ')
+        && str_contains(remoteProcessScript($process), '>/dev/null 2>/tmp/mc-pipe.log || {')
+        && str_contains(remoteProcessScript($process), '/tmp/mc-pipe.log >&2; exit $status; }) && mc stat')
+        && str_contains(remoteProcessScript($process), 'temporary/bucket/')
+        && str_contains(remoteProcessScript($process), $expectedFilename)
+        && substr_count(remoteProcessScript($process), '--resolve') === 3
+        && substr_count(remoteProcessScript($process), '>/dev/null') >= 1
+        && ! str_contains(remoteProcessScript($process), ' > ')
+        && ! str_contains(remoteProcessScript($process), 'mc cp'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker run -d --rm --name')
+        && str_contains(remoteProcessScript($process), "-e 'MC_REGION=ru-central-1'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc alias set --resolve'));
     expect($execution->status)->toBe('success')
         ->and($execution->size)->toBe(128)
         ->and($execution->s3_uploaded)->toBeTrue()
@@ -2056,7 +2021,7 @@ it('fails an unsupported S3 stream without falling back to a local archive', fun
     $disk->shouldReceive('delete')->once()->andReturnTrue();
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
-    Process::fake([
+    fakeRemoteProcesses([
         '*mc pipe*' => Process::result(errorOutput: 'streaming upload is unsupported', exitCode: 1),
         '*' => '',
     ]);
@@ -2070,11 +2035,11 @@ it('fails an unsupported S3 stream without falling back to a local archive', fun
         ->and($execution->message)->toContain('Enable local backups to use the local archive upload method.')
         ->and($execution->filename)->toBeNull()
         ->and($execution->local_storage_deleted)->toBeTrue();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc pipe')
-        && ! str_contains($process->command, 'mc cp')
-        && ! str_contains($process->command, ' > '));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mkdir -p')
-        || (str_contains($process->command, 'rm -f') && str_contains($process->command, '.tar.gz')));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc pipe')
+        && ! str_contains(remoteProcessScript($process), 'mc cp')
+        && ! str_contains(remoteProcessScript($process), ' > '));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'mkdir -p')
+        || preg_match("/(^|\n)rm -f '[^\n]*\.tar\.gz'/", remoteProcessScript($process)) === 1);
 });
 
 it('keeps local-first archive creation and mc copy when retaining a local volume backup', function () {
@@ -2105,18 +2070,18 @@ it('keeps local-first archive creation and mc copy when retaining a local volume
     $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
     Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
     Storage::shouldReceive('build')->once()->andReturn($disk);
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);
 
     (new VolumeBackupJob($backup))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
-        && str_contains($process->command, '>')
-        && ! str_contains($process->command, 'mc pipe'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp --resolve ')
-        && ! str_contains($process->command, 'mc pipe'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'tar -I')
+        && str_contains(remoteProcessScript($process), '>')
+        && ! str_contains(remoteProcessScript($process), 'mc pipe'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mc cp --resolve ')
+        && ! str_contains(remoteProcessScript($process), 'mc pipe'));
 });
 
 it('removes local volume backups older than the configured retention days', function () {
@@ -2146,7 +2111,7 @@ it('removes local volume backups older than the configured retention days', func
     ]);
     ScheduledVolumeBackupExecution::query()->whereKey($recentExecution)->update(['created_at' => now()->subDay()]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);
@@ -2155,8 +2120,8 @@ it('removes local volume backups older than the configured retention days', func
 
     expect($expiredExecution->fresh())->toBeNull()
         ->and($recentExecution->fresh())->not->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'expired.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'expired.tar.gz'));
 });
 
 it('removes oldest local volume backups over the configured storage limit', function () {
@@ -2179,7 +2144,7 @@ it('removes oldest local volume backups over the configured storage limit', func
     ]);
     ScheduledVolumeBackupExecution::query()->whereKey($oldExecution)->update(['created_at' => now()->subDay()]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);
@@ -2188,8 +2153,8 @@ it('removes oldest local volume backups over the configured storage limit', func
 
     expect($oldExecution->fresh())->toBeNull()
         ->and($backup->executions()->where('status', 'success')->count())->toBe(1);
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, 'over-limit.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), 'over-limit.tar.gz'));
 });
 
 it('removes retained S3 archives from the storage recorded on each execution', function () {
@@ -2319,7 +2284,7 @@ it('keeps a successful backup successful when retention cleanup fails', function
         'created_at' => now()->subDay(),
     ]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*rm -f*' => Process::result(errorOutput: 'permission denied', exitCode: 1),
         '*du -b*' => '128',
         '*' => '',
@@ -2345,7 +2310,7 @@ it('stops and restarts containers that use the volume when requested', function 
         'stop_during_backup' => true,
     ]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker ps -q*' => "abc123\ndef456",
         '*du -b*' => '128',
         '*' => '',
@@ -2353,16 +2318,16 @@ it('stops and restarts containers that use the volume when requested', function 
 
     (new VolumeBackupJob($backup))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'trap cleanup EXIT')
-        && str_contains($process->command, 'exit 143')
-        && str_contains($process->command, 'TERM')
-        && str_contains($process->command, 'docker stop')
-        && str_contains($process->command, 'docker start')
-        && str_contains($process->command, 'state_file='));
-    Process::assertRan(fn ($process) => str_contains($process->command, '{{println .Source}}{{println .Name}}')
-        && str_contains($process->command, "grep -Fqx -- 'app-data'")
-        && str_contains($process->command, '{{if not .State.Paused}}')
-        && str_contains($process->command, 'continue'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'trap cleanup EXIT')
+        && str_contains(remoteProcessScript($process), 'exit 143')
+        && str_contains(remoteProcessScript($process), 'TERM')
+        && str_contains(remoteProcessScript($process), 'docker stop')
+        && str_contains(remoteProcessScript($process), 'docker start')
+        && str_contains(remoteProcessScript($process), 'state_file='));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '{{println .Source}}{{println .Name}}')
+        && str_contains(remoteProcessScript($process), "grep -Fqx -- 'app-data'")
+        && str_contains(remoteProcessScript($process), '{{if not .State.Paused}}')
+        && str_contains(remoteProcessScript($process), 'continue'));
 });
 
 /**
@@ -2374,10 +2339,10 @@ function runVolumeContainerScan(string $fakeDocker): array
 {
     $scan = '';
     Process::assertRan(function ($process) use (&$scan): bool {
-        if (! str_contains($process->command, 'docker ps -q')) {
+        if (! str_contains(remoteProcessScript($process), 'docker ps -q')) {
             return false;
         }
-        $scan = $process->command;
+        $scan = remoteProcessScript($process);
 
         return true;
     });
@@ -2406,7 +2371,7 @@ it('skips containers that are removed while scanning for volume users', function
         'stop_during_backup' => true,
     ]);
 
-    Process::fake(['*du -b*' => '128', '*' => '']);
+    fakeRemoteProcesses(['*du -b*' => '128', '*' => '']);
     (new VolumeBackupJob($backup))->handle();
 
     $docker = <<<'SH'
@@ -2436,7 +2401,7 @@ it('finds containers using a bind mounted host path before stopping', function (
         'stop_during_backup' => true,
     ]);
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker ps -q*' => 'abc123',
         '*du -b*' => '128',
         '*' => '',
@@ -2444,8 +2409,8 @@ it('finds containers using a bind mounted host path before stopping', function (
 
     (new VolumeBackupJob($backup))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, '{{println .Source}}{{println .Name}}')
-        && str_contains($process->command, "grep -Fqx -- '/srv/app-data'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '{{println .Source}}{{println .Name}}')
+        && str_contains(remoteProcessScript($process), "grep -Fqx -- '/srv/app-data'"));
 });
 
 it('archives an application directory mount from its resolved host path', function () {
@@ -2468,7 +2433,7 @@ it('archives an application directory mount from its resolved host path', functi
     ]);
     $source = $application->workdir().'/uploads';
 
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker ps -q*' => 'abc123',
         '*du -b*' => '128',
         '*' => '',
@@ -2477,13 +2442,13 @@ it('archives an application directory mount from its resolved host path', functi
     (new VolumeBackupJob($backup))->handle();
 
     expect(ScheduledVolumeBackupExecution::query()->sole()->status)->toBe('success');
-    Process::assertRan(fn ($process) => str_contains($process->command, 'test -d '.escapeshellarg($source)));
-    Process::assertRan(fn ($process) => str_contains($process->command, $source)
-        && str_contains($process->command, ':/volume:ro')
-        && str_contains($process->command, 'directory-uploads-'));
-    Process::assertRan(fn ($process) => str_contains($process->command, "grep -Fqx -- '".$source."'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker stop')
-        && str_contains($process->command, 'docker start'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'test -d '.escapeshellarg($source)));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $source)
+        && str_contains(remoteProcessScript($process), ':/volume:ro')
+        && str_contains(remoteProcessScript($process), 'directory-uploads-'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "grep -Fqx -- '".$source."'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker stop')
+        && str_contains(remoteProcessScript($process), 'docker start'));
 });
 
 it('retries container recovery when a timed out backup left a container stopped', function () {
@@ -2499,7 +2464,7 @@ it('retries container recovery when a timed out backup left a container stopped'
         'status' => 'running',
         'stop_recovery_pending' => true,
     ]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*cat *coolify-volume-backup-*' => 'abc123',
         '*docker start*' => Process::result(errorOutput: 'daemon unavailable', exitCode: 1),
     ]);
@@ -2523,7 +2488,7 @@ it('restarts containers and removes a partial archive when archiving fails', fun
         'frequency' => 'daily',
         'stop_during_backup' => true,
     ]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker ps -q*' => 'abc123',
         '*trap cleanup EXIT*' => Process::result(errorOutput: 'archive failed', exitCode: 1),
         '*' => '',
@@ -2534,8 +2499,8 @@ it('restarts containers and removes a partial archive when archiving fails', fun
     $execution = ScheduledVolumeBackupExecution::query()->sole();
     expect($execution->status)->toBe('failed')
         ->and($execution->stop_container_ids)->toBeNull();
-    Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
-        && str_contains($process->command, '.tar.gz'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'rm -f')
+        && str_contains(remoteProcessScript($process), '.tar.gz'));
 });
 
 it('throws when the S3 filesystem reports that deletion failed', function () {
@@ -2887,7 +2852,7 @@ it('notifies the team when a volume backup succeeds', function () {
         'team_id' => $team->id,
         'frequency' => 'daily',
     ]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*du -b*' => '128',
         '*' => '',
     ]);

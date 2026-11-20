@@ -211,16 +211,16 @@ test('the tags page reopens the canvas when the user left it on the canvas view'
     tagCanvasAs($this, $this->admin, $this->team)
         ->get(route('tags.canvas'))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_tags_view", 'canvas');
+        ->assertPlainCookie("coolify_{$this->admin->id}_tags_view", 'canvas');
 
     tagCanvasAs($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_tags_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_tags_view", 'canvas')
         ->get(route('tags.show'))
         ->assertRedirect(route('tags.canvas'));
 
     tagCanvasAs($this, $this->admin, $this->team)
-        ->withCookie("coolify_{$this->admin->id}_tags_view", 'canvas')
+        ->withUnencryptedCookie("coolify_{$this->admin->id}_tags_view", 'canvas')
         ->get(route('tags.show', ['view' => 'grid']))
         ->assertOk()
-        ->assertCookie("coolify_{$this->admin->id}_tags_view", 'grid');
+        ->assertPlainCookie("coolify_{$this->admin->id}_tags_view", 'grid');
 });

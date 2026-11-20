@@ -3,6 +3,7 @@
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopLogDrain;
+use App\Enums\LogDrainType;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -153,10 +154,10 @@ describe('Docker cleanup API', function () {
 describe('Log drains API', function () {
     test('GET returns log drain settings and hides secrets without read:sensitive', function () {
         $this->server->settings->update([
-            'is_logdrain_axiom_enabled' => false,
-            'logdrain_axiom_dataset_name' => 'coolify-logs',
-            'logdrain_axiom_api_key' => 'secret-axiom-key',
-            'logdrain_newrelic_license_key' => 'secret-nr-key',
+            'logdrain_config' => [
+                'axiom' => ['dataset_name' => 'coolify-logs', 'api_key' => 'secret-axiom-key'],
+                'newrelic' => ['license_key' => 'secret-nr-key'],
+            ],
         ]);
 
         $readToken = $this->user->createToken('server-subsystems-read', ['read'])->plainTextToken;
@@ -185,9 +186,28 @@ describe('Log drains API', function () {
             ->assertOk()
             ->assertJsonPath('logdrain_axiom_dataset_name', 'api-dataset');
 
-        $settings = $this->server->settings->fresh();
-        expect($settings->logdrain_axiom_dataset_name)->toBe('api-dataset')
-            ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Axiom))
+            ->toBe(['dataset_name' => 'api-dataset', 'api_key' => 'axiom-key-123']);
+    });
+
+    test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+            ])
+            ->assertOk()
+            ->assertJsonPath('logdrain_axiom_domain', 'eu-central-1.aws.edge.axiom.co');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
+                'logdrain_axiom_domain' => "evil.example.com\nAXIOM_API_KEY=x",
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('logdrain_axiom_domain');
+
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Axiom)['domain'])->toBe('eu-central-1.aws.edge.axiom.co');
     });
 
     test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
@@ -217,13 +237,12 @@ describe('Log drains API', function () {
             ->assertForbidden()
             ->assertJsonPath('message', 'Missing required permissions: deploy');
 
-        $settings = $this->server->settings->fresh();
-        expect($settings->{$field})->toBeNull();
+        expect($this->server->settings->fresh()->logdrain_config)->toBeNull();
     })->with(['logdrain_custom_config', 'logdrain_custom_config_parser']);
 
     test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
-        $this->server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name stdout"]);
+        $this->server->settings->update(['logdrain_config' => ['custom' => ['config' => "[OUTPUT]\n    Name stdout"]]]);
         $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
@@ -236,7 +255,7 @@ describe('Log drains API', function () {
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeTruthy();
+        expect($this->server->settings->fresh()->logdrain_type)->toBe(LogDrainType::Custom);
     });
 
     test('PATCH changes the custom log drain config with the deploy permission', function () {
@@ -252,7 +271,7 @@ describe('Log drains API', function () {
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Custom)['config'])->toBe("[OUTPUT]\n    Name stdout");
     });
 
     test('PATCH enables the Amazon CloudWatch Logs drain', function () {
@@ -271,8 +290,8 @@ describe('Log drains API', function () {
             ->assertJsonPath('logdrain_cloudwatch_stream_prefix', 'docker/');
 
         $settings = $this->server->settings->fresh();
-        expect($settings->is_logdrain_cloudwatch_enabled)->toBeTrue()
-            ->and($settings->logdrain_cloudwatch_region)->toBe('us-east-1');
+        expect($settings->logdrain_type)->toBe(LogDrainType::Cloudwatch)
+            ->and($settings->logDrainConfig()['region'])->toBe('us-east-1');
     });
 
     test('PATCH rejects enabling CloudWatch without a log group', function () {
@@ -286,7 +305,7 @@ describe('Log drains API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('logdrain_cloudwatch_group');
 
-        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
     });
 
     test('PATCH rejects enabling CloudWatch without a region', function () {
@@ -300,7 +319,7 @@ describe('Log drains API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('logdrain_cloudwatch_region');
 
-        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
     });
 
     test('PATCH rejects CloudWatch values that could break the compose file', function (string $field, mixed $value) {
@@ -323,9 +342,8 @@ describe('Log drains API', function () {
     test('PATCH rejects enabling CloudWatch together with another log drain', function () {
         Queue::fake();
         $this->server->settings->update([
-            'is_logdrain_axiom_enabled' => true,
-            'logdrain_axiom_dataset_name' => 'ds',
-            'logdrain_axiom_api_key' => 'key',
+            'logdrain_type' => LogDrainType::Axiom,
+            'logdrain_config' => ['axiom' => ['dataset_name' => 'ds', 'api_key' => 'key']],
         ]);
 
         $this->withHeaders(serverSubsystemsHeaders())

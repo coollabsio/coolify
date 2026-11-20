@@ -76,7 +76,7 @@ it('shows which registries a server is logged in to and which ones its applicati
     makeDockerRegistriesServerReachable($this->server);
 
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: str_contains($command, '.docker/config.json')
             ? json_encode(['auths' => ['ghcr.io' => ['auth' => base64_encode('user:SECRET_TOKEN')]]])
@@ -171,7 +171,7 @@ function fakeDockerRegistryServer(string $loginError = ''): array
 {
     $commands = [];
     Process::fake(function ($process) use (&$commands, $loginError) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         if ($loginError !== '' && str_contains($command, ' login ')) {
@@ -191,7 +191,7 @@ it('logs in to a registry with the token on stdin and never as plain text in the
     makeDockerRegistriesServerReachable($this->server);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -226,7 +226,7 @@ it('lets docker choose the Docker Hub key and runs the login through sudo for no
     makeDockerRegistriesServerReachable($this->server);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -271,7 +271,7 @@ it('validates the registry host and username before running a command', function
         ->call('login')
         ->assertHasErrors($errorField);
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' login '));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), ' login '));
 })->with([
     'shell characters in registry' => ["ghcr.io';reboot;'", 'user', 'registry'],
     'space in username' => ['ghcr.io', 'my user', 'username'],
@@ -289,7 +289,7 @@ it('logs out from a registry', function () {
         ->call('logout', 'ghcr.io', '')
         ->assertDispatched('success');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker --config \"\$HOME/.docker\" logout 'ghcr.io'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker --config \"\$HOME/.docker\" logout 'ghcr.io'"));
     expect(AuditEvent::query()->where('event', 'ui.server.registry_logout')->sole()->metadata['registry'])->toBe('ghcr.io');
 });
 
@@ -309,7 +309,7 @@ it('does not let a user who lost the admin role log in or log out', function (st
         ? $component->call('login')->assertForbidden()
         : $component->call('logout', 'ghcr.io')->assertForbidden();
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' login ') || str_contains($process->command, ' logout '));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), ' login ') || str_contains(remoteProcessScript($process), ' logout '));
 })->with(['login', 'logout']);
 
 it('does not render the registries page again for a user who lost the admin role', function () {
@@ -364,7 +364,7 @@ it('edits an existing login with the registry kept fixed', function () {
     makeDockerRegistriesServerReachable($this->server);
     $commands = [];
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -440,8 +440,8 @@ it('always uses the fixed host of a provider, even if the browser sends another 
         ->assertHasNoErrors()
         ->assertDispatched('success', 'Logged in to ghcr.io.');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "--password-stdin 'ghcr.io'"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'evil.example.com'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "--password-stdin 'ghcr.io'"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'evil.example.com'));
 });
 
 it('checks that the host belongs to the chosen cloud provider', function (string $provider, string $registry, bool $valid) {
@@ -650,7 +650,7 @@ it('tests a saved login and shows the result on the row', function () {
     makeDockerRegistriesServerReachable($this->server);
     $checkFails = false;
     Process::fake(function ($process) use (&$checkFails) {
-        if (str_contains($process->command, '</dev/null')) {
+        if (str_contains(remoteProcessScript($process), '</dev/null')) {
             return $checkFails
                 ? Process::result(errorOutput: "Authenticating with existing credentials... [Username: octocat]\nLogin did not succeed, error: Error response from daemon: unauthorized\nerror: cannot perform an interactive login from a non-TTY device", exitCode: 1)
                 : Process::result(output: 'Login Succeeded');
@@ -663,7 +663,7 @@ it('tests a saved login and shows the result on the row', function () {
         ->call('testLogin', 'ghcr.io')
         ->assertSet('loginChecks', ['ghcr.io' => ['ok' => true, 'message' => 'The login works.']])
         ->assertDispatched('success', 'The login for ghcr.io works.');
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker --config \"\$HOME/.docker\" login 'ghcr.io' </dev/null"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker --config \"\$HOME/.docker\" login 'ghcr.io' </dev/null"));
 
     $checkFails = true;
     $component->call('testLogin', 'ghcr.io')
@@ -682,7 +682,7 @@ it('does not test registries that are not logged in', function () {
         ->call('testLogin', 'registry.example.com')
         ->assertSet('loginChecks', []);
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, '</dev/null'));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), '</dev/null'));
 });
 
 it('logs in to several servers at once from the overview page', function () {
@@ -743,7 +743,7 @@ it('refuses a multi-server login to a server of another team', function () {
         ->call('login')
         ->assertForbidden();
 
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' login '));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), ' login '));
 });
 
 it('does not open the overview login form for members', function () {

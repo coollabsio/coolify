@@ -3,10 +3,16 @@
 namespace App\Actions\Service;
 
 use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Events\ServiceStartFinished;
+use App\Jobs\NotifyResourceStoppedJob;
+use App\Jobs\ScanResourceImagesJob;
+use App\Jobs\ServerFilesFromServerJob;
 use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\ImageScan\ImageStartPin;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -24,12 +30,13 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        self::queueFileStorageSync($service);
         // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
         // saveComposeConfigs() below reuses the fetched secrets.
         $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
-        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
-            StopService::run(service: $service, dockerCleanup: false);
-        }
+        // Compose recreates the containers, so a status check can find them stopped for a moment.
+        $service->applications()->get()->concat($service->databases()->get())
+            ->each(fn (ServiceApplication|ServiceDatabase $part) => NotifyResourceStoppedJob::expectStop($part));
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
         $service->applications()->get()->each->resetRestartLimit();
@@ -52,9 +59,17 @@ class StartService
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "{$compose} pull < /dev/null";
         }
+        // After the pull: the scanned build of a "Pull latest" security update keeps the tag of the compose file.
+        $commands = array_merge($commands, ImageStartPin::commands(ImageStartPin::take($service), serverDockerConfigPrefix($service->server)));
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
+        }
+        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
+            // The stop removes every container, so no container keeps a deleted volume.
+            $commands = array_merge($commands, self::stopAfterImageCheckCommands($service, $compose));
+        } else {
+            $commands = array_merge($commands, self::removeContainersWithRemovedVolumesCommands($service));
         }
         $commands[] = 'echo Starting service.';
         if (data_get($service, 'connect_to_docker_network')) {
@@ -82,7 +97,10 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: $service->id, queue: deployment_queue());
+        $activity = remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStartFinished', callEventData: ServiceStartFinished::dataFor($service), queue: deployment_queue());
+        ScanResourceImagesJob::dispatchAfterStart($service);
+
+        return $activity;
     }
 
     /**
@@ -101,6 +119,80 @@ class StartService
         $connectedNetworks = "docker container inspect --format '{{range \$name, \$_ := .NetworkSettings.Networks}}{{println \$name}}{{end}}' {$containerName}";
 
         return "{$connectedNetworks} | grep -qxF {$network} || docker network connect --alias {$containerName} {$network} {$containerName} || echo {$warning}";
+    }
+
+    /**
+     * Stops and removes the containers of the service, but only after Compose has every image on the
+     * server. `up --no-start --no-recreate` pulls (or builds) only the missing images and does not touch
+     * the running containers. If an image cannot be fetched, the script stops there and the service
+     * keeps running.
+     *
+     * @return list<string>
+     */
+    public static function stopAfterImageCheckCommands(Service $service, string $compose): array
+    {
+        $containers = $service->applications()->pluck('name')
+            ->concat($service->databases()->pluck('name'))
+            ->map(fn (string $name): string => "{$name}-{$service->uuid}")
+            ->values()
+            ->all();
+        if ($containers === []) {
+            return [];
+        }
+
+        return [
+            "echo 'Checking that all images are on the server.'",
+            "{$compose} up --no-start --no-recreate < /dev/null",
+            "echo 'Stopping service.'",
+            ...array_map(fn (string $command): string => "{$command} || true", StopService::stopContainersCommands($containers, $service->server)),
+        ];
+    }
+
+    /**
+     * Removes the containers that `docker compose up` would give a volume that the user deleted
+     * in Coolify (see composeContainersWithRemovedVolumes()).
+     *
+     * @param  string|null  $composeServiceName  only this Compose service, when `up` starts only it
+     * @return list<string>
+     */
+    public static function removeContainersWithRemovedVolumesCommands(Service $service, ?string $composeServiceName = null): array
+    {
+        $server = $service->server;
+        $projectMounts = (string) instant_remote_process([composeProjectMountsCommand($service->uuid)], $server, false, maxAttempts: 1);
+        if (trim($projectMounts) === '') {
+            return [];
+        }
+        $services = data_get(parseDockerComposeYaml((string) $service->docker_compose), 'services');
+        $services = is_array($services) ? $services : [];
+        if ($composeServiceName !== null) {
+            $services = array_intersect_key($services, [$composeServiceName => true]);
+        }
+        $storageNames = LocalPersistentVolume::query()
+            ->where(fn ($query) => $query->where('resource_type', (new ServiceApplication)->getMorphClass())->whereIn('resource_id', $service->applications()->select('id')))
+            ->orWhere(fn ($query) => $query->where('resource_type', (new ServiceDatabase)->getMorphClass())->whereIn('resource_id', $service->databases()->select('id')))
+            ->pluck('name')
+            ->all();
+        $commands = [];
+        foreach (composeContainersWithRemovedVolumes($projectMounts, $services, $service->uuid, $storageNames) as $containerName => $volumeName) {
+            $commands[] = 'echo '.escapeshellarg("Removing container {$containerName}, so that it does not keep the deleted volume {$volumeName}.");
+            // Without --time, Docker waits the stop_grace_period of the Compose file, as Compose does.
+            $commands[] = 'docker stop '.escapeshellarg($containerName).' || true';
+            $commands[] = dockerRemoveCommand($containerName);
+        }
+
+        return $commands;
+    }
+
+    /**
+     * Queues one sync of the file storages with the server for each resource of the service that has
+     * file storages. The sync marks each storage as a file or a directory, as it is on the server.
+     */
+    public static function queueFileStorageSync(Service $service): void
+    {
+        $service->applications()->get()
+            ->concat($service->databases()->get())
+            ->filter(fn (ServiceApplication|ServiceDatabase $resource): bool => $resource->fileStorages()->exists())
+            ->each(fn (ServiceApplication|ServiceDatabase $resource) => ServerFilesFromServerJob::dispatch($resource));
     }
 
     /**

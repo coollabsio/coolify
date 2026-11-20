@@ -13,7 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
-use Livewire\Attributes\Locked;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -46,33 +46,25 @@ beforeEach(function () {
 });
 
 describe('ScheduledTask locked properties', function () {
-    test('Show component task property has Locked attribute', function () {
-        $property = new ReflectionProperty(Show::class, 'task');
-        $attributes = $property->getAttributes(Locked::class);
+    test('rejects client updates to the task and resource identity', function (string $component, string $property) {
+        $ownTask = ScheduledTask::factory()->create([
+            'team_id' => $this->attackerTeam->id,
+            'application_id' => $this->application->id,
+        ]);
+        $victimTask = ScheduledTask::factory()->create(['team_id' => $this->victimTeam->id]);
 
-        expect($attributes)->not->toBeEmpty();
-    });
+        $parameters = $component === Show::class
+            ? ['resource' => $this->application, 'task' => $ownTask]
+            : ['taskId' => $ownTask->id];
 
-    test('Show component resource property has Locked attribute', function () {
-        $property = new ReflectionProperty(Show::class, 'resource');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('Executions component task id property has Locked attribute', function () {
-        $property = new ReflectionProperty(Executions::class, 'taskId');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('Executions component selected execution property has Locked attribute', function () {
-        $property = new ReflectionProperty(Executions::class, 'selectedExecution');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
+        expect(fn () => Livewire::test($component, $parameters)->set($property, $victimTask->id))
+            ->toThrow(CannotUpdateLockedPropertyException::class);
+    })->with([
+        'show task' => [Show::class, 'task'],
+        'show resource' => [Show::class, 'resource'],
+        'executions task id' => [Executions::class, 'taskId'],
+        'executions selected execution' => [Executions::class, 'selectedExecution'],
+    ]);
 });
 
 describe('ScheduledTask cross-team access', function () {

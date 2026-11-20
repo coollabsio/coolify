@@ -30,7 +30,7 @@ beforeEach(function () {
 
     // Every path on the server is missing, and every path is inside the resource directory.
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'empty-directory')) {
             return Process::result(output: collect(range(1, substr_count($command, '/ssl/server.')))->map(fn (int $index) => "{$index}:missing")->implode("\n"));
         }
@@ -80,7 +80,7 @@ it('writes a new SSL certificate file on the server before the container starts'
 
     foreach ($files as $file) {
         $path = escapeshellarg($database->workdir()."/ssl/{$file}");
-        Process::assertRan(fn ($process) => str_contains($process->command, "base64 -d | tee {$path}"));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "base64 -d | tee {$path}"));
     }
     $commands = implode("\n", $this->executor->commands);
     expect($commands)->toContain('missing configuration file')

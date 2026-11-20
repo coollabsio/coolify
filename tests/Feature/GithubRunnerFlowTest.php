@@ -127,7 +127,6 @@ function sendWorkflowJobWebhook($test, GithubApp $githubApp, string $secret, str
 function fakeRunnerGithubApi(GithubApp $githubApp): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => Http::response([
             'runner' => ['id' => 42, 'name' => 'runner'],
@@ -140,7 +139,6 @@ function fakeRunnerGithubApi(GithubApp $githubApp): void
 function fakeWorkflowRunApi(GithubApp $githubApp, mixed $runResponse): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/repos/acme/api/actions/runs/321' => $runResponse,
     ]);
@@ -506,7 +504,7 @@ describe('provisioning', function () {
 
         $commands = '';
         Process::assertRan(function (PendingProcess $process) use (&$commands) {
-            $commands .= $process->command."\n";
+            $commands .= remoteProcessScript($process)."\n";
 
             return true;
         });
@@ -584,7 +582,6 @@ describe('provisioning', function () {
         runnerTestConfig($server, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($server) {
                 DeleteServer::run($server->id);
@@ -596,7 +593,7 @@ describe('provisioning', function () {
         (new ProvisionGithubRunnerJob($execution->id))->handle();
 
         expect(GithubRunnerExecution::find($execution->id))->toBeNull();
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, '/home/runner/run.sh'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/home/runner/run.sh'));
         Queue::assertPushed(DeregisterGithubRunnerJob::class, fn ($job) => $job->githubAppId === $this->githubApp->id && $job->runnerId === 42);
         Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
     });
@@ -648,7 +645,7 @@ describe('provisioning', function () {
             ->and($execution->server_id)->toBeNull()
             ->and($execution->runner_name)->toBeNull()
             ->and($execution->error_message)->toContain('Attempt 1 of 3 failed')->toContain('Resource not accessible by integration');
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, "docker rm -f -v coolify-runner-{$uuid}"));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), "docker rm -f -v coolify-runner-{$uuid}"));
         Queue::assertPushed(ProvisionGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id && $job->delay !== null);
         Queue::assertNotPushed(CleanupGithubRunnerJob::class);
     });
@@ -659,7 +656,6 @@ describe('provisioning', function () {
         runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
         $execution = runnerTestExecution($this->githubApp, ['provision_attempts' => $attempts]);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution, $status) {
@@ -687,7 +683,6 @@ describe('provisioning', function () {
         runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution) {
@@ -701,7 +696,7 @@ describe('provisioning', function () {
 
         expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
             ->and($execution->fresh()->ready_at)->toBeNull();
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, '/home/runner/run.sh'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/home/runner/run.sh'));
         Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
     });
 
@@ -712,7 +707,6 @@ describe('provisioning', function () {
         runnerTestConfig($server, $this->githubApp);
         $execution = runnerTestExecution($this->githubApp);
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
             'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($server, $execution, $cancelled) {
@@ -732,12 +726,12 @@ describe('provisioning', function () {
 
         expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
             ->and($execution->fresh()->ready_at)->toBeNull();
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, '/home/runner/run.sh'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/home/runner/run.sh'));
         Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
 
         (new CleanupGithubRunnerJob($execution->id))->handle();
 
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, 'docker rm'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker rm'));
         Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
     })->with(['the transfer cancelled the execution' => true, 'the transfer commits after the last check' => false]);
 
@@ -747,7 +741,7 @@ describe('provisioning', function () {
         $execution = runnerTestExecution($this->githubApp);
         fakeRunnerGithubApi($this->githubApp);
         Process::fake(['*' => function (PendingProcess $process) use ($execution, $duringStart) {
-            if (! $duringStart || str_contains($process->command, '/home/runner/run.sh')) {
+            if (! $duringStart || str_contains(remoteProcessScript($process), '/home/runner/run.sh')) {
                 $execution->finish(GithubRunnerStatus::Cancelled);
             }
 
@@ -770,7 +764,7 @@ describe('provisioning', function () {
         $execution = runnerTestExecution($this->githubApp);
         fakeRejectedJitConfig();
         Process::fake(['*' => function (PendingProcess $process) use ($execution) {
-            if (str_contains($process->command, 'docker rm -f -v')) {
+            if (str_contains(remoteProcessScript($process), 'docker rm -f -v')) {
                 $execution->finish(GithubRunnerStatus::Cancelled, 'Stopped externally');
             }
 
@@ -817,7 +811,7 @@ describe('cleanup and reconciliation', function () {
 
         (new CleanupGithubRunnerJob($execution->id))->handle();
 
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, "docker rm -f -v coolify-runner-{$execution->uuid}"));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), "docker rm -f -v coolify-runner-{$execution->uuid}"));
         Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/orgs/acme/actions/runners/42'));
         Queue::assertPushed(ProvisionGithubRunnerJob::class, fn ($job) => $job->executionId === $next->id);
     });
@@ -846,8 +840,8 @@ describe('cleanup and reconciliation', function () {
             ->and($long->fresh()->status)->toBe(GithubRunnerStatus::TimedOut)
             ->and($healthy->fresh()->status)->toBe(GithubRunnerStatus::Running);
         Queue::assertPushed(CleanupGithubRunnerJob::class, 3);
-        Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, 'docker rm -f -v coolify-runner-orphanuuid'));
-        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, "docker rm -f -v coolify-runner-{$healthy->uuid}"));
+        Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker rm -f -v coolify-runner-orphanuuid'));
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), "docker rm -f -v coolify-runner-{$healthy->uuid}"));
     });
 
     it('lets a late completed webhook replace a failure guessed from a stopped container', function () {
@@ -942,7 +936,6 @@ describe('server deletion', function () {
 
     it('removes the runner from GitHub and ignores GitHub errors', function (int $status) {
         Http::fake([
-            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
             'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
             'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, $status),
         ]);
@@ -977,7 +970,6 @@ describe('server deletion', function () {
 function fakeRejectedJitConfig(): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
         'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => Http::response(['message' => 'Resource not accessible by integration'], 403),
     ]);

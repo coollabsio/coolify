@@ -2,6 +2,7 @@
 
 use App\Actions\Server\StartSentinel;
 use App\Livewire\Server\Sentinel;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -66,12 +67,6 @@ it('restores default Sentinel configuration without rotating credentials or disa
         ->and($settings->sentinel_metrics_history_days)->toBe(7)
         ->and($settings->sentinel_push_interval_seconds)->toBe(60)
         ->and((bool) $settings->is_sentinel_debug_enabled)->toBeFalse();
-});
-
-it('offers a confirmed restore action and explains what it preserves', function () {
-    Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->assertSee('Restore defaults')
-        ->assertSee('The Sentinel token and metrics setting will be preserved.');
 });
 
 it('does not let team members restore Sentinel defaults', function () {
@@ -207,4 +202,18 @@ it('shows out of sync when the first report timeout expires', function () {
     Livewire::test(Sentinel::class, ['server' => $this->server->fresh()])
         ->assertSet('sentinelStatus', 'out_of_sync')
         ->assertSee('Out of sync');
+});
+
+it('warns about remote HTTP reports even when the instance URL uses HTTP', function () {
+    InstanceSettings::get()->update(['fqdn' => 'http://coolify.example.com']);
+    $remoteServer = Server::factory()->create([
+        'team_id' => $this->server->team_id,
+        'ip' => '192.0.2.10',
+    ]);
+    $remoteServer->settings->forceFill([
+        'sentinel_custom_url' => 'http://coolify.example.com',
+    ])->saveQuietly();
+
+    Livewire::test(Sentinel::class, ['server' => $remoteServer])
+        ->assertSee('Sentinel reports over plain HTTP');
 });

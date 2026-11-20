@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\RecordsWorkerHost;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use OpenApi\Attributes as OA;
 
@@ -22,6 +23,8 @@ use OpenApi\Attributes as OA;
 )]
 class ScheduledTaskExecution extends BaseModel
 {
+    use RecordsWorkerHost;
+
     protected $fillable = [
         'scheduled_task_id',
         'status',

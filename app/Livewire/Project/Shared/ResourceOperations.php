@@ -2,8 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Actions\Database\StartDatabase;
-use App\Actions\Database\StopDatabase;
+use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Actions\Shared\MigrateResourceToDestination;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
@@ -13,6 +12,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -22,6 +22,7 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use RuntimeException;
@@ -54,7 +55,9 @@ class ResourceOperations extends Component
         $teamId = $this->resourceTeamId();
         $this->projects = Project::query()->where('team_id', $teamId)->orderByRaw('LOWER(name)')->get();
         $servers = Server::query()->where('team_id', $teamId)->get();
-        $this->servers = $servers->reject(fn ($server) => $server->isBuildServer());
+        $this->servers = $servers->reject(fn ($server) => $server->isBuildServer())
+            ->filter(fn ($server) => Gate::allows('placeResource', $server))
+            ->values();
         $this->buildServers = $servers->filter(fn ($server) => $server->isBuildServer());
     }
 
@@ -72,6 +75,9 @@ class ResourceOperations extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            if ($this->cloneVolumeData) {
+                $this->authorize(CloneVolumeDataWithSourceStopped::sourceAbility($this->resource), $this->resource);
+            }
 
             $new_environment = $this->resource->environment;
             if ($environment_id !== null) {
@@ -80,6 +86,7 @@ class ResourceOperations extends Component
                     return $this->addError('environment_id', 'Environment not found.');
                 }
             }
+            $this->authorize('createAnyResource', [$new_environment]);
 
             $new_destination = $this->findResourceTeamDestination($destination_uuid);
             if (! $new_destination) {
@@ -121,6 +128,7 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
                 $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneInfluxdb::class ||
                 $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
                 $uuid = new_public_id();
@@ -130,7 +138,7 @@ class ResourceOperations extends Component
                     'updated_at',
                 ])->fill([
                     'uuid' => $uuid,
-                    'name' => $this->resource->name.'-clone-'.$uuid,
+                    'name' => clone_resource_name($this->resource->name, $uuid),
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $new_environment->id,
@@ -145,6 +153,7 @@ class ResourceOperations extends Component
                 }
 
                 $new_resource->persistentStorages()->delete();
+                $pendingVolumeClones = [];
                 $persistentVolumes = $this->resource->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
                     $originalName = $volume->name;
@@ -158,6 +167,10 @@ class ResourceOperations extends Component
                         $newName = 'redis-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                        $newName = 'influxdb-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                        $newName = 'influxdb-config-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {
@@ -188,21 +201,17 @@ class ResourceOperations extends Component
                     $newPersistentVolume->save();
 
                     if ($this->cloneVolumeData) {
-                        try {
-                            StopDatabase::dispatch($this->resource);
-                            $sourceVolume = $volume->name;
-                            $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $this->resource->destination->server;
-                            $targetServer = $new_resource->destination->server;
-
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                            StartDatabase::dispatch($this->resource);
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                        }
+                        $pendingVolumeClones[] = new VolumeCloneJob(
+                            $volume->name,
+                            $newPersistentVolume->name,
+                            $this->resource->destination->server,
+                            $new_resource->destination->server,
+                            $newPersistentVolume,
+                        );
                     }
                 }
+
+                CloneVolumeDataWithSourceStopped::run($this->resource, $pendingVolumeClones);
 
                 $fileStorages = $this->resource->fileStorages()->get();
                 foreach ($fileStorages as $storage) {
@@ -282,6 +291,7 @@ class ResourceOperations extends Component
             if (! $new_environment) {
                 return $this->addError('environment_id', 'Environment not found.');
             }
+            $this->authorize('createAnyResource', [$new_environment]);
             $this->resource->fill([
                 'environment_id' => $new_environment->id,
             ])->save();
@@ -395,8 +405,12 @@ class ResourceOperations extends Component
         $teamId = $this->resourceTeamId();
         $destination = StandaloneDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first()
             ?? SwarmDocker::query()->whereRelation('server', 'team_id', $teamId)->where('uuid', $uuid)->first();
+        if (! $destination?->server?->canHostResources()) {
+            return null;
+        }
+        $this->authorize('placeResource', $destination->server);
 
-        return $destination?->server?->canHostResources() ? $destination : null;
+        return $destination;
     }
 
     public function render()

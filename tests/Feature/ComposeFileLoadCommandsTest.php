@@ -1,9 +1,14 @@
 <?php
 
 use App\Models\Application;
+use App\Models\GiteaApp;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
 uses(RefreshDatabase::class);
@@ -240,3 +245,165 @@ test('a symlinked Compose file inside a Git submodule is rejected', function () 
         ->and($process->getErrorOutput())->toContain('symbolic link')
         ->and($process->getErrorOutput())->not->toContain('linked-target-value');
 });
+
+test('the Compose file loads from a Git submodule with a deploy key', function (string $user) {
+    Storage::fake('ssh-keys');
+    $submoduleSource = $this->root.'/infra-src';
+    mkdir($submoduleSource);
+    file_put_contents("{$submoduleSource}/docker-compose.yml", $this->compose);
+    $gitEnv = ['GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'protocol.file.allow', 'GIT_CONFIG_VALUE_0' => 'always'];
+    foreach ([
+        [$submoduleSource, ['git', 'init', '-q', '-b', 'main']],
+        [$submoduleSource, ['git', 'add', '-A']],
+        [$submoduleSource, ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'infra']],
+        [$submoduleSource, ['git', 'clone', '-q', '--bare', '.', $this->root.'/infra.git']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', 'infra']],
+        [$this->root.'/src', ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'add infra']],
+        [$this->root.'/src', ['git', 'push', '-q', $this->root.'/repo.git', 'main']],
+    ] as [$cwd, $command]) {
+        (new Process($command, $cwd, $gitEnv))->mustRun();
+    }
+
+    // A git stub that clones the SSH remote from the local bare repository, and fails a submodule
+    // update like an SSH authentication error when the deploy key of GIT_SSH_COMMAND is missing.
+    $realGit = trim((new Process(['sh', '-c', 'command -v git']))->mustRun()->getOutput());
+    file_put_contents($this->root.'/bin/git', <<<SH
+        #!/bin/bash
+        args=()
+        for arg in "\$@"; do
+            [[ \$arg == git@* ]] && arg='{$this->root}/repo.git'
+            args+=("\$arg")
+        done
+        if [[ " \$* " == *" submodule update "* ]]; then
+            key=\$(printf '%s' "\$GIT_SSH_COMMAND" | sed -n 's/.* -i \\([^ ]*\\).*/\\1/p')
+            if [ ! -f "\$key" ]; then echo 'Permission denied (publickey).' >&2; exit 128; fi
+        fi
+        exec {$realGit} "\${args[@]}"
+        SH);
+    chmod($this->root.'/bin/git', 0755);
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => 'git@git.example.com:org/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => '/',
+        'docker_compose_location' => '/infra/docker-compose.yml',
+        'private_key_id' => PrivateKey::factory()->create()->id,
+    ]);
+    $application->settings->update(['is_git_submodules_enabled' => true]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid);
+    // Keep the deploy key out of the real /root/.ssh of the test host.
+    $commands = $commands->map(fn (string $command) => str_replace('/root/.ssh', $this->root.'/ssh', $command));
+    if ($user !== 'root') {
+        $server = Mockery::mock(Server::class)->makePartial();
+        $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
+        $server->shouldReceive('setAttribute')->andReturnSelf();
+        $commands = collect(parseCommandsByLineForSudo($commands, $server));
+    }
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')] + $gitEnv);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    expect($process->getErrorOutput())->not->toContain('Permission denied')
+        ->and($process->getExitCode())->toBe(0)
+        ->and($process->getOutput())->toBe($this->compose)
+        ->and(glob($this->root.'/ssh/*'))->toBe([]);
+})->with([
+    'root' => ['root'],
+    'non-root' => ['ubuntu'],
+]);
+
+test('a pinned commit loads the Compose file of that commit for every source type', function (string $sourceType, bool $shallow, string $user) {
+    Storage::fake('ssh-keys');
+    $pinnedCommit = $this->commit;
+    file_put_contents($this->root.'/src/apps/web/docker-compose.yml', "services:\n  api:\n    image: branch-head\n");
+    foreach ([
+        ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qam', 'branch head'],
+        ['git', 'push', '-q', $this->root.'/repo.git', 'main'],
+    ] as $command) {
+        (new Process($command, $this->root.'/src'))->mustRun();
+    }
+
+    // A git stub that sends every remote URL (HTTPS with a token, or SSH) to the local bare repository.
+    $realGit = trim((new Process(['sh', '-c', 'command -v git']))->mustRun()->getOutput());
+    file_put_contents($this->root.'/bin/git', <<<SH
+        #!/bin/bash
+        args=()
+        for arg in "\$@"; do
+            [[ \$arg == git@* || \$arg == https://* ]] && arg='{$this->root}/repo.git'
+            args+=("\$arg")
+        done
+        exec {$realGit} "\${args[@]}"
+        SH);
+    chmod($this->root.'/bin/git', 0755);
+
+    $privateKey = PrivateKey::factory()->create();
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $sourceType === 'other' ? $this->root.'/repo.git' : 'git@git.example.com:org/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => $pinnedCommit,
+        'base_directory' => '/apps/web',
+        'docker_compose_location' => '/docker-compose.yml',
+        'private_key_id' => $sourceType === 'deploy key' ? $privateKey->id : null,
+    ]);
+    $application->settings->update(['is_git_shallow_clone_enabled' => $shallow]);
+    $application = $application->fresh();
+
+    if ($sourceType === 'GitHub App') {
+        $application->git_repository = 'org/repo';
+        $source = Mockery::mock(GithubApp::class)->makePartial();
+        $source->forceFill(['html_url' => 'https://github.example.test', 'is_public' => false]);
+        $source->shouldReceive('getMorphClass')->andReturn(GithubApp::class);
+        $source->shouldReceive('installationToken')->andReturn('ghs_token');
+        $application->setRelation('source', $source);
+    } elseif ($sourceType === 'Gitea token') {
+        $application->git_repository = 'org/repo';
+        $source = (new GiteaApp)->forceFill(['html_url' => 'https://gitea.example.test', 'api_url' => 'https://gitea.example.test/api/v1', 'is_public' => false]);
+        $source->access_token = 'gitea-token';
+        $source->refresh_token = 'gitea-refresh-token';
+        $source->expires_at = time() + 3600;
+        $application->setRelation('source', $source);
+    } elseif ($sourceType === 'GitLab SSH key') {
+        $source = (new GitlabApp)->forceFill(['html_url' => 'https://gitlab.example.test', 'team_id' => $privateKey->team_id, 'custom_port' => 22]);
+        $source->setRelation('privateKey', $privateKey);
+        $application->setRelation('source', $source);
+    }
+
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application, $uuid);
+    // Keep the deploy key out of the real /root/.ssh of the test host.
+    $commands = $commands->map(fn (string $command) => str_replace('/root/.ssh', $this->root.'/ssh', $command));
+    if ($user !== 'root') {
+        $server = Mockery::mock(Server::class)->makePartial();
+        $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
+        $server->shouldReceive('setAttribute')->andReturnSelf();
+        $commands = collect(parseCommandsByLineForSudo($commands, $server));
+    }
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')]);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    expect($process->getErrorOutput())->not->toContain('syntax error')
+        ->and($process->getExitCode())->toBe(0)
+        ->and($process->getOutput())->toBe($this->compose);
+})->with([
+    'public URL' => ['other'],
+    'deploy key' => ['deploy key'],
+    'GitHub App' => ['GitHub App'],
+    'Gitea token' => ['Gitea token'],
+    'GitLab SSH key' => ['GitLab SSH key'],
+])->with([
+    'full clone' => [false],
+    'shallow clone' => [true],
+])->with([
+    'root' => ['root'],
+    'non-root' => ['ubuntu'],
+]);

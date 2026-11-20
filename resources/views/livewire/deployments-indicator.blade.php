@@ -48,7 +48,7 @@
                                 <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                     {{ $deployment->application_name }}
                                 </p>
-                                <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType"
+                                <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'"
                                     class="shrink-0" />
                             </div>
 

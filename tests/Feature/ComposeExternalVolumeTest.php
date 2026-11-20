@@ -261,7 +261,7 @@ function loginExternalVolumeOwner(): void
 function fakeExternalVolumeServer(array &$commands): void
 {
     Process::fake(function ($process) use (&$commands) {
-        $commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -757,9 +757,7 @@ describe('validation', function () {
     });
 
     it('accepts external volumes with a literal name', function (string $compose) {
-        validateDockerComposeForInjection($compose);
-
-        expect(true)->toBeTrue();
+        expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
     })->with([
         'short' => [EXTERNAL_VOLUME_SHORT_COMPOSE],
         'long' => [EXTERNAL_VOLUME_LONG_COMPOSE],

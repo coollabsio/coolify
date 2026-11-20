@@ -32,13 +32,12 @@ trait CallsRestApi
         'api/v1/sentinel/',
         'api/v1/settings/',
         'api/v1/teams',
-        'api/v1/security/integration-tokens',
     ];
 
     /**
      * Response keys that are never returned to MCP clients, whatever the token abilities are.
      */
-    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|password|^(internal|external)_db_url$|(^|_)token$)/i';
+    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|authorization_header|password|^(internal|external)_db_url$|(^|_)token$)/i';
 
     private const MAX_BODY_BYTES = 1_048_576;
 

@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -29,7 +30,7 @@ class ConfigurationChecker extends Component
 
     public array $missingRequiredEnvironmentVariableNames = [];
 
-    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource;
+    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource;
 
     public function getListeners(): array
     {
@@ -53,7 +54,7 @@ class ConfigurationChecker extends Component
     }
 
     /**
-     * Members must never see environment variable values or Compose content, so redact
+     * Members must never see environment variable values, Compose content, commands, or configuration, so redact
      * those changes before they are serialized to the browser.
      *
      * @param  array<int, array<string, mixed>>  $changes
@@ -67,8 +68,9 @@ class ConfigurationChecker extends Component
 
         return collect($changes)
             ->map(function (array $change): array {
+                $key = str((string) data_get($change, 'key'))->afterLast('.')->value();
                 $isHidden = data_get($change, 'section') === 'environment'
-                    || str((string) data_get($change, 'key'))->afterLast('.')->value() === 'docker_compose_raw';
+                    || in_array($key, [...Application::COMMAND_AND_CONFIGURATION_ATTRIBUTES, 'docker_compose_raw', 'dockerfile', 'custom_labels'], true);
                 if (! $isHidden) {
                     return $change;
                 }

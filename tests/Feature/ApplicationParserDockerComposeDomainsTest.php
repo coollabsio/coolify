@@ -820,3 +820,83 @@ it('preserves migrated null assignments separately for production and previews',
         ->toBe($pullRequestId ? '${LEGACY:-default}' : '')
         ->and($application->fresh()->docker_compose_raw)->toBe($compose);
 })->with([0, 42]);
+
+test('applicationParser keeps port-suffixed SERVICE_URL and SERVICE_FQDN variables in sync with a changed domain', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  api:
+    image: nginx
+    environment:
+      - PUBLIC_API_URL=${SERVICE_URL_API_8000}
+  api2:
+    image: nginx
+    environment:
+      - PUBLIC_API2_URL=${SERVICE_URL_API2_9000}
+YAML,
+    ]);
+
+    applicationParser($application);
+    $application->refresh();
+
+    $application->docker_compose_domains = json_encode([
+        'api' => ['domain' => 'https://frontend.example.com:8000'],
+        'api2' => ['domain' => 'https://api2.example.com:9000'],
+    ]);
+    $application->save();
+
+    applicationParser($application);
+
+    $variables = $application->environment_variables()->pluck('value', 'key');
+
+    expect($variables['SERVICE_URL_API'])->toBe('https://frontend.example.com')
+        ->and($variables['SERVICE_FQDN_API'])->toBe('frontend.example.com')
+        ->and($variables['SERVICE_URL_API_8000'])->toBe('https://frontend.example.com:8000')
+        ->and($variables['SERVICE_FQDN_API_8000'])->toBe('frontend.example.com:8000')
+        ->and($variables['SERVICE_URL_API2'])->toBe('https://api2.example.com')
+        ->and($variables['SERVICE_URL_API2_9000'])->toBe('https://api2.example.com:9000')
+        ->and($variables['SERVICE_FQDN_API2_9000'])->toBe('api2.example.com:9000');
+});
+
+test('applicationParser clears magic URL variables only for the service whose domain is removed', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  api:
+    image: nginx
+    environment:
+      - PUBLIC_API_URL=${SERVICE_URL_API_8000}
+  api2:
+    image: nginx
+    environment:
+      - PUBLIC_API2_URL=${SERVICE_URL_API2_9000}
+YAML,
+    ]);
+
+    applicationParser($application);
+    $application->refresh();
+
+    $application->docker_compose_domains = json_encode([
+        'api' => ['domain' => ''],
+        'api2' => ['domain' => 'https://api2.example.com:9000'],
+    ]);
+    $application->save();
+
+    applicationParser($application);
+
+    $variables = $application->environment_variables()->pluck('value', 'key');
+
+    expect($variables['SERVICE_URL_API'])->toBeNull()
+        ->and($variables['SERVICE_URL_API_8000'])->toBeNull()
+        ->and($variables['SERVICE_FQDN_API_8000'])->toBeNull()
+        ->and($variables['SERVICE_URL_API2'])->toBe('https://api2.example.com')
+        ->and($variables['SERVICE_URL_API2_9000'])->toBe('https://api2.example.com:9000');
+});

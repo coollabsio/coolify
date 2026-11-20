@@ -5,7 +5,9 @@ use App\Models\PrivateKey;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -150,11 +152,25 @@ function encodeGithubPathSegment(string $segment): string
     return rawurlencode($segment);
 }
 
-function assertGithubClockInSync(string $apiUrl): void
+/**
+ * GitHub rejects an App JWT when the clocks of Coolify and GitHub differ.
+ * Call this with the failed response of a JWT request: its Date header shows the difference without an extra request.
+ */
+function assertGithubClockInSync(Response $response): void
 {
-    $response = Http::GitSource($apiUrl)->get("{$apiUrl}/zen");
+    $date = $response->header('Date');
+
+    if (blank($date)) {
+        return;
+    }
+
+    try {
+        $githubTime = Carbon::parse($date);
+    } catch (Throwable) {
+        return;
+    }
+
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
-    $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
@@ -168,6 +184,15 @@ function assertGithubClockInSync(string $apiUrl): void
     }
 }
 
+/**
+ * GitHub sometimes answers with a 5xx page or drops the connection. A repeated read or token request is harmless.
+ */
+function isTransientGithubFailure(Throwable $exception): bool
+{
+    return $exception instanceof ConnectionException
+        || ($exception instanceof RequestException && $exception->response->serverError());
+}
+
 function githubAppPrivateKey(GithubApp $source): ?PrivateKey
 {
     $privateKey = $source->privateKey;
@@ -175,11 +200,12 @@ function githubAppPrivateKey(GithubApp $source): ?PrivateKey
     return $privateKey?->team_id === $source->team_id ? $privateKey : null;
 }
 
-function generateGithubToken(GithubApp $source, string $type)
+/**
+ * @param  int|null  $timeout  Seconds for each request to GitHub. Null keeps the HTTP client default.
+ */
+function generateGithubToken(GithubApp $source, string $type, ?int $timeout = null)
 {
     $privateKey = githubAppPrivateKey($source) ?? throw new RuntimeException('Private key not found for this GitHub App.');
-
-    assertGithubClockInSync($source->api_url);
 
     $signingKey = InMemory::plainText($privateKey->private_key);
     $algorithm = new Sha256;
@@ -196,23 +222,17 @@ function generateGithubToken(GithubApp $source, string $type)
 
     return match ($type) {
         'jwt' => $jwt,
-        'installation' => (function () use ($source, $jwt) {
-            // GitHub sometimes answers with a 5xx page or drops the connection; a new token request is harmless.
-            $response = Http::GitSource($source->api_url)->withHeaders([
+        'installation' => (function () use ($source, $jwt, $timeout) {
+            $response = githubRequestTimeout(Http::GitSource($source->api_url), $timeout)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
-            ])->retry(
-                3,
-                fn (int $attempt) => $attempt * 1000,
-                fn (Throwable $exception) => $exception instanceof ConnectionException
-                    || ($exception instanceof RequestException && $exception->response->serverError()),
-                throw: false,
-            )->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+            ])->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false)->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
+                assertGithubClockInSync($response);
                 $error = data_get($response->json(), 'message', "HTTP {$response->status()}");
                 if ($error === 'Not Found') {
-                    $error = 'Repository not found. Is it moved or deleted?';
+                    $error = "GitHub App installation {$source->installation_id} was not found. Install the GitHub App again or update its installation ID.";
                 }
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
@@ -223,9 +243,17 @@ function generateGithubToken(GithubApp $source, string $type)
     };
 }
 
-function generateGithubInstallationToken(GithubApp $source)
+function generateGithubInstallationToken(GithubApp $source, ?int $timeout = null)
 {
-    return $source->installationToken();
+    return $source->installationToken($timeout);
+}
+
+/**
+ * Limits how long a request waits for GitHub, both to connect and for the whole answer.
+ */
+function githubRequestTimeout(PendingRequest $request, ?int $timeout): PendingRequest
+{
+    return $timeout === null ? $request : $request->connectTimeout($timeout)->timeout($timeout);
 }
 
 function generateGithubJwt(GithubApp $source)
@@ -233,7 +261,7 @@ function generateGithubJwt(GithubApp $source)
     return generateGithubToken($source, 'jwt');
 }
 
-function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
+function githubApi(?GithubApp $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true, ?int $timeout = null)
 {
     if (is_null($source)) {
         throw new Exception('Source is required for API calls');
@@ -243,15 +271,19 @@ function githubApi(?GithubApp $source, string $endpoint, string $method = 'get',
         throw new InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
     }
 
-    if ($source->is_public) {
-        $response = Http::GitHub($source->api_url)->$method($endpoint);
+    $request = githubRequestTimeout($source->is_public
+        ? Http::GitHub($source->api_url)
+        : Http::GitHub($source->api_url, generateGithubInstallationToken($source, $timeout)), $timeout);
+
+    // Only reads are retried: a repeated POST could create a second pull request comment.
+    if (strtolower($method) === 'get') {
+        $request = $request->retry(3, fn (int $attempt) => $attempt * 1000, isTransientGithubFailure(...), throw: false);
+    }
+
+    if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
+        $response = $request->$method($endpoint, $data);
     } else {
-        $token = generateGithubInstallationToken($source);
-        if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint, $data);
-        } else {
-            $response = Http::GitHub($source->api_url, $token)->$method($endpoint);
-        }
+        $response = $request->$method($endpoint);
     }
 
     if (! $response->successful() && $throwError) {
@@ -303,8 +335,6 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
             return null;
         }
 
-        assertGithubClockInSync($source->api_url);
-
         $jwt = generateGithubAppJwt($privateKey->private_key, $source->app_id);
 
         $response = Http::GitSource($source->api_url)->withHeaders([
@@ -314,6 +344,7 @@ function syncGithubAppName(GithubApp $source, bool $throw = false): ?string
         ])->get("{$source->api_url}/app");
 
         if (! $response->successful()) {
+            assertGithubClockInSync($response);
             throw new RuntimeException(data_get($response->json(), 'message', 'Failed to fetch GitHub App information.'));
         }
 
@@ -388,10 +419,9 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
         ]);
     $json = $response->json();
     if ($response->status() !== 200) {
-        return [
-            'total_count' => 0,
-            'repositories' => [],
-        ];
+        $error = data_get($json, 'message', "HTTP {$response->status()}");
+
+        throw new RuntimeException("Failed to load repositories for {$source->name} with error: ".$error);
     }
 
     if ($json['total_count'] === 0) {

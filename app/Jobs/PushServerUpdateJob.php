@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -116,6 +117,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public bool $foundLogDrainContainer = false;
 
+    public array $logDrainContainerLabels = [];
+
     private ?array $cachedDestinationIds = null;
 
     public function middleware(): array
@@ -130,6 +133,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function __construct(public Server $server, public $data)
     {
+        $this->onQueue(sentinel_queue());
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();
@@ -245,6 +249,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
         $this->allServiceApplicationIds = $this->serviceApplicationsById->keys();
         $this->allServiceDatabaseIds = $this->serviceDatabasesById->keys();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds($this->applications->whereIn('id', $this->allApplicationIds)
+            ->concat($this->previews)
+            ->concat($this->databases)
+            ->concat($this->serviceApplicationsById)
+            ->concat($this->serviceDatabasesById));
 
         // Owners of application containers outside this server's applications, in one query.
         $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
@@ -275,6 +284,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $name = data_get($container, 'name');
             if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
                 $this->foundLogDrainContainer = true;
+                $this->logDrainContainerLabels = $labels->all();
             }
             // Containers are matched by owner UUID; numeric ids differ between instances.
             if (isContainerOfType($labels, 'application')) {
@@ -401,6 +411,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         // Aggregate multi-container service statuses
         $this->aggregateServiceContainerStatuses();
+
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
 
         $this->checkLogDrainContainer();
 
@@ -545,6 +557,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
             StandaloneSqlite::class,
         ])->flatMap(function (string $databaseClass) use ($databaseColumns, $standaloneDockerIds, $swarmDockerIds) {
             return $databaseClass::query()
@@ -614,7 +627,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         ->where('restart_limit_reached', false)
                         ->update(['restart_limit_reached' => true]) === 1;
 
-                    if ($restartLimitClaimed) {
+                    // Stop again while a container still runs: an earlier stop can fail or come too late.
+                    $stillRunning = $containerStatuses->contains(fn (string $status): bool => ! str($status)->contains('exited'));
+                    if ($restartLimitClaimed || $stillRunning) {
                         $application->refresh();
                         StopApplication::dispatch(
                             application: $application,
@@ -623,6 +638,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                             resetRestartCount: false,
                             removeContainers: false,
                         );
+                    }
+                    if ($restartLimitClaimed) {
                         $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
                     }
                 }
@@ -860,6 +877,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $tcpProxyContainerFound) {
                 StartDatabaseProxy::dispatch($database);
                 $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server, restartedResource: $database));
+            } elseif (StartDatabaseProxy::claimOutdatedRefresh($databaseUuid, data_get($tcpProxyContainerFound, 'labels'))) {
+                StartDatabaseProxy::dispatch($database);
             }
         } elseif ($this->isRunning($containerStatus) && ! $tcpProxy) {
             // Clean up orphaned proxy containers when is_public=false
@@ -973,7 +992,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function checkLogDrainContainer()
     {
-        if ($this->server->isFluentBitLogDrainEnabled() && $this->foundLogDrainContainer === false) {
+        if (! $this->server->isFluentBitLogDrainEnabled()) {
+            return;
+        }
+        if ($this->foundLogDrainContainer === false || StartLogDrain::claimOutdatedRefresh($this->server, $this->logDrainContainerLabels)) {
             StartLogDrain::dispatch($this->server);
         }
     }

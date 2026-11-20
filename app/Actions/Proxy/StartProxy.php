@@ -48,13 +48,13 @@ class StartProxy
         if ($async) {
             $server->markProxyTransitionStarted();
 
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: ProxyStatusChanged::dataFor($server), queue: deployment_queue());
         } else {
             instant_remote_process($commands, $server);
 
             $server->proxy->set('type', $proxyType);
             $server->save();
-            ProxyStatusChanged::dispatch($server->id);
+            ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
 
             return 'OK';
         }

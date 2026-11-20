@@ -310,8 +310,7 @@
                         <div class="application-settings-section-body relative flex min-h-0 flex-1 flex-col overflow-hidden">
                             <form wire:submit="updateDomain" class="flex min-h-0 flex-1 flex-col">
                                 <div data-testid="domain-settings-scroll"
-                                    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
-                                    style="-webkit-overflow-scrolling: touch;">
+                                    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service</label>

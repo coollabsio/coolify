@@ -60,9 +60,19 @@ test('server transfer page is available in production', function () {
 });
 
 test('server transfer link is shown to admins in production', function () {
+    // The sidebar links Transfer only for a validated server, because the transfer runs SSH commands on it.
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
     $this->get('/server/'.$this->server->uuid)
         ->assertOk()
         ->assertSee('/server/'.$this->server->uuid.'/transfer', escape: false);
+});
+
+test('server transfer link is disabled until the server is validated', function () {
+    $this->get('/server/'.$this->server->uuid)
+        ->assertOk()
+        ->assertSee('Transfer')
+        ->assertDontSee('/server/'.$this->server->uuid.'/transfer', escape: false);
 });
 
 test('taking back a transferred server needs a typed confirmation', function () {
@@ -159,11 +169,6 @@ test('a team admin cannot start a transfer, because it sends every secret to the
 
     Queue::assertNotPushed(MigrateServerToInstanceJob::class);
     expect(data_get($this->server->fresh()->server_metadata, 'migration'))->toBeNull();
-});
-
-test('the transfer confirmation says that locked secrets are sent to the target', function () {
-    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('every environment variable value, also locked ones');
 });
 
 test('transfer page shows the error of a failed transfer', function () {

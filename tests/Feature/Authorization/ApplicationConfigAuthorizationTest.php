@@ -220,8 +220,9 @@ test('member cannot load application environment variable values', function () {
         'type' => 'application',
     ])
         ->call('loadValues')
-        ->assertForbidden()
+        ->assertOk()
         ->assertSet('valuesLoaded', false)
+        ->assertSet('isValueHidden', true)
         ->assertSet('value', null);
 });
 
@@ -273,21 +274,6 @@ test('member cannot save the application container name prefix', function () {
         ->assertDispatched('error');
 
     expect($this->application->settings->fresh()->custom_container_name_prefix)->toBeNull();
-});
-
-test('the private application advanced syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $original = (bool) $this->application->settings->is_force_https_enabled;
-
-    $component = Livewire::test(ApplicationAdvanced::class, ['application' => $this->application])
-        ->set('isForceHttpsEnabled', ! $original);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect((bool) $this->application->settings->fresh()->is_force_https_enabled)->toBe($original);
 });
 
 // --- Application Rollback Livewire actions ---

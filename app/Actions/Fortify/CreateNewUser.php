@@ -38,7 +38,9 @@ class CreateNewUser implements CreatesNewUsers
 
         if (! User::query()->exists() && ! RootSetupWindow::isOpen()) {
             throw ValidationException::withMessages([
-                'email' => 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+                'email' => RootSetupWindow::isPending()
+                    ? 'Coolify has not finished starting. Wait a few seconds, then try again.'
+                    : 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
             ]);
         }
 

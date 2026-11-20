@@ -9,6 +9,10 @@ Frequency: {{ $frequency }}
 {{ $output }}
 @endisset
 
+@isset($reminder)
+{{ $reminder }}
+@endisset
+
 @if ($url)
 Click [here]({{ $url }}) to open the resource.
 @endif

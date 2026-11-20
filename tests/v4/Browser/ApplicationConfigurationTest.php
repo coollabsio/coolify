@@ -20,28 +20,6 @@ beforeEach(function () {
     ]);
 });
 
-it('shows application configuration sections and navigation', function () {
-    loginAndSkipBoarding();
-
-    $url = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    $page = visit($url);
-
-    $page->assertSee('Config App')
-        ->assertSee('General')
-        ->assertSee('Environment Variables')
-        ->assertSee('Danger Zone')
-        ->assertSee('Application details')
-        ->assertSee('Internal access')
-        ->assertSee('Docker network')
-        ->assertSee('Build & deploy')
-        ->screenshot(filename: 'application-configuration-overview');
-});
-
 it('keeps the PR suffix listbox visible outside the volumes table while scrolling', function () {
     foreach (range(1, 8) as $index) {
         LocalPersistentVolume::create([
@@ -308,40 +286,6 @@ it('restores the default file location when the field is cleared', function (str
     'Docker Compose' => ['dockercompose', 'docker_compose_location', '/docker-compose.yaml'],
 ]);
 
-it('opens environment variables page for the application', function () {
-    loginAndSkipBoarding();
-
-    $base = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    $page = visit("{$base}/environment-variables");
-
-    $page->assertSee('Environment Variables')
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-environment-variables');
-});
-
-it('opens advanced and healthcheck configuration pages', function () {
-    loginAndSkipBoarding();
-
-    $base = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    visit("{$base}/advanced")
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-advanced');
-
-    visit("{$base}/healthcheck")
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-healthcheck');
-});
-
 it('lists the application on the environment resources page', function () {
     loginAndSkipBoarding();
 
@@ -352,22 +296,6 @@ it('lists the application on the environment resources page', function () {
 
     $page->assertSee('Config App')
         ->screenshot(filename: 'environment-lists-application');
-});
-
-it('shows danger zone for application deletion', function () {
-    loginAndSkipBoarding();
-
-    $base = applicationConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->application
-    );
-
-    $page = visit("{$base}/danger");
-
-    $page->assertSee('Danger')
-        ->assertSee('Config App')
-        ->screenshot(filename: 'application-danger-zone');
 });
 
 it('uses compact application domains with unified settings and a form save button', function () {

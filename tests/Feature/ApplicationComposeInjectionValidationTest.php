@@ -75,7 +75,7 @@ function composeInjectionPayloads(): array
 function fakeRepositoryCompose(string $compose): void
 {
     Process::fake(function ($process) use ($compose) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'git cat-file blob')) {
             return Process::result(output: $compose);
         }
@@ -310,7 +310,7 @@ test('a deployment stops with a visible log line when the repository Compose fil
         ->not->toContain('#0 ')
         ->not->toContain('.php');
     expect($this->application->refresh()->docker_compose_raw)->toBe(SAFE_APPLICATION_COMPOSE);
-    Process::assertNotRan(fn ($process) => str_contains(is_array($process->command) ? implode(' ', $process->command) : $process->command, 'base64 -d'));
+    Process::assertNotRan(fn ($process) => str_contains(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process), 'base64 -d'));
 })->with(['production' => 0, 'pull request preview' => 42]);
 
 test('the deployment log shows the unsafe Compose file explanation once and a short failure line', function () {

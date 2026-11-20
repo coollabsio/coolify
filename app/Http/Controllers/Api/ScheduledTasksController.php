@@ -78,7 +78,7 @@ class ScheduledTasksController extends Controller
             return $return;
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'use_shell', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
@@ -86,6 +86,7 @@ class ScheduledTasksController extends Controller
             'frequency' => 'required|string',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1|max:36000',
+            'use_shell' => 'boolean',
             'enabled' => 'boolean',
         ]);
 
@@ -124,6 +125,7 @@ class ScheduledTasksController extends Controller
         $task->frequency = $request->frequency;
         $task->container = $request->container;
         $task->timeout = $request->has('timeout') ? $request->timeout : 300;
+        $task->use_shell = $request->has('use_shell') ? $request->boolean('use_shell') : true;
         $task->enabled = $enabled;
         $task->team_id = $teamId;
 
@@ -159,7 +161,7 @@ class ScheduledTasksController extends Controller
             return response()->json(['message' => 'At least one field must be provided.'], 422);
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'use_shell', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -167,6 +169,7 @@ class ScheduledTasksController extends Controller
             'frequency' => 'string',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1|max:36000',
+            'use_shell' => 'boolean',
             'enabled' => 'boolean',
         ]);
 
@@ -202,7 +205,13 @@ class ScheduledTasksController extends Controller
             return $response;
         }
 
-        $task->update($request->only($allowedFields));
+        $task->fill($request->only($allowedFields));
+        $changedFields = auditChangedFields($task);
+        $task->save();
+
+        if ($changedFields === []) {
+            return response()->json($this->removeSensitiveData($task), 200);
+        }
 
         auditLog('api.scheduled_task.updated', [
             'team_id' => getTeamIdFromToken(),
@@ -210,7 +219,7 @@ class ScheduledTasksController extends Controller
             'task_name' => $task->name,
             'resource_type' => $resource instanceof Application ? 'application' : 'service',
             'resource_uuid' => $resource->uuid,
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => $changedFields,
         ]);
 
         return response()->json($this->removeSensitiveData($task), 200);
@@ -218,7 +227,7 @@ class ScheduledTasksController extends Controller
 
     private function deleteTask(Request $request, Application|Service $resource): JsonResponse
     {
-        $this->authorize('update', $resource);
+        $this->authorize('delete', $resource);
 
         $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
         if (! $task) {
@@ -376,6 +385,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -467,6 +477,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -747,6 +758,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -838,6 +850,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),

@@ -59,6 +59,143 @@ trait HasMaintenancePage
     }
 
     /**
+     * Container labels that the proxy routes the resource with, when the user edits them.
+     * Null when the labels come from the domains, so the domain routes apply.
+     *
+     * @return Collection<int, string>|null
+     */
+    public function maintenanceProxyLabels(): ?Collection
+    {
+        return null;
+    }
+
+    /**
+     * Traefik routers that show the maintenance page. With custom labels, each label router
+     * gets a maintenance router with the same rule, so wildcard and custom rules also match.
+     *
+     * @return Collection<int, array{name: string, rule: string, entryPoints: array<int, string>|null, tls: array<string, mixed>|null, priority: int}>
+     */
+    public function maintenanceTraefikRouters(): Collection
+    {
+        $labels = $this->maintenanceProxyLabels();
+        if ($labels !== null) {
+            return $this->maintenanceTraefikRoutersFromLabels($labels);
+        }
+
+        return $this->maintenanceRoutes()->flatMap(function (array $route, int $index): array {
+            $rule = "Host(`{$route['host']}`) && PathPrefix(`{$route['path']}`)";
+            $router = ['name' => "{$index}-http", 'rule' => $rule, 'entryPoints' => ['http'], 'tls' => null, 'priority' => strlen($rule) + 1];
+            if ($route['scheme'] !== 'https') {
+                return [$router];
+            }
+
+            return [$router, array_merge($router, ['name' => "{$index}-https", 'entryPoints' => ['https'], 'tls' => ['certResolver' => 'letsencrypt']])];
+        })->values();
+    }
+
+    /**
+     * Caddy site addresses and path matchers that show the maintenance page. A site address
+     * must be the same as in the labels, so caddy-docker-proxy merges both into one site block.
+     *
+     * @return Collection<int, array{address: string, path: string}>
+     */
+    public function maintenanceCaddySites(): Collection
+    {
+        $labels = $this->maintenanceProxyLabels();
+        if ($labels !== null) {
+            return $this->maintenanceCaddySitesFromLabels($labels);
+        }
+
+        return $this->maintenanceRoutes()
+            ->map(fn (array $route) => [
+                'address' => caddySiteAddress($route['scheme'], $route['host'], $route['force_https']),
+                'path' => "{$route['path']}*",
+            ])
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $labels
+     * @return Collection<int, array{name: string, rule: string, entryPoints: array<int, string>|null, tls: array<string, mixed>|null, priority: int}>
+     */
+    protected function maintenanceTraefikRoutersFromLabels(Collection $labels): Collection
+    {
+        $values = $this->maintenanceLabelValues($labels);
+        if (strtolower($values['traefik.enable'] ?? 'true') === 'false') {
+            return collect();
+        }
+
+        $routers = [];
+        foreach ($values as $key => $value) {
+            if (preg_match('/^traefik\.http\.routers\.([A-Za-z0-9_-]+)\.(.+)$/', $key, $matches)) {
+                $routers[$matches[1]][$matches[2]] = $value;
+            }
+        }
+
+        return collect($routers)
+            ->filter(fn (array $router) => filled($router['rule'] ?? null))
+            ->map(function (array $router, string $name): array {
+                $options = array_change_key_case($router);
+                $tls = null;
+                if (collect($options)->keys()->contains(fn (string $key) => str_starts_with($key, 'tls.'))
+                    || strtolower($options['tls'] ?? '') === 'true') {
+                    $tls = filled($options['tls.certresolver'] ?? null)
+                        ? ['certResolver' => $options['tls.certresolver']]
+                        : ['options' => $options['tls.options'] ?? 'default'];
+                }
+                $entryPoints = filled($options['entrypoints'] ?? null)
+                    ? array_values(array_filter(array_map('trim', explode(',', $options['entrypoints']))))
+                    : null;
+                $priority = is_numeric($options['priority'] ?? null) ? (int) $options['priority'] : strlen($router['rule']);
+
+                return ['name' => $name, 'rule' => $router['rule'], 'entryPoints' => $entryPoints, 'tls' => $tls, 'priority' => $priority + 1];
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $labels
+     * @return Collection<int, array{address: string, path: string}>
+     */
+    protected function maintenanceCaddySitesFromLabels(Collection $labels): Collection
+    {
+        $values = $this->maintenanceLabelValues($labels);
+
+        return collect($values)
+            ->filter(fn (string $value, string $key) => preg_match('/^caddy(_\d+)?$/', $key) === 1)
+            ->map(function (string $address, string $key) use ($values): ?array {
+                $address = trim($address);
+                $path = trim($values["{$key}.handle_path"] ?? $values["{$key}.handle"] ?? '') ?: '/*';
+                // The values go into the Caddyfile as plain text.
+                if (! preg_match('#^[A-Za-z0-9.*:/_\[\], -]+$#', $address) || ! preg_match('#^/[A-Za-z0-9/._~%*-]*$#', $path)) {
+                    return null;
+                }
+
+                return ['address' => $address, 'path' => $path];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $labels
+     * @return array<string, string>
+     */
+    private function maintenanceLabelValues(Collection $labels): array
+    {
+        $values = [];
+        foreach ($labels as $label) {
+            $label = trim((string) $label);
+            if (str_contains($label, '=') && ! str_starts_with($label, '#')) {
+                [$key, $value] = explode('=', $label, 2);
+                $values[trim($key)] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
      * The custom maintenance page HTML, or the Coolify default page.
      */
     public function maintenancePageHtml(): string

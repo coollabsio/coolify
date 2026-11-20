@@ -51,6 +51,7 @@ class Show extends Component
             $this->destination->name = $this->name;
             $changedFields = auditChangedFields($this->destination);
             $this->destination->save();
+            $this->dispatch('name-changed', uuid: $this->destination->uuid, name: $this->destination->name);
             if ($changedFields !== []) {
                 auditLog('ui.destination.updated', $this->auditContext([
                     'changed_fields' => $changedFields,

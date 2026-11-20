@@ -5,6 +5,8 @@ namespace App\Livewire\Project\Resource;
 use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
@@ -41,13 +43,18 @@ class Index extends Component
 
     protected Collection $clickhouses;
 
+    protected Collection $influxdbs;
+
     protected Collection $sqlites;
 
     protected Collection $services;
 
+    /** @var array<string, array{status: string, text: string, label: string, tooltip: ?string}> */
+    private array $markers = [];
+
     public function mount(): void
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->sqlites = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->influxdbs = $this->sqlites = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -80,6 +87,7 @@ class Index extends Component
             'keydbs:id,uuid,name,environment_id',
             'dragonflies:id,uuid,name,environment_id',
             'clickhouses:id,uuid,name,environment_id',
+            'influxdbs:id,uuid,name,environment_id',
             'sqlites:id,uuid,name,environment_id',
         ];
 
@@ -96,6 +104,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'influxdbs',
             'mariadbs',
             'mongodbs',
             'sqlites',
@@ -131,6 +140,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'influxdbs' => 'influxdbs',
             'sqlites' => 'sqlites',
         ];
 
@@ -168,6 +178,11 @@ class Index extends Component
 
     public function render()
     {
+        $this->markers = VulnerabilityMarkers::for(collect([
+            $this->applications, $this->postgresqls, $this->redis, $this->mongodbs, $this->mysqls, $this->mariadbs,
+            $this->keydbs, $this->dragonflies, $this->clickhouses, $this->influxdbs, $this->sqlites, $this->services,
+        ])->flatten(1));
+
         return view('livewire.project.resource.index', [
             'applications' => $this->applications,
             'postgresqls' => $this->postgresqls,
@@ -178,6 +193,7 @@ class Index extends Component
             'keydbs' => $this->keydbs,
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
+            'influxdbs' => $this->influxdbs,
             'sqlites' => $this->sqlites,
             'services' => $this->services,
             'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
@@ -189,6 +205,7 @@ class Index extends Component
             'keydbsJs' => $this->toSearchableArray($this->keydbs, 'database', 'Database'),
             'dragonfliesJs' => $this->toSearchableArray($this->dragonflies, 'database', 'Database'),
             'clickhousesJs' => $this->toSearchableArray($this->clickhouses, 'database', 'Database'),
+            'influxdbsJs' => $this->toSearchableArray($this->influxdbs, 'database', 'Database'),
             'sqlitesJs' => $this->toSearchableArray($this->sqlites, 'database', 'Database'),
             'servicesJs' => $this->toSearchableArray($this->services, 'service', 'Service'),
         ]);
@@ -221,6 +238,7 @@ class Index extends Component
                 'id' => $tag->id,
                 'name' => $tag->name,
             ])->values()->toArray(),
+            'security' => $this->markers[ResourceScans::key($item)] ?? null,
         ])->values()->toArray();
     }
 }

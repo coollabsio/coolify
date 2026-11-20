@@ -76,11 +76,10 @@ beforeEach(function () {
  */
 function chainedServiceVolumeClones(): array
 {
-    $first = Bus::dispatched(CallQueuedClosure::class)->first();
+    $first = Bus::dispatched(CallQueuedClosure::class)->first() ?? Bus::dispatched(VolumeCloneJob::class)->first();
     expect($first)->not->toBeNull('No volume clone chain was dispatched.');
 
-    return collect($first->chained)
-        ->map(fn (string $job) => unserialize($job))
+    return collect([$first, ...array_map(fn (string $job) => unserialize($job), $first->chained)])
         ->filter(fn ($job) => $job instanceof VolumeCloneJob)
         ->map(fn (VolumeCloneJob $job) => (fn () => [$this->sourceVolume, $this->targetVolume])->call($job))
         ->values()
@@ -179,4 +178,70 @@ test('cloning a service without volume data dispatches no volume copy', function
     Bus::assertNotDispatched(CallQueuedClosure::class);
     Bus::assertNotDispatched(VolumeCloneJob::class);
     expect(serviceVolumeNames($clone))->toHaveCount(2);
+});
+
+test('cloning a cloned service replaces the clone suffix instead of adding another one', function () {
+    $this->service->update(['name' => 'Gitea Runner']);
+
+    $source = $this->service;
+    foreach (range(1, 10) as $ignored) {
+        Livewire::test(ResourceOperations::class, ['resource' => $source])
+            ->call('cloneTo', $this->destination->uuid)
+            ->assertHasNoErrors();
+
+        $source = Service::query()->latest('id')->firstOrFail();
+    }
+
+    expect($source->name)->toBe("Gitea Runner-clone-{$source->uuid}");
+});
+
+test('cloning a service to another server keeps its generated database credentials and copies its volumes there', function () {
+    $this->service->update(['docker_compose_raw' => <<<'YAML'
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    environment:
+      - SERVICE_URL_FRESHRSS_80
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    volumes:
+      - freshrss-data:/var/www/FreshRSS/data
+  freshrss-db:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+YAML]);
+    $this->service->parse();
+    $sourceCredentials = $this->service->environment_variables()
+        ->whereIn('key', ['SERVICE_USER_MARIADB', 'SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_ROOT'])
+        ->pluck('value', 'key')
+        ->all();
+    expect($sourceCredentials)->toHaveCount(3);
+
+    $nodeB = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->service->server->private_key_id]);
+    $nodeB->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $nodeBDestination = StandaloneDocker::where('server_id', $nodeB->id)->firstOrFail();
+
+    Livewire::test(ResourceOperations::class, ['resource' => $this->service])
+        ->set('cloneVolumeData', true)
+        ->call('cloneTo', $nodeBDestination->uuid)
+        ->assertHasNoErrors();
+
+    $clone = Service::query()->whereKeyNot($this->service->id)->sole();
+    $cloneCredentials = $clone->environment_variables()
+        ->whereIn('key', array_keys($sourceCredentials))
+        ->pluck('value', 'key')
+        ->all();
+
+    expect($clone->server_id)->toBe($nodeB->id)
+        ->and($cloneCredentials)->toEqual($sourceCredentials)
+        ->and($clone->environment_variables()->where('key', 'SERVICE_PASSWORD_MARIADB')->count())->toBe(1)
+        ->and(chainedServiceVolumeClones())->toEqualCanonicalizing([
+            ["{$this->service->uuid}_freshrss-data", "{$clone->uuid}_freshrss-data"],
+            ["{$this->service->uuid}_mariadb-data", "{$clone->uuid}_mariadb-data"],
+        ]);
 });

@@ -46,6 +46,18 @@
                 <x-forms.button class="w-full justify-center" type="submit" isHighlighted>Configure 2FA</x-forms.button>
             </form>
         @endif
+        @if (!request()->user()->two_factor_confirmed_at && $teamsWithoutTwoFactor->isNotEmpty())
+            <div class="flex flex-col gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">Or switch to a team that does not require 2FA:</p>
+                @foreach ($teamsWithoutTwoFactor as $teamWithoutTwoFactor)
+                    <form action="{{ route('two-factor.required.switch-team') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="team_id" value="{{ $teamWithoutTwoFactor->id }}">
+                        <x-forms.button class="w-full justify-center" type="submit">{{ $teamWithoutTwoFactor->name }}</x-forms.button>
+                    </form>
+                @endforeach
+            </div>
+        @endif
     </div>
     @unless (request()->user()->two_factor_confirmed_at)
         <x-slot:footer>

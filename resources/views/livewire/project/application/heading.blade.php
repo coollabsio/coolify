@@ -1,5 +1,8 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none" x-data
     x-init="@js($loadComposeOnOpen) && $wire.loadComposeFile(true)">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
+    @endteleport
     <div>
         @if ($application->build_pack === 'nixpacks')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
@@ -27,6 +30,11 @@
                     </div>
                     <div class="flex w-full flex-wrap gap-1">
                         <x-application.restart-limit-warning :application="$application" />
+                        @if ($this->imageScanGate)
+                            <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
+                                :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
+                                :deployment-url="$this->imageScanGate['deployment_url']" />
+                        @endif
                     </div>
                 </div>
             </div>
@@ -138,6 +146,17 @@
                 </div>
             </div>
         </div>
+
+        @if ($this->imageScanGate)
+            {{-- From xl the topbar shows the warning. Below xl the in-flow heading above repeats it. --}}
+            @teleport('#configuration-warning-hud-slot')
+                <div class="hidden items-center xl:flex">
+                    <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
+                        :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
+                        :deployment-url="$this->imageScanGate['deployment_url']" />
+                </div>
+            @endteleport
+        @endif
 
         {{-- Desktop actions live in the fixed top bar so they cannot overlap page content. --}}
         @teleport('#resource-action-hud-slot')

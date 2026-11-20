@@ -64,7 +64,7 @@ test('delete returns error string when password is incorrect', function () {
     expect(Application::find($this->application->id))->not->toBeNull();
 });
 
-test('delete hides the resource before the redirect and dispatches cleanup after the response', function () {
+test('delete hides the resource before the redirect and queues the cleanup job', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
         'server_id' => $this->server->id,
@@ -87,7 +87,9 @@ test('delete hides the resource before the redirect and dispatches cleanup after
     // The redirected environment page must not list the resource while the cleanup job still runs.
     expect(Service::find($service->id))->toBeNull()
         ->and(Service::withTrashed()->find($service->id))->not->toBeNull();
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
+    // A queue worker runs the cleanup. After the response, the job would be skipped when the client disconnects first.
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service)
+        && $job->connection !== 'sync');
 });
 
 test('delete succeeds without a password for a user with a linked oauth identity', function () {

@@ -15,11 +15,11 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
 });
 
-function pushSentinelFrom(string $clientIp): TestResponse
+function pushSentinelFrom(string $clientIp, string $peer = '172.70.0.1'): TestResponse
 {
     return test()
         ->withHeader('CF-Connecting-IP', $clientIp)
-        ->withServerVariables(['REMOTE_ADDR' => '172.70.0.1'])
+        ->withServerVariables(['REMOTE_ADDR' => $peer])
         ->postJson('/api/v1/sentinel/push');
 }
 
@@ -33,13 +33,13 @@ it('gives each Cloudflare client ip its own sentinel push bucket on cloud', func
     pushSentinelFrom('203.0.113.20')->assertUnauthorized();
 });
 
-it('ignores the Cloudflare client ip for sentinel pushes on self-hosted instances', function () {
+it('ignores the Cloudflare client ip for sentinel pushes on self-hosted instances when the peer is not Cloudflare', function () {
     config()->set('constants.coolify.self_hosted', true);
 
-    pushSentinelFrom('203.0.113.10')->assertUnauthorized();
-    pushSentinelFrom('203.0.113.10')->assertUnauthorized();
+    pushSentinelFrom('203.0.113.10', peer: '198.51.100.7')->assertUnauthorized();
+    pushSentinelFrom('203.0.113.10', peer: '198.51.100.7')->assertUnauthorized();
 
-    pushSentinelFrom('203.0.113.20')->assertStatus(429);
+    pushSentinelFrom('203.0.113.20', peer: '198.51.100.7')->assertStatus(429);
 });
 
 it('keys unauthenticated limiters by the Cloudflare client ip on cloud', function (string $limiter) {

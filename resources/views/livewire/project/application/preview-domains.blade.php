@@ -177,34 +177,33 @@
                             </div>
                             <div class="service-domain-actions flex items-center justify-end gap-1">
                                 @can('update', $preview->application)
-                                    <button type="button" wire:click="checkDomainDns({{ $index }})"
-                                        wire:loading.attr="disabled"
-                                        wire:target="checkDomainDns({{ $index }}),checkAllDns"
-                                        class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </button>
-                                    <button type="button"
-                                        @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']))"
-                                        class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ getFqdnWithoutPort($row['url']) }}">
-                                        <x-reicon name="settings" class="size-3.5" />
-                                    </button>
-                                    <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
-                                        buttonTitle="Remove" isErrorButton
-                                        submitAction="removeDomainByKey({{ $domainKey }})"
-                                        :actions="[
-                                            'This domain will be removed from the preview deployment.',
-                                            'Redeploy the preview to apply proxy changes.',
-                                        ]"
-                                        :confirmWithPassword="false" :confirmWithText="false"
-                                        step2ButtonText="Remove domain">
-                                        <x-slot:trigger>
-                                            <button type="button"
-                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                title="Remove domain" aria-label="Remove domain">
-                                                <x-reicon name="trash" class="size-3.5" />
-                                            </button>
-                                        </x-slot:trigger>
-                                    </x-modal-confirmation>
+                                    <x-table.row-actions label="Domain actions">
+                                        <x-table.row-action wire:click="checkDomainDns({{ $index }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="checkDomainDns({{ $index }}),checkAllDns">
+                                            Check DNS
+                                        </x-table.row-action>
+                                        <x-table.row-action
+                                            x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from($row['service']) }})"
+                                            aria-label="Edit {{ getFqdnWithoutPort($row['url']) }}">
+                                            Edit
+                                        </x-table.row-action>
+                                        <x-slot:danger>
+                                            <x-modal-confirmation buttonFullWidth title="Remove domain?"
+                                                buttonTitle="Remove" isErrorButton
+                                                submitAction="removeDomainByKey({{ $domainKey }})"
+                                                :actions="[
+                                                    'This domain will be removed from the preview deployment.',
+                                                    'Redeploy the preview to apply proxy changes.',
+                                                ]"
+                                                :confirmWithPassword="false" :confirmWithText="false"
+                                                step2ButtonText="Remove domain">
+                                                <x-slot:trigger>
+                                                    <x-table.row-action>Delete</x-table.row-action>
+                                                </x-slot:trigger>
+                                            </x-modal-confirmation>
+                                        </x-slot:danger>
+                                    </x-table.row-actions>
                                 @endcan
                             </div>
                         </div>

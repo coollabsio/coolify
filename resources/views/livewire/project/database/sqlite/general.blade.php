@@ -5,7 +5,7 @@
         <x-application.settings-section id="database-details-section" title="Database details"
             description="Manage the identity, container image, and database files of this SQLite database.">
             <x-slot:actions>
-                <x-status-badge status="Experimental" type="warning" />
+                <x-experimental-badge />
                 <x-modal-input title="Resource details" buttonTitle="Details">
                     <livewire:project.shared.resource-details :resource="$database" />
                 </x-modal-input>
@@ -31,11 +31,15 @@
 
         <x-application.settings-section id="container-section" title="Container"
             description="Docker options and log forwarding for the database container.">
-            <x-forms.input
-                helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
-                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
-                id="customDockerRunOptions" label="Custom Docker options" canGate="update"
-                :canResource="$database" />
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Custom Docker options" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input
+                    helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                    id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                    :canResource="$database" />
+            @endif
             <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
                 <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                     :disabled="! auth()->user()->can('update', $database)" :options="[

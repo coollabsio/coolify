@@ -297,18 +297,18 @@ test('each shared variables page reopens its canvas when the user left it on the
     sharedVariableCanvasAs($this, $this->admin, $this->team)
         ->get(route("shared-variables.{$scope}.canvas", $parameters))
         ->assertOk()
-        ->assertCookie($cookie, 'canvas');
+        ->assertPlainCookie($cookie, 'canvas');
 
     sharedVariableCanvasAs($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route($listRoute, $parameters))
         ->assertRedirect(route("shared-variables.{$scope}.canvas", $parameters));
 
     sharedVariableCanvasAs($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route($listRoute, [...$parameters, 'view' => 'list']))
         ->assertOk()
-        ->assertCookie($cookie, 'list');
+        ->assertPlainCookie($cookie, 'list');
 })->with(['team', 'project', 'environment', 'server']);
 
 test('an admin adds a shared variable from the canvas modal and the canvas reloads', function () {

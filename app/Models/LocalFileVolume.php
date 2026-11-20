@@ -72,6 +72,11 @@ class LocalFileVolume extends BaseModel
         done
         SH;
 
+    /**
+     * The pull request whose preview this copy writes. Not saved: see forPullRequest().
+     */
+    protected int $previewPullRequestId = 0;
+
     protected $casts = [
         // 'fs_path' => 'encrypted',
         // 'mount_path' => 'encrypted',
@@ -343,10 +348,17 @@ class LocalFileVolume extends BaseModel
         validateShellSafePath($path, 'storage path');
         $escapedPath = escapeshellarg($path);
 
-        $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
-        $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
+        $state = self::remoteFileStates([(string) $path], $server)[0];
+        if ($state === 'unknown') {
+            throw new \Exception("Coolify cannot check the file {$path} on the server.");
+        }
+        if ($state === 'other' && ! $this->is_directory) {
+            throw new \Exception("A symbolic link or a special file is at {$path} on the server. Coolify did not write the file.");
+        }
+        $isFile = $state === 'file';
+        $isDir = in_array($state, ['directory', 'empty-directory'], true);
         $replacesEmptyDirectory = false;
-        if ($isFile === 'OK' && $this->is_directory) {
+        if ($isFile && $this->is_directory) {
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
@@ -356,7 +368,7 @@ class LocalFileVolume extends BaseModel
             $this->save();
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
-        } elseif ($isDir === 'OK' && ! $this->is_directory) {
+        } elseif ($isDir && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
                 $this->is_directory = true;
                 $this->save();
@@ -364,12 +376,12 @@ class LocalFileVolume extends BaseModel
             }
             // Docker creates a missing bind source as an empty directory. Replace only an empty
             // directory inside the resource directory; never delete files that are on the server.
-            if ($isOutsideResourceDirectory || self::remoteFileStates([(string) $path], $server)[0] !== 'empty-directory') {
+            if ($isOutsideResourceDirectory || $state !== 'empty-directory') {
                 throw new \Exception("The following file is a directory on the server, but you are trying to mark it as a file: {$path}<br><br>Please delete the directory on the server or mark it as directory.");
             }
             $replacesEmptyDirectory = true;
         }
-        if (($isDir === 'NOK' || $replacesEmptyDirectory) && ! $this->is_directory) {
+        if ((! $isDir || $replacesEmptyDirectory) && ! $this->is_directory) {
             if ($replacesEmptyDirectory) {
                 $commands->push("rmdir {$escapedPath}");
             }
@@ -388,7 +400,7 @@ class LocalFileVolume extends BaseModel
             if ($chmod) {
                 $commands->push('chmod -- '.escapeshellarg($chmod)." {$escapedPath}");
             }
-        } elseif ($isDir === 'NOK' && $this->is_directory) {
+        } elseif (! $isDir && $this->is_directory) {
             $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
         }
 
@@ -405,22 +417,24 @@ class LocalFileVolume extends BaseModel
      * front of it and never changes the script. See REMOTE_FILE_STATE_SCRIPT for the output.
      *
      * @param  list<string>  $paths
+     * @param  (Closure(string): string)|null  $quote  Makes a shell argument of a path. The default is escapeshellarg().
      */
-    public static function remoteFileStateCommand(array $paths): string
+    public static function remoteFileStateCommand(array $paths, ?Closure $quote = null): string
     {
-        return 'sh -c '.escapeshellarg(self::REMOTE_FILE_STATE_SCRIPT).' sh '.implode(' ', array_map('escapeshellarg', $paths));
+        return 'sh -c '.escapeshellarg(self::REMOTE_FILE_STATE_SCRIPT).' sh '.implode(' ', array_map($quote ?? escapeshellarg(...), $paths));
     }
 
     /**
      * Gets the state of each path with one server command. A path without a state in the output is `unknown`.
      *
      * @param  list<string>  $paths
+     * @param  (Closure(string): string)|null  $quote  Makes a shell argument of a path. The default is escapeshellarg().
      * @return list<string>
      */
-    public static function remoteFileStates(array $paths, Server $server): array
+    public static function remoteFileStates(array $paths, Server $server, ?Closure $quote = null): array
     {
         $states = [];
-        $output = (string) instant_remote_process([self::remoteFileStateCommand($paths)], $server, false);
+        $output = (string) instant_remote_process([self::remoteFileStateCommand($paths, $quote)], $server, false);
         foreach (preg_split('/\R/', trim($output)) as $line) {
             if (preg_match('/^(\d+):([a-z-]+)$/', trim($line), $matches)) {
                 $states[(int) $matches[1] - 1] = $matches[2];
@@ -560,16 +574,28 @@ class LocalFileVolume extends BaseModel
     public function resolvedFsPath(string $workdir): Stringable
     {
         $path = trim((string) $this->fs_path);
-        if (str_starts_with($path, '/') || str_starts_with($path, '~')) {
-            return str($path);
-        }
-        if (str_starts_with($path, '.')) {
-            $path = substr($path, 1);
+        if (! str_starts_with($path, '/') && ! str_starts_with($path, '~')) {
+            if (str_starts_with($path, '.')) {
+                $path = substr($path, 1);
+            }
+            $path = ltrim($path, '/');
+            $path = rtrim($workdir, '/').($path === '' ? '' : '/'.$path);
         }
 
-        $path = ltrim($path, '/');
+        return str(addPreviewDeploymentSuffix($path, $this->previewPullRequestId));
+    }
 
-        return str(rtrim($workdir, '/').($path === '' ? '' : '/'.$path));
+    /**
+     * A copy that uses the path of the preview of a pull request, as the Compose parser mounts it
+     * (`<path>-pr-<id>` unless the PR suffix is off for this storage). The row keeps the path of
+     * the application, so saving the copy never stores the preview path.
+     */
+    public function forPullRequest(int $pullRequestId): static
+    {
+        $copy = clone $this;
+        $copy->previewPullRequestId = $pullRequestId !== 0 && ($this->is_preview_suffix_enabled ?? true) ? $pullRequestId : 0;
+
+        return $copy;
     }
 
     /**

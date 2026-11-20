@@ -122,10 +122,13 @@ function allowedPathsForTwoFactorSetup(): array
 {
     return [
         'two-factor-required',
+        'two-factor-required/switch-team',
         'two-factor-challenge',
         'logout',
         'user/confirm-password',
         'user/confirmed-password-status',
+        'passkeys/confirm',
+        'passkeys/confirm/options',
         'user/two-factor-authentication',
         'user/confirmed-two-factor-authentication',
         'user/two-factor-qr-code',

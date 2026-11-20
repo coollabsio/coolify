@@ -91,7 +91,7 @@ beforeEach(function () {
 function fakePreviewCleanupServer(array &$commands, string $previewNetwork, ?array $previewNetworkContainers = [], string $dockerPs = ''): void
 {
     Process::fake(function ($process) use (&$commands, $previewNetwork, $previewNetworkContainers, $dockerPs) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         if (str_contains($command, 'docker network inspect') && str_contains($command, "'{$previewNetwork}'")) {

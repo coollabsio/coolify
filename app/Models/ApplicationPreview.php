@@ -34,6 +34,7 @@ class ApplicationPreview extends BaseModel
         'last_online_at',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'keeps_production_values',
     ];
 
     protected $hidden = [
@@ -44,6 +45,7 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'keeps_production_values' => 'boolean',
     ];
 
     protected static function booted(): void

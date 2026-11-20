@@ -31,6 +31,7 @@
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
+use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -185,6 +186,12 @@ it('parses the application compose exactly as recorded', function (array $option
     ]);
     $application->forceFill(['uuid' => 'referenceapplication0001'])->save();
     $application->settings->update($options['settings'] ?? []);
+    // Creating the production variable also creates its preview copy; the preview gets its own value.
+    EnvironmentVariable::create([
+        'key' => 'MAP_EMPTY_FROM_DATABASE', 'value' => 'production-value', 'is_preview' => false,
+        'resourceable_type' => Application::class, 'resourceable_id' => $application->id,
+    ]);
+    $application->environment_variables_preview()->where('key', 'MAP_EMPTY_FROM_DATABASE')->firstOrFail()->update(['value' => 'preview-value']);
     $commit = 'abcdef0123456789abcdef0123456789abcdef01';
 
     $snapshot = [];
@@ -253,7 +260,7 @@ it('parses the application compose exactly as recorded', function (array $option
     'application with exact traefik labels' => [['proxy' => 'TRAEFIK', 'server' => ['generate_exact_labels' => true]], 'application-with-exact-traefik-labels'],
     'application with exact caddy labels' => [['proxy' => 'CADDY', 'server' => ['generate_exact_labels' => true]], 'application-with-exact-caddy-labels'],
     'application with settings' => [[
-        'server' => ['is_logdrain_custom_enabled' => true],
+        'server' => ['logdrain_type' => 'custom'],
         'settings' => ['is_gzip_enabled' => false, 'is_stripprefix_enabled' => false, 'is_container_label_escape_enabled' => false, 'is_log_drain_enabled' => true, 'connect_to_docker_network' => true],
     ], 'application-with-settings'],
 ]);
@@ -320,7 +327,7 @@ function serviceParserReferenceCases(): array
         'reference with exact traefik labels' => [$reference, null, ['proxy' => 'TRAEFIK', 'server' => ['generate_exact_labels' => true]]],
         'reference with exact caddy labels' => [$reference, null, ['proxy' => 'CADDY', 'server' => ['generate_exact_labels' => true, 'is_traffic_analytics_enabled' => true]]],
         'reference with application settings' => [$reference, null, [
-            'server' => ['is_logdrain_custom_enabled' => true],
+            'server' => ['logdrain_type' => 'custom'],
             'applications' => [
                 'web' => ['is_gzip_enabled' => false, 'is_force_https_enabled' => false, 'redirect' => 'www', 'noindex' => true, 'is_log_drain_enabled' => true],
                 'api' => ['is_stripprefix_enabled' => false],

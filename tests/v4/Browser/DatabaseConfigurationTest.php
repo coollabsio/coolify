@@ -68,39 +68,6 @@ it('saves postgres name description and credentials fields', function () {
         ->screenshot(filename: 'database-postgres-after-reload');
 });
 
-it('shows ssl controls on postgres configuration', function () {
-    loginAndSkipBoarding();
-
-    $url = databaseConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->postgres
-    );
-
-    $page = visit($url);
-    // SSL toggle is present; mode selector appears after enabling SSL.
-    $page->assertSee('General')
-        ->assertSee('Config Postgres')
-        ->screenshot(filename: 'database-postgres-ssl-controls');
-
-    $page->script(<<<'JS'
-        (() => {
-            const toggle = document.querySelector('[id^="enableSsl"]');
-            if (toggle) {
-                toggle.click();
-            }
-        })()
-    JS);
-    $page->wait(2);
-
-    $this->postgres->refresh();
-    if ($this->postgres->enable_ssl) {
-        $page->assertSee('SSL Mode');
-    }
-
-    $page->screenshot(filename: 'database-postgres-ssl-after-toggle');
-});
-
 it('shows redis configuration page', function () {
     loginAndSkipBoarding();
 

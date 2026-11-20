@@ -56,7 +56,7 @@ class ScheduledBackups extends Component
     public function delete($scheduled_backup_id): void
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
 
             $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
             $backup->delete();

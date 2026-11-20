@@ -87,11 +87,6 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
     }
 
-    public function get_last_days_backup_status($days = 7)
-    {
-        return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
-    }
-
     public function executionsPaginated(int $skip = 0, int $take = 10)
     {
         $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->with('s3Replicas.s3')->orderBy('created_at', 'desc');

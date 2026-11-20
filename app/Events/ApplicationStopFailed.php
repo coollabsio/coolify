@@ -24,4 +24,18 @@ class ApplicationStopFailed implements ShouldBroadcastNow
     {
         return [new PrivateChannel("team.{$this->teamId}")];
     }
+
+    /**
+     * The team channel also reaches members without access to the application, so only Coolify can read the data.
+     *
+     * @return array{payload: string}
+     */
+    public function broadcastWith(): array
+    {
+        return ['payload' => encrypt([
+            'teamId' => $this->teamId,
+            'applicationUuid' => $this->applicationUuid,
+            'message' => $this->message,
+        ])];
+    }
 }

@@ -6,29 +6,13 @@ use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
-use App\Rules\ValidFluentBitConfig;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class ServerLogDrainsController extends Controller
 {
-    private const ALLOWED_FIELDS = [
-        'is_logdrain_newrelic_enabled',
-        'logdrain_newrelic_license_key',
-        'logdrain_newrelic_base_uri',
-        'is_logdrain_axiom_enabled',
-        'logdrain_axiom_dataset_name',
-        'logdrain_axiom_api_key',
-        'is_logdrain_custom_enabled',
-        'logdrain_custom_config',
-        'logdrain_custom_config_parser',
-        'is_logdrain_cloudwatch_enabled',
-        'logdrain_cloudwatch_region',
-        'logdrain_cloudwatch_group',
-        'logdrain_cloudwatch_stream_prefix',
-    ];
-
     private function findServerForTeam(int $teamId, string $uuid): ?Server
     {
         return Server::whereTeamId($teamId)->whereUuid($uuid)->first();
@@ -41,27 +25,7 @@ class ServerLogDrainsController extends Controller
 
     private function transform(Server $server): array
     {
-        $settings = $server->settings;
-        $payload = [
-            'is_logdrain_newrelic_enabled' => (bool) $settings->is_logdrain_newrelic_enabled,
-            'logdrain_newrelic_base_uri' => $settings->logdrain_newrelic_base_uri,
-            'is_logdrain_axiom_enabled' => (bool) $settings->is_logdrain_axiom_enabled,
-            'logdrain_axiom_dataset_name' => $settings->logdrain_axiom_dataset_name,
-            'is_logdrain_custom_enabled' => (bool) $settings->is_logdrain_custom_enabled,
-            'is_logdrain_cloudwatch_enabled' => (bool) $settings->is_logdrain_cloudwatch_enabled,
-            'logdrain_cloudwatch_region' => $settings->logdrain_cloudwatch_region,
-            'logdrain_cloudwatch_group' => $settings->logdrain_cloudwatch_group,
-            'logdrain_cloudwatch_stream_prefix' => $settings->logdrain_cloudwatch_stream_prefix,
-        ];
-
-        if ($this->canReadSensitive()) {
-            $payload['logdrain_newrelic_license_key'] = $settings->logdrain_newrelic_license_key;
-            $payload['logdrain_axiom_api_key'] = $settings->logdrain_axiom_api_key;
-            $payload['logdrain_custom_config'] = $settings->logdrain_custom_config;
-            $payload['logdrain_custom_config_parser'] = $settings->logdrain_custom_config_parser;
-        }
-
-        return $payload;
+        return LegacyLogDrainFields::fromSettings($server->settings, $this->canReadSensitive());
     }
 
     #[OA\Get(
@@ -85,6 +49,7 @@ class ServerLogDrainsController extends Controller
                         new OA\Property(property: 'logdrain_newrelic_base_uri', type: 'string', nullable: true),
                         new OA\Property(property: 'is_logdrain_axiom_enabled', type: 'boolean'),
                         new OA\Property(property: 'logdrain_axiom_dataset_name', type: 'string', nullable: true),
+                        new OA\Property(property: 'logdrain_axiom_domain', type: 'string', nullable: true),
                         new OA\Property(property: 'logdrain_axiom_api_key', type: 'string', description: 'Only present with read:sensitive.'),
                         new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                         new OA\Property(property: 'logdrain_custom_config', type: 'string', description: 'Only present with read:sensitive.'),
@@ -121,7 +86,7 @@ class ServerLogDrainsController extends Controller
 
     #[OA\Patch(
         summary: 'Update log drain settings',
-        description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
+        description: 'Update New Relic, Axiom, Amazon CloudWatch Logs, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.',
         path: '/servers/{uuid}/log-drains',
         operationId: 'update-server-log-drains',
         security: [['bearerAuth' => []]],
@@ -138,6 +103,7 @@ class ServerLogDrainsController extends Controller
                     new OA\Property(property: 'logdrain_newrelic_base_uri', type: 'string'),
                     new OA\Property(property: 'is_logdrain_axiom_enabled', type: 'boolean'),
                     new OA\Property(property: 'logdrain_axiom_dataset_name', type: 'string'),
+                    new OA\Property(property: 'logdrain_axiom_domain', type: 'string', description: 'Base domain of the Axiom edge deployment. Default: us-east-1.aws.edge.axiom.co. Use eu-central-1.aws.edge.axiom.co for EU datasets.'),
                     new OA\Property(property: 'logdrain_axiom_api_key', type: 'string'),
                     new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                     new OA\Property(property: 'logdrain_custom_config', type: 'string'),
@@ -178,23 +144,14 @@ class ServerLogDrainsController extends Controller
 
         $this->authorize('update', $server);
 
-        $validator = customApiValidator($request->all(), [
-            'is_logdrain_newrelic_enabled' => 'boolean',
-            'logdrain_newrelic_license_key' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
-            'logdrain_newrelic_base_uri' => 'nullable|url',
-            'is_logdrain_axiom_enabled' => 'boolean',
-            'logdrain_axiom_dataset_name' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
-            'logdrain_axiom_api_key' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
-            'is_logdrain_custom_enabled' => 'boolean',
-            'logdrain_custom_config' => ['nullable', 'string', new ValidFluentBitConfig],
-            'logdrain_custom_config_parser' => ['nullable', 'string', new ValidFluentBitConfig(parsersOnly: true)],
-            'is_logdrain_cloudwatch_enabled' => 'boolean',
-            'logdrain_cloudwatch_region' => ['nullable', 'string', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'],
-            'logdrain_cloudwatch_group' => ['nullable', 'string', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
-            'logdrain_cloudwatch_stream_prefix' => ['nullable', 'string', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
-        ]);
+        $allowedFields = [...array_keys(LegacyLogDrainFields::FLAGS), ...array_keys(LegacyLogDrainFields::FIELDS)];
+        $rules = array_map(fn () => 'boolean', LegacyLogDrainFields::FLAGS);
+        foreach (array_keys(LegacyLogDrainFields::FIELDS) as $name) {
+            $rules[$name] = ['nullable', ...LegacyLogDrainFields::field($name)['rules']];
+        }
+        $validator = customApiValidator($request->all(), $rules);
 
-        $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             foreach ($extraFields as $field) {
@@ -209,67 +166,68 @@ class ServerLogDrainsController extends Controller
 
         $settings = $server->settings;
 
-        foreach (self::ALLOWED_FIELDS as $field) {
-            if ($request->has($field)) {
-                $settings->{$field} = $request->input($field);
+        $config = $settings->logdrain_config ?? [];
+        foreach (LegacyLogDrainFields::FIELDS as $name => [$type, $key]) {
+            if (! $request->has($name)) {
+                continue;
+            }
+            $value = $request->input($name);
+            if (filled($value)) {
+                $config[$type->value][$key] = $value;
+            } else {
+                unset($config[$type->value][$key]);
             }
         }
+        $config = array_filter($config);
 
-        // Conditional required fields when enabling a drain type (matches Livewire).
-        if ($settings->is_logdrain_newrelic_enabled) {
-            $errors = [];
-            if (blank($settings->logdrain_newrelic_license_key)) {
-                $errors['logdrain_newrelic_license_key'] = ['The New Relic license key is required when New Relic log drain is enabled.'];
+        $type = $settings->logdrain_type;
+        $enabledTypes = [];
+        foreach (LegacyLogDrainFields::FLAGS as $flag => $flagType) {
+            if (! $request->has($flag)) {
+                continue;
             }
-            if (blank($settings->logdrain_newrelic_base_uri)) {
-                $errors['logdrain_newrelic_base_uri'] = ['The New Relic base URI is required when New Relic log drain is enabled.'];
-            }
-            if ($errors !== []) {
-                return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
-            }
-        }
-        if ($settings->is_logdrain_axiom_enabled) {
-            $errors = [];
-            if (blank($settings->logdrain_axiom_dataset_name)) {
-                $errors['logdrain_axiom_dataset_name'] = ['The Axiom dataset name is required when Axiom log drain is enabled.'];
-            }
-            if (blank($settings->logdrain_axiom_api_key)) {
-                $errors['logdrain_axiom_api_key'] = ['The Axiom API key is required when Axiom log drain is enabled.'];
-            }
-            if ($errors !== []) {
-                return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+            if ($request->boolean($flag)) {
+                $enabledTypes[$flag] = $flagType;
+            } elseif ($type === $flagType) {
+                $type = null;
             }
         }
-        if ($settings->is_logdrain_custom_enabled && blank($settings->logdrain_custom_config)) {
+        if (count($enabledTypes) > 1) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => [
-                    'logdrain_custom_config' => ['The custom log drain config is required when custom log drain is enabled.'],
-                ],
+                'errors' => array_map(fn () => ['Only one log drain can be enabled at a time.'], $enabledTypes),
             ], 422);
         }
-
-        if ($settings->is_logdrain_cloudwatch_enabled) {
-            if ($settings->is_logdrain_newrelic_enabled || $settings->is_logdrain_axiom_enabled || $settings->is_logdrain_custom_enabled || $settings->is_logdrain_highlight_enabled) {
+        if ($enabledTypes !== []) {
+            $flag = array_key_first($enabledTypes);
+            $enabledType = $enabledTypes[$flag];
+            if ($type !== null && $type !== $enabledType) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
-                        'is_logdrain_cloudwatch_enabled' => ['Amazon CloudWatch Logs cannot be enabled together with another log drain.'],
+                        $flag => ["{$enabledType->label()} cannot be enabled together with another log drain."],
                     ],
                 ], 422);
             }
+            $type = $enabledType;
+        }
+
+        // The fields of the enabled drain must be set (matches Livewire).
+        if ($type !== null) {
             $errors = [];
-            if (blank($settings->logdrain_cloudwatch_region)) {
-                $errors['logdrain_cloudwatch_region'] = ['The CloudWatch region is required when Amazon CloudWatch Logs is enabled.'];
-            }
-            if (blank($settings->logdrain_cloudwatch_group)) {
-                $errors['logdrain_cloudwatch_group'] = ['The CloudWatch log group is required when Amazon CloudWatch Logs is enabled.'];
+            foreach (LegacyLogDrainFields::FIELDS as $name => [$fieldType, $key]) {
+                $field = LegacyLogDrainFields::field($name);
+                if ($fieldType === $type && ($field['required'] ?? false) && blank($config[$type->value][$key] ?? null)) {
+                    $errors[$name] = ["{$field['label']} is required when the {$type->label()} log drain is enabled."];
+                }
             }
             if ($errors !== []) {
                 return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
             }
         }
 
+        $settings->logdrain_type = $type;
+        $settings->logdrain_config = $config === [] ? null : $config;
         $settings->save();
         $server->refresh();
 
@@ -286,7 +244,7 @@ class ServerLogDrainsController extends Controller
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
-            'changed_fields' => array_values(array_intersect(self::ALLOWED_FIELDS, array_keys($request->all()))),
+            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
         ]);
 
         return response()->json($this->transform($server));

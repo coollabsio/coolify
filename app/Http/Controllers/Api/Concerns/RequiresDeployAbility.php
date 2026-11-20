@@ -17,12 +17,17 @@ trait RequiresDeployAbility
      */
     private function deployAbilityForbiddenResponse(Request $request, string $reason): ?JsonResponse
     {
-        if ($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root')) {
+        if ($this->hasDeployAbility($request)) {
             return null;
         }
 
         return response()->json([
             'message' => "Missing required permissions: deploy. {$reason}",
         ], 403);
+    }
+
+    private function hasDeployAbility(Request $request): bool
+    {
+        return $request->user()->tokenCan('deploy') || $request->user()->tokenCan('root');
     }
 }

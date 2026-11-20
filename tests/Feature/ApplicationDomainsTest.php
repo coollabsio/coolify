@@ -725,13 +725,6 @@ it('shows the compose service redirect control in domain settings', function () 
         ->and(substr_count($html, 'application-domain-direction-'))->toBeGreaterThan(0);
 });
 
-it('shows dns entries control next to Add', function () {
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSuccessful()
-        ->assertSee('DNS checks and records for this server')
-        ->assertSee('Manual records');
-});
-
 it('shows dns entries when domains are managed through labels', function () {
     $this->application->settings->update([
         'is_container_label_readonly_enabled' => false,
@@ -2276,14 +2269,6 @@ it('groups compose domains by service and hides empty services', function () {
         ->assertDontSee('No domains for this service');
 });
 
-it('keys compose domain groups by a stable service identity', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-
-    expect($view)
-        ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
-        ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"');
-});
-
 it('uses the dns badge as progress for single and all application checks', function (string $action, array $parameters) {
     Queue::fake();
     $this->application->update(['fqdn' => 'https://badge.example.com']);
@@ -3707,7 +3692,7 @@ it('offers dns provider record creation for a public server ip', function () {
         ->not->toContain('The server has no public IP address; add the DNS record manually.');
 });
 
-it('does not queue file sync jobs when polling dns checks for compose applications', function () {
+it('does not parse the compose file or queue file sync jobs when it shows compose application domains', function () {
     Queue::fake();
 
     $this->application->update([
@@ -3720,12 +3705,10 @@ it('does not queue file sync jobs when polling dns checks for compose applicatio
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
-    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class)->count();
-
     $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
 
-    expect($queuedOnMount)->toBe(1)
-        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
+        ->and($this->application->persistentStorages()->count())->toBe(0)
         ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
 

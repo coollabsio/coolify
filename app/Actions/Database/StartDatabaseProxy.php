@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -13,6 +14,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Notifications\Container\ContainerRestarted;
+use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
@@ -21,12 +23,33 @@ class StartDatabaseProxy
 {
     use AsAction;
 
+    /**
+     * Version of the generated proxy configuration. Raise it when the configuration changes, so the
+     * status checks recreate proxies that an older Coolify version started with the old configuration.
+     */
+    public const CONFIG_VERSION = '2';
+
+    public const CONFIG_VERSION_LABEL = 'coolify.databaseProxyConfigVersion';
+
+    /**
+     * True when a running proxy has an older configuration and no recreation was claimed in the last
+     * ten minutes. The claim stops a busy queue from recreating the proxy again before the first run.
+     */
+    public static function claimOutdatedRefresh(string $databaseUuid, mixed $labels): bool
+    {
+        if ((string) collect($labels)->get(self::CONFIG_VERSION_LABEL) === self::CONFIG_VERSION) {
+            return false;
+        }
+
+        return Cache::add("database-proxy-refresh:{$databaseUuid}", true, now()->addMinutes(10));
+    }
+
     public function configureJob(JobDecorator $job): void
     {
         $job->onQueue(deployment_queue());
     }
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
@@ -46,6 +69,7 @@ class StartDatabaseProxy
             'standalone-postgresql', 'standalone-supabase/postgres' => 5432,
             'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
+            'standalone-influxdb' => 8086,
             'standalone-mongodb' => 27017,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };
@@ -85,6 +109,9 @@ class StartDatabaseProxy
                     'image' => 'nginx:stable-alpine',
                     'container_name' => $proxyContainerName,
                     'restart' => RESTART_MODE,
+                    'labels' => [
+                        self::CONFIG_VERSION_LABEL => self::CONFIG_VERSION,
+                    ],
                     'ports' => [
                         "$database->public_port:$database->public_port",
                     ],
@@ -120,7 +147,6 @@ class StartDatabaseProxy
         ];
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
-        instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
 
         try {
             instant_remote_process([
@@ -129,6 +155,8 @@ class StartDatabaseProxy
                 "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
                 // Pass -f so Compose uses only the file that Coolify wrote.
                 "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml pull",
+                // Remove the old proxy only after the pull, so a failed pull keeps it running.
+                dockerRemoveCommand($proxyContainerName),
                 "docker compose --project-directory {$configuration_dir} -f {$configuration_dir}/docker-compose.yaml up -d",
             ], $server);
         } catch (\RuntimeException $e) {

@@ -6,6 +6,8 @@ use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
@@ -44,7 +46,7 @@ beforeEach(function () {
 function fakeVolumeCloneServer(?array $sourceVolume): void
 {
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'docker volume inspect')
+        output: str_contains(remoteProcessScript($process), 'docker volume inspect')
             ? json_encode($sourceVolume === null ? [] : [$sourceVolume])
             : '',
     ));
@@ -54,7 +56,7 @@ function volumeCloneCommands(): string
 {
     $commands = [];
     Process::assertRan(function ($process) use (&$commands) {
-        $commands[] = $process->command;
+        $commands[] = remoteProcessScript($process);
 
         return true;
     });
@@ -191,4 +193,33 @@ test('a non-root server runs the volume create as one sudo shell script', functi
     $inner = "docker volume create --opt 'type=cifs' --opt 'o=password=a&&b|c \$(x)' 'clone-target'";
     expect(volumeCloneCommands())->toContain('sudo sh -c '.escapeshellarg($inner))
         ->and(volumeCloneCommands())->toContain('sudo docker volume inspect');
+});
+
+test('a service clone creates the target volume with the Compose labels of the service project', function () {
+    $service = Service::factory()->create();
+    $serviceApplication = ServiceApplication::create(['name' => 'gitea', 'service_id' => $service->id]);
+    $this->volume->update(['resource_type' => ServiceApplication::class, 'resource_id' => $serviceApplication->id]);
+    fakeVolumeCloneServer(['Name' => 'clone-source', 'Driver' => 'local', 'Options' => null]);
+
+    (new VolumeCloneJob('clone-source', 'clone-target', $this->server, $this->server, $this->volume->fresh()))->handle();
+
+    expect(volumeCloneCommands())->toContain(escapeshellarg(
+        "docker volume create --label 'com.docker.compose.project={$service->uuid}' --label 'com.docker.compose.volume=clone-target' 'clone-target'"
+    ));
+});
+
+test('an application clone creates the target volume with the Compose labels of the application project', function () {
+    $application = Application::factory()->create();
+    $this->volume->update(['resource_type' => Application::class, 'resource_id' => $application->id]);
+    fakeVolumeCloneServer([
+        'Name' => 'clone-source',
+        'Driver' => 'local',
+        'Options' => ['type' => 'none', 'o' => 'bind', 'device' => '/srv/app-data'],
+    ]);
+
+    (new VolumeCloneJob('clone-source', 'clone-target', $this->server, $this->server, $this->volume->fresh()))->handle();
+
+    expect(volumeCloneCommands())->toContain(escapeshellarg(
+        "docker volume create --label 'com.docker.compose.project={$application->uuid}' --label 'com.docker.compose.volume=clone-target' 'clone-target'"
+    ));
 });

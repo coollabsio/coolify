@@ -38,8 +38,8 @@
                 icon-name="dashboard" />
         </x-application.settings-section>
     @else
-        @if ($live)
-            <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="loadData" class="hidden"></div>
+        @if ($this->pollSeconds())
+            <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
         @endif
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect recent CPU and memory usage reported by Sentinel.">
@@ -58,12 +58,12 @@
                 ]" />
             </div>
             <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                While live, ranges up to one hour refresh every five seconds. Longer ranges refresh every minute.
+                Ranges up to one hour refresh live every five seconds. Longer ranges load once; turn on live refresh to update them every minute.
             </p>
         </x-application.settings-section>
 
         <x-application.settings-section id="cpu-metrics-section" title="CPU usage"
-            helper="Percentage of available CPU capacity used by the application container.">
+            helper="CPU usage of the container, as in docker stats. 100% means one CPU core is fully busy, so a container that uses more than one core can go above 100%. The maximum is the number of cores × 100%.">
             <x-slot:actions>
                 <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
             </x-slot:actions>

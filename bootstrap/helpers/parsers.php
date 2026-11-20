@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ProxyTypes;
-use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\LocalFileVolume;
@@ -64,6 +63,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                 $e
             );
         }
+        validateComposeServiceName((string) $serviceName);
 
         // Validate volumes in this service (both string and array formats)
         if (isset($serviceConfig['volumes']) && is_array($serviceConfig['volumes'])) {
@@ -209,6 +209,24 @@ function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase
  *
  * @throws Exception If the source is missing or contains shell metacharacters
  */
+/**
+ * Coolify names each container "<service name>-<suffix>". Docker allows only container names
+ * that match [a-zA-Z0-9][a-zA-Z0-9_.-]+, and Docker Compose allows only service names that
+ * match [a-zA-Z0-9._-]+. Compose accepts a service name that starts with ".", "-", or "_",
+ * but Docker then refuses to create its container.
+ *
+ * @throws Exception If Docker cannot use the service name at the start of a container name
+ */
+function validateComposeServiceName(string $serviceName): void
+{
+    if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $serviceName) !== 1) {
+        throw new Exception(
+            "Service name \"{$serviceName}\" must start with a letter or a digit and contain only letters, digits, \".\", \"-\", and \"_\". ".
+            'Docker uses the same rule for container names, and Coolify uses the service name at the start of the container name.'
+        );
+    }
+}
+
 /**
  * Coolify sets container_name on every Compose service, and Docker Compose does not start more
  * than one container of a service that has a fixed container_name.
@@ -1151,13 +1169,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
+    $pullRequestPreview = $isPullRequest
+        ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+        : null;
+    // A public preview can run the compose file of a fork pull request. A preview from before v4.5.1 keeps the production values.
+    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled') && ! $pullRequestPreview?->keeps_production_values;
     $server = data_get($resource, 'destination.server');
     try {
         $yaml = parseDockerComposeYaml($compose);
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1201,6 +1227,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
         validateComposeServiceScale((string) $serviceName, $service);
 
         $magicEnvironments = collect([]);
@@ -1216,12 +1243,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // convert environment variables to one format
         $environment = convertToKeyValueCollection($environment);
 
-        // Add Coolify defined environments
-        $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
-
-        $allEnvironments = $allEnvironments->mapWithKeys(function ($item) {
-            return [$item['key'] => $item['value']];
-        });
         // filter and add magic environments
         foreach ($environment as $key => $value) {
             // Get all SERVICE_ variables from keys and values
@@ -1269,7 +1290,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $resource->save();
                 }
 
-                if (! $parsed['has_port']) {
+                // The stored variables belong to the main application; a preview deployment gets its own domains.
+                if (! $parsed['has_port'] && ! $isPullRequest) {
                     $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -1279,7 +1301,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 }
-                if ($parsed['has_port']) {
+                if ($parsed['has_port'] && ! $isPullRequest) {
 
                     $newKey = str($key)->beforeLast('_');
                     $resource->environment_variables()->updateOrCreate([
@@ -1375,45 +1397,48 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
                     }
 
-                    // ALWAYS create base SERVICE_FQDN variable (host only, no scheme)
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceNamePreserved}",
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $fqdnValueForEnv,
-                        'is_preview' => false,
-                    ]);
-
-                    // ALWAYS create base SERVICE_URL variable (with scheme)
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => "SERVICE_URL_{$serviceNamePreserved}",
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $url,
-                        'is_preview' => false,
-                    ]);
-
-                    // If port-specific, ALSO create port-specific pairs
-                    if ($parsed['has_port'] && $port) {
+                    // The stored variables belong to the main application; a preview deployment gets its own domains.
+                    if (! $isPullRequest) {
+                        // ALWAYS create base SERVICE_FQDN variable (host only, no scheme)
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => "SERVICE_FQDN_{$serviceNamePreserved}_{$port}",
+                            'key' => "SERVICE_FQDN_{$serviceNamePreserved}",
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'value' => $fqdnValueForEnvWithPort,
+                            'value' => $fqdnValueForEnv,
                             'is_preview' => false,
                         ]);
 
+                        // ALWAYS create base SERVICE_URL variable (with scheme)
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => "SERVICE_URL_{$serviceNamePreserved}_{$port}",
+                            'key' => "SERVICE_URL_{$serviceNamePreserved}",
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
-                            'value' => $urlWithPort,
+                            'value' => $url,
                             'is_preview' => false,
                         ]);
+
+                        // If port-specific, ALSO create port-specific pairs
+                        if ($parsed['has_port'] && $port) {
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => "SERVICE_FQDN_{$serviceNamePreserved}_{$port}",
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $fqdnValueForEnvWithPort,
+                                'is_preview' => false,
+                            ]);
+
+                            $resource->environment_variables()->firstOrCreate([
+                                'key' => "SERVICE_URL_{$serviceNamePreserved}_{$port}",
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $urlWithPort,
+                                'is_preview' => false,
+                            ]);
+                        }
                     }
 
                     if ($resource->build_pack === 'dockercompose') {
@@ -1437,6 +1462,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             }
                         }
                     }
+                } elseif ($isPullRequest) {
+                    // A preview deployment reads its preview variables, so a pull request parse generates the value there.
+                    $previewVariable = $resource->environment_variables_preview()->firstOrCreate([
+                        'key' => $key->value(),
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => generateEnvValue($command, $resource),
+                        'is_preview' => true,
+                    ]);
+                    // A public preview does not get the production secret; it gets its own value.
+                    if ($isPublicPullRequest && ! $previewVariable->wasRecentlyCreated
+                        && $previewVariable->value === $resource->environment_variables()->where('key', $key->value())->first()?->value) {
+                        $previewVariable->update(['value' => generateEnvValue($command, $resource)]);
+                    }
                 } else {
                     $value = generateEnvValue($command, $resource);
                     $resource->environment_variables()->firstOrCreate([
@@ -1451,6 +1491,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
     }
+
+    // A pull request parse keeps its magic variables in the preview variables (see above), not in the production variables.
+    $isPullRequestMagicVariable = fn (string $key): bool => $isPullRequest && $allMagicEnvironments->has($key);
 
     // generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = collect([]);
@@ -1584,6 +1627,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
+                        $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
                             ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
                             : true;
@@ -1599,7 +1644,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                     'resource_type' => get_class($originalResource),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => $storedSource,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
@@ -1680,7 +1725,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         ? ['name' => $name]
                         : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }
@@ -1763,8 +1807,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $networks_temp->put($key, $network);
                 }
             }
+            // A preview renames its services to "<name>-pr-<id>". The alias keeps the original name as a hostname
+            // on the preview network, so that services can still reach each other by their Compose names.
             foreach ($baseNetwork as $key => $network) {
-                $networks_temp->put($network, null);
+                $networks_temp->put($network, $isPullRequest ? ['aliases' => [(string) $serviceName]] : null);
             }
 
             if (data_get($resource, 'settings.connect_to_docker_network')) {
@@ -1863,15 +1909,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $isRequired = str_contains($operator, '?');
 
                             // Create the primary variable with its default (only if it doesn't exist)
-                            $envVar = $resource->environment_variables()->firstOrCreate([
-                                'key' => $varName,
-                                'resourceable_type' => get_class($resource),
-                                'resourceable_id' => $resource->id,
-                            ], [
-                                'value' => $isRequired ? null : $defaultValue,
-                                'is_preview' => false,
-                                'is_required' => $isRequired,
-                            ]);
+                            if (! $isPullRequestMagicVariable($varName)) {
+                                $envVar = $resource->environment_variables()->firstOrCreate([
+                                    'key' => $varName,
+                                    'resourceable_type' => get_class($resource),
+                                    'resourceable_id' => $resource->id,
+                                ], [
+                                    'value' => $isRequired ? null : $defaultValue,
+                                    'is_preview' => false,
+                                    'is_required' => $isRequired,
+                                ]);
+                            }
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
@@ -1887,7 +1935,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                     // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
                                     $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
 
-                                    if (! $isMagicVariable) {
+                                    if (! $isMagicVariable && ! $isPullRequestMagicVariable($nestedVarName)) {
                                         if ($nestedSplit !== null) {
                                             $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
                                                 'key' => $nestedSplit['variable'],
@@ -1918,14 +1966,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             // Simple variable reference without default
                             $parsedKeyValue = replaceVariables($value);
-                            $envVar = $resource->environment_variables()->firstOrCreate([
-                                'key' => $content,
-                                'resourceable_type' => get_class($resource),
-                                'resourceable_id' => $resource->id,
-                            ], [
-                                'is_preview' => false,
-                                'is_required' => $isRequired,
-                            ]);
+                            if (! $isPullRequestMagicVariable($content)) {
+                                $envVar = $resource->environment_variables()->firstOrCreate([
+                                    'key' => $content,
+                                    'resourceable_type' => get_class($resource),
+                                    'resourceable_id' => $resource->id,
+                                ], [
+                                    'is_preview' => false,
+                                    'is_required' => $isRequired,
+                                ]);
+                            }
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -1977,10 +2027,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
-        $branch = $originalResource->git_branch;
-        if ($pullRequestId !== 0) {
-            $branch = "pull/{$pullRequestId}/head";
-        }
+        $branch = $originalResource->coolifyBranch($pullRequestId);
         if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
             $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
         }
@@ -2012,7 +2059,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
                 $parsedDomain = composeDomainEntryString($domain);
-                $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
+                $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper()->value();
 
                 if (filled($parsedDomain)) {
                     $parsedDomain = str($parsedDomain)->explode(',')->first();
@@ -2020,42 +2067,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
                     $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
                     $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
                     // A preview uses its own domains; the stored variables belong to the main application.
                     if ($isPullRequest) {
                         continue;
                     }
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyUrl->__toString(),
-                        'is_preview' => false,
-                    ]);
-                    $resource->environment_variables()->updateOrCreate([
-                        'resourceable_type' => Application::class,
-                        'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.$serviceEnvKey,
-                    ], [
-                        'value' => $coolifyFqdn,
-                        'is_preview' => false,
-                    ]);
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, $coolifyUrl->__toString(), $coolifyFqdn);
                 } elseif (! $isPullRequest) {
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
-                    $resource->environment_variables()->where('resourceable_type', Application::class)
-                        ->where('resourceable_id', $resource->id)
-                        ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
-                        ->update([
-                            'value' => null,
-                        ]);
+                    syncComposeServiceUrlVariables($resource, $serviceEnvKey, null, null);
                 }
             }
         }
@@ -2108,7 +2128,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($environment->count() > 0) {
             $environment = $environment->filter(function ($value, $key) {
                 return ! str($key)->startsWith('SERVICE_FQDN_');
-            })->map(function ($value, $key) use ($resource, $isPullRequest) {
+            })->map(function ($value, $key) use ($resource, $isPullRequest, $isPublicPullRequest) {
+                $isValueFromDatabase = false;
                 // Preserve empty strings and null values with correct Docker Compose semantics:
                 // - Empty string: Variable is set to "" (e.g., HTTP_PROXY="" means "no proxy")
                 // - Null: Variable is unset/removed from container environment (may inherit from host)
@@ -2119,10 +2140,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } elseif ($value === '' && ! ($isPullRequest && str($key)->startsWith('SERVICE_URL_'))) {
                     // Empty string - allow database override for backward compatibility.
                     // The stored service URLs belong to the main application, so a preview does not use them.
-                    $dbEnv = $resource->environment_variables()->where('key', $key)->first();
+                    // A preview uses its preview variables, like ApplicationDeploymentJob does.
+                    $dbEnv = $isPullRequest
+                        ? $resource->environment_variables_preview()->where('key', $key)->first()
+                        : $resource->environment_variables()->where('key', $key)->first();
+                    // A public preview does not get preview variables that still have the production value.
+                    if ($dbEnv && $isPublicPullRequest && $resource->environment_variables()->where('key', $key)->first()?->value === $dbEnv->value) {
+                        $dbEnv = null;
+                    }
                     // Only use database override if it exists AND has a non-empty value
                     if ($dbEnv && str($dbEnv->value)->isNotEmpty()) {
                         $value = $dbEnv->value;
+                        $isValueFromDatabase = true;
                     }
                     // Otherwise keep empty string as-is
                 }
@@ -2130,7 +2159,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
                 // Without this, literal {{...}} strings end up in the compose environment: section,
                 // which takes precedence over the resolved values in the .env file (env_file:)
-                if (is_string($value) && str_contains($value, '{{')) {
+                // A public preview resolves them only in its own variables, not in the compose file of the pull request.
+                if (is_string($value) && str_contains($value, '{{') && ($isValueFromDatabase || ! $isPublicPullRequest)) {
                     $value = resolveSharedEnvironmentVariables($value, $resource);
                 }
 
@@ -2272,6 +2302,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
+        // A security update of this service, while the compose file still names the image it replaced.
+        if (($imageOverride = $resource->composeImageOverride((string) $serviceName, $image->isEmpty() ? null : $image->value())) !== null) {
+            $payload['image'] = $imageOverride;
+        }
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
@@ -2381,6 +2415,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     return $topLevel;
 }
 
+/**
+ * Marks the applications and databases of a service whose names are no longer in its compose file.
+ * They keep their settings, so a part that comes back under the same name is used again.
+ * The service status ignores marked parts, and the user can delete them.
+ *
+ * @param  array<string|int, mixed>|Collection<string|int, mixed>  $services
+ */
+function markServicePartsRemovedFromCompose(Service $resource, array|Collection $services): void
+{
+    $serviceNames = collect($services)->keys()->map(fn ($name): string => (string) $name)->all();
+    if ($serviceNames === []) {
+        return;
+    }
+
+    foreach ([$resource->applications(), $resource->databases()] as $parts) {
+        (clone $parts)->whereIn('name', $serviceNames)->where('is_removed_from_compose', true)
+            ->update(['is_removed_from_compose' => false]);
+        (clone $parts)->whereNotIn('name', $serviceNames)->where('is_removed_from_compose', false)
+            ->update(['is_removed_from_compose' => true]);
+    }
+}
+
 function serviceParser(Service $resource): Collection
 {
     $resource->resetComposeVolumeWarnings();
@@ -2402,7 +2458,10 @@ function serviceParser(Service $resource): Collection
     } catch (Exception) {
         return collect([]);
     }
-    $services = data_get($yaml, 'services', collect([]));
+    $services = data_get($yaml, 'services', []);
+    if (! is_array($services)) {
+        return collect([]);
+    }
 
     // Clean up corrupted environment variables from previous parser bugs
     // (keys starting with $ or ending with } should not exist as env var names)
@@ -2414,6 +2473,7 @@ function serviceParser(Service $resource): Collection
                 ->orWhere('key', 'LIKE', '%}');
         })
         ->delete();
+    $existingEnvironmentVariableKeys = $resource->environment_variables()->pluck('key');
 
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
@@ -2455,6 +2515,7 @@ function serviceParser(Service $resource): Collection
                 ' Service names must not contain shell metacharacters.'
             );
         }
+        validateComposeServiceName((string) $serviceName);
         validateComposeServiceScale((string) $serviceName, $service);
 
         $image = data_get_str($service, 'image');
@@ -2504,6 +2565,7 @@ function serviceParser(Service $resource): Collection
             $savedService->save();
         }
     }
+    markServicePartsRemovedFromCompose($resource, $services);
     foreach ($services as $serviceName => $service) {
         $predefinedPort = null;
         $magicEnvironments = collect([]);
@@ -3089,7 +3151,6 @@ function serviceParser(Service $resource): Collection
                     );
                     $topLevel->get('volumes')->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
         }
@@ -3664,6 +3725,7 @@ function serviceParser(Service $resource): Collection
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
 
+    fillDockerComposeDefaultsForBareReferences($resource, $existingEnvironmentVariableKeys);
     syncDockerComposeEnvironmentVariableRequiredState($resource);
 
     return $topLevel;

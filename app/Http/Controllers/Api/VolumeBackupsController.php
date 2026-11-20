@@ -289,6 +289,12 @@ class VolumeBackupsController extends Controller
         string $resourceType,
         Model $resource,
     ): JsonResponse {
+        $existing = $storage->scheduledBackups()->first();
+        $newStorageIds = $existing ? $existing->newS3StorageIds($s3Storages->pluck('id')) : $s3Storages->pluck('id');
+        if ($newStorageIds->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $resource);
+        }
+
         $attributes = [
             'team_id' => $teamId,
             'frequency' => $request->string('frequency')->toString(),
@@ -396,7 +402,7 @@ class VolumeBackupsController extends Controller
             return response()->json(['message' => 'Resource not found.'], 404);
         }
 
-        $this->authorize('update', $resource);
+        $this->authorize('delete', $resource);
 
         $storage = $this->findStorage($resource, $request->route('storage_uuid'));
         if (! $storage) {

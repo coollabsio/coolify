@@ -90,7 +90,7 @@ it('records a failed SQLite dump as failed and removes the partial backup file',
     ]);
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands->push($command);
 
         return str_contains($command, 'VACUUM INTO')

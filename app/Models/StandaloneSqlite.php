@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
 use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +20,7 @@ use InvalidArgumentException;
 
 class StandaloneSqlite extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     public const DATA_DIRECTORY = '/var/lib/sqlite';
 
@@ -56,6 +58,23 @@ class StandaloneSqlite extends BaseModel
         'health_check_timeout',
         'health_check_retries',
         'health_check_start_period',
+    ];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'custom_docker_run_options',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        ...self::CONFIGURATION_ATTRIBUTES,
     ];
 
     protected $appends = ['database_type', 'server_status'];

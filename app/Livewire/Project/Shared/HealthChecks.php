@@ -118,17 +118,18 @@ class HealthChecks extends Component
 
             $this->resource->save();
         } else {
-            // Sync from model
+            // Sync from model. The command and response text can embed credentials, so only users who can update the resource get them.
+            $canViewSecrets = auth()->user()?->can('update', $this->resource) ?? false;
             $this->healthCheckEnabled = $this->resource->health_check_enabled;
             $this->healthCheckType = $this->resource->health_check_type ?? 'http';
-            $this->healthCheckCommand = $this->resource->health_check_command;
+            $this->healthCheckCommand = $canViewSecrets ? $this->resource->health_check_command : null;
             $this->healthCheckMethod = $this->resource->health_check_method;
             $this->healthCheckScheme = $this->resource->health_check_scheme;
             $this->healthCheckHost = $this->resource->health_check_host;
             $this->healthCheckPort = $this->resource->health_check_port;
             $this->healthCheckPath = $this->resource->health_check_path;
             $this->healthCheckReturnCode = $this->resource->health_check_return_code;
-            $this->healthCheckResponseText = $this->resource->health_check_response_text;
+            $this->healthCheckResponseText = $canViewSecrets ? $this->resource->health_check_response_text : null;
             $this->healthCheckInterval = $this->resource->health_check_interval;
             $this->healthCheckTimeout = $this->resource->health_check_timeout;
             $this->healthCheckRetries = $this->resource->health_check_retries;

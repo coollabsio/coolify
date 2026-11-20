@@ -73,6 +73,14 @@ test('preserves quoted backup container and file arguments for a non-root server
     expect($result)->toBe(['sudo '.$command]);
 });
 
+test('does not add sudo to && and || inside a docker exec sh -c script', function () {
+    $command = "docker exec postgres sh -c '/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'docker exec postgres sh -c '\\''/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'\\'''");
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',
@@ -876,4 +884,15 @@ test('railpack builder helper command gets sudo only outside the helper script',
         .' if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi;'
         ." exit \$status' 2>/dev/null || sudo true"
     );
+});
+
+test('railpack builder bootstrap script gets no sudo inside the helper script', function () {
+    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af');
+
+    $parsed = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
+
+    expect($parsed)
+        ->toStartWith('sudo docker run --rm ')
+        ->toContain(railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af; status=$?;')
+        ->toEndWith("exit \$status' 2>/dev/null || sudo true");
 });
