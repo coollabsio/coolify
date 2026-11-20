@@ -3,5 +3,5 @@
     <x-forms.textarea canGate="update" :canResource="$server" allowTab useMonacoEditor
         monacoEditorLanguage="{{ $server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value ? 'yaml' : '' }}" id="value" label="Configuration"
         required rows="20" />
-    <x-forms.button canGate="update" :canResource="$server" type="submit" @click="slideOverOpen=false">Save</x-forms.button>
+    <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
 </form>

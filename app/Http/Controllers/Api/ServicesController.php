@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Exceptions\ComposeRejectedException;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
@@ -21,10 +22,12 @@ use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -46,7 +49,7 @@ class ServicesController extends Controller
 
     private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -65,7 +68,7 @@ class ServicesController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($service)) {
             $service->makeVisible([
                 'docker_compose_raw',
                 'docker_compose',
@@ -145,6 +148,33 @@ class ServicesController extends Controller
         $service->applications()->get()
             ->filter(fn (ServiceApplication $application): bool => isset($previousHostnames[$application->id]))
             ->each(fn (ServiceApplication $application) => $cleanup->queueReleaseOfRemovedHostnames($application, $previousHostnames[$application->id], $teamId));
+    }
+
+    /**
+     * Applies the urls of a service that the request creates. Rejected urls throw the error response, so the
+     * transaction of the creation rolls back and no part of the service stays.
+     *
+     * @throws HttpResponseException
+     */
+    private function applyNewServiceUrls(Service $service, Request $request, string $teamId): void
+    {
+        if (! $request->has('urls') || ! is_array($request->urls)) {
+            return;
+        }
+        $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+        if (isset($urlResult['errors'])) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $urlResult['errors'],
+            ], 422));
+        }
+        if (isset($urlResult['conflicts'])) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => $urlResult['conflicts'],
+                'warning' => $urlResult['warning'],
+            ], 409));
+        }
     }
 
     private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
@@ -557,58 +587,44 @@ class ServicesController extends Controller
                 if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK) || $request->boolean('connect_to_docker_network')) {
                     data_set($servicePayload, 'connect_to_docker_network', true);
                 }
-                $service = new Service($servicePayload);
-                $service->save();
-                $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
-                $service->description = $request->description;
-                if ($request->has('is_container_label_escape_enabled')) {
-                    $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
-                }
-                if ($request->has('redact_all_env_values_in_logs')) {
-                    $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
-                }
-                $service->save();
-                if ($oneClickDotEnvs?->count() > 0) {
-                    $oneClickDotEnvs->each(function ($value) use ($service) {
-                        $key = str()->before($value, '=');
-                        $value = str(str()->after($value, '='));
-                        $generatedValue = $value;
-                        if ($value->contains('SERVICE_')) {
-                            $command = $value->after('SERVICE_')->beforeLast('_');
-                            $generatedValue = generateEnvValue($command->value(), $service);
-                        }
-                        $service->environment_variables()->updateOrCreate(['key' => $key], [
-                            'value' => $generatedValue,
-                            'resourceable_id' => $service->id,
-                            'resourceable_type' => $service->getMorphClass(),
-                            'is_preview' => false,
-                        ]);
-                    });
-                }
-                $service->parse(isNew: true);
-
-                // Apply service-specific application prerequisites
-                applyServiceApplicationPrerequisites($service);
-
-                if ($request->has('urls') && is_array($request->urls)) {
-                    $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                    if ($urlResult !== null) {
-                        $service->delete();
-                        if (isset($urlResult['errors'])) {
-                            return response()->json([
-                                'message' => 'Validation failed.',
-                                'errors' => $urlResult['errors'],
-                            ], 422);
-                        }
-                        if (isset($urlResult['conflicts'])) {
-                            return response()->json([
-                                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                                'conflicts' => $urlResult['conflicts'],
-                                'warning' => $urlResult['warning'],
-                            ], 409);
-                        }
+                $service = DB::transaction(function () use ($servicePayload, $request, $oneClickServiceName, $oneClickDotEnvs, $teamId) {
+                    $service = new Service($servicePayload);
+                    $service->save();
+                    $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
+                    $service->description = $request->description;
+                    if ($request->has('is_container_label_escape_enabled')) {
+                        $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
                     }
-                }
+                    if ($request->has('redact_all_env_values_in_logs')) {
+                        $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
+                    }
+                    $service->save();
+                    if ($oneClickDotEnvs?->count() > 0) {
+                        $oneClickDotEnvs->each(function ($value) use ($service) {
+                            $key = str()->before($value, '=');
+                            $value = str(str()->after($value, '='));
+                            $generatedValue = $value;
+                            if ($value->contains('SERVICE_')) {
+                                $command = $value->after('SERVICE_')->beforeLast('_');
+                                $generatedValue = generateEnvValue($command->value(), $service);
+                            }
+                            $service->environment_variables()->updateOrCreate(['key' => $key], [
+                                'value' => $generatedValue,
+                                'resourceable_id' => $service->id,
+                                'resourceable_type' => $service->getMorphClass(),
+                                'is_preview' => false,
+                            ]);
+                        });
+                    }
+                    $service->parse(isNew: true);
+
+                    // Apply service-specific application prerequisites
+                    applyServiceApplicationPrerequisites($service);
+
+                    $this->applyNewServiceUrls($service, $request, $teamId);
+
+                    return $service;
+                });
 
                 if ($request->has('tags')) {
                     $this->attachTagsToResource($service, $request->tags, $teamId);
@@ -778,28 +794,20 @@ class ServicesController extends Controller
             if ($request->has('redact_all_env_values_in_logs')) {
                 $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
             }
-            $service->save();
-
-            $service->parse(isNew: true);
-
-            if ($request->has('urls') && is_array($request->urls)) {
-                $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                if ($urlResult !== null) {
-                    $service->delete();
-                    if (isset($urlResult['errors'])) {
-                        return response()->json([
-                            'message' => 'Validation failed.',
-                            'errors' => $urlResult['errors'],
-                        ], 422);
-                    }
-                    if (isset($urlResult['conflicts'])) {
-                        return response()->json([
-                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                            'conflicts' => $urlResult['conflicts'],
-                            'warning' => $urlResult['warning'],
-                        ], 409);
-                    }
-                }
+            try {
+                DB::transaction(function () use ($service, $request, $teamId) {
+                    $service->save();
+                    $service->parse(isNew: true);
+                    $service->ensureDockerComposeAccepted();
+                    $this->applyNewServiceUrls($service, $request, $teamId);
+                });
+            } catch (ComposeRejectedException $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
             }
 
             if ($request->has('tags')) {
@@ -1026,6 +1034,7 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_backups', in: 'query', required: false, description: 'Delete the database and storage backups, on the server and on S3.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1090,6 +1099,7 @@ class ServicesController extends Controller
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteBackups: $request->boolean('delete_backups', false),
         );
 
         auditLog('api.service.deleted', [
@@ -1338,9 +1348,23 @@ class ServicesController extends Controller
             $service->include_coolify_default_variables = $request->boolean('include_coolify_default_variables');
         }
         $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
-        $service->save();
-
-        $service->parse();
+        $isComposeChanged = $service->isDirty('docker_compose_raw');
+        try {
+            DB::transaction(function () use ($service, $isComposeChanged) {
+                $service->save();
+                $service->parse();
+                if ($isComposeChanged) {
+                    $service->ensureDockerComposeAccepted();
+                }
+            });
+        } catch (ComposeRejectedException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'docker_compose_raw' => $e->getMessage(),
+                ],
+            ], 422);
+        }
 
         $urlResult = null;
         if ($request->has('urls') && is_array($request->urls)) {
@@ -2115,7 +2139,7 @@ class ServicesController extends Controller
 
     #[OA\Post(
         summary: 'Start',
-        description: 'Start service.',
+        description: 'Start service. Pulls the latest images first.',
         path: '/services/{uuid}/start',
         operationId: 'start-service-by-uuid',
         security: [
@@ -2183,7 +2207,7 @@ class ServicesController extends Controller
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
-        StartService::dispatch($service);
+        StartService::dispatch($service, true);
 
         auditLog('api.service.deployed', [
             'team_id' => $teamId,

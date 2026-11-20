@@ -8,7 +8,7 @@
 
 services:
   maybe:
-    image: ghcr.io/maybe-finance/maybe:latest
+    image: ghcr.io/maybe-finance/maybe:0.6.0
     volumes:
       - app_storage:/rails/storage
     environment:
@@ -41,7 +41,7 @@ services:
       retries: 5
 
   worker:
-    image: ghcr.io/maybe-finance/maybe:latest
+    image: ghcr.io/maybe-finance/maybe:0.6.0
     command: bundle exec sidekiq
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}

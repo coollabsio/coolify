@@ -7,7 +7,7 @@
 
 services:
   vikunja:
-    image: vikunja/vikunja
+    image: vikunja/vikunja:2.8.0
     environment:
       - SERVICE_URL_VIKUNJA
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_URL_VIKUNJA
@@ -28,7 +28,7 @@ services:
       start_period: 15s
 
   init:
-    image: busybox
+    image: busybox:1.38.0
     restart: no
     volumes:
       - vikunja-files:/app/vikunja/files

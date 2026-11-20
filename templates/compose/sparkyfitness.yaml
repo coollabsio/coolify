@@ -7,7 +7,7 @@
 
 services:
   sparkyfitness-frontend:
-    image: 'codewithcj/sparkyfitness:v1.6.1'
+    image: 'codewithcj/sparkyfitness:v1.12.1'
     environment:
       - SERVICE_URL_SPARKYFITNESS_80
       - 'SPARKY_FITNESS_FRONTEND_URL=${SERVICE_URL_SPARKYFITNESS_80}'
@@ -17,7 +17,7 @@ services:
       - sparkyfitness-server
 
   sparkyfitness-server:
-    image: 'codewithcj/sparkyfitness_server:v1.6.1'
+    image: 'codewithcj/sparkyfitness_server:v1.12.1'
     environment:
       - 'SPARKY_FITNESS_LOG_LEVEL=${SPARKY_FITNESS_LOG_LEVEL:-info}'
       - 'NODE_ENV=${NODE_ENV:-production}'

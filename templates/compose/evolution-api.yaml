@@ -4,6 +4,7 @@
 # tags: evolution-api,evo-api,evolution,whatsapp,api,postgres,redis
 # logo: svgs/evolution-api.svg
 # port: 8080
+# outdated: true
 
 services:
   api:
@@ -151,7 +152,7 @@ services:
         condition: service_healthy
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     command: redis-server --port 6379 --appendonly yes
     volumes:
       - 'evolution_redis:/data'

@@ -83,6 +83,9 @@
                             <span>Executions</span>
                             <span class="text-right">Actions</span>
                         </div>
+                        @php
+                            $canManageBackups = auth()->user()?->can('manageBackups', $database) ?? false;
+                        @endphp
                         @foreach ($database->scheduledBackups as $backup)
                             @php
                                 $latestExecution = $backup->latest_log;
@@ -120,15 +123,15 @@
                                     <x-backup-s3-storage :enabled="$backup->save_s3" :names="$s3Storages->pluck('name')" :tooltip="$s3Tooltip" />
                                 </span>
                                 <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($latestStatus === 'running' ? 'Running now' : 'Never') }}</span>
-                                <span>{{ $backup->executions_count ?? $backup->executions()->count() }}</span>
+                                <span>{{ $backup->executions_count }}</span>
                                 <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
                                     <x-table.row-actions label="Backup schedule actions">
-                                        @can('manageBackups', $database)
+                                        @if ($canManageBackups)
                                             <x-table.row-action
                                                 :disabled="! str($database->status)->startsWith('running')"
                                                 :title="! str($database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
                                                 wire:click="backupNow('{{ $backup->uuid }}')">Back up now</x-table.row-action>
-                                        @endcan
+                                        @endif
                                         <x-table.row-action
                                             wire:click="openSchedule('{{ $backup->uuid }}')">Edit</x-table.row-action>
                                     </x-table.row-actions>

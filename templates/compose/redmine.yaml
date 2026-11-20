@@ -7,7 +7,7 @@
 
 services:
   redmine:
-    image: redmine:6-alpine
+    image: redmine:7-alpine
     environment:
       - SERVICE_FQDN_REDMINE_3000
       - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_REDMINE}

@@ -4,6 +4,7 @@
 # tags: websockets,open,source,messaging
 # logo: svgs/soketi.jpeg
 # port: 6001
+# outdated: true
 
 services:
   soketi:

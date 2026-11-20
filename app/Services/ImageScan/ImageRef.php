@@ -21,6 +21,14 @@ final class ImageRef implements Stringable
 
     public static function parse(string $ref): self
     {
+        // Docker reads `name:tag@digest` by its digest alone, so the tag only has to be valid.
+        if (preg_match('#\A([^@]+):([^:/@]+)(@[^@]+)\z#', $ref, $matches) === 1) {
+            if (! self::isValidTag($matches[2])) {
+                throw new InvalidArgumentException('Invalid image tag.');
+            }
+            $ref = $matches[1].$matches[3];
+        }
+
         $failed = $ref === '';
         (new DockerImageFormat)->validate('image', $ref, function () use (&$failed): void {
             $failed = true;

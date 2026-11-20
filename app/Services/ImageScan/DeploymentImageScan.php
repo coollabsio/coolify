@@ -147,15 +147,28 @@ final class DeploymentImageScan
             return;
         }
 
+        $pullError = null;
         if ($this->application->build_pack === 'dockerimage' && ! $this->startPinned) {
             $this->deployment->addLogEntry("Pulling image ({$imageRef}) to scan it before the start.");
-            ($this->run)([
-                serverDockerConfigPrefix($this->job('server')).'docker pull '.escapeshellarg($imageRef),
-                'hidden' => true,
-            ]);
+            try {
+                ($this->run)([
+                    serverDockerConfigPrefix($this->job('server')).'docker pull '.escapeshellarg($imageRef),
+                    'hidden' => true,
+                ]);
+            } catch (DeploymentException $e) {
+                $pullError = $e;
+            }
         }
 
         $image = $this->inspectImageForScan($imageRef);
+
+        // An image that is only on the server cannot be pulled; the gate scans the local image.
+        if ($pullError !== null) {
+            if ($image === null) {
+                throw $pullError;
+            }
+            $this->deployment->addLogEntry("Could not pull the image ({$imageRef}) from the registry. Scanning the image that is already on the server.", 'stderr');
+        }
 
         if ($image !== null && $this->job('rollback') && $this->imageRanBefore($image['id'])) {
             $this->deployment->addLogEntry('Rollback to an image that ran before. The image scan does not block it.');

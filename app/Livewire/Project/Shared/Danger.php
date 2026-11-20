@@ -31,6 +31,8 @@ class Danger extends Component
 
     public bool $delete_connected_networks = true;
 
+    public bool $delete_backups = false;
+
     public ?string $modalId = null;
 
     public string $resourceDomain = '';
@@ -111,6 +113,7 @@ class Danger extends Component
             $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
             $this->delete_configurations = in_array('delete_configurations', $selectedActions);
             $this->docker_cleanup = in_array('docker_cleanup', $selectedActions);
+            $this->delete_backups = in_array('delete_backups', $selectedActions);
         }
 
         try {
@@ -123,6 +126,7 @@ class Danger extends Component
                 $this->delete_connected_networks,
                 $this->delete_configurations,
                 $this->docker_cleanup,
+                deleteBackups: $this->delete_backups,
             );
 
             return redirectRoute($this, 'project.resource.index', [
@@ -167,9 +171,11 @@ class Danger extends Component
                 ['id' => 'delete_connected_networks', 'label' => __('resource.delete_connected_networks')],
                 ['id' => 'delete_configurations', 'label' => __('resource.delete_configurations')],
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
-                // ['id' => 'delete_associated_backups_locally', 'label' => 'All backups associated with this Ressource will be permanently deleted from local storage.'],
-                // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected S3 Storage.'],
-                // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this Ressource will be permanently deleted from the selected SFTP Storage.']
+                [
+                    'id' => 'delete_backups',
+                    'label' => __('resource.delete_backups'),
+                    'default_warning' => __('resource.keep_backups'),
+                ],
             ],
         ]);
     }

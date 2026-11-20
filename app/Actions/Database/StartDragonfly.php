@@ -106,7 +106,9 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword,
+                        ...($this->database->enable_ssl ? ['--tls', '--cacert', '/etc/dragonfly/certs/coolify-ca.crt', '--cert', '/etc/dragonfly/certs/server.crt', '--key', '/etc/dragonfly/certs/server.key'] : []),
+                        'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -190,7 +192,7 @@ class StartDragonfly
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";

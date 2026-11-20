@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -220,7 +221,17 @@ it('removes the preview containers, network, and volumes through the delete job 
     $commands = [];
     fakePreviewCleanupServer($commands, $this->previewNetwork, [], $previewContainer."\n".$mainContainer);
 
-    (new DeleteResourceJob($this->preview))->handle();
+    foreach (['config/app.conf' => true, 'shared.conf' => false] as $path => $hasSuffix) {
+        LocalFileVolume::create([
+            'fs_path' => $this->application->workdir().'/'.$path,
+            'mount_path' => '/etc/'.basename($path),
+            'is_preview_suffix_enabled' => $hasSuffix,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+    }
+
+    (new DeleteResourceJob($this->preview->fresh()))->handle();
 
     $all = implode("\n", $commands);
     $containerRemoval = collect($commands)->search(fn (string $command): bool => str_contains($command, "docker rm -f 'web-{$this->uuid}-pr-42'"));
@@ -231,6 +242,11 @@ it('removes the preview containers, network, and volumes through the delete job 
         ->and($containerRemoval)->toBeLessThan($networkRemoval)
         ->and($all)->not->toContain("docker rm -f 'web-{$this->uuid}'")
         ->and($all)->toContain("docker volume rm -f '{$this->uuid}_app-data-pr-42'")
+        ->and($all)->toContain('rm -rf '.escapeshellarg($this->application->workdir().'-pr-42'))
+        ->and($all)->toContain('rm -f '.escapeshellarg($this->application->workdir().'/docker-compose-pr-42.yaml'))
+        ->and($all)->toContain('rm -rf '.escapeshellarg($this->application->workdir().'/config/app.conf-pr-42'))
+        ->and($all)->not->toContain('rm -rf '.escapeshellarg($this->application->workdir().'/shared.conf'))
+        ->and($all)->not->toContain('rm -rf '.escapeshellarg($this->application->workdir())."\n")
         ->and(implode("\n", dockerResourceCommands($commands)))
         ->not->toContain("'coolify'")
         ->not->toContain("'shared-proxy'")

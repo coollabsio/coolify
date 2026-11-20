@@ -26,4 +26,16 @@ trait ValidatesPreviewDeploymentRepository
 
         return hash_equals($sourceRepository, $targetRepository) || $publicPreviewsEnabled;
     }
+
+    /**
+     * Only a branch in the repository itself deploys the Compose file of its pull request.
+     */
+    protected function isPreviewFromSameRepository(mixed $sourceRepository, mixed $targetRepository): bool
+    {
+        if (! is_scalar($sourceRepository) || ! is_scalar($targetRepository) || trim((string) $targetRepository) === '') {
+            return false;
+        }
+
+        return hash_equals(trim((string) $targetRepository), trim((string) $sourceRepository));
+    }
 }

@@ -70,10 +70,12 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
         'two_factor_recovery_codes',
         'two_factor_secret',
         'created_before_oauth_identities',
+        'created_by_invitation',
     ];
 
     protected $casts = [
         'created_before_oauth_identities' => 'boolean',
+        'created_by_invitation' => 'boolean',
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',

@@ -383,6 +383,17 @@ class SshMultiplexingHelper
         $timeout = max((int) config('constants.ssh.mux_health_check_timeout'), self::getConnectionTimeout($server));
         $process = self::runWithTimeout($healthCommand, $timeout);
 
+        // A master that refuses new sessions (sshd MaxSessions, often filled by remote commands that still run
+        // after their local ssh client was killed) prints a mux_client_ error, then ssh connects directly.
+        if ($process !== null && str_contains($process->errorOutput(), 'mux_client_')) {
+            Log::info('SSH mux master refused a new session, replacing it', [
+                'server_uuid' => $server->uuid,
+                'error' => trim($process->errorOutput()),
+            ]);
+
+            return false;
+        }
+
         return $process?->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
 

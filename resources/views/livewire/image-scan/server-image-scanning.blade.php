@@ -114,11 +114,11 @@
                         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <x-forms.listbox id="scannerSyftTimeout" label="Syft time limit" onChange="$commit"
                                 :disabled="$cannotUpdate"
-                                helper="Time to list the packages of one image. Large images need more time."
+                                helper="Time to export one local image from Docker, and time to list its packages. Large images and slow disks need more time."
                                 :options="$timeoutOptions" />
                             <x-forms.listbox id="scannerGrypeTimeout" label="Grype time limit" onChange="$commit"
                                 :disabled="$cannotUpdate"
-                                helper="Time to match the packages of one image with the vulnerability database."
+                                helper="Time to check the vulnerability database, and time to match the packages of one image with it. Slow disks need more time."
                                 :options="$timeoutOptions" />
                             <x-forms.listbox id="scannerCpus" label="Scanner CPU limit" onChange="$commit"
                                 :disabled="$cannotUpdate"

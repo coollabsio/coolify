@@ -1165,6 +1165,8 @@ paths:
           description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
+        '429':
+          description: 'GitHub API rate limit exceeded. The message tells when to try again.'
         '409':
           description: 'Domain conflicts detected.'
           content:
@@ -2903,6 +2905,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Application deleted.'
@@ -5268,6 +5278,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Database deleted.'
@@ -5490,7 +5508,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup configuration'
-      description: 'Deletes a backup configuration and all its executions.'
+      description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.'
       operationId: delete-backup-configuration-by-uuid
       parameters:
         -
@@ -6587,7 +6605,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup execution'
-      description: 'Deletes a specific backup execution.'
+      description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.'
       operationId: delete-backup-execution-by-uuid
       parameters:
         -
@@ -7708,13 +7726,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Application'
+                properties:
+                  count: { description: 'Total number of deployments of the application.', type: integer }
+                  deployments: { type: array, items: { $ref: '#/components/schemas/ApplicationDeploymentQueue' } }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -10129,6 +10150,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '503':
+          description: 'Database migrations are not finished yet.'
   /projects:
     get:
       tags:
@@ -13306,6 +13329,14 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: remove_resources_from_server
+          in: query
+          description: 'With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '403':
           description: 'The token needs the deploy permission to delete the resources or the cloud server.'
@@ -13407,6 +13438,14 @@ paths:
                   type: string
                   nullable: true
                   description: 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'
+                public_ipv4:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
+                public_ipv6:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
                 server_timezone:
                   type: string
                   description: 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'
@@ -14638,6 +14677,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -15153,7 +15200,7 @@ paths:
       tags:
         - Services
       summary: Start
-      description: 'Start service.'
+      description: 'Start service. Pulls the latest images first.'
       operationId: start-service-by-uuid
       parameters:
         -
@@ -18474,7 +18521,7 @@ components:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
     ApplicationDeploymentQueue:
-      description: 'Project model'
+      description: 'Application deployment model'
       properties:
         id:
           type: integer
@@ -18956,6 +19003,14 @@ components:
           type: string
           nullable: true
           description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
+        public_ipv4:
+          type: string
+          nullable: true
+          description: 'Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP.'
+        public_ipv6:
+          type: string
+          nullable: true
+          description: 'Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP.'
         is_reachable:
           type: boolean
         ssh_host_key:

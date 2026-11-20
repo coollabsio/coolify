@@ -187,7 +187,7 @@ class SharedVariableCanvasController extends Controller
         $user = $request->user();
         $token = $user->currentAccessToken();
 
-        return $user->isAdminOfTeam($this->canvas->teamId($scope, $owner))
+        return $user->can('update', $owner)
             && ($token->can('root') || $token->can('write'));
     }
 

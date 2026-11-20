@@ -51,7 +51,7 @@ class GetApplication extends Tool
         $application->makeVisible($visibleSensitiveKeys);
 
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($application->toArray(), $visibleSensitiveKeys),
+            redactLockedApiResourceValues($application, $this->scrubSensitive($application->toArray(), $visibleSensitiveKeys)),
             $this->actionsForApplication($uuid, $application->status),
         ), ['resource_uuid' => $uuid]);
     }

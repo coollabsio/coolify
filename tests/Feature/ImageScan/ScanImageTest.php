@@ -223,7 +223,7 @@ it('fails with the needed disk space when the server has too little', function (
     expect($scan->exists)->toBeTrue()
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::DiskSpace)
-        ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 21]);
+        ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 21, 'detail' => 'needed 22548578304 bytes, free 500000000000 and 5000000000 bytes']);
     Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'docker save'));
 });
 
@@ -245,6 +245,29 @@ it('fails with lock busy after the wait when another scan holds the server lock'
             'context' => ['server' => $this->server->name],
         ]);
     Process::assertNothingRan();
+});
+
+it('names the resource and the image in the error of an image reference that is not valid', function () {
+    scanImageTestFake();
+
+    $scan = ScanImage::run($this->server, $this->application, 'nginx:${NGINX_VERSION}');
+
+    expect($scan->status)->toBe(ImageScanStatus::Failed)
+        ->and($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
+        ->and($scan->error_context['detail'])->toBe("invalid image reference 'nginx:\${NGINX_VERSION}' of {$this->application->name}: Invalid image reference.");
+    Process::assertNothingRan();
+});
+
+it('scans an image that is pinned by tag and digest by its digest', function () {
+    scanImageTestFake();
+    $ref = 'postgres:15.0-alpine@'.SCAN_TEST_REPO_DIGEST;
+
+    $scan = ScanImage::run($this->server, $this->application, $ref);
+
+    expect($scan->status)->toBe(ImageScanStatus::Completed)
+        ->and($scan->error_code)->toBeNull()
+        ->and($scan->image_ref)->toBe($ref);
+    Process::assertRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), "docker image inspect --format '{{.Id}}' 'postgres@".SCAN_TEST_REPO_DIGEST."'"));
 });
 
 it('keeps the progress of another run of the resource and records no busy lock for it', function () {
@@ -474,6 +497,21 @@ it('fails with a timeout when grype is stopped by the server timeout, and still 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "-name 'tmp-*' -mmin +60"));
 });
 
+it('reads the database status within the Grype time limit and names the check when it times out', function () {
+    $this->server->settings->forceFill(['image_scan_grype_timeout' => 1200])->saveQuietly();
+    $this->server->load('settings');
+    scanImageTestFake(['db-status' => "coolify-scan-exit db-status 124 0\ncoolify-scan-payload\n"]);
+
+    $scan = scanImageTestRun();
+
+    expect($scan->status)->toBe(ImageScanStatus::Failed)
+        ->and($scan->error_code)->toBe(ImageScanErrorCode::Timeout)
+        ->and($scan->error_context['step'])->toBe('db-status');
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-status')
+        && str_contains(remoteProcessScript($process), 'timeout -k 10 1200 docker run ')
+        && $process->timeout === 1200 + 60);
+});
+
 it('fails with a timeout when `timeout` kills a scanner after its grace period', function (string $step, string $output) {
     // A kill by `timeout` exits with 137 right away, long before the SSH budget of the step, and Docker reports no OOM.
     scanImageTestFake([$step => $output]);
@@ -608,7 +646,7 @@ it('fails as unknown when the server returns no output', function () {
 
     expect($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::Unknown)
-        ->and($scan->error_context)->toBe(['server' => $this->server->name]);
+        ->and($scan->error_context)->toBe(['server' => $this->server->name, 'detail' => 'step grype did not report an exit code (the command did not run or the SSH connection failed), output: (no output)']);
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "-name 'tmp-*' -mmin +60"));
 });
 

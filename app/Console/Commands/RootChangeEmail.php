@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class RootChangeEmail extends Command
 {
@@ -24,19 +26,31 @@ class RootChangeEmail extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
-        //
-        $this->info('You are about to change the root user\'s email.');
-        $email = $this->ask('Give me a new email for root user');
-        $this->info('Updating root email...');
-        try {
-            User::find(0)->update(['email' => $email]);
-            $this->info('Root user\'s email updated successfully.');
-        } catch (\Exception $e) {
-            $this->error('Failed to update root user\'s email.');
+        $user = User::find(0);
+        if (! $user) {
+            $this->error('Root user not found. Create the root account in the browser first.');
 
-            return;
+            return self::FAILURE;
         }
+
+        $this->info('You are about to change the root user\'s email.');
+        $email = strtolower(trim((string) $this->ask('Give me a new email for root user')));
+
+        $validator = Validator::make(['email' => $email], [
+            'email' => ['required', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+        ]);
+        if ($validator->fails()) {
+            $this->error($validator->errors()->first('email'));
+
+            return self::FAILURE;
+        }
+
+        $this->info('Updating root email...');
+        $user->update(['email' => $email]);
+        $this->info('Root user\'s email updated successfully.');
+
+        return self::SUCCESS;
     }
 }

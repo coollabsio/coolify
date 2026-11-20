@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://chaskiq.io
 # slogan: Chaskiq is an messaging platform for marketing, support & sales
 # category: helpdesk
@@ -8,15 +9,16 @@
 services:
   chaskiq:
     image: chaskiq/chaskiq:latest
+    user: root
     environment:
       - SERVICE_URL_CHASKIQ_3000
       - REDIS_URL=redis://redis:6379/
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - SERVICE_URL=${SERVICE_URL_CHASKIQ}
-      - HOST=${SERVICE_URL_CHASKIQ_3000}
-      - ASSET_HOST=${SERVICE_URL_CHASKIQ_3000}
-      - WS=wss://${SERVICE_URL_CHASKIQ}/cable
+      - HOST=${SERVICE_URL_CHASKIQ}
+      - ASSET_HOST=${SERVICE_URL_CHASKIQ}
+      - WS=wss://${SERVICE_FQDN_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
@@ -55,21 +57,19 @@ services:
           #!/bin/sh
           set -e
           rm -f /usr/src/app/tmp/pids/server.pid
-          exec "$@"
           echo "Running database migrations..."
-          bundle exec rails db:setup || true
-          bundle exec rails db:migrate
+          bundle exec rails db:prepare
           echo "Finished running database migrations."
           echo "Running packages update..."
           bundle exec rails packages:update
           echo "Finished packages update."
-          if [ ! -f /usr/src/app/admin_generated ]; then
-              echo "/usr/src/app/admin_generated not found, executing admin generation.."
+          if [ ! -f /data/storage/admin_generated ]; then
+              echo "/data/storage/admin_generated not found, executing admin generation.."
               bundle exec rake admin_generator
-              touch /usr/src/app/admin_generated
+              touch /data/storage/admin_generated
               echo "Admin generation finished !"
           fi
-          bundle exec rails s -b 0.0.0.0 -p 3000
+          exec bundle exec rails s -b 0.0.0.0 -p 3000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
       interval: 5s
@@ -77,13 +77,14 @@ services:
       retries: 15
   sidekiq:
     image: chaskiq/chaskiq:latest
+    user: root
     environment:
       - REDIS_URL=redis://redis:6379/
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-chaskiq}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - HOST=${SERVICE_URL_CHASKIQ_3000}
-      - ASSET_HOST=${SERVICE_URL_CHASKIQ_3000}
-      - WS=wss://${SERVICE_URL_CHASKIQ}/cable
+      - HOST=${SERVICE_URL_CHASKIQ}
+      - ASSET_HOST=${SERVICE_URL_CHASKIQ}
+      - WS=wss://${SERVICE_FQDN_CHASKIQ}/cable
       - SNS_CONFIGURATION_SET=metrics
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}

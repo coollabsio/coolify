@@ -36,6 +36,8 @@ class ExecutionHistory extends Component
 
     public ?array $selectedExecution = null;
 
+    public bool $delete_backup_s3 = false;
+
     public function getListeners(): array
     {
         return [
@@ -94,6 +96,67 @@ class ExecutionHistory extends Component
         }
     }
 
+    /**
+     * Delete one execution with its local file and, when selected, its S3 copies.
+     *
+     * @param  array<int, string>  $selectedActions
+     */
+    public function deleteExecution(string $executionUuid, mixed $password, array $selectedActions = []): bool|string
+    {
+        $this->authorize('delete', $this->database);
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+        $execution = $this->executionQuery()->where('uuid', $executionUuid)->first();
+        abort_unless($execution, 404);
+
+        try {
+            if ($execution->filename && ! $execution->local_storage_deleted) {
+                $server = $execution->scheduledDatabaseBackup->server();
+                if (! $server) {
+                    throw new \RuntimeException('The backup server is unavailable.');
+                }
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
+            }
+            if (in_array('delete_backup_s3', $selectedActions, true)) {
+                $execution->deleteS3Copies();
+            }
+            $execution->delete();
+        } catch (\Throwable $e) {
+            $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+
+            return false;
+        } finally {
+            $this->delete_backup_s3 = false;
+        }
+
+        if ($this->selectedExecution && $this->selectedExecution['uuid'] === $executionUuid) {
+            $this->closeExecutionModal();
+        }
+        $this->dispatch('success', 'Backup deleted.');
+
+        return true;
+    }
+
+    public function cleanupFailed(): void
+    {
+        $this->authorize('delete', $this->database);
+        $this->executionsOfDatabase()->where('status', 'failed')->delete();
+        $this->dispatch('success', 'Failed backups cleaned up.');
+    }
+
+    public function cleanupDeleted(): void
+    {
+        $this->authorize('delete', $this->database);
+        $deletedCount = $this->executionsOfDatabase()->where('local_storage_deleted', true)->delete();
+        if ($deletedCount === 0) {
+            $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+
+            return;
+        }
+        $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
+    }
+
     public function closeExecutionModal(): void
     {
         $this->executionModalOpen = false;
@@ -120,9 +183,8 @@ class ExecutionHistory extends Component
     {
         [$column, $direction] = explode('_', $this->sortBy, 2);
 
-        return ScheduledDatabaseBackupExecution::query()
+        return $this->executionsOfDatabase()
             ->with(['scheduledDatabaseBackup', 's3Replicas.s3'])
-            ->whereIn('scheduled_database_backup_id', $this->database->scheduledBackups()->select('id'))
             ->when($column === 'schedule', fn ($query) => $query->orderBy(
                 ScheduledDatabaseBackup::query()->select('frequency')
                     ->whereColumn('scheduled_database_backups.id', 'scheduled_database_backup_executions.scheduled_database_backup_id'),
@@ -132,6 +194,12 @@ class ExecutionHistory extends Component
             ->when($column === 'size', fn ($query) => $query->orderByRaw("CAST(NULLIF(size, '') AS BIGINT) {$direction}"))
             ->orderBy('created_at', $column === 'started' ? $direction : 'desc')
             ->orderByDesc('id');
+    }
+
+    private function executionsOfDatabase(): Builder
+    {
+        return ScheduledDatabaseBackupExecution::query()
+            ->whereIn('scheduled_database_backup_id', $this->database->scheduledBackups()->select('id'));
     }
 
     private function formatExecution(ScheduledDatabaseBackupExecution $execution): array
@@ -155,6 +223,8 @@ class ExecutionHistory extends Component
             'size' => $execution->size,
             'message' => $execution->message,
             'filename' => $execution->filename,
+            'local_storage_deleted' => (bool) $execution->local_storage_deleted,
+            'has_live_s3_copies' => $execution->s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted),
             'download_url' => $execution->status === 'success' && $execution->isDownloadable()
                 ? route('download.backup', $execution->id)
                 : null,

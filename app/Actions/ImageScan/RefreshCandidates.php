@@ -660,7 +660,7 @@ class RefreshCandidates
                 return null;
             }
 
-            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', ScanImage::sbomStepTimeout($this->commands->server));
+            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', ScanImage::registrySbomStepTimeout($this->commands->server));
             $packages = $created !== null && $created['code'] === 0 ? $this->runStep($this->commands->packages($hex), 'packages', self::TIMEOUT_PACKAGES) : null;
             if ($packages === null || $packages['code'] !== 0) {
                 $this->error ??= 'scan';

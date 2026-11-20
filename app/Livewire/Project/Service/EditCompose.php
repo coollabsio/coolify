@@ -69,7 +69,7 @@ class EditCompose extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $isValid = validateComposeFile($this->dockerComposeRaw, $this->service->server_id);
+            $isValid = validateComposeFile((string) $this->dockerComposeRaw, $this->service->server, $this->service->workdir());
             if ($isValid !== 'OK') {
                 $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             } else {

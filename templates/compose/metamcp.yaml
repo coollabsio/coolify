@@ -4,6 +4,7 @@
 # category: mcp
 # logo: svgs/metamcp.png
 # port: 12008
+# outdated: true
 
 services:
   app:

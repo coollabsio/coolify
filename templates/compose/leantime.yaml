@@ -7,7 +7,7 @@
 
 services:
   leantime:
-    image: leantime/leantime:latest
+    image: leantime/leantime:3.15.0
     environment:
       - SERVICE_URL_LEANTIME_8080
       - LEAN_APP_URL=${SERVICE_URL_LEANTIME}

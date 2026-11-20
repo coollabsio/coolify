@@ -6,7 +6,7 @@
 
 services:
   ollama-api:
-    image: "ollama/ollama:latest"
+    image: "ollama/ollama:0.40.16"
     volumes:
       - "ollama:/root/.ollama"
     healthcheck:
@@ -16,7 +16,7 @@ services:
       retries: 10
 
   open-webui:
-    image: "ghcr.io/open-webui/open-webui:main"
+    image: "ghcr.io/open-webui/open-webui:v0.13.3"
     volumes:
       - "open-webui:/app/backend/data"
     depends_on:

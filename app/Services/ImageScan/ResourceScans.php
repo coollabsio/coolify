@@ -78,8 +78,8 @@ final class ResourceScans
 
     /**
      * The images Coolify scans for a resource without a deployment: each application and database of a service, or
-     * the resource itself (a standalone database), with its image. Owners excluded from the status and owners without
-     * an image are not scanned.
+     * the resource itself (a standalone database), with its image as configuredImage() resolves it. Owners excluded from
+     * the status and owners without an image are not scanned.
      *
      * @return list<array{0: Model, 1: string}>
      */
@@ -93,7 +93,7 @@ final class ResourceScans
 
         return $owners
             ->filter(fn (Model $owner): bool => self::isScanTarget($owner))
-            ->map(fn (Model $owner): array => [$owner, trim((string) $owner->getAttribute('image'))])
+            ->map(fn (Model $owner): array => [$owner, self::configuredImage($owner)])
             ->values()
             ->all();
     }

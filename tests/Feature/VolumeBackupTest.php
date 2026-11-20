@@ -1700,7 +1700,7 @@ it('deletes disabled volume backup archives before deleting their application', 
     ]);
     $application->delete();
 
-    (new DeleteResourceJob($application))->handle();
+    (new DeleteResourceJob($application, deleteBackups: true))->handle();
 
     expect($backup->fresh())->toBeNull()
         ->and($execution->fresh())->toBeNull();

@@ -67,3 +67,25 @@ it('does not open the setup window when a user exists', function () {
 
     expect(RootSetupWindow::isOpen())->toBeFalse();
 });
+
+it('shows the installer hint instead of the form for a predefined root user', function () {
+    config()->set('constants.seeder.is_root_user_predefined', true);
+    RootSetupWindow::openIfNoUserExists();
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+    $this->get('/register')
+        ->assertOk()
+        ->assertSee('Root user not created')
+        ->assertDontSee('Create account');
+});
+
+it('uses only the predefined root user when an older setup window is cached', function () {
+    RootSetupWindow::openIfNoUserExists();
+    config()->set('constants.seeder.is_root_user_predefined', true);
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+});

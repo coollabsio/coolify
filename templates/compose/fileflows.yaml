@@ -7,7 +7,7 @@
 
 services:
   fileflows:
-    image: revenz/fileflows
+    image: revenz/fileflows:26.10
     environment:
       - SERVICE_URL_FILEFLOWS_5000
       - _APP_URL=$SERVICE_URL_FILE_FLOWS

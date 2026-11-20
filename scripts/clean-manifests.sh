@@ -50,8 +50,12 @@ main() {
 }
 
 read_ghcr_versions() {
-	local page window=$((${LIMIT:-0} * 2))
-	list_ghcr_versions "state=active" --paginate > "$WORK_DIR/ghcr-active.tsv"
+	local page versions window=$((${LIMIT:-0} * 2))
+	for ((page = 1; ; page++)); do
+		versions="$(list_ghcr_versions "state=active&page=$page")"
+		[ -n "$versions" ] || break
+		printf '%s\n' "$versions"
+	done > "$WORK_DIR/ghcr-active.tsv"
 	for ((page = 1; page <= (window + 99) / 100; page++)); do
 		list_ghcr_versions "state=deleted&page=$page"
 	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
@@ -253,11 +257,16 @@ verify_kept_manifests() {
 }
 
 list_ghcr_versions() {
-	local query="$1"
-	shift
-	gh api "$@" "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$query" \
-		--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv' 2> /dev/null \
-		|| die "gh could not list the versions of ghcr.io/$IMAGE, its token needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
+	local attempt versions
+	for attempt in 1 2 3 4 5; do
+		if versions="$(gh api "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$1" \
+			--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv')"; then
+			[ -z "$versions" ] || printf '%s\n' "$versions"
+			return
+		fi
+		sleep $((attempt * 5))
+	done
+	die "gh could not list the versions of ghcr.io/$IMAGE"
 }
 
 request_manifests() {

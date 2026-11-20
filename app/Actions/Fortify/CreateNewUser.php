@@ -38,9 +38,11 @@ class CreateNewUser implements CreatesNewUsers
 
         if (! User::query()->exists() && ! RootSetupWindow::isOpen()) {
             throw ValidationException::withMessages([
-                'email' => RootSetupWindow::isPending()
-                    ? 'Coolify has not finished starting. Wait a few seconds, then try again.'
-                    : 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+                'email' => match (true) {
+                    RootSetupWindow::isReservedForPredefinedRootUser() => 'Coolify creates the root account from the ROOT_USER_* values in /data/coolify/source/.env, but it rejected them. Read the reason in docker logs coolify, then run the installer again with corrected values.',
+                    RootSetupWindow::isPending() => 'Coolify has not finished starting. Wait a few seconds, then try again.',
+                    default => 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+                },
             ]);
         }
 

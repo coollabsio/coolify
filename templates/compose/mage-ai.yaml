@@ -7,7 +7,7 @@
 
 services:
   mage-ai:
-    image: 'mageai/mageai:0.9.78'
+    image: 'mageai/mageai:0.9.80'
     command: 'mage start default_project'
     environment:
       - SERVICE_URL_MAGEAI_6789

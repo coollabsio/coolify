@@ -394,7 +394,7 @@ $serverListboxOptions = array_merge(
                     dataLabels: { enabled: false },
                     grid: { borderColor: 'rgba(128, 128, 128, 0.14)', strokeDashArray: 4 },
                     legend: { show: false },
-                    xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: axisColor } } },
+                    xaxis: { type: 'datetime', labels: { datetimeUTC: false, style: { colors: axisColor } } },
                     yaxis: { min: 0, max: max => max > 0 ? max * 1.2 : 1, forceNiceScale: true, tickAmount: 4, labels: { style: { colors: axisColor }, formatter } },
                     noData: { text: 'No data for this range', style: { color: axisColor } },
                     tooltip: { shared: true, intersect: false, marker: { show: false }, custom: customTooltip(formatter) },

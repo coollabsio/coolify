@@ -160,8 +160,11 @@ Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('p
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
-Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
-Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
+// The invitation link acts for the invited user, so the state of a logged-in user must not redirect it.
+Route::withoutMiddleware([CheckForcePasswordReset::class, DecideWhatToDoWithUser::class, RequireTeamTwoFactor::class])->group(function () {
+    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+    Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
+});
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
@@ -635,8 +638,8 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            if (! auth()->user()->can('manageBackups', $execution->scheduledDatabaseBackup->database)) {
+                return response()->json(['message' => 'You need write access on this database to download its backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -680,8 +683,9 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            $resource = $execution->scheduledVolumeBackup->targetResource();
+            if (is_null($resource) || ! auth()->user()->can('update', $resource)) {
+                return response()->json(['message' => 'You need write access on this resource to download its backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);

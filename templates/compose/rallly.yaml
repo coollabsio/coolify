@@ -23,7 +23,7 @@ services:
       retries: 15
 
   rallly:
-    image: lukevella/rallly:latest
+    image: lukevella/rallly:4.17.0
     platform: linux/amd64
     environment:
       - SERVICE_URL_RALLLY_3000

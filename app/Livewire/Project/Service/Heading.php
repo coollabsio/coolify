@@ -73,8 +73,9 @@ class Heading extends Component
         $this->checkDeployments();
         $this->dispatchIfResourceStatusesChanged();
 
-        if ($this->service->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->service->server);
+        $server = $this->service->server;
+        if ($server?->isFunctional()) {
+            GetContainersStatus::dispatch($server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }

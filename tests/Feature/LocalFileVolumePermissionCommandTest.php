@@ -70,3 +70,20 @@ test('file storage quotes owner and mode as single command arguments', function 
     Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "chown {$owner}")
         || str_contains(remoteProcessScript($process), "chmod {$mode}"));
 });
+
+test('file storage makes the file readable for every user, independent of the server umask', function () {
+    $volume = LocalFileVolume::create([
+        'fs_path' => './config/app.conf',
+        'mount_path' => '/etc/app.conf',
+        'content' => 'listen 8080;',
+        'is_directory' => false,
+        'resource_id' => $this->serviceApplication->id,
+        'resource_type' => $this->serviceApplication->getMorphClass(),
+    ])->fresh();
+
+    $volume->saveStorageOnServer();
+
+    $file = escapeshellarg($this->service->workdir().'/config/app.conf');
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\nchmod a+rx {$file}"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "chmod +x {$file}"));
+});

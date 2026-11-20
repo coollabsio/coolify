@@ -7,7 +7,7 @@
 
 services:
   unstructured:
-    image: "downloads.unstructured.io/unstructured-io/unstructured-api:latest"
+    image: "downloads.unstructured.io/unstructured-io/unstructured-api:0.1.16"
     environment:
       - SERVICE_URL_UNSTRUCTURED_8000
       - "UNSTRUCTURED_API_KEY=${SERVICE_PASSWORD_APIKEY}"

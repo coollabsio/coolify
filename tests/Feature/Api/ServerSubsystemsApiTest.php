@@ -243,7 +243,7 @@ describe('Log drains API', function () {
 
     test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
-        $this->server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name stdout"]);
+        $this->server->settings->update(['logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout"]);
         $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
@@ -252,7 +252,7 @@ describe('Log drains API', function () {
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
                 'is_logdrain_custom_enabled' => true,
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
@@ -268,11 +268,11 @@ describe('Log drains API', function () {
             'Accept' => 'application/json',
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[OUTPUT]\n    Name stdout");
+        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout");
     });
 
     test('PATCH enables the Amazon CloudWatch Logs drain', function () {

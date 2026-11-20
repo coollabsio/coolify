@@ -298,6 +298,46 @@ it('reports the exit code and explains a lost SSH connection when a command ends
         ->toContain('SSH connection to the server closed');
 });
 
+it('does not retry a command that exits with 255 and prints nothing, because the remote command can have run', function () {
+    config()->set('constants.ssh.max_retries', 3);
+    config()->set('constants.ssh.retry_base_delay', 0);
+    config()->set('constants.ssh.host_key_checking', 'off');
+    [$job] = makeSensitiveCommandFailureJob();
+
+    $runs = 0;
+    Process::fake(function () use (&$runs) {
+        $runs++;
+
+        return Process::result(exitCode: 255);
+    });
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command(['command' => 'docker exec app php artisan migrate']));
+
+    expect($runs)->toBe(1)
+        ->and($exception->getCode())->toBe(255)
+        ->and($exception->getMessage())->toContain('Command failed with no error output');
+});
+
+it('retries a command when ssh exits with 255 and reports a refused key exchange', function () {
+    config()->set('constants.ssh.max_retries', 3);
+    config()->set('constants.ssh.retry_base_delay', 0);
+    config()->set('constants.ssh.host_key_checking', 'off');
+    [$job] = makeSensitiveCommandFailureJob();
+
+    $runs = 0;
+    Process::fake(function () use (&$runs) {
+        $runs++;
+
+        return $runs === 1
+            ? Process::result(errorOutput: 'kex_exchange_identification: read: Connection reset by peer', exitCode: 255)
+            : Process::result(output: 'ok');
+    });
+
+    $job->execute_remote_command(['command' => 'echo ok']);
+
+    expect($runs)->toBe(2);
+});
+
 it('does not add the SSH connection hint to failures of the remote command', function () {
     [$job] = makeSensitiveCommandFailureJob();
 
@@ -425,16 +465,20 @@ it('starts the helper with its own DOCKER_CONFIG after build secret HOME and DOC
         ->and(strrpos($helperCommands[0], '-e DOCKER_CONFIG=/root/.docker'))->toBeGreaterThan(strpos($helperCommands[0], '/app/.docker'));
 });
 
-it('mounts the server CA bundle into the helper so the Docker CLI can fetch registry tokens', function (string $detectedBundle, ?string $expectedMount) {
+it('makes the helper trust the server CA bundle for the Docker CLI, Git LFS, git, and curl', function (string $detectedBundle, ?string $expectedMount) {
     [$job, $reflection] = makeSensitiveCommandFailureJob();
     $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
     setSensitiveFailureJobProperties($job, $reflection, ['destination' => $server->standaloneDockers()->firstOrFail()]);
 
     $helperCommands = [];
-    Process::fake(function (PendingProcess $process) use (&$helperCommands, $detectedBundle) {
+    $helperExecCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, &$helperExecCommands, $detectedBundle) {
         $script = remoteProcessScript($process);
         if (str_contains($script, 'docker run -d')) {
             $helperCommands[] = $script;
+        }
+        if (str_contains($script, 'docker exec')) {
+            $helperExecCommands[] = $script;
         }
 
         return Process::result(output: match (true) {
@@ -446,17 +490,62 @@ it('mounts the server CA bundle into the helper so the Docker CLI can fetch regi
 
     invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
 
+    $appendToOpenSslBundle = 'cat /etc/ssl/certs/coolify-host-ca-certificates.crt >> /etc/ssl/certs/ca-certificates.crt';
     expect($helperCommands)->toHaveCount(1);
     if ($expectedMount === null) {
-        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt');
+        expect($helperCommands[0])->not->toContain('coolify-host-ca-certificates.crt')
+            ->and(implode("\n", $helperExecCommands))->not->toContain($appendToOpenSslBundle);
     } else {
-        expect($helperCommands[0])->toContain($expectedMount);
+        expect($helperCommands[0])->toContain($expectedMount)
+            ->and($helperExecCommands[0])->toContain($appendToOpenSslBundle);
     }
 })->with([
     'Debian and Ubuntu bundle' => ['/etc/ssl/certs/ca-certificates.crt', '--mount type=bind,source=/etc/ssl/certs/ca-certificates.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
     'RHEL bundle' => ['/etc/pki/tls/certs/ca-bundle.crt', '--mount type=bind,source=/etc/pki/tls/certs/ca-bundle.crt,target=/etc/ssl/certs/coolify-host-ca-certificates.crt,readonly'],
     'no bundle' => ['', null],
     'unknown output' => ['/root:/x -v /', null],
+]);
+
+it('mounts the Docker config with the registry logins into the helper', function (string $user, string $home, array $existingConfigs, bool $useBuildServer, ?string $expectedConfig) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+    $server = readSensitiveFailureJobProperty($job, $reflection, 'server');
+    $server->user = $user;
+    setSensitiveFailureJobProperties($job, $reflection, [
+        'destination' => $server->standaloneDockers()->firstOrFail(),
+        'use_build_server' => $useBuildServer,
+    ]);
+
+    $helperCommands = [];
+    Process::fake(function (PendingProcess $process) use (&$helperCommands, $home, $existingConfigs) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'docker run -d')) {
+            $helperCommands[] = $script;
+        }
+        $testedConfig = collect(["{$home}/.docker/config.json", '/root/.docker/config.json'])
+            ->first(fn (string $path) => str_contains($script, "test -f {$path}"));
+
+        return Process::result(output: match (true) {
+            str_contains($script, 'echo $HOME') => $home,
+            $testedConfig !== null => in_array($testedConfig, $existingConfigs, true) ? 'OK' : 'NOK',
+            default => '',
+        });
+    });
+
+    invokeSensitiveFailureJobMethod($job, $reflection, 'prepare_builder_image');
+
+    expect($helperCommands)->toHaveCount(1);
+    if ($expectedConfig === null) {
+        expect($helperCommands[0])->not->toContain('config.json');
+    } else {
+        expect($helperCommands[0])->toContain("-v {$expectedConfig}:/root/.docker/config.json:ro");
+    }
+})->with([
+    'root user config' => ['root', '/root', ['/root/.docker/config.json'], false, '/root/.docker/config.json'],
+    'root without config' => ['root', '/root', [], false, null],
+    'non-root user config' => ['coolify', '/home/coolify', ['/home/coolify/.docker/config.json', '/root/.docker/config.json'], false, '/home/coolify/.docker/config.json'],
+    'non-root sudo docker login' => ['coolify', '/home/coolify', ['/root/.docker/config.json'], false, '/root/.docker/config.json'],
+    'non-root without config' => ['coolify', '/home/coolify', [], false, null],
+    'build server with sudo docker login' => ['coolify', '/home/coolify', ['/root/.docker/config.json'], true, '/root/.docker/config.json'],
 ]);
 
 it('shows the helper container command when no build secrets are passed', function () {
@@ -684,8 +773,7 @@ it('tells how to log in when the build server has no Docker config for the SSH u
 
     expect($exception->getMessage())
         ->toContain('of the SSH user (coolify) not found on the build server (build-1)')
-        ->toContain('Server → Docker Registries')
-        ->toContain('"sudo docker login" is saved for root');
+        ->toContain('Server → Docker Registries');
     Process::assertNotRan(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), 'docker run -d'));
 });
 
@@ -741,4 +829,37 @@ it('removes the old helper synchronously before it starts the helper again with 
     expect($runIndex)->toBeInt()
         ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker rm -f') && str_contains($command, 'sensitive-failure-deployment')))->toBeTrue()
         ->and($beforeRun->contains(fn (string $command) => str_contains($command, 'docker stop')))->toBeFalse();
+});
+
+it('explains where to log in when a registry refuses access to an image', function (string $error) {
+    [$job, $reflection] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: $error, exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose pull',
+    ]));
+
+    $server = $reflection->getProperty('server')->getValue($job);
+    expect($exception->getMessage())
+        ->toContain($error)
+        ->toContain("Docker registry logins of the SSH user ({$server->user}) on the server {$server->name}")
+        ->toContain('Registries page of this server');
+})->with([
+    'Docker Hub' => "Error response from daemon: pull access denied for acme/app, repository does not exist or may require 'docker login': denied: requested access to the resource is denied",
+    'ghcr.io' => 'Error response from daemon: Head "https://ghcr.io/v2/acme/app/manifests/latest": unauthorized',
+    'ghcr.io denied' => 'Error response from daemon: Head "https://ghcr.io/v2/acme/app/manifests/latest": denied',
+    'no credentials' => 'Error response from daemon: Get "https://registry.example.com/v2/acme/app/manifests/1.0": no basic auth credentials',
+]);
+
+it('does not add the registry login hint to other failures', function () {
+    [$job] = makeSensitiveCommandFailureJob();
+
+    Process::fake(['*' => Process::result(errorOutput: 'Error response from daemon: manifest for acme/app:missing not found: manifest unknown', exitCode: 1)]);
+
+    $exception = captureDeploymentException(fn () => $job->execute_remote_command([
+        'command' => 'docker compose pull',
+    ]));
+
+    expect($exception->getMessage())->not->toContain('Registries');
 });

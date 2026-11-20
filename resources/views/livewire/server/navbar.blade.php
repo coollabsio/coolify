@@ -118,14 +118,14 @@
             <span class="relative flex min-w-0 shrink items-center gap-2 px-1"
                 x-data="{ open: false, search: '', servers: @js($serverSwitcherOptions) }"
                 @click.outside="open = false" @keydown.escape.window="open = false">
-                <div class="flex h-8 max-w-56 min-w-0 items-center rounded-md xl:max-w-72">
+                <div class="flex h-8 max-w-56 min-w-0 items-center rounded-md transition-colors hover:bg-neutral-100 xl:max-w-72 dark:hover:bg-white/[0.05]">
                     <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }} title="Go to server"
-                        class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                        class="flex h-8 min-w-0 items-center pr-1 pl-2">
                         <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
                             {{ $server->name }}
                         </span>
                     </a>
-                    <button type="button" class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]"
+                    <button type="button" class="flex h-8 shrink-0 items-center px-0.5"
                         @click="open = !open" :aria-expanded="open" aria-label="Switch server">
                         <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
                             fill="none" aria-hidden="true">

@@ -7,7 +7,7 @@
 
 services:
   passbolt:
-    image: passbolt/passbolt:latest-ce
+    image: passbolt/passbolt:5.18.0-1-ce
     environment:
       - SERVICE_URL_PASSBOLT
       - APP_FULL_BASE_URL=${SERVICE_URL_PASSBOLT}

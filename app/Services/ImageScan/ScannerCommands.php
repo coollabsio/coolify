@@ -92,7 +92,7 @@ class ScannerCommands
 
     private const SCANNER_USER = '65534:65534';
 
-    /** `docker save` of a local image. Syft has a time limit per server, see syftTimeout(). */
+    /** Lowest time limit of `docker save` of a local image, see saveTimeout(). */
     private const TIMEOUT_SAVE = 600;
 
     /** Syft `convert` of a stored SBOM. Grype has a time limit per server, see grypeTimeout(). */
@@ -107,8 +107,6 @@ class ScannerCommands
 
     private const TIMEOUT_DB_UPDATE = 900;
 
-    private const TIMEOUT_DB_STATUS = 60;
-
     private const TIMEOUT_PULL = 600;
 
     private const TIMEOUT_VOLUME_SETUP = 120;
@@ -119,10 +117,19 @@ class ScannerCommands
         return self::clampTimeout($server->settings?->image_scan_syft_timeout);
     }
 
-    /** Seconds that one Grype run may take on the server. */
+    /**
+     * Seconds that one Grype run may take on the server. Also the limit of `grype db status`: it hashes the whole
+     * database file, which takes minutes on a slow disk.
+     */
     public static function grypeTimeout(Server $server): int
     {
         return self::clampTimeout($server->settings?->image_scan_grype_timeout);
+    }
+
+    /** Seconds that `docker save` of a local image may take: the Syft time limit, at least 10 minutes. */
+    public static function saveTimeout(Server $server): int
+    {
+        return max(self::TIMEOUT_SAVE, self::syftTimeout($server));
     }
 
     /** CPUs of one scanner container, as the `docker run --cpus` value. */
@@ -243,7 +250,7 @@ class ScannerCommands
      */
     public function dbStatus(): array
     {
-        return $this->capture('db-status', $this->dockerRun('grype', self::TIMEOUT_DB_STATUS, false, $this->grypeDatabaseEnv(), [$this->databaseMount()], ['db', 'status', '-o', 'json']));
+        return $this->capture('db-status', $this->dockerRun('grype', self::grypeTimeout($this->server), false, $this->grypeDatabaseEnv(), [$this->databaseMount()], ['db', 'status', '-o', 'json']));
     }
 
     /**
@@ -330,7 +337,7 @@ class ScannerCommands
             ...$this->sbomDirectory(),
             'rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true',
             'mkdir -p -m 0700 '.escapeshellarg($this->workDir().'/in').' '.escapeshellarg($this->workDir().'/scratch'),
-            $this->step('save', 'timeout -k 10 '.self::TIMEOUT_SAVE.' docker save -o '.escapeshellarg($archive).' '.escapeshellarg('sha256:'.$imageIdHex).' >/dev/null 2>&1'),
+            $this->step('save', 'timeout -k 10 '.self::saveTimeout($this->server).' docker save -o '.escapeshellarg($archive).' '.escapeshellarg('sha256:'.$imageIdHex).' >/dev/null 2>&1'),
             ...$this->ownWorkDir(),
             $this->writeSbom($imageIdHex, $this->dockerRun('syft', self::syftTimeout($this->server), false, [], ['type=bind,src='.$this->workDir().'/in,dst=/in,readonly'], ['scan', 'docker-archive:/in/image.tar', '-o', 'syft-json', '-q'])),
             ...$this->finish(['rm -f '.escapeshellarg($this->sbomTmpPath($imageIdHex)).' || true']),

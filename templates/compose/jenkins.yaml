@@ -7,7 +7,7 @@
 
 services:
   jenkins:
-    image: jenkins/jenkins:latest
+    image: jenkins/jenkins:2.590
     environment:
       - SERVICE_URL_JENKINS_8080
     volumes:

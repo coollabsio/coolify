@@ -153,3 +153,16 @@ test('delete applies selectedActions from checkbox state', function () {
     expect($component->get('delete_configurations'))->toBeTrue();
     expect($component->get('docker_cleanup'))->toBeTrue();
 });
+
+test('delete keeps the backups unless their checkbox is selected', function () {
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', 'test-password');
+
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->deleteBackups === false);
+
+    $this->application->restore();
+    Livewire::test(Danger::class, ['resource' => $this->application->fresh()])
+        ->call('delete', 'test-password', ['delete_volumes', 'delete_backups']);
+
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->deleteBackups === true);
+});

@@ -9,10 +9,11 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 
-function importResource(string $class, ?string $databaseType = null): object
+function importResource(string $class, ?string $databaseType = null, string $image = 'postgres:18-alpine'): object
 {
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn($image);
     if ($class === ServiceDatabase::class) {
         $resource->shouldReceive('databaseType')->andReturn($databaseType);
     }
@@ -100,15 +101,15 @@ test('dump-all mysql and mariadb commands use valid shell parameter expansions',
 
     $command = $builder->buildRestoreCommand(importResource($class), '/tmp/dump.sql.gz', true);
 
-    $rootPassword = '${'.$prefix.'_ROOT_PASSWORD}';
+    $rootLogin = '-u root ${root_password:+"-p$root_password"}';
     $database = '${'.$prefix.'_DATABASE:-default}';
 
     expect($command)
         ->toContain($binary)
         ->toStartWith("backup='/tmp/dump.sql.gz'\n")
-        ->toContain('-p'.$rootPassword)
+        ->toContain('root_password=${'.$prefix.'_ROOT_PASSWORD:-}')
         ->toContain('CREATE DATABASE IF NOT EXISTS \`'.$database.'\`')
-        ->and(substr_count($command, $rootPassword))->toBe(6)
+        ->and(substr_count($command, $rootLogin))->toBe(7)
         ->and(substr_count($command, $database))->toBe(2)
         ->and($command)->not->toContain('${{');
 })->with([
@@ -143,6 +144,17 @@ test('restores PostgreSQL archives without owners and privileges by default', fu
     // --single-transaction would roll back the whole restore on the first ALTER OWNER.
     expect($command)->toContain('pg_restore --exit-on-error --single-transaction --no-owner --no-acl');
 })->with(['keep existing objects' => [false], 'replace existing objects' => [true]]);
+
+test('restores into Supabase images over 127.0.0.1, because their socket refuses users other than postgres and supabase_admin', function (string $class, ?string $type) {
+    $supabase = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type, 'supabase/postgres:15.8.1.085'), '/tmp/backup.dump', false);
+    $official = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type), '/tmp/backup.dump', false);
+
+    expect($supabase)->toContain("export PGHOST='127.0.0.1'")
+        ->and($official)->not->toContain('PGHOST');
+})->with([
+    'standalone' => [StandalonePostgresql::class, null],
+    'service' => [ServiceDatabase::class, 'postgresql'],
+]);
 
 test('keeps PostgreSQL owners and privileges when requested', function () {
     $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump', false, false, keepOwners: true);

@@ -244,3 +244,11 @@ test('a team member cannot change the option', function () {
 
     expect($database->fresh()->include_coolify_default_variables)->toBeTrue();
 });
+
+test('a compose application gets its resource UUID in the .env file, so that the compose file can reference it', function () {
+    $application = coolifyDefaultsApplication();
+    $application->update(['build_pack' => 'dockercompose']);
+
+    expect((int) $application->fresh()->compose_parsing_version)->toBeGreaterThanOrEqual(3)
+        ->and(coolifyDefaultsApplicationEnv($application))->toContain("COOLIFY_RESOURCE_UUID=\"{$application->uuid}\"");
+});

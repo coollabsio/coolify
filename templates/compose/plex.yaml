@@ -7,7 +7,7 @@
 
 services:
   plex:
-    image: lscr.io/linuxserver/plex:latest
+    image: lscr.io/linuxserver/plex:1.43.5.11079-b3b13e506-ls332
     environment:
       - SERVICE_URL_PLEX_32400
       - _APP_URL=$SERVICE_URL_PLEX

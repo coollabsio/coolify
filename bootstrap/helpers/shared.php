@@ -42,6 +42,7 @@ use App\Models\User;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\DnsRecord;
 use App\Services\Dns\DnsResolver;
+use App\Services\Dns\ServerDnsAddresses;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
@@ -1257,10 +1258,11 @@ function parseEnvFormatToArray($env_file_contents)
                     // Found whitespace followed by #, extract comment
                     $remainder = substr($value_and_comment, $matches[0][1]);
                     $value = substr($value_and_comment, 0, $matches[0][1]);
-                    $value = rtrim($value);
                 } else {
                     $value = $value_and_comment;
                 }
+                // Like a .env file, an unquoted value loses its edge whitespace. Quotes keep it.
+                $value = trim($value);
             }
 
             // Extract comment from remainder (if any)
@@ -1300,7 +1302,7 @@ function formatEnvValueForDevView(?string $value): ?string
         return null;
     }
 
-    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1;
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1 || $value !== trim($value);
     if (! $needsQuotes) {
         return $value;
     }
@@ -1688,12 +1690,26 @@ function resolveHostToIp(string $host): string
 
 function service_templates_cache_key(): string
 {
-    return (string) config('constants.services.cache_key', 'coolify:service-templates-bundle');
+    return config('constants.services.cache_key', 'coolify:service-templates-bundle').':'.service_templates_cdn_url();
 }
 
 function service_templates_path(): string
 {
     return base_path('templates/'.config('constants.services.file_name'));
+}
+
+function service_templates_cdn_url(): ?string
+{
+    $version = config('constants.coolify.version');
+    $url = config('constants.services.official');
+
+    return match (true) {
+        isDev() => null,
+        preg_match('/^\d+\.\d+\.\d+$/', $version) === 1 => $url,
+        preg_match('/^\d+\.\d+\.\d+-(beta|rc)\.\d+$/', $version) === 1 => dirname($url).'/preview/'.basename($url),
+        preg_match('/^\d+\.\d+\.\d+-(alpha\.\d+|(alpha|beta|rc)\.\d+\.\d{8}\.\d+)$/', $version) === 1 => dirname($url).'/nightly/'.basename($url),
+        default => null,
+    };
 }
 
 /**
@@ -1747,12 +1763,12 @@ function get_service_templates_fetched_at(): ?CarbonImmutable
 
 function get_service_templates(bool $force = false): Collection
 {
-    if ($force) {
+    if ($force && service_templates_cdn_url()) {
         try {
             $response = Http::retry(3, 1000, throw: false)
                 ->timeout(60)
                 ->connectTimeout(10)
-                ->get(config('constants.services.official'));
+                ->get(service_templates_cdn_url());
             if ($response->failed()) {
                 return collect([]);
             }
@@ -2435,26 +2451,12 @@ function resolveServerIpAddress(?string $ipOrHost): array
 }
 
 /**
- * Preferred server address for DNS validation: public instance IPs for localhost,
+ * Preferred server address for DNS validation: the public IPs of the server (instance settings for localhost),
  * otherwise the server IP/hostname resolved to a real IP when possible.
  */
 function serverDnsTargetIp(Server $server): ?string
 {
-    $settings = instanceSettings();
-
-    if ($server->id === 0) {
-        $configured = data_get($settings, 'public_ipv4')
-            ?: data_get($settings, 'public_ipv6')
-            ?: $server->ip;
-    } else {
-        $configured = $server->ip;
-    }
-
-    $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
-
-    // Prefer resolved IP; fall back to configured value so existing hostname-based
-    // comparisons still have something to show if DNS resolution fails.
-    return $resolved['ip'] ?? $resolved['configured'];
+    return ServerDnsAddresses::forServer($server)->address;
 }
 
 /**
@@ -5997,24 +5999,19 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
         return $value;
     }
     $value = trim($value);
-    $sharedEnvsFound = str($value)->matchAll('/{{(.*?)}}/');
-    if ($sharedEnvsFound->isEmpty()) {
-        return $value;
-    }
-    foreach ($sharedEnvsFound as $sharedEnv) {
-        $type = str($sharedEnv)->trim()->match('/(.*?)\./');
-        if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, $value, $references, PREG_SET_ORDER);
+    foreach ($references as [$reference, $type, $variable]) {
+        if (! in_array($type, SHARED_VARIABLE_TYPES, true)) {
             continue;
         }
-        $variable = str($sharedEnv)->trim()->match('/\.(.*)/');
         $id = null;
-        if ($type->value() === 'environment') {
+        if ($type === 'environment') {
             $id = $resource->environment->id;
-        } elseif ($type->value() === 'project') {
+        } elseif ($type === 'project') {
             $id = $resource->environment->project->id;
-        } elseif ($type->value() === 'team') {
+        } elseif ($type === 'team') {
             $id = $resource->team()->id;
-        } elseif ($type->value() === 'server') {
+        } elseif ($type === 'server') {
             $id = data_get($resource, 'destination.server_id');
         }
         if (is_null($id)) {
@@ -6026,11 +6023,11 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             ->where("{$type}_id", $id)
             ->first();
         if ($found) {
-            $value = str($value)->replace("{{{$sharedEnv}}}", $found->value);
+            $value = str_replace($reference, $found->value, $value);
         }
     }
 
-    return str($value)->value();
+    return $value;
 }
 
 /**
@@ -6056,7 +6053,7 @@ function redactLockedValuesInGeneratedCompose(string|array|Collection|null $comp
 
     $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
 
-    preg_match_all('/{{\s*(\w+)\.([^}\s]+)\s*}}/', (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
     $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], SHARED_VARIABLE_TYPES, true));
     $teamId = $resource->team()?->id;
     if ($references->isNotEmpty() && $teamId !== null) {

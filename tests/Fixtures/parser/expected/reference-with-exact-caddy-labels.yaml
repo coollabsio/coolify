@@ -54,6 +54,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -80,6 +84,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -157,6 +163,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -231,6 +239,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -889,6 +898,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -915,6 +928,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -992,6 +1007,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -1066,6 +1083,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -1726,6 +1744,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       fqdn: 'https://worker-extra.example.com'
       required_port: 8080
@@ -1753,6 +1775,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -1830,6 +1854,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -1904,6 +1930,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh

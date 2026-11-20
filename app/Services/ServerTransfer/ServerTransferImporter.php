@@ -1254,6 +1254,10 @@ class ServerTransferImporter
         $attributes = (array) data_get($payload, 'attributes', []);
         unset($attributes['id'], $attributes['environment_id'], $attributes['destination_id'], $attributes['destination_type'], $attributes['source_id'], $attributes['source_type'], $attributes['private_key_id']);
         $attributes = $this->onlyExistingColumns(Application::class, $attributes);
+        // A bundle without the flag is from a Coolify version whose healthcheck did not check the text.
+        if (! data_get($payload, 'checks_health_check_response_text', false)) {
+            $attributes['health_check_response_text'] = null;
+        }
 
         $attributes['uuid'] = $uuid;
         $attributes['environment_id'] = $environment->id;
@@ -1881,6 +1885,7 @@ class ServerTransferImporter
             'custom_port' => data_get($payload, 'custom_port'),
             'app_id' => data_get($payload, 'app_id'),
             'installation_id' => data_get($payload, 'installation_id'),
+            'installation_account' => data_get($payload, 'installation_account'),
             'client_id' => data_get($payload, 'client_id'),
             'client_secret' => data_get($payload, 'client_secret'),
             'webhook_secret' => data_get($payload, 'webhook_secret'),
@@ -2388,6 +2393,7 @@ class ServerTransferImporter
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
                 'keeps_production_values' => (bool) data_get($previewPayload, 'keeps_production_values', false),
+                'is_same_repository' => (bool) data_get($previewPayload, 'is_same_repository', false),
             ];
 
             if ($preview) {
