@@ -4,6 +4,7 @@ use App\Actions\Proxy\StopProxy;
 use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
+use App\Jobs\RefreshDefaultRedirectJob;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -62,24 +63,20 @@ function errorPageScriptLines(): array
     return $lines;
 }
 
-it('routes the Traefik catch-all through the errors middleware and keeps the 503', function () {
+it('routes the Traefik catch-all to the 404 script of the page container', function () {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
 
     $config = Yaml::parse($server->defaultRedirectConfiguration());
 
-    expect($config['http']['routers']['catchall']['service'])->toBe('noop')
-        ->and($config['http']['routers']['catchall']['middlewares'])->toBe(['error-pages'])
-        ->and($config['http']['services']['noop']['loadBalancer']['servers'])->toBe([])
-        ->and($config['http']['middlewares']['error-pages']['errors'])->toBe([
-            'status' => ['503'],
-            'service' => 'error-pages',
-            'query' => '/503.html',
-        ])
-        ->and($config['http']['services']['error-pages']['loadBalancer']['servers'])
-        ->toBe([['url' => 'http://coolify-proxy-error-pages:80']]);
+    expect($config['http']['routers']['catchall']['service'])->toBe('error-pages')
+        ->and($config['http']['routers']['catchall']['middlewares'])->toBe(['error-page-404'])
+        ->and($config['http']['middlewares']['error-page-404'])->toBe(['replacePath' => ['path' => '/cgi-bin/404']])
+        ->and($config['http']['services'])->toBe([
+            'error-pages' => ['loadBalancer' => ['servers' => [['url' => 'http://coolify-proxy-error-pages:80']]]],
+        ]);
 });
 
-it('catches plain HTTP with a router without TLS', function (array $proxy, array $middlewares) {
+it('catches plain HTTP with a router without TLS', function (array $proxy, string $service, array $middlewares) {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value, $proxy);
 
     $routers = Yaml::parse($server->defaultRedirectConfiguration())['http']['routers'];
@@ -89,24 +86,23 @@ it('catches plain HTTP with a router without TLS', function (array $proxy, array
         ->and($routers['catchall']['tls'])->toBe(['certResolver' => 'letsencrypt'])
         ->and($routers['catchall-http'])->toBe([
             'entryPoints' => ['http'],
-            'service' => 'noop',
+            'service' => $service,
             'rule' => 'PathPrefix(`/`)',
             'priority' => -1000,
             'middlewares' => $middlewares,
         ]);
 })->with([
-    'error page' => [[], ['error-pages']],
-    'redirect URL' => [['redirect_url' => 'https://example.com'], ['redirect-regexp']],
+    'error page' => [[], 'error-pages', ['error-page-404']],
+    'redirect URL' => [['redirect_url' => 'https://example.com'], 'noop', ['redirect-regexp']],
 ]);
 
-it('serves the error page through Caddy with a 503 status', function () {
+it('serves the error page through the 404 script on Caddy', function () {
     $server = useErrorPageProxy($this->server, ProxyTypes::CADDY->value);
 
     expect($server->defaultRedirectConfiguration())
         ->toContain('reverse_proxy coolify-proxy-error-pages:80 {')
-        ->toContain('rewrite /503.html')
-        ->toContain('copy_response 503')
-        ->not->toContain('respond 503');
+        ->toContain('rewrite /cgi-bin/404')
+        ->not->toContain('respond 404');
 });
 
 it('keeps the redirect URL ahead of the error page', function (string $proxyType) {
@@ -130,9 +126,9 @@ it('removes the catch-all and the page container when the default redirect is di
     $lines = errorPageScriptLines();
 
     expect($lines)
-        ->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_503.yaml')
+        ->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_404.yaml')
         ->toContain('sudo docker rm -f coolify-proxy-error-pages >/dev/null 2>&1 || sudo true')
-        ->and(writtenProxyFile($lines, '/data/coolify/proxy//dynamic/default_redirect_503.yaml'))->toBeNull();
+        ->and(writtenProxyFile($lines, '/data/coolify/proxy//dynamic/default_redirect_404.yaml'))->toBeNull();
 });
 
 it('starts the page container through sudo before it writes the catch-all', function (string $proxyType, string $catchAll) {
@@ -150,14 +146,34 @@ it('starts the page container through sudo before it writes the catch-all', func
         ->and($lines[$runLine])->toBe('sudo docker start coolify-proxy-error-pages >/dev/null 2>&1 || sudo docker run -d --name coolify-proxy-error-pages --network coolify --restart unless-stopped --label coolify.managed=true -v /data/coolify/proxy/error-pages:/www:ro busybox:musl httpd -f -p 80 -h /www')
         ->and($lines)->toContain('sudo mkdir -p /data/coolify/proxy/error-pages && sudo find /data/coolify/proxy/error-pages -user root -exec chown -h cooluser:cooluser {} + && sudo chmod o-rwx /data/coolify/proxy/error-pages')
         // The page goes through scp, then sudo moves it into place.
-        ->and(collect($lines)->contains(fn (string $line) => preg_match('#^sudo mv -f /tmp/coolify-upload-[0-9a-f]+ /data/coolify/proxy/error-pages/503.html$#', $line) === 1))->toBeTrue()
-        ->and($lines)->toContain('sudo chmod 644 /data/coolify/proxy/error-pages/503.html')
+        ->and(collect($lines)->contains(fn (string $line) => preg_match('#^sudo mv -f /tmp/coolify-upload-[0-9a-f]+ /data/coolify/proxy/error-pages/404.html$#', $line) === 1))->toBeTrue()
+        ->and($lines)->toContain('sudo chmod 644 /data/coolify/proxy/error-pages/404.html')
+        ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/404.html'))->toContain('There is no site at this address')
+        ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/cgi-bin/404'))
+        ->toBe("#!/bin/sh\nprintf 'HTTP/1.1 404 Not Found\\r\\nContent-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store\\r\\n\\r\\n'\ncat /www/404.html\n")
         ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/503.html'))->toContain('This site is not available at the moment')
+        ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/cgi-bin/503'))
+        ->toBe("#!/bin/sh\nprintf 'HTTP/1.1 503 Service Unavailable\\r\\nContent-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store\\r\\n\\r\\n'\ncat /www/503.html\n")
+        ->and($lines)->toContain('sudo chmod 755 /data/coolify/proxy/error-pages/cgi-bin/404 /data/coolify/proxy/error-pages/cgi-bin/503')
         ->and(writtenProxyFile($lines, $catchAll))->toContain('coolify-proxy-error-pages');
 })->with([
-    'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy//dynamic/default_redirect_503.yaml'],
-    'caddy' => [ProxyTypes::CADDY->value, '/data/coolify/proxy/caddy/dynamic/default_redirect_503.caddy'],
+    'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy//dynamic/default_redirect_404.yaml'],
+    'caddy' => [ProxyTypes::CADDY->value, '/data/coolify/proxy/caddy/dynamic/default_redirect_404.caddy'],
 ]);
+
+it('writes the current catch-all and its hash when the refresh job runs', function () {
+    $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
+    $server->proxy->set('default_redirect_hash', null);
+    $server->save();
+
+    (new RefreshDefaultRedirectJob($server))->handle();
+    $lines = errorPageScriptLines();
+
+    expect($lines)->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_503.yaml')
+        ->and(writtenProxyFile($lines, '/data/coolify/proxy//dynamic/default_redirect_404.yaml'))->toContain('/cgi-bin/404')
+        ->and($server->fresh()->proxy->get('default_redirect_hash'))->toBe(md5($server->defaultRedirectConfiguration()))
+        ->and($server->fresh()->claimOutdatedDefaultRedirectRefresh())->toBeFalse();
+});
 
 it('pushes the custom page and falls back to the default page after a reset', function () {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
@@ -165,38 +181,32 @@ it('pushes the custom page and falls back to the default page after a reset', fu
     $server->save();
 
     $server->setupDefaultRedirect();
-    expect(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/503.html'))->toBe('<h1>Maintenance</h1>');
+    expect(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/404.html'))->toBe('<h1>Maintenance</h1>');
 
     $server->proxy_error_page = null;
     $server->save();
     $server->setupDefaultRedirect();
 
-    expect(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/503.html'))
-        ->toContain('This site is not available at the moment')
+    expect(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/404.html'))
+        ->toContain('There is no site at this address')
         ->toContain('https://coolify.io/docs/troubleshoot/applications/no-available-server')
         ->not->toContain($server->name)
         ->not->toContain($server->ip)
         ->not->toContain($this->team->name);
 });
 
-it('keeps Swarm servers on the plain catch-all without a page container', function (string $swarmSetting) {
+it('leaves the 404 to Traefik on Swarm servers, without a catch-all or a page container', function (string $swarmSetting) {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
     $server->settings->update([$swarmSetting => true]);
     $server->refresh();
 
-    $config = Yaml::parse($server->defaultRedirectConfiguration());
+    $configuration = $server->defaultRedirectConfiguration();
     $server->setupDefaultRedirect();
+    $lines = errorPageScriptLines();
 
-    expect($config['http']['routers'])->toBe(['catchall' => [
-        'entryPoints' => ['http', 'https'],
-        'service' => 'noop',
-        'rule' => 'PathPrefix(`/`)',
-        'tls' => ['certResolver' => 'letsencrypt'],
-        'priority' => -1000,
-    ]])
-        ->and($config['http'])->not->toHaveKey('middlewares')
-        ->and(array_keys($config['http']['services']))->toBe(['noop'])
-        ->and(implode("\n", errorPageScriptLines()))->not->toContain('coolify-proxy-error-pages');
+    expect($configuration)->toBeNull()
+        ->and($lines)->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_404.yaml')
+        ->and(implode("\n", $lines))->not->toContain('coolify-proxy-error-pages');
 })->with(['is_swarm_manager', 'is_swarm_worker']);
 
 it('removes the page container when the proxy stops', function () {
@@ -228,7 +238,7 @@ it('lets an admin save and reset the custom error page', function () {
         ->assertDispatched('success');
 
     expect($server->fresh()->proxy_error_page)->toBe('<h1>Maintenance</h1>')
-        ->and(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/503.html'))->toBe('<h1>Maintenance</h1>');
+        ->and(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/404.html'))->toBe('<h1>Maintenance</h1>');
 
     $component->call('resetCustomErrorPage')
         ->assertDispatched('success')
@@ -247,7 +257,7 @@ it('uploads a custom page larger than one shell argument', function () {
     $lines = errorPageScriptLines();
 
     // Linux limits one shell argument to 128 KiB, so the page must not be inside a command.
-    expect(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/503.html'))->toBe($page)
+    expect(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/404.html'))->toBe($page)
         ->and(collect($lines)->max(fn (string $line) => strlen($line)))->toBeLessThan(128 * 1024);
 });
 

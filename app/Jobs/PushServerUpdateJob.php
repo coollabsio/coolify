@@ -843,9 +843,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     }
                 } catch (\Throwable $e) {
                 }
-            } elseif ($this->server->proxy->get('status') !== 'running') {
-                $this->server->proxy->set('status', 'running');
-                $this->server->save();
+            } else {
+                if ($this->server->proxy->get('status') !== 'running') {
+                    $this->server->proxy->set('status', 'running');
+                    $this->server->save();
+                }
+                if ($this->server->claimOutdatedDefaultRedirectRefresh()) {
+                    RefreshDefaultRedirectJob::dispatch($this->server);
+                }
             }
         }
     }

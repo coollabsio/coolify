@@ -20223,6 +20223,15 @@
                                             ],
                                             "example": "https:\/\/example.com"
                                         },
+                                        "unknown_host_status": {
+                                            "description": "Status of the catch-all for hosts that no resource on the server uses. The domains of resources on the server get 503 while the resource is down.",
+                                            "type": "integer",
+                                            "example": 404,
+                                            "enum": [
+                                                404,
+                                                503
+                                            ]
+                                        },
                                         "proxy_error_page": {
                                             "type": [
                                                 "string",
@@ -20304,6 +20313,14 @@
                                             "null"
                                         ]
                                     },
+                                    "unknown_host_status": {
+                                        "description": "Status of the catch-all for hosts that no resource on the server uses (when redirect_url is empty). The domains of resources on the server get 503 while the resource is down.",
+                                        "type": "integer",
+                                        "enum": [
+                                            404,
+                                            503
+                                        ]
+                                    },
                                     "proxy_error_page": {
                                         "description": "Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.",
                                         "type": [
@@ -20363,6 +20380,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -20483,6 +20507,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {

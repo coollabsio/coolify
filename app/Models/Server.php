@@ -142,11 +142,23 @@ class Server extends BaseModel
     protected array $auditExclude = ['canvas_position'];
 
     /**
-     * Serves the proxy error pages (503.html) for the Traefik and Caddy catch-all.
+     * Serves the proxy error pages (404.html, 503.html) for the Traefik and Caddy catch-all.
      */
     public const PROXY_ERROR_PAGE_CONTAINER = 'coolify-proxy-error-pages';
 
     public const PROXY_ERROR_PAGE_IMAGE = 'busybox:musl';
+
+    /**
+     * Statuses of the catch-all error page. For each status, the error page container has a page
+     * (/<status>.html) and a CGI script (/cgi-bin/<status>) that sends the page with that status.
+     */
+    public const PROXY_ERROR_PAGE_STATUSES = [404 => 'Not Found', 503 => 'Service Unavailable'];
+
+    /**
+     * Status of the catch-all for unknown hosts on servers created before the 404 option
+     * (proxy.unknown_host_status is missing). New servers get 404.
+     */
+    public const LEGACY_UNKNOWN_HOST_STATUS = 503;
 
     /**
      * Maximum size of a custom error or maintenance page. The page goes to the server with scp
@@ -182,6 +194,11 @@ class Server extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function ($server) {
+            if ($server->proxy->get('unknown_host_status') === null) {
+                $server->proxy->set('unknown_host_status', 404);
+            }
+        });
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
@@ -748,25 +765,26 @@ class Server extends BaseModel
             "# Disable the default redirect to customize (only if you know what are you doing).\n\n";
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
-        $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
-            $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
+            $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
         } elseif ($proxy_type === ProxyTypes::CADDY->value) {
-            $default_redirect_file = "$dynamic_conf_path/default_redirect_503.caddy";
+            $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
         }
 
+        // Older Coolify versions wrote a catch-all with a 503 status to these files.
         instant_remote_process([
             "mkdir -p $dynamic_conf_path",
-            "rm -f $dynamic_conf_path/default_redirect_404.yaml",
-            "rm -f $dynamic_conf_path/default_redirect_404.caddy",
+            "rm -f $dynamic_conf_path/default_redirect_503.yaml",
+            "rm -f $dynamic_conf_path/default_redirect_503.caddy",
         ], $this);
         // The error page container must run before the catch-all points to it.
         $this->setupProxyErrorPageContainer();
 
-        if ($redirect_enabled === false) {
+        $configuration = $this->defaultRedirectFileContents();
+        if ($configuration === null) {
             instant_remote_process(["rm -f $default_redirect_file"], $this);
         } else {
-            $conf = $banner.$this->defaultRedirectConfiguration();
+            $conf = $banner.$configuration;
             $base64 = base64_encode($conf);
             instant_remote_process([
                 "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
@@ -776,15 +794,77 @@ class Server extends BaseModel
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
+
+        // Only the hash: the rest of this proxy copy can be older than the row (queued refresh job).
+        $hash = md5($configuration ?? '');
+        static::query()->whereKey($this->id)->update(['proxy->default_redirect_hash' => $hash]);
+        $this->proxy->set('default_redirect_hash', $hash);
+    }
+
+    /**
+     * Whether the catch-all on the running Traefik or Caddy proxy is outdated: an older Coolify
+     * version wrote it, or a resource domain was added or removed after it was written.
+     * Claims the refresh for 10 minutes, so that the frequent server checks queue only one.
+     */
+    public function claimOutdatedDefaultRedirectRefresh(): bool
+    {
+        if (! in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+            return false;
+        }
+
+        $hash = md5($this->defaultRedirectFileContents() ?? '');
+        if ($this->proxy->get('default_redirect_hash') === $hash) {
+            return false;
+        }
+
+        return Cache::add("default-redirect-refresh:{$this->uuid}:{$hash}", true, now()->addMinutes(10));
+    }
+
+    /**
+     * Status for requests to hosts that no resource on this server uses: 404 or 503.
+     */
+    public function unknownHostStatus(): int
+    {
+        return (int) $this->proxy->get('unknown_host_status') === 404 ? 404 : self::LEGACY_UNKNOWN_HOST_STATUS;
+    }
+
+    /**
+     * Contents of the catch-all file without the banner, or null when the server has no catch-all file.
+     */
+    private function defaultRedirectFileContents(): ?string
+    {
+        return ($this->proxy->redirect_enabled ?? true) === false ? null : $this->defaultRedirectConfiguration();
+    }
+
+    /**
+     * Hosts of the application and service domains on this server. The catch-all answers them
+     * with 503: the resource exists, but it is stopped, deploying, or unhealthy.
+     *
+     * @return Collection<int, string>
+     */
+    public function resourceHosts(): Collection
+    {
+        return $this->applications()->load('settings')
+            ->concat($this->services()->with('applications')->get())
+            ->flatMap(fn (Application|Service $resource) => $resource->maintenanceRoutes())
+            ->map(fn (array $route) => strtolower($route['host']))
+            ->unique()
+            ->sort()
+            ->values();
     }
 
     /**
      * Catch-all proxy configuration (without the banner) for an enabled default redirect.
+     * Unknown hosts get unknownHostStatus(). With 404, search engines remove the URLs of deleted
+     * resources, and the domains of resources on this server still get a 503, so a stopped or
+     * deploying resource keeps its URLs. Null means no catch-all: Traefik then answers 404 itself.
      */
-    public function defaultRedirectConfiguration(): string
+    public function defaultRedirectConfiguration(): ?string
     {
         $redirect_url = $this->proxy->redirect_url;
         $usesErrorPage = $this->usesProxyErrorPage();
+        $unknownHostStatus = $this->unknownHostStatus();
+        $hosts = filled($redirect_url) || $unknownHostStatus === 503 ? collect() : $this->resourceHosts();
 
         if ($this->proxyType() === ProxyTypes::CADDY->value) {
             if (filled($redirect_url)) {
@@ -792,100 +872,84 @@ class Server extends BaseModel
    redir $redirect_url
 }";
             }
-            if ($usesErrorPage) {
-                // busybox httpd answers 200, so copy_response sets the 503 status.
-                return ':80, :443 {
-    reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.':80 {
-        rewrite /503.html
-        handle_response {
-            copy_response 503
-        }
-    }
-}';
-            }
+            $respond = fn (int $status) => $usesErrorPage
+                ? 'reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.":80 {\n            rewrite /cgi-bin/$status\n        }"
+                : "respond $status";
+            $resources = $hosts->isEmpty() ? '' : '    @resources host '.$hosts->implode(' ')."\n    handle @resources {\n        {$respond(503)}\n    }\n";
 
-            return ':80, :443 {
-    respond 503
-}';
+            return ":80, :443 {\n{$resources}    handle {\n        {$respond($unknownHostStatus)}\n    }\n}";
         }
 
-        $dynamic_conf = [
-            'http' => [
-                'routers' => [
-                    'catchall' => [
-                        'entryPoints' => [
-                            0 => 'http',
-                            1 => 'https',
-                        ],
-                        'service' => 'noop',
-                        'rule' => 'PathPrefix(`/`)',
-                        'tls' => $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [],
-                        'priority' => -1000,
-                    ],
-                ],
-                'services' => [
-                    'noop' => [
-                        'loadBalancer' => [
-                            'servers' => [],
-                        ],
-                    ],
-                ],
-            ],
-        ];
+        $router = fn (string $rule, string $service, array $tls, int $priority, array $middlewares = []) => [
+            'entryPoints' => ['http', 'https'],
+            'service' => $service,
+            'rule' => $rule,
+            'tls' => $tls,
+            'priority' => $priority,
+        ] + ($middlewares === [] ? [] : ['middlewares' => $middlewares]);
+        $certificateResolver = $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [];
+        $routers = [];
+        $middlewares = [];
+        $services = [];
+
         if (filled($redirect_url)) {
-            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                0 => 'redirect-regexp',
-            ];
-
-            $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
-                'url' => '',
-            ];
-            $dynamic_conf['http']['middlewares'] = [
-                'redirect-regexp' => [
-                    'redirectRegex' => [
-                        'regex' => '(.*)',
-                        'replacement' => $redirect_url,
-                        'permanent' => false,
-                    ],
+            $routers['catchall'] = $router('PathPrefix(`/`)', 'noop', $certificateResolver, -1000, ['redirect-regexp']);
+            $middlewares['redirect-regexp'] = [
+                'redirectRegex' => [
+                    'regex' => '(.*)',
+                    'replacement' => $redirect_url,
+                    'permanent' => false,
                 ],
             ];
-        } elseif ($usesErrorPage) {
-            // The noop service (no servers) keeps the 503; the errors middleware only replaces the body.
-            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                0 => 'error-pages',
-            ];
-            $dynamic_conf['http']['middlewares'] = [
-                'error-pages' => [
-                    'errors' => [
-                        'status' => ['503'],
-                        'service' => 'error-pages',
-                        'query' => '/503.html',
-                    ],
-                ],
-            ];
-            $dynamic_conf['http']['services']['error-pages'] = [
-                'loadBalancer' => [
-                    'servers' => [
-                        ['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80'],
-                    ],
-                ],
-            ];
+            $services['noop'] = ['loadBalancer' => ['servers' => [['url' => '']]]];
+        } else {
+            $catchAlls = ['catchall' => ['PathPrefix(`/`)', -1000, $unknownHostStatus, $certificateResolver]];
+            if ($hosts->isNotEmpty()) {
+                // HostRegexp, not Host: when two routers of one host have different TLS options, Traefik
+                // applies the default options to both, so Host() would drop the TLS options of the resource.
+                // No certResolver: Traefik uses the stored certificate of the resource and orders no new one.
+                $pattern = '^('.$hosts->map(fn (string $host) => str_replace('.', '\\.', $host))->implode('|').')$';
+                $rule = str_starts_with(ltrim((string) $this->detected_traefik_version, 'v'), '2.')
+                    ? "HostRegexp(`{host:$pattern}`)"
+                    : "HostRegexp(`$pattern`)";
+                $catchAlls['catchall-resources'] = [$rule, -999, 503, []];
+            }
+            foreach ($catchAlls as $name => [$rule, $priority, $status, $tls]) {
+                if ($usesErrorPage) {
+                    $routers[$name] = $router($rule, 'error-pages', $tls, $priority, ["error-page-$status"]);
+                    $middlewares["error-page-$status"] = ['replacePath' => ['path' => "/cgi-bin/$status"]];
+                    $services['error-pages'] = ['loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]]];
+                } elseif ($status === 503) {
+                    // The noop service has no servers, so Traefik answers 503. Without a router, Traefik answers 404.
+                    $routers[$name] = $router($rule, 'noop', $tls, $priority);
+                    $services['noop'] = ['loadBalancer' => ['servers' => []]];
+                }
+            }
         }
 
-        // A router with `tls` matches only HTTPS, so plain HTTP needs its own catch-all router.
+        if ($routers === []) {
+            return null;
+        }
+
+        // A router with `tls` matches only HTTPS, so plain HTTP needs its own router.
         if (! $this->isSwarm()) {
-            $catchall = $dynamic_conf['http']['routers']['catchall'];
-            $dynamic_conf['http']['routers']['catchall']['entryPoints'] = ['https'];
-            unset($catchall['tls']);
-            $dynamic_conf['http']['routers']['catchall-http'] = array_merge($catchall, ['entryPoints' => ['http']]);
+            foreach ($routers as $name => $config) {
+                $routers[$name]['entryPoints'] = ['https'];
+                unset($config['tls']);
+                $routers["$name-http"] = array_merge($config, ['entryPoints' => ['http']]);
+            }
         }
 
-        return Yaml::dump($dynamic_conf, 12, 2);
+        return Yaml::dump(['http' => array_filter([
+            'routers' => $routers,
+            'middlewares' => $middlewares,
+            'services' => $services,
+        ])], 12, 2);
     }
 
     /**
      * True when the catch-all shows the error page: a standalone Traefik or Caddy proxy with
-     * the default redirect enabled and no redirect URL. Swarm servers keep the plain 503.
+     * the default redirect enabled and no redirect URL. Swarm servers get a plain 404 or 503.
      */
     public function usesProxyErrorPage(): bool
     {
@@ -901,11 +965,11 @@ class Server extends BaseModel
     }
 
     /**
-     * The custom error page HTML, or the Coolify default page.
+     * The custom error page HTML, or the Coolify default page for the status.
      */
-    public function proxyErrorPageHtml(): string
+    public function proxyErrorPageHtml(int $status = 404): string
     {
-        return filled($this->proxy_error_page) ? $this->proxy_error_page : view('proxy.error-page')->render();
+        return filled($this->proxy_error_page) ? $this->proxy_error_page : view('proxy.error-page', ['status' => $status])->render();
     }
 
     /**
@@ -924,7 +988,7 @@ class Server extends BaseModel
     }
 
     /**
-     * Writes 503.html and starts the error page container, or removes the container when
+     * Writes the error pages and starts the error page container, or removes the container when
      * neither the catch-all nor a maintenance page uses it. Swarm servers are not supported.
      */
     public function setupProxyErrorPageContainer(): void
@@ -944,8 +1008,13 @@ class Server extends BaseModel
         $mount = devHostDockerPath($this, $path);
         $restart = RESTART_MODE;
 
-        instant_remote_process(["mkdir -p $path"], $this);
-        $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
+        instant_remote_process(["mkdir -p $path/cgi-bin"], $this);
+        // busybox httpd answers 200 for a file (501 for POST), so a CGI script sends each page with its status.
+        foreach (self::PROXY_ERROR_PAGE_STATUSES as $status => $reason) {
+            $this->uploadProxyFile("$path/$status.html", $this->proxyErrorPageHtml($status));
+            $this->uploadProxyFile("$path/cgi-bin/$status", "#!/bin/sh\nprintf 'HTTP/1.1 $status $reason\\r\\nContent-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store\\r\\n\\r\\n'\ncat /www/$status.html\n");
+        }
+        instant_remote_process(["chmod 755 $path/cgi-bin/404 $path/cgi-bin/503"], $this);
         instant_remote_process([
             dockerNetworkEnsureCommand('coolify'),
             "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
