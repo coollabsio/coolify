@@ -16,6 +16,7 @@ use App\Models\VolumeBackupS3Replica;
 use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\VolumeBackup\BackupFailed;
 use App\Notifications\VolumeBackup\BackupSuccess;
+use App\Services\HorizonNodeDrainer;
 use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
@@ -304,6 +305,11 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->occurrenceUuid) {
             app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
+        // The catch in handle() already recovered the stopped containers of a run that the drain stopped.
+        if (HorizonNodeDrainer::wasMoved(HorizonNodeDrainer::VOLUME_BACKUP, $this->backup->id)) {
+            return;
         }
 
         $execution = $this->execution ?? $this->backup->executions()
