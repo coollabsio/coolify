@@ -23,7 +23,7 @@ trait MatchesManualWebhookApplications
             return null;
         }
 
-        if (! preg_match('/\A[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\z/', $fullName)) {
+        if (! preg_match('/\A~?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\z/', $fullName)) {
             return null;
         }
 
