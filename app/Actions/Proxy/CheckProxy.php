@@ -70,7 +70,8 @@ class CheckProxy
             try {
                 if ($server->proxyType() !== ProxyTypes::NONE->value) {
                     $proxyCompose = GetProxyConfiguration::run($server);
-                    $portsToCheck = ProxyPortParser::fromConfiguration($proxyCompose);
+                    $hostAddressesByPort = ProxyPortParser::hostAddressesByPort($proxyCompose);
+                    $portsToCheck = array_keys($hostAddressesByPort);
                     $publishesOnlyUncheckedPorts = $portsToCheck === [] && ProxyPortParser::publishesOnlyUncheckedPorts($proxyCompose);
                 }
             } catch (\Throwable $e) {
@@ -82,9 +83,8 @@ class CheckProxy
                 // Variable ports such as `${HTTP_PORT}:80` are only resolved by Compose on start.
                 return $publishesOnlyUncheckedPorts;
             }
-            $portsToCheck = array_values(array_unique($portsToCheck));
             // Check port conflicts in parallel
-            $conflicts = $this->checkPortConflictsInParallel($server, $portsToCheck, $proxyContainerName);
+            $conflicts = $this->checkPortConflictsInParallel($server, $hostAddressesByPort, $proxyContainerName);
             foreach ($conflicts as $port => $conflict) {
                 if ($conflict) {
                     if ($fromUI) {
@@ -102,18 +102,21 @@ class CheckProxy
     /**
      * Check multiple ports for conflicts in parallel
      * Returns an array with port => conflict_status mapping
+     *
+     * @param  array<int, list<string>|null>  $hostAddressesByPort  see ProxyPortParser::hostAddressesByPort()
      */
-    private function checkPortConflictsInParallel(Server $server, array $ports, string $proxyContainerName): array
+    private function checkPortConflictsInParallel(Server $server, array $hostAddressesByPort, string $proxyContainerName): array
     {
-        if (empty($ports)) {
+        if (empty($hostAddressesByPort)) {
             return [];
         }
+        $ports = array_keys($hostAddressesByPort);
 
         try {
             // Build concurrent port check commands
-            $results = Process::concurrently(function ($pool) use ($server, $ports, $proxyContainerName) {
-                foreach ($ports as $port) {
-                    $commands = $this->buildPortCheckCommands($server, $port, $proxyContainerName);
+            $results = Process::concurrently(function ($pool) use ($server, $hostAddressesByPort, $proxyContainerName) {
+                foreach ($hostAddressesByPort as $port => $hostAddresses) {
+                    $commands = $this->buildPortCheckCommands($server, $port, $proxyContainerName, $hostAddresses);
                     $pool->command($commands['ssh_command'])->input($commands['input'])->timeout(10);
                 }
             });
@@ -139,7 +142,7 @@ class CheckProxy
             // Fallback to sequential checking if parallel fails
             $conflicts = [];
             foreach ($ports as $port) {
-                $conflicts[$port] = $this->isPortConflict($server, $port, $proxyContainerName);
+                $conflicts[$port] = $this->isPortConflict($server, $port, $proxyContainerName, $hostAddressesByPort[$port]);
             }
 
             return $conflicts;
@@ -149,9 +152,9 @@ class CheckProxy
     /**
      * Build the SSH command for checking a specific port
      */
-    private function buildPortCheckCommands(Server $server, int $port, string $proxyContainerName): array
+    private function buildPortCheckCommands(Server $server, int $port, string $proxyContainerName, ?array $hostAddresses): array
     {
-        $portCheckScript = $this->buildPortCheckScript($port, $proxyContainerName);
+        $portCheckScript = $this->buildPortCheckScript($port, $proxyContainerName, $hostAddresses);
 
         return [
             'ssh_command' => SshMultiplexingHelper::generateSshBatchCommand($server),
@@ -160,8 +163,36 @@ class CheckProxy
         ];
     }
 
-    private function buildPortCheckScript(int $port, string $proxyContainerName): string
+    /**
+     * Docker can bind a port on its host addresses when other listeners use other specific addresses.
+     * Returns an extended regular expression (for grep -E and preg_match) that matches only the listeners
+     * that block the bind, or null when the proxy binds all addresses: then every listener blocks it.
+     *
+     * @param  list<string>|null  $hostAddresses  normalized IPs from ProxyPortParser::hostAddressesByPort()
+     */
+    private function blockingListenerPattern(int $port, ?array $hostAddresses): ?string
     {
+        if ($hostAddresses === null) {
+            return null;
+        }
+
+        $addresses = ['0\\.0\\.0\\.0', '\\*', '\\[::\\]', '::'];
+        foreach ($hostAddresses as $hostAddress) {
+            $address = str_replace('.', '\\.', $hostAddress);
+            array_push($addresses, $address, '\\['.$address.'\\]');
+        }
+
+        // ss: 100.64.0.1:443, [::]:443, *:443; netstat: :::443; lsof: TCP *:443 (LISTEN). %eth0 is an interface.
+        return '(^|[[:space:]])('.implode('|', $addresses).')(%[^[:space:]]+)?:'.$port.'([[:space:]]|$)';
+    }
+
+    /**
+     * @param  list<string>|null  $hostAddresses
+     */
+    private function buildPortCheckScript(int $port, string $proxyContainerName, ?array $hostAddresses = null): string
+    {
+        $blockingListenerPattern = $this->blockingListenerPattern($port, $hostAddresses);
+        $blockingListenerFilter = $blockingListenerPattern === null ? '' : ' | grep -E '.escapeshellarg($blockingListenerPattern);
 
         $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
         $socketPort = escapeshellarg(':'.$port);
@@ -186,55 +217,42 @@ class CheckProxy
             
             # Try ss command first
             if command -v ss >/dev/null 2>&1; then
-                ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null);
+                ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null$blockingListenerFilter);
                 if [ -z \"\$ss_output\" ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
-                # Filter: only wildcard-bound listeners (0.0.0.0, *, [::], ::) conflict with Docker's 0.0.0.0 binding
-                # Specific IP bindings (e.g., Tailscale 100.x.x.x) coexist via SO_REUSEADDR
-                wildcard_output=\$(echo \"\$ss_output\" | grep -E '(0\\.0\\.0\\.0|\\*|\\[::\\]):{$port}[[:space:]]|:::{$port}[[:space:]]');
-                if [ -z \"\$wildcard_output\" ]; then
-                    echo 'port_free';
-                    exit 0;
-                fi;
-                count=\$(echo \"\$wildcard_output\" | grep -c $portSuffixPattern);
+                count=\$(echo \"\$ss_output\" | grep -c $portSuffixPattern);
                 if [ \$count -eq 0 ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
                 # Check for dual-stack or docker processes
-                if [ \$count -le 2 ] && (echo \"\$wildcard_output\" | grep -q 'docker\\|coolify'); then
+                if [ \$count -le 2 ] && (echo \"\$ss_output\" | grep -q 'docker\\|coolify'); then
                     echo 'port_free';
                     exit 0;
                 fi;
-                echo \"port_conflict|\$wildcard_output\";
+                echo \"port_conflict|\$ss_output\";
                 exit 0;
             fi;
             
             # Try netstat as fallback
             if command -v netstat >/dev/null 2>&1; then
-                netstat_output=\$(netstat -tuln 2>/dev/null | grep $portSuffixPattern);
+                netstat_output=\$(netstat -tuln 2>/dev/null | grep $portSuffixPattern$blockingListenerFilter);
                 if [ -z \"\$netstat_output\" ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
-                # Filter: only wildcard-bound listeners conflict with Docker's 0.0.0.0 binding
-                wildcard_output=\$(echo \"\$netstat_output\" | grep -E '(0\\.0\\.0\\.0|\\*|\\[::\\]):{$port}[[:space:]]|:::{$port}[[:space:]]');
-                if [ -z \"\$wildcard_output\" ]; then
-                    echo 'port_free';
-                    exit 0;
-                fi;
-                count=\$(echo \"\$wildcard_output\" | grep -c 'LISTEN');
+                count=\$(echo \"\$netstat_output\" | grep -c 'LISTEN');
                 if [ \$count -eq 0 ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
-                if [ \$count -le 2 ] && (echo \"\$wildcard_output\" | grep -q 'docker\\|coolify'); then
+                if [ \$count -le 2 ] && (echo \"\$netstat_output\" | grep -q 'docker\\|coolify'); then
                     echo 'port_free';
                     exit 0;
                 fi;
-                echo \"port_conflict|\$wildcard_output\";
+                echo \"port_conflict|\$netstat_output\";
                 exit 0;
             fi;
             
@@ -293,8 +311,10 @@ class CheckProxy
      * Smart port checker that handles dual-stack configurations
      * Returns true only if there's a real port conflict (not just dual-stack)
      */
-    private function isPortConflict(Server $server, int $port, string $proxyContainerName): bool
+    private function isPortConflict(Server $server, int $port, string $proxyContainerName, ?array $hostAddresses = null): bool
     {
+        $blockingListenerPattern = $this->blockingListenerPattern($port, $hostAddresses);
+
         $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
         $socketPort = escapeshellarg(':'.$port);
         $portSuffixPattern = escapeshellarg(':'.$port.' ');
@@ -366,23 +386,15 @@ class CheckProxy
                 // Get the detailed output and listener count
                 $details = trim(implode("\n", array_slice($lines, 0, -1)));
                 $count = intval(trim($lines[count($lines) - 1] ?? '0'));
+                if ($blockingListenerPattern !== null) {
+                    $blockingLines = preg_grep('~'.$blockingListenerPattern.'~', explode("\n", $details));
+                    $details = implode("\n", $blockingLines);
+                    $count = count($blockingLines);
+                }
                 // If no listeners or empty result, port is free
                 if ($count == 0 || empty($details)) {
                     return false;
                 }
-
-                // Filter: only wildcard-bound listeners (0.0.0.0, *, [::], ::) conflict with Docker's 0.0.0.0 binding
-                // Specific IP bindings (e.g., Tailscale 100.x.x.x) coexist via SO_REUSEADDR
-                $detailLines = explode("\n", $details);
-                $wildcardPattern = '/(0\.0\.0\.0|\*|\[::\]):'.preg_quote($port, '/').'(\s|$)|:::'.preg_quote($port, '/').'(\s|$)/';
-                $wildcardLines = array_filter($detailLines, function ($line) use ($wildcardPattern) {
-                    return preg_match($wildcardPattern, $line);
-                });
-                if (empty($wildcardLines)) {
-                    return false;
-                }
-                $details = trim(implode("\n", $wildcardLines));
-                $count = count($wildcardLines);
 
                 // Try to detect if this is our coolify-proxy
                 if (strpos($details, 'docker') !== false || strpos($details, $proxyContainerName) !== false) {
