@@ -309,6 +309,22 @@ describe('Server metrics API', function () {
         Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '/cpu/history?from=2026-11-20T09:00:00Z&to=2026-11-20T10:00:00Z"'));
     });
 
+    test('to in the future reads up to now', function () {
+        enableServerMetricsForTest();
+        $this->travelTo('2026-11-20 12:00:00');
+
+        fakeRemoteProcesses([
+            '*cpu/history*' => Process::result(output: json_encode([['time' => 1787259000000, 'percent' => 3.0]])),
+            '*memory/history*' => Process::result(output: json_encode([['time' => 1787259000000, 'usedPercent' => 4.0]])),
+        ]);
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?from=2026-11-20T09:00:00Z&to=9999-12-31T00:00:00Z")
+            ->assertOk();
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '/cpu/history?from=2026-11-20T09:00:00Z&bucket_ms=60000"'));
+    });
+
     test('types returns disk per mount, network, and load series', function () {
         enableServerMetricsForTest();
 

@@ -50,6 +50,9 @@ trait ValidatesMetricsWindow
 
         $from = CarbonImmutable::parse($request->query('from'))->utc();
         $to = $request->query->has('to') ? CarbonImmutable::parse($request->query('to'))->utc() : null;
+        if ($to?->isFuture()) {
+            $to = null;
+        }
 
         if ($from->lt(now()->subDays($retentionDays))) {
             $this->throwMetricsWindowError('from', $retentionError);
