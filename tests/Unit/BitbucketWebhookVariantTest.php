@@ -150,3 +150,19 @@ describe('BitbucketDataCenterWebhookVariant pushes', function () {
             ->and($context->repositoryIdentifiers[0])->toBe('PROJ/repo');
     });
 });
+
+test('uses only the full name of a bitbucket cloud repository', function () {
+    $request = Request::create('/webhooks/source/bitbucket/events/manual', 'POST', [
+        'repository' => [
+            'full_name' => 'workspace/repo',
+            'slug' => 'repo',
+            'project' => ['key' => 'PROJ'],
+            'links' => ['clone' => [['href' => 'https://bitbucket.org/other/repo.git']]],
+        ],
+        'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => str_repeat('a', 40)]]]]],
+    ], [], [], ['HTTP_X-Event-Key' => 'repo:push']);
+
+    $context = (new BitbucketCloudWebhookVariant)->parse($request);
+
+    expect($context->repositoryIdentifiers)->toBe(['workspace/repo']);
+});

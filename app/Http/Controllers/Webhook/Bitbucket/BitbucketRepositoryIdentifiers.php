@@ -17,12 +17,14 @@ class BitbucketRepositoryIdentifiers
      */
     public static function fromPayload(Collection $payload): array
     {
-        $identifiers = collect();
-
+        // Bitbucket Cloud payloads have `full_name`. Use only that, so Cloud
+        // matching stays the same as before Data Center support.
         $fullName = data_get($payload, 'repository.full_name');
         if (is_string($fullName) && $fullName !== '') {
-            $identifiers->push($fullName);
+            return [$fullName];
         }
+
+        $identifiers = collect();
 
         $repository = data_get($payload, 'repository')
             ?? data_get($payload, 'pullRequest.toRef.repository')
