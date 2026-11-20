@@ -74,7 +74,7 @@ it('allows team admin to update their own team service', function () {
     $user->shouldReceive('canAccess')->with(AccessLevel::Write, $service)->andReturn(true);
 
     $policy = new ServicePolicy;
-    expect($policy->update($user, $service))->toBeTrue();
+    expect($policy->update($user, $service)->allowed())->toBeTrue();
 });
 
 it('denies team member to update their own team service', function () {
@@ -84,7 +84,7 @@ it('denies team member to update their own team service', function () {
     $user->shouldReceive('canAccess')->with(AccessLevel::Write, $service)->andReturn(false);
 
     $policy = new ServicePolicy;
-    expect($policy->update($user, $service))->toBeFalse();
+    expect($policy->update($user, $service)->allowed())->toBeFalse();
 });
 
 it('allows team admin to delete their own team service', function () {

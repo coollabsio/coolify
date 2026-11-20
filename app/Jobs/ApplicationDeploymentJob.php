@@ -25,6 +25,7 @@ use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\ImageScan\DeploymentImageScan;
+use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -3860,6 +3861,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ['commit_message' => $commit_message->value()]
             );
         }
+        $this->detectUnlinkedConfigFile();
+    }
+
+    private function detectUnlinkedConfigFile(): void
+    {
+        $hint = app(UnlinkedConfigFileHint::class);
+        if (! $hint->shouldCheck($this->application, $this->pull_request_id)) {
+            return;
+        }
+        $this->execute_remote_command([$hint->command($this->deployment_uuid, $this->basedir), 'hidden' => true, 'save' => 'coolify_json_file']);
+        $hint->record($this->application, $this->application_deployment_queue, $this->saved_outputs->get('coolify_json_file'));
     }
 
     /**

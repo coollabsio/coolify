@@ -58,12 +58,12 @@ class RepositoryDetector
         $maxEnvBytes = self::MAX_ENV_FILE_BYTES;
 
         $classifyFiles = <<<'AWK'
-{ split($1, meta, " "); if (meta[1] != "100644" && meta[1] != "100755") next; path = $2; lower = tolower(path); name = lower; sub(/.*\//, "", name); if (name ~ /^dockerfile(\.[a-z0-9_-]+)?$/) kind = "dockerfile"; else if (name ~ /^(docker-)?compose\.ya?ml$/) kind = "compose"; else if (lower ~ /^\.env\.(example|sample|template|dist|local\.example)$/) kind = "env"; else next; print kind "\t" meta[3] "\t" path }
+{ split($1, meta, " "); if (meta[1] != "100644" && meta[1] != "100755") next; path = $2; lower = tolower(path); name = lower; sub(/.*\//, "", name); if (name ~ /^dockerfile(\.[a-z0-9_-]+)?$/) kind = "dockerfile"; else if (name ~ /^(docker-)?compose\.ya?ml$/) kind = "compose"; else if (lower ~ /^\.env\.(example|sample|template|dist|local\.example)$/) kind = "env"; else if (lower == "coolify.json") kind = "config"; else next; print kind "\t" meta[3] "\t" path }
 AWK;
         $exposedPort = <<<'AWK'
 { sub(/\r$/, "") } toupper($1) == "EXPOSE" { split($2, p, "/"); if (p[1] ~ /^[0-9]+$/ && p[1] + 0 > 0 && p[1] + 0 <= 65535) print p[1] + 0; exit }
 AWK;
-        $summary = '{dockerfiles: map(select(.kind == "dockerfile") | .file), dockerComposeFiles: map(select(.kind == "compose") | .file), envFiles: (map(select(.kind == "env") | {(.file): .content}) | add // {}), dockerfilePorts: (map(select(.kind == "dockerfile") | {(.file): .port}) | add // {})}';
+        $summary = '{dockerfiles: map(select(.kind == "dockerfile") | .file), dockerComposeFiles: map(select(.kind == "compose") | .file), envFiles: (map(select(.kind == "env") | {(.file): .content}) | add // {}), dockerfilePorts: (map(select(.kind == "dockerfile") | {(.file): .port}) | add // {}), configFile: (map(select(.kind == "config") | .file) | first // null)}';
 
         $scan = 'tab=$(printf "\t"); '
             ."git -c core.quotePath=false ls-tree -r {$tree} | awk -F '\\t' ".escapeshellarg($classifyFiles)
@@ -71,6 +71,7 @@ AWK;
             .'dockerfile) port=$(git cat-file blob "$object" | awk '.escapeshellarg($exposedPort).'); '
             .'jq -nc --arg file "$file" --argjson port "${port:-null}" \'{kind: "dockerfile", file: $file, port: $port}\' ;; '
             .'compose) jq -nc --arg file "$file" \'{kind: "compose", file: $file}\' ;; '
+            .'config) jq -nc --arg file "$file" \'{kind: "config", file: $file}\' ;; '
             ."env) git cat-file blob \"\$object\" | head -c {$maxEnvBytes} | jq -Rsc --arg file \"\$file\" '{kind: \"env\", file: \$file, content: .}' ;; "
             .'esac; done | jq -sc '.escapeshellarg($summary);
 
@@ -108,6 +109,7 @@ AWK;
             dockerComposeFiles: $this->sortByPreference(array_filter($data['dockerComposeFiles'] ?? [], 'is_string'), '/^docker-compose\.ya?ml$/i'),
             envFiles: array_filter($data['envFiles'] ?? [], fn ($content) => is_string($content) || $content === null),
             dockerfilePorts: $dockerfilePorts,
+            configFile: is_string($data['configFile'] ?? null) ? $data['configFile'] : null,
         );
     }
 

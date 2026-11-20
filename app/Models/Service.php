@@ -91,6 +91,7 @@ class Service extends BaseModel
     protected function casts(): array
     {
         return [
+            'config_meta' => 'array',
             'is_maintenance_enabled' => 'boolean',
         ];
     }

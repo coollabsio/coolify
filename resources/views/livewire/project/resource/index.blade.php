@@ -25,6 +25,9 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 sm:shrink-0">
+                @if ($configStatus)
+                    <x-project-config.sync-badge :status="$configStatus" :href="$configUrl" class="mr-2" />
+                @endif
                 @if ($environment->isEmpty())
                     {{-- The list toolbar (with its canvas switch) is hidden when there are no resources. --}}
                     <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
@@ -49,17 +52,29 @@
             </div>
         </header>
 
+        @if ($configStatus && $configStatus['needs_attention'])
+            <x-project-config.attention :status="$configStatus" :href="$configUrl" class="mb-4" />
+        @endif
+
         @if ($environment->isEmpty())
             @can('createAnyResource', [$environment])
                 <x-empty title="No resources yet"
                     description="Add an application, database, or service to this environment."
                     icon-name="layers">
                     <x-slot:contents>
-                        <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
-                            {{ wireNavigate() }} class="button">
-                            <x-reicon name="plus" class="size-3.5" />
-                            Add resource
-                        </a>
+                        <div class="flex flex-wrap items-center justify-center gap-2">
+                            <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                                {{ wireNavigate() }} class="button">
+                                <x-reicon name="plus" class="size-3.5" />
+                                Add resource
+                            </a>
+                            @unless ($configStatus)
+                                <a href="{{ $configUrl }}" {{ wireNavigate() }} class="button" title="Create the resources from a coolify.json file">
+                                    <x-reicon name="file-content" class="size-3.5" />
+                                    Use a config file
+                                </a>
+                            @endunless
+                        </div>
                     </x-slot:contents>
                 </x-empty>
             @else
@@ -194,6 +209,7 @@
                                         {{ wireNavigate() }}
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
+                                    <span x-show="item.managed" x-cloak title="Managed by coolify.json" class="relative inline-flex shrink-0 text-neutral-400 dark:text-fg-faint"><x-reicon name="file-content" class="size-3.5" /></span>
                                     <x-image-scan.marker bind="item.security" class="relative" />
                                 </div>
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
@@ -291,6 +307,7 @@
                                         <h2
                                             class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                             x-text="item.name"></h2>
+                                        <span x-show="item.managed" x-cloak title="Managed by coolify.json" class="relative inline-flex shrink-0 text-neutral-400 dark:text-fg-faint"><x-reicon name="file-content" class="size-3.5" /></span>
                                         <x-image-scan.marker bind="item.security" class="relative" />
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"

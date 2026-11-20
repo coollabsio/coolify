@@ -88,6 +88,15 @@ class Show extends Component
 
     public bool $is_really_required = false;
 
+    /**
+     * How coolify.json sets this variable: value, required, generate, or ref.
+     */
+    #[Locked]
+    public ?string $configForm = null;
+
+    #[Locked]
+    public bool $configValueMissing = false;
+
     public bool $is_redis_credential = false;
 
     public bool $isValueHidden = false;
@@ -282,6 +291,7 @@ class Show extends Component
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
             $this->isValueHidden = $this->valuesHiddenForUser();
+            $this->syncConfigForm();
 
             if ($this->valuesLoaded) {
                 $this->hydrateValueFields();
@@ -293,6 +303,14 @@ class Show extends Component
                 $this->is_really_required = $this->is_required;
             }
         }
+    }
+
+    private function syncConfigForm(): void
+    {
+        $this->configForm = $this->env instanceof ModelsEnvironmentVariable ? ($this->env->config_meta['form'] ?? null) : null;
+        // Decrypts only file-required values, and only to know if one is set.
+        $this->configValueMissing = $this->configForm === 'required'
+            && blank($this->valuesLoaded ? $this->env->value : ModelsEnvironmentVariable::query()->whereKey($this->env->getKey())->first(['id', 'value'])?->value);
     }
 
     private function hydrateValueFields(): void

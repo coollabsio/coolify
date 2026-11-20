@@ -10,6 +10,11 @@ use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use App\Services\Access\AccessResolver;
+use App\Services\ProjectConfig\AdapterRegistry;
+use App\Services\ProjectConfig\Adapters\ApplicationAdapter;
+use App\Services\ProjectConfig\Adapters\ServiceAdapter;
+use App\Services\ProjectConfig\Adapters\StandaloneDatabaseAdapter;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use App\Support\AtomicFilesystem;
 use App\Support\RetryHttpConnectionFailures;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +39,12 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->scoped(ConfigPushRouter::class);
+        $this->app->singleton(AdapterRegistry::class, fn () => new AdapterRegistry([
+            new ApplicationAdapter,
+            new ServiceAdapter,
+            ...array_map(fn (string $type) => new StandaloneDatabaseAdapter($type), array_keys(StandaloneDatabaseAdapter::TYPES)),
+        ]));
         $this->app->scoped(AccessResolver::class);
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
 
@@ -72,7 +83,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function configureServerTransferImport(): void
     {
-        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import');
+        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import', 'api/v1/environments/*/config/*', 'api/v1/config/*');
         TrimStrings::skipWhen($isImport);
         ConvertEmptyStringsToNull::skipWhen($isImport);
     }

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitea\Change as GiteaSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitea extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -152,6 +154,7 @@ class Gitea extends Controller
                     ]);
                 }
                 $commit = $this->webhookCommitSha($payload, 'after');
+                $this->beginConfigPush($gitea_app, data_get($payload, 'repository.full_name'), $branch, $commit);
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);
@@ -413,6 +416,9 @@ class Gitea extends Controller
                 return response('Nothing to do. Invalid repository.');
             }
             $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
+            if ($x_gitea_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $x_hub_signature_256));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
