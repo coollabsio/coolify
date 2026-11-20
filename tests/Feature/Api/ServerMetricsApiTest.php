@@ -56,6 +56,18 @@ function serverMetricsHeaders(): array
     ];
 }
 
+function enableServerMetricsForTest(): void
+{
+    ServerSetting::withoutEvents(function () {
+        test()->server->settings->update([
+            'is_metrics_enabled' => true,
+            'sentinel_token' => 'server-metrics-test-token',
+        ]);
+    });
+
+    test()->server->settings->refresh();
+}
+
 describe('Server metrics API', function () {
     test('read token can access metrics endpoint', function () {
         $this->withHeaders(serverMetricsHeaders())
@@ -278,6 +290,92 @@ describe('Server metrics API', function () {
                 "/api/v1/servers/{$this->server->uuid}/metrics",
             )
             ->assertForbidden();
+    });
+
+    test('from and to set the Sentinel history window', function () {
+        enableServerMetricsForTest();
+        $this->travelTo('2026-11-20 12:00:00');
+
+        fakeRemoteProcesses([
+            '*cpu/history*' => Process::result(output: json_encode([['time' => 1787259000000, 'percent' => 3.0]])),
+            '*memory/history*' => Process::result(output: json_encode([['time' => 1787259000000, 'usedPercent' => 4.0]])),
+        ]);
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?from=2026-11-20T09:00:00Z&to=2026-11-20T10:00:00%2B00:00")
+            ->assertOk()
+            ->assertExactJson(['cpu' => [[1787259000000, 3.0]], 'memory' => [[1787259000000, 4.0]]]);
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '/cpu/history?from=2026-11-20T09:00:00Z&to=2026-11-20T10:00:00Z"'));
+    });
+
+    test('types returns disk per mount, network, and load series', function () {
+        enableServerMetricsForTest();
+
+        fakeRemoteProcesses([
+            '*disk/history*' => Process::result(output: json_encode([
+                ['time' => 1000, 'mount' => '/', 'usedPercent' => 40.0],
+                ['time' => 1000, 'mount' => '/boot', 'usedPercent' => 90.0],
+                ['time' => 2000, 'mount' => '/', 'usedPercent' => 41.0],
+            ])),
+            '*network/history*' => Process::result(output: json_encode([
+                ['time' => 1000, 'rxBytesPerSec' => 100, 'txBytesPerSec' => 10],
+            ])),
+            '*load/history*' => Process::result(output: json_encode([
+                ['time' => 1000, 'load1' => 0.5, 'load5' => 1.0, 'load15' => 1.5],
+            ])),
+        ]);
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?types=disk,network,load")
+            ->assertOk()
+            ->assertExactJson([
+                'disk' => ['/' => [[1000, 40.0], [2000, 41.0]], '/boot' => [[1000, 90.0]]],
+                'network' => ['rx' => [[1000, 100.0]], 'tx' => [[1000, 10.0]]],
+                'load' => ['load1' => [[1000, 0.5]], 'load5' => [[1000, 1.0]], 'load15' => [[1000, 1.5]]],
+            ]);
+    });
+
+    test('requested types are null when metrics are disabled', function () {
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?types=disk,load")
+            ->assertOk()
+            ->assertExactJson(['disk' => null, 'load' => null]);
+    });
+
+    test('unknown type returns validation error', function () {
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?types=cpu,gpu")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.types.0', 'Unknown metric types: gpu. Use cpu, memory, disk, network, or load.');
+    });
+
+    test('minutes cannot be combined with from', function () {
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?minutes=5&from=".now()->subHour()->toIso8601ZuluString())
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('minutes');
+    });
+
+    test('to must be after from', function () {
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?from=2026-11-20T10:00:00Z&to=2026-11-20T09:00:00Z")
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('to');
+    });
+
+    test('from cannot be older than configured Sentinel retention', function () {
+        ServerSetting::withoutEvents(fn () => $this->server->settings->update(['sentinel_metrics_history_days' => 7]));
+        $this->travelTo('2026-11-20 12:00:00');
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?from=2026-11-13T11:59:00Z")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.from.0', 'The requested metrics history exceeds the configured Sentinel retention period of 7 day(s).');
+
+        $this->withHeaders(serverMetricsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/metrics?from=2026-11-13T12:01:00Z")
+            ->assertOk();
     });
 
     test('request without token is rejected', function () {

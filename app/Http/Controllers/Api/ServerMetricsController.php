@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ValidatesMetricsWindow;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
 use Illuminate\Http\JsonResponse;
@@ -9,11 +10,17 @@ use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Throwable;
 
+#[OA\Parameter(parameter: 'MetricsMinutes', name: 'minutes', in: 'query', required: false, description: 'Number of minutes of metric history before now. Cannot be sent with from or to. Cannot exceed the Sentinel metrics retention period of the server.', schema: new OA\Schema(type: 'integer', default: 10, minimum: 1))]
+#[OA\Parameter(parameter: 'MetricsFrom', name: 'from', in: 'query', required: false, description: 'Start of the metric history, as an ISO 8601 date. Cannot be older than the Sentinel metrics retention period of the server. The window length is rounded up to whole minutes, so the history can start up to a minute before from.', schema: new OA\Schema(type: 'string', format: 'date-time', example: '2026-11-20T08:00:00Z'))]
+#[OA\Parameter(parameter: 'MetricsTo', name: 'to', in: 'query', required: false, description: 'End of the metric history, as an ISO 8601 date after from. Needs from. Defaults to now.', schema: new OA\Schema(type: 'string', format: 'date-time', example: '2026-11-20T09:00:00Z'))]
+
 class ServerMetricsController extends Controller
 {
+    use ValidatesMetricsWindow;
+
     #[OA\Get(
         summary: 'Get server metrics',
-        description: 'Get CPU and memory usage history collected by Sentinel for a server owned by the authenticated team. Each data point is [unix_timestamp_ms, used_percent]. cpu and memory are null when metrics are disabled for the server.',
+        description: 'Get the metric history that Sentinel collects for a server owned by the authenticated team. Send minutes, or from with an optional to. The response has only the requested types. Each type is null when metrics are disabled for the server.',
         path: '/servers/{uuid}/metrics',
         operationId: 'get-server-metrics',
         security: [['bearerAuth' => []]],
@@ -26,41 +33,53 @@ class ServerMetricsController extends Controller
                 description: 'Server UUID',
                 schema: new OA\Schema(type: 'string'),
             ),
+            new OA\Parameter(ref: '#/components/parameters/MetricsMinutes'),
+            new OA\Parameter(ref: '#/components/parameters/MetricsFrom'),
+            new OA\Parameter(ref: '#/components/parameters/MetricsTo'),
             new OA\Parameter(
-                name: 'minutes',
+                name: 'types',
                 in: 'query',
                 required: false,
-                description: 'Number of minutes of metric history to return. Cannot exceed the server configured Sentinel metrics retention period.',
-                schema: new OA\Schema(
-                    type: 'integer',
-                    default: 10,
-                    minimum: 1,
-                ),
+                description: 'Comma-separated metric types: cpu, memory, disk, network, load.',
+                schema: new OA\Schema(type: 'string', default: 'cpu,memory', example: 'cpu,memory,disk'),
             ),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Server CPU and memory metrics.',
+                description: 'Server metrics of the requested types.',
                 content: new OA\JsonContent(
                     properties: [
+                        new OA\Property(property: 'cpu', ref: '#/components/schemas/MetricSeries', description: 'CPU usage in percent.'),
+                        new OA\Property(property: 'memory', ref: '#/components/schemas/MetricSeries', description: 'Memory usage in percent.'),
                         new OA\Property(
-                            property: 'cpu',
-                            type: 'array',
+                            property: 'disk',
+                            type: 'object',
                             nullable: true,
-                            items: new OA\Items(
-                                type: 'array',
-                                items: new OA\Items(type: 'number'),
-                            ),
+                            description: 'Disk usage in percent, keyed by mount path.',
+                            additionalProperties: new OA\AdditionalProperties(ref: '#/components/schemas/MetricSeries'),
+                            example: ['/' => [[1787259000000, 41.2]]],
                         ),
                         new OA\Property(
-                            property: 'memory',
-                            type: 'array',
+                            property: 'network',
+                            type: 'object',
                             nullable: true,
-                            items: new OA\Items(
-                                type: 'array',
-                                items: new OA\Items(type: 'number'),
-                            ),
+                            description: 'Received and sent bytes per second.',
+                            properties: [
+                                new OA\Property(property: 'rx', ref: '#/components/schemas/MetricSeries'),
+                                new OA\Property(property: 'tx', ref: '#/components/schemas/MetricSeries'),
+                            ],
+                        ),
+                        new OA\Property(
+                            property: 'load',
+                            type: 'object',
+                            nullable: true,
+                            description: 'Load averages over 1, 5, and 15 minutes.',
+                            properties: [
+                                new OA\Property(property: 'load1', ref: '#/components/schemas/MetricSeries'),
+                                new OA\Property(property: 'load5', ref: '#/components/schemas/MetricSeries'),
+                                new OA\Property(property: 'load15', ref: '#/components/schemas/MetricSeries'),
+                            ],
                         ),
                     ],
                     type: 'object',
@@ -90,19 +109,6 @@ class ServerMetricsController extends Controller
             return invalidTokenResponse();
         }
 
-        $validator = customApiValidator($request->query(), [
-            'minutes' => 'sometimes|integer|min:1',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $minutes = (int) $request->query('minutes', 10);
-
         $server = Server::whereTeamId($teamId)
             ->whereUuid($request->uuid)
             ->first();
@@ -115,25 +121,24 @@ class ServerMetricsController extends Controller
 
         $this->authorize('view', $server);
 
-        $retentionDays = (int) $server->settings->sentinel_metrics_history_days;
-        $maxMinutes = $retentionDays * 24 * 60;
+        [$minutes, $to] = $this->metricsWindow($request, $server, [
+            'types' => ['bail', 'sometimes', 'string', function (string $attribute, mixed $value, \Closure $fail) {
+                $unknown = array_diff(explode(',', (string) $value), array_keys(Server::SERVER_METRIC_TYPES));
+                if ($unknown !== []) {
+                    $fail('Unknown metric types: '.implode(', ', $unknown).'. Use cpu, memory, disk, network, or load.');
+                }
+            }],
+        ]);
 
-        if ($minutes > $maxMinutes) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'minutes' => [
-                        "The requested metrics history exceeds the configured Sentinel retention period of {$retentionDays} day(s).",
-                    ],
-                ],
-            ], 422);
-        }
+        $types = array_unique(explode(',', (string) $request->query('types', 'cpu,memory')));
 
         try {
-            return response()->json([
-                'cpu' => $server->getCpuMetrics($minutes),
-                'memory' => $server->getMemoryMetrics($minutes),
-            ]);
+            $metrics = [];
+            foreach ($types as $type) {
+                $metrics[$type] = $server->getServerMetrics($type, $minutes, $to);
+            }
+
+            return response()->json($metrics);
         } catch (Throwable $e) {
             report($e);
 
