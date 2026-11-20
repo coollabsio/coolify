@@ -139,7 +139,7 @@ class DatabasesController extends Controller
 
     private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -219,7 +219,7 @@ class DatabasesController extends Controller
     private function createdDatabasePayload(Request $request, $database): array
     {
         $payload = ['uuid' => $database->uuid];
-        if ($request->attributes->get('can_read_sensitive', false) !== true) {
+        if (! canReadResourceSecretsFromApi($database)) {
             return $payload;
         }
         $payload['internal_db_url'] = $database->internal_db_url;
@@ -236,7 +236,7 @@ class DatabasesController extends Controller
             'id',
             'laravel_through_key',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($database)) {
             $database->makeVisible([
                 'internal_db_url',
                 'external_db_url',
@@ -373,7 +373,7 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases($databaseRelations));
         }
 
-        if ($request->attributes->get('can_read_sensitive', false) === true) {
+        if ($request->attributes->get('has_read_sensitive_ability', false) === true) {
             // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
             $databases
                 ->filter(fn ($database) => $database instanceof StandaloneRedis || $database instanceof StandaloneKeydb || $database instanceof StandaloneDragonfly)
@@ -2933,6 +2933,7 @@ class DatabasesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_backups', in: 'query', required: false, description: 'Delete the database and storage backups, on the server and on S3.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -2994,7 +2995,8 @@ class DatabasesController extends Controller
             deleteVolumes: $request->boolean('delete_volumes', true),
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
-            dockerCleanup: $request->boolean('docker_cleanup', true)
+            dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteBackups: $request->boolean('delete_backups', false),
         );
 
         auditLog('api.database.deleted', [
@@ -3011,7 +3013,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup configuration',
-        description: 'Deletes a backup configuration and all its executions.',
+        description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}',
         operationId: 'delete-backup-configuration-by-uuid',
         security: [
@@ -3098,12 +3100,13 @@ class DatabasesController extends Controller
             DB::beginTransaction();
             // Get all executions for this backup configuration
             $executions = $backup->executions()->get();
+            $server = $database->destination?->server;
+            $deleteLocalFiles = $server?->isFunctional() ?? false;
 
-            // Delete all execution files (locally and optionally from S3)
+            // Delete all execution files (locally when the server is reachable, and optionally from S3)
             foreach ($executions as $execution) {
-                if ($execution->filename) {
-                    deleteBackupsLocally($execution->filename, $database->destination->server);
-
+                if ($deleteLocalFiles && $execution->filename && ! $execution->local_storage_deleted) {
+                    deleteBackupsLocally($execution->filename, $server, throwError: true);
                 }
 
                 if ($deleteS3) {
@@ -3137,7 +3140,7 @@ class DatabasesController extends Controller
 
     #[OA\Delete(
         summary: 'Delete backup execution',
-        description: 'Deletes a specific backup execution.',
+        description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.',
         path: '/databases/{uuid}/backups/{scheduled_backup_uuid}/executions/{execution_uuid}',
         operationId: 'delete-backup-execution-by-uuid',
         security: [
@@ -3237,9 +3240,10 @@ class DatabasesController extends Controller
         $deleteS3 = $request->boolean('delete_s3', false);
 
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $database->destination->server);
-
+            // An unreachable server keeps the local file, as when the UI skips the local delete.
+            $server = $database->destination?->server;
+            if ($execution->filename && ! $execution->local_storage_deleted && ($server?->isFunctional() ?? false)) {
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
             }
 
             if ($deleteS3) {
@@ -3820,7 +3824,7 @@ class DatabasesController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($env)) {
             $env->makeVisible([
                 'value',
                 'real_value',
@@ -5420,7 +5424,7 @@ class DatabasesController extends Controller
     private function redactBackupExecutionMessage(ScheduledDatabaseBackupExecution $execution, ?Model $database, array &$secretsByDatabase): void
     {
         $message = $execution->message;
-        if (request()->attributes->get('can_read_sensitive', false) !== true || ! is_string($message) || ! $database) {
+        if (! is_string($message) || ! canReadResourceSecretsFromApi($database)) {
             $execution->setAttribute('message', null);
 
             return;

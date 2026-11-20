@@ -17,10 +17,12 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
+use App\Models\User;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -760,9 +762,43 @@ class Github extends Controller
         $github_app->client_secret = $client_secret;
         $github_app->webhook_secret = $webhook_secret;
         $github_app->private_key_id = $private_key->id;
+        $ownerMismatch = $this->syncGithubAppOwner($github_app, (array) data_get($data, 'owner'));
         $github_app->save();
 
-        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        $redirect = redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+
+        return $ownerMismatch ? $redirect->with('error', $ownerMismatch) : $redirect;
+    }
+
+    /**
+     * GitHub registers the App on the account that it shows in its form, not always on the organization
+     * of the manifest URL (for example, when the user cannot manage GitHub Apps of that organization).
+     * Store the real owner, so that the install, permission, and runner settings point to it.
+     *
+     * @param  array{login?: string, type?: string}  $owner
+     * @return string|null The warning for the user when the owner is not the requested organization
+     */
+    private function syncGithubAppOwner(GithubApp $github_app, array $owner): ?string
+    {
+        $login = data_get($owner, 'login');
+        if (blank($login)) {
+            return null;
+        }
+
+        $requested = normalizeGithubOrganization($github_app->organization);
+        $isOrganization = data_get($owner, 'type') === 'Organization';
+        $github_app->organization = $isOrganization ? $login : null;
+
+        if (blank($requested) || ($isOrganization && strcasecmp($requested, $login) === 0)) {
+            return null;
+        }
+
+        [$login, $requested] = [e($login), e($requested)];
+        $account = data_get($owner, 'type') === 'User' ? "personal account {$login}" : "account {$login}";
+
+        return "GitHub registered this GitHub App on your {$account}, not on the organization {$requested}. "
+            ."It can only be installed on {$login}. Make sure that your GitHub user is an owner or a GitHub App manager of {$requested}, "
+            .'then delete this GitHub App on GitHub and in Coolify, and create it again.';
     }
 
     public function install(Request $request)
@@ -783,7 +819,7 @@ class Github extends Controller
             action: 'install',
         );
 
-        $verification_error = $this->githubInstallationVerificationError($github_app, $installation_id);
+        [$installation, $verification_error] = $this->verifiedGithubInstallation($github_app, $installation_id);
         if ($verification_error) {
             Log::warning('GitHub App installation could not be verified.', [
                 'github_app_id' => $github_app->id,
@@ -799,10 +835,67 @@ class Github extends Controller
                 ->with('error', $message);
         }
 
-        $github_app->installation_id = $installation_id;
-        $github_app->save();
+        $source = $this->sourceForGithubInstallation($github_app, $installation_id, $installation, $request->user());
+        $source->installation_id = $installation_id;
+        $source->installation_account = data_get($installation, 'account.login');
+        $source->deployments = data_get($installation, 'permissions.deployments');
+        $source->save();
 
-        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        $redirect = redirect()->route('source.github.show', ['github_app_uuid' => $source->uuid]);
+
+        return $source->is($github_app)
+            ? $redirect
+            : $redirect->with('success', 'Added a new source for this installation. Each account that installs the GitHub App has its own source.');
+    }
+
+    /**
+     * One GitHub App can be installed on several accounts. Each installation is its own source,
+     * so an installation on another account must not replace the installation that applications already use.
+     */
+    private function sourceForGithubInstallation(GithubApp $github_app, string $installation_id, array $installation, User $user): GithubApp
+    {
+        if ($this->installationReplacesSourceInstallation($github_app, $installation_id, $installation)) {
+            return $github_app;
+        }
+
+        $existing = GithubApp::where('team_id', $github_app->team_id)
+            ->where('api_url', $github_app->api_url)
+            ->where('app_id', $github_app->app_id)
+            ->where('installation_id', $installation_id)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        // Runner groups and approved permissions belong to one installation.
+        $source = $github_app->replicate(['uuid', 'installation_id', 'installation_account', 'deployments', 'runner_group_id']);
+        $source->is_system_wide = $github_app->is_system_wide && $user->can('makeSystemWide', GithubApp::class);
+
+        return $source;
+    }
+
+    /**
+     * The new installation replaces the current one when the source has none yet, or when the
+     * current installation was removed at GitHub or belongs to the same account (a reinstall).
+     */
+    private function installationReplacesSourceInstallation(GithubApp $github_app, string $installation_id, array $installation): bool
+    {
+        if (blank($github_app->installation_id) || (string) $github_app->installation_id === $installation_id) {
+            return true;
+        }
+
+        try {
+            $response = $this->requestGithubInstallation($github_app, (string) $github_app->installation_id);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        if ($response->notFound()) {
+            return true;
+        }
+
+        return $response->successful()
+            && data_get($response->json(), 'account.id') === data_get($installation, 'account.id');
     }
 
     private function redirectAfterGithubAppInstallationUpdate(string $installation_id): RedirectResponse
@@ -825,38 +918,43 @@ class Github extends Controller
      * unauthenticated-reachable GET callback, so it must be confirmed against
      * the GitHub API using the App's own credentials before it is persisted.
      *
-     * @return string|null The reason the verification failed, or null when it passed.
+     * @return array{0: array<string, mixed>, 1: null}|array{0: null, 1: string} The installation, or the reason the verification failed.
      */
-    private function githubInstallationVerificationError(GithubApp $github_app, string $installation_id): ?string
+    private function verifiedGithubInstallation(GithubApp $github_app, string $installation_id): array
     {
         if (blank($github_app->app_id) || blank(githubAppPrivateKey($github_app)?->private_key)) {
-            return 'The GitHub App ID or private key is missing.';
+            return [null, 'The GitHub App ID or private key is missing.'];
         }
 
         try {
-            $jwt = generateGithubJwt($github_app);
-            $response = Http::GitSource($github_app->api_url)->withHeaders([
-                'Authorization' => "Bearer $jwt",
-                'Accept' => 'application/vnd.github+json',
-            ])
-                ->timeout(10)
-                ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+            $response = $this->requestGithubInstallation($github_app, $installation_id);
             if (! $response->successful()) {
                 assertGithubClockInSync($response);
             }
         } catch (\Throwable $e) {
-            return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
+            return [null, strip_tags(str_replace('<br>', ' ', $e->getMessage()))];
         }
 
         if (! $response->successful()) {
-            return "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found');
+            return [null, "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found')];
         }
 
-        if ((string) data_get($response->json(), 'app_id') !== (string) $github_app->app_id) {
-            return 'The installation belongs to a different GitHub App.';
+        $installation = $response->json();
+        if (! is_array($installation) || (string) data_get($installation, 'app_id') !== (string) $github_app->app_id) {
+            return [null, 'The installation belongs to a different GitHub App.'];
         }
 
-        return null;
+        return [$installation, null];
+    }
+
+    private function requestGithubInstallation(GithubApp $github_app, string $installation_id): Response
+    {
+        return Http::GitSource($github_app->api_url)->withHeaders([
+            'Authorization' => 'Bearer '.generateGithubJwt($github_app),
+            'Accept' => 'application/vnd.github+json',
+        ])
+            ->timeout(10)
+            ->get("{$github_app->api_url}/app/installations/{$installation_id}");
     }
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp

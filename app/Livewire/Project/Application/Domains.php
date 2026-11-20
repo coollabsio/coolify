@@ -717,9 +717,9 @@ class Domains extends Component
         $this->authorize('update', $this->application);
     }
 
-    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    protected function dnsTargetServer(): ?Server
     {
-        return $this->application->destination?->server?->id === 0;
+        return $this->application->destination?->server;
     }
 
     public function checkAllDns(): void

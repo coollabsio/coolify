@@ -101,7 +101,7 @@
                                 ['value' => true, 'label' => 'Raw (deploy file as-is)'],
                             ]" :disabled="! $canUpdate" />
                         <x-forms.listbox id="isConnectToDockerNetworkEnabled" label="Predefined network" onChange="instantSave"
-                            helper="By default a compose resource only gets its own internal network. Connecting to a Coolify predefined network may require different internal DNS names. More info <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>here</a>."
+                            helper="By default a compose resource only gets its own internal network. Connecting to a Coolify predefined network may require different internal DNS names.<br><br>Production and its preview deployments share this network: a service name such as <b>db</b> resolves to the production container, also from a preview. Use <b>${SERVICE_NAME_DB}</b> as the hostname to reach the service of the same deployment. More info <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/applications/deployments/preview-deployments#docker-compose-preview-names'>here</a>."
                             :options="[
                                 ['value' => false, 'label' => 'Isolated network only'],
                                 ['value' => true, 'label' => 'Connect to predefined network'],

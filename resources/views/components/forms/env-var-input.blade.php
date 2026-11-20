@@ -1,4 +1,4 @@
-<div class="w-full">
+<div class="w-full" x-data="{ hasEdgeSpace: false }">
     @if ($label)
         <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
             <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
@@ -22,6 +22,9 @@
             availableVars: @js($availableVars),
             hasVaultSource: @js($hasVaultSource),
             vaultKeysLoading: false,
+            checkEdgeSpace() {
+                this.hasEdgeSpace = /^\s|\s$/.test(this.$refs.input?.value || '');
+            },
             get availableScopes() {
                 // Only include scopes that have at least one variable
                 const allScopes = ['team', 'project', 'environment', 'server'];
@@ -224,11 +227,11 @@
                 }
             }
         }"
-        @click.outside="showDropdown = false">
+        @click.outside="showDropdown = false" x-init="$nextTick(() => checkEdgeSpace())">
 
         <input
             x-ref="input"
-            @input="handleInput()"
+            @input="handleInput(); checkEdgeSpace()"
             @keydown="handleKeydown($event)"
             @click="handleInput()"
             autocomplete="{{ $autocomplete }}"
@@ -310,6 +313,9 @@
         </div>
     </div>
 
+    <p x-cloak x-show="hasEdgeSpace" class="mt-1 text-xs text-warning">
+        The value starts or ends with a space. Coolify keeps the space.
+    </p>
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif

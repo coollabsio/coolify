@@ -63,6 +63,9 @@ class DeploymentGateTestJob extends ApplicationDeploymentJob
     /** @var array<string, string> */
     public array $outputs = [];
 
+    /** @var list<string> Parts of commands that fail. */
+    public array $failures = [];
+
     /** Stop at the container start, or let the job go on. */
     public bool $stopAtStart = true;
 
@@ -75,6 +78,12 @@ class DeploymentGateTestJob extends ApplicationDeploymentJob
         foreach ($commands as $command) {
             $text = (string) ($command['command'] ?? $command[0]);
             $this->commands[] = $text;
+
+            foreach ($this->failures as $needle) {
+                if (str_contains($text, $needle)) {
+                    throw new DeploymentException("Command failed: {$needle}", 1);
+                }
+            }
 
             if ($this->stopAtStart && preg_match('/ up (--pull always )?--build -d|stack deploy/', $text) === 1) {
                 throw new DeploymentGateStarted('started');
@@ -733,6 +742,35 @@ it('keeps the compose pull of a Docker image when the gate is off', function () 
         ->and(collect($job->commands)->contains(fn (string $command) => preg_match('/docker compose .* pull/', $command) === 1))->toBeTrue()
         ->and(Yaml::parse((new ReflectionProperty(ApplicationDeploymentJob::class, 'docker_compose'))->getValue($job))['services']['gate-app']['image'])->toBe('nginx:1.27');
 });
+
+it('starts a Docker image that is only on the server when the pull fails (#6122)', function (bool $gateOn) {
+    if ($gateOn) {
+        deployGatePolicy();
+        ScanImage::shouldRun()->once()->andReturn(deployGateReturnedScan([]));
+    }
+    $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'private/my-image', 'docker_registry_image_tag' => 'latest']);
+    $job = deployGateJob(['production_image_name' => 'private/my-image:latest']);
+    // A local image has no repo digest.
+    $job->outputs = ['docker image inspect' => GATE_IMAGE_ID.' '];
+    $job->failures = ['docker pull', '/artifacts/gate-deployment pull'];
+
+    expect(deployGateReachesStart($job))->toBeTrue()
+        ->and(deployGateLogs())->toContain('Could not pull the image (private/my-image:latest) from the registry. Using the image that is already on the server.');
+})->with(['gate off' => false, 'gate on' => true]);
+
+it('stops the deployment when the pull of a Docker image fails and the image is not on the server', function (bool $gateOn) {
+    if ($gateOn) {
+        deployGatePolicy();
+        ScanImage::shouldRun()->never();
+    }
+    $this->application->update(['build_pack' => 'dockerimage', 'docker_registry_image_name' => 'private/my-image', 'docker_registry_image_tag' => 'latest']);
+    $job = deployGateJob(['production_image_name' => 'private/my-image:latest']);
+    $job->outputs = [];
+    $job->failures = ['docker pull', '/artifacts/gate-deployment pull'];
+
+    expect(fn () => deployGateReachesStart($job))->toThrow(DeploymentException::class, 'pull')
+        ->and(collect($job->commands)->contains(fn (string $command) => str_contains($command, ' up --build -d')))->toBeFalse();
+})->with(['gate off' => false, 'gate on' => true]);
 
 it('gates a built image without a repo digest by its local image ID and does not pin it', function () {
     deployGatePolicy();

@@ -521,9 +521,9 @@ class Domains extends Component
         $this->authorize('update', $this->service);
     }
 
-    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    protected function dnsTargetServer(): ?Server
     {
-        return $this->service->server?->id === 0;
+        return $this->service->server;
     }
 
     public function checkAllDns(): void

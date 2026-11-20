@@ -183,7 +183,7 @@
                                 placeholder="Name"></x-forms.input>
                             <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Description"
                                 id="description"></x-forms.input>
-                            <x-forms.input class="sm:col-span-2" canGate="update" :canResource="$serviceDatabase" required
+                            <x-forms.input class="sm:col-span-2" canGate="update" :canResource="$serviceDatabase" :required="filled($serviceDatabase->image)"
                                 helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                 label="Image" id="image"></x-forms.input>
                         </div>

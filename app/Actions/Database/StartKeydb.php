@@ -108,7 +108,10 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'keydb-cli',
+                        ...(str_contains((string) $this->database->keydb_conf, 'requirepass') ? [] : ['--pass', $this->resolvedRedisPassword]),
+                        ...$this->database->healthCheckPortArguments($this->database->keydb_conf),
+                        'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -208,7 +211,7 @@ class StartKeydb
         if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
             $this->commands[] = "chown 999:999 $this->configuration_dir/keydb.conf";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";

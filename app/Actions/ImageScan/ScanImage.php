@@ -36,7 +36,6 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
 /**
@@ -49,20 +48,23 @@ class ScanImage
 {
     use AsAction;
 
-    /** lockTtl() without its SBOM and its two Grype runs. */
-    private const LOCK_TTL_WITHOUT_SCANNERS = 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_DB_UPDATE
+    /** lockTtl() without its SBOM and its four Grype runs (two database status reads and two scans). */
+    private const LOCK_TTL_WITHOUT_SCANNERS = self::TIMEOUT_DB_UPDATE
         + 2 * self::TIMEOUT_DEFAULT + self::TIMEOUT_PULL
         + self::TIMEOUT_DEFAULT + self::TIMEOUT_PACKAGES
         + self::TIMEOUT_DEFAULT;
 
-    /** SBOM, packages, and two Grype runs at the highest Syft and Grype time limits: one candidate scan at most. */
-    public const MAX_SCANNER_STEPS_SECONDS = self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
+    /** sbomStepTimeout() at the highest Syft time limit: `docker save` and Syft each get the Syft time limit. */
+    private const MAX_SBOM_STEP_SECONDS = 2 * ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN;
+
+    /** Registry SBOM, packages, and two Grype runs at the highest Syft and Grype time limits: one candidate scan at most. */
+    public const MAX_SCANNER_STEPS_SECONDS = ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
         + self::TIMEOUT_PACKAGES + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
 
     /** lockTtl() at the highest Syft and Grype time limits: for job timeouts and marks that do not know the server. */
     public const MAX_LOCK_TTL = self::LOCK_TTL_WITHOUT_SCANNERS
-        + self::TIMEOUT_SAVE + ScannerCommands::MAX_SYFT_TIMEOUT + self::STEP_MARGIN
-        + 2 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
+        + self::MAX_SBOM_STEP_SECONDS
+        + 4 * (ScannerCommands::MAX_GRYPE_TIMEOUT + self::STEP_MARGIN);
 
     /**
      * One wait of a deploy gate for the server lock (spec 5); background scans never wait. The gate waits again while
@@ -76,8 +78,6 @@ class ScanImage
     private const TIMEOUT_DEFAULT = 120;
 
     private const TIMEOUT_DB_UPDATE = 960;
-
-    private const TIMEOUT_SAVE = 600;
 
     private const TIMEOUT_PACKAGES = 360;
 
@@ -131,7 +131,7 @@ class ScanImage
         try {
             ImageRef::parse($imageRef);
         } catch (InvalidArgumentException $e) {
-            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference: {$e->getMessage()}");
+            $failure = new ScanFailed(ImageScanErrorCode::Unknown, detail: "invalid image reference '{$imageRef}' of {$resource->getAttribute('name')}: {$e->getMessage()}");
             $failure->log($server, $imageRef);
 
             return $this->failBeforeRow($server, $resource, $imageRef, null, ImageScanErrorCode::Unknown, $failure->errorContext($context));
@@ -247,22 +247,28 @@ class ScanImage
      */
     public static function lockTtl(Server $server): int
     {
-        return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
+        return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 4 * self::grypeStepTimeout($server);
     }
 
-    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    /** The deploy time that a gate keeps for its own scan (database status, SBOM, and Grype) after it waited for the lock. */
     public static function gateScanReserveSeconds(Server $server): int
     {
-        return self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
+        return self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
     }
 
     /** SSH timeout of one SBOM step on the server: `docker save` of a local image, then Syft. */
     public static function sbomStepTimeout(Server $server): int
     {
-        return self::TIMEOUT_SAVE + ScannerCommands::syftTimeout($server) + self::STEP_MARGIN;
+        return ScannerCommands::saveTimeout($server) + ScannerCommands::syftTimeout($server) + self::STEP_MARGIN;
     }
 
-    /** SSH timeout of one Grype run on the server. */
+    /** SSH timeout of one SBOM step of a registry image on the server: Syft only, no `docker save`. */
+    public static function registrySbomStepTimeout(Server $server): int
+    {
+        return ScannerCommands::syftTimeout($server) + self::STEP_MARGIN;
+    }
+
+    /** SSH timeout of one Grype run on the server, also of a database status read. */
     public static function grypeStepTimeout(Server $server): int
     {
         return ScannerCommands::grypeTimeout($server) + self::STEP_MARGIN;
@@ -504,9 +510,9 @@ class ScanImage
 
     private static function databaseStatus(ScannerCommands $commands): ?CarbonImmutable
     {
-        $result = self::runStep($commands->server, $commands->dbStatus(), 'db-status', self::TIMEOUT_DEFAULT);
+        $result = self::runStep($commands->server, $commands->dbStatus(), 'db-status', self::grypeStepTimeout($commands->server));
         if (in_array($result['code'], self::EXIT_TIMEOUT, true)) {
-            throw new ScanFailed(ImageScanErrorCode::Timeout, detail: "step db-status exited with code {$result['code']}");
+            throw new ScanFailed(ImageScanErrorCode::Timeout, ['step' => 'db-status'], "step db-status exited with code {$result['code']} (timeout)");
         }
 
         $status = $result['code'] === 0 ? json_decode($result['payload'], true) : null;
@@ -932,7 +938,7 @@ class ScanImage
         }
 
         try {
-            $compose = Yaml::parse((string) ($application->docker_compose ?: $application->docker_compose_raw));
+            $compose = parseDockerComposeYaml((string) ($application->docker_compose ?: $application->docker_compose_raw));
         } catch (ParseException) {
             return false;
         }

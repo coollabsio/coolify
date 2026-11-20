@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -97,6 +98,31 @@ test('http basic auth credentials can be saved through the general form', functi
     expect($application->http_basic_auth_username)->toBe('new-user')
         ->and($application->http_basic_auth_password)->toBe('new-pass')
         ->and((bool) $application->is_http_basic_auth_enabled)->toBeTrue();
+});
+
+test('a 64 character http basic auth password can be saved and read back', function () {
+    $application = createApplicationForHttpBasicAuth(['redirect' => 'both']);
+    $password = str_repeat('a', 64);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('httpBasicAuthPassword', $password)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $application->refresh();
+
+    expect(strlen($application->getRawOriginal('http_basic_auth_password')))->toBeGreaterThan(255)
+        ->and($application->http_basic_auth_password)->toBe($password);
+});
+
+test('the migration changes the http basic auth password column from string to text', function () {
+    $migration = require database_path('migrations/2026_10_19_210000_change_http_basic_auth_password_to_text_in_applications.php');
+
+    $migration->down();
+    expect(Schema::getColumnType('applications', 'http_basic_auth_password'))->toBe('varchar');
+
+    $migration->up();
+    expect(Schema::getColumnType('applications', 'http_basic_auth_password'))->toBe('text');
 });
 
 test('disabling http basic auth is saved instantly', function () {

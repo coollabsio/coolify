@@ -151,6 +151,12 @@ class Application extends BaseModel
 
     private static $parserVersion = '5';
 
+    /**
+     * Set by a preview deployment that uses the Compose file of its pull request (not saved). The parser then
+     * reads the variables and file storages of the application, but does not add or change them.
+     */
+    public bool $usesPullRequestComposeFile = false;
+
     protected $attributes = [
         'max_restart_count' => 0,
     ];
@@ -657,6 +663,32 @@ class Application extends BaseModel
     }
 
     /**
+     * The custom container labels that a preview container also gets. Proxy labels are left out,
+     * because they route the domains of the main application. Previews get their own proxy labels.
+     *
+     * @return Collection<int, string>
+     */
+    public function previewCustomLabels(): Collection
+    {
+        if (blank($this->custom_labels)) {
+            return collect();
+        }
+        $labels = decodeBase64EncodedLabels($this->custom_labels) ?? $this->custom_labels;
+
+        return collect(preg_split("/\r\n|\n|\r/", $labels))
+            ->map(fn (string $label) => trim($label))
+            ->filter(function (string $label) {
+                $key = str($label)->before('=')->trim()->lower()->value();
+
+                return $key !== ''
+                    && ! str_starts_with($key, 'traefik.')
+                    && ! str_starts_with($key, 'caddy')
+                    && ! str_starts_with($key, 'coolify.');
+            })
+            ->values();
+    }
+
+    /**
      * @return Collection<int, Server>
      */
     public function maintenanceServers(): Collection
@@ -838,13 +870,13 @@ class Application extends BaseModel
                 $base_dir = $this->base_directory ?? '/';
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/branch/{$this->git_branch}{$base_dir}";
+                        return "{$this->sourceRepositoryUrl()}/src/branch/{$this->git_branch}{$base_dir}";
                     }
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
+                        return "{$this->sourceRepositoryUrl()}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
+                    return "{$this->sourceRepositoryUrl()}/tree/{$this->git_branch}{$base_dir}";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
@@ -855,7 +887,7 @@ class Application extends BaseModel
                     return "{$httpsRepository}/tree/{$this->git_branch}{$base_dir}";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
     }
@@ -865,14 +897,14 @@ class Application extends BaseModel
         return Attribute::make(
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
-                    return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
+                    return "{$this->sourceRepositoryUrl()}/settings/hooks";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/settings/hooks";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
     }
@@ -883,29 +915,42 @@ class Application extends BaseModel
             get: function () {
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if ($this->source instanceof GiteaApp) {
-                        return "{$this->source->html_url}/{$this->git_repository}/commits/branch/{$this->git_branch}";
+                        return "{$this->sourceRepositoryUrl()}/commits/branch/{$this->git_branch}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
+                    return "{$this->sourceRepositoryUrl()}/commits/{$this->git_branch}";
                 }
                 $httpsRepository = $this->httpsUrlFromSshGitRepository();
                 if (is_string($httpsRepository)) {
                     return "{$httpsRepository}/commits/{$this->git_branch}";
                 }
 
-                return $this->git_repository;
+                return $this->httpGitRepositoryUrl();
             }
         );
+    }
+
+    /**
+     * The raw repository value is shown as a link, so only an http(s) URL is returned.
+     */
+    private function httpGitRepositoryUrl(): ?string
+    {
+        $repository = $this->git_repository;
+        if (! is_string($repository) || ! in_array(parse_url($repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $repository;
     }
 
     public function gitCommitLink($link): ?string
     {
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
-                return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
+                return "{$this->sourceRepositoryUrl()}/commits/{$link}";
             }
 
-            return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
+            return "{$this->sourceRepositoryUrl()}/commit/{$link}";
         }
 
         $git_repository = $this->git_repository;
@@ -924,6 +969,24 @@ class Application extends BaseModel
         $url = $url->withPath(Str::finish($url->getPath(), '/').$commitPath.'/'.$link);
 
         return $url->__toString();
+    }
+
+    /**
+     * Web URL of the repository for an application with a Git source.
+     * The repository is usually stored as owner/name, but deploy key and public applications can store a full SSH or http(s) URL.
+     */
+    private function sourceRepositoryUrl(): string
+    {
+        $httpsRepository = $this->httpsUrlFromSshGitRepository();
+        if (is_string($httpsRepository)) {
+            return $httpsRepository;
+        }
+
+        if (in_array(parse_url($this->git_repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
+            return (string) Url::fromString(Str::replaceEnd('.git', '', $this->git_repository))->withUserInfo('');
+        }
+
+        return "{$this->source->html_url}/{$this->git_repository}";
     }
 
     private function httpsUrlFromSshGitRepository(): ?string
@@ -1143,8 +1206,23 @@ class Application extends BaseModel
      */
     public function mustBuildOnBuildServer(Server $server): bool
     {
-        return ! $server->canBuildApplications()
-            && ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+        return ! $server->canBuildApplications() && $this->supportsBuildServer();
+    }
+
+    /**
+     * Docker image applications build nothing, and Compose applications do not support build servers.
+     */
+    public function supportsBuildServer(): bool
+    {
+        return ! in_array($this->build_pack, ['dockerimage', 'dockercompose'], true);
+    }
+
+    /**
+     * The build server setting stays saved when the build pack changes, so it only counts for build packs that support it.
+     */
+    public function isBuildServerEnabled(): bool
+    {
+        return $this->supportsBuildServer() && (bool) data_get($this, 'settings.is_build_server_enabled');
     }
 
     /**
@@ -1160,7 +1238,7 @@ class Application extends BaseModel
         if ($pullsImage) {
             return collect();
         }
-        if (! $this->mustBuildOnBuildServer($server) && ! data_get($this, 'settings.is_build_server_enabled')) {
+        if (! $this->mustBuildOnBuildServer($server) && ! $this->isBuildServerEnabled()) {
             return collect();
         }
         $teamId = $this->team()?->id;
@@ -1173,7 +1251,8 @@ class Application extends BaseModel
 
     /**
      * Another application of the team that builds and pushes an image with the same Docker image name.
-     * Both push the same tags (the commit SHA, `latest`, `pr-<id>`), so one application can run the image of the other.
+     * Both push the same tags (the commit SHA, `latest`, `pr-<id>-<commit>`), so one application can run the image of the other.
+     * The Docker image tag does not keep them apart: it is pushed in addition, and rollbacks read the commit SHA tag.
      */
     public function otherApplicationBuildingSameImage(): ?Application
     {
@@ -1192,7 +1271,10 @@ class Application extends BaseModel
 
     public function sharedImageNameMessage(Application $otherApplication): string
     {
-        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. Both push the same image tags, so one application can run the image of the other. Set a different Docker image name for each application in the General settings.";
+        return "The application {$otherApplication->name} also builds the Docker image {$this->docker_registry_image_name}. "
+            .'Coolify tags each build with the commit SHA (latest for a Dockerfile set in Coolify, pr-<id>-<commit> for previews) and pushes the Docker image tag only in addition. '
+            .'A different Docker image tag does not keep the images apart, so one application can run the image of the other. '
+            ."Set a different Docker image name for each application in the General settings, for example {$this->docker_registry_image_name}-staging.";
     }
 
     public function serviceType()
@@ -1543,6 +1625,29 @@ class Application extends BaseModel
         return 'other';
     }
 
+    /**
+     * Stops git commands when the application points to a Git source row that does not exist (for example after an
+     * incomplete database restore). Without this check, git gets only the repository path and fails with
+     * "does not appear to be a git repository".
+     *
+     * @throws RuntimeException
+     */
+    private function ensureGitSourceExists(): void
+    {
+        if ($this->deploymentType() !== 'other' || blank($this->source_type) || is_null($this->source_id)) {
+            return;
+        }
+
+        $sourceName = match ($this->source_type) {
+            GithubApp::class => 'GitHub App',
+            GitlabApp::class => 'GitLab App',
+            GiteaApp::class => 'Gitea App',
+            default => class_basename($this->source_type),
+        };
+
+        throw new RuntimeException("The Git source of this application ({$sourceName} with ID {$this->source_id}) does not exist. Select a Git source on the Source page of the application, then deploy again.");
+    }
+
     public function could_set_build_commands(): bool
     {
         if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
@@ -1576,6 +1681,15 @@ class Application extends BaseModel
     public function workdir()
     {
         return application_configuration_dir()."/{$this->uuid}";
+    }
+
+    /**
+     * The folder on the server of one deployment: the application folder, or the own folder of a preview. A preview
+     * keeps its checkout, Compose file and .env there, so it never replaces the files of the application.
+     */
+    public function deploymentWorkdir(int $pullRequestId = 0): string
+    {
+        return addPreviewDeploymentSuffix($this->workdir(), $pullRequestId);
     }
 
     public function isLogDrainEnabled()
@@ -1832,6 +1946,7 @@ class Application extends BaseModel
 
     public function generateGitLsRemoteCommands(string $deployment_uuid, bool $exec_in_docker = true)
     {
+        $this->ensureGitSourceExists();
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $commands = collect([]);
@@ -2043,6 +2158,20 @@ class Application extends BaseModel
         return '-c '.escapeshellarg("http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}");
     }
 
+    /**
+     * `git -c` options that send the token of the source with the git commands, also to submodules on the same host.
+     * Submodule URLs in SSH form (`git@host:org/repo.git`, `ssh://git@host/org/repo.git`) are changed to HTTPS too,
+     * because the token works only over HTTPS. Git does not save `-c` options in .git/config.
+     */
+    private function gitTokenUrlRewriteOptions(string $tokenBaseUrl, string $httpsBaseUrl, string $sshHost, ?string $sshUser): string
+    {
+        $sshUser = filled($sshUser) ? $sshUser : 'git';
+
+        return collect([$httpsBaseUrl, "{$sshUser}@{$sshHost}:", "ssh://{$sshUser}@{$sshHost}/"])
+            ->map(fn (string $prefix): string => '-c '.escapeshellarg("url.{$tokenBaseUrl}.insteadOf={$prefix}"))
+            ->implode(' ');
+    }
+
     private function gitHttpsCredentialOrigin(): ?string
     {
         $url = parse_url((string) $this->git_repository);
@@ -2156,6 +2285,7 @@ class Application extends BaseModel
 
     public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
+        $this->ensureGitSourceExists();
         $commit = $commit ?: ($this->git_commit_sha ?: 'HEAD');
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
@@ -2209,8 +2339,12 @@ class Application extends BaseModel
                     $github_access_token = generateGithubInstallationToken($this->source);
                     $encodedToken = rawurlencode($github_access_token);
 
-                    // Rewrite same-host HTTPS URLs only for these git commands so submodules can authenticate without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}/");
+                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
+                        tokenBaseUrl: "{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/",
+                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}/",
+                        sshHost: $source_html_url_host,
+                        sshUser: $this->source->custom_user,
+                    );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     if ($exec_in_docker) {
@@ -2263,8 +2397,12 @@ class Application extends BaseModel
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
 
-                    // Rewrite same-host HTTPS submodule URLs to auth with the OAuth token (mirrors the GitHub path) without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
+                        tokenBaseUrl: "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/",
+                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/",
+                        sshHost: $url['host'] ?? '',
+                        sshUser: $oauthSource->custom_user,
+                    );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
@@ -2563,7 +2701,7 @@ class Application extends BaseModel
     public function activeComposeImageOverrides(): array
     {
         try {
-            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services', []);
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services', []);
         } catch (\Throwable) {
             return [];
         }
@@ -2591,7 +2729,7 @@ class Application extends BaseModel
         }
 
         try {
-            $services = data_get(Yaml::parse((string) $this->docker_compose_raw), 'services');
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services');
         } catch (\Throwable) {
             return;
         }
@@ -2608,6 +2746,80 @@ class Application extends BaseModel
         static::query()->whereKey($this->getKey())->update(['docker_compose_image_overrides' => $value === null ? null : json_encode($value)]);
         $this->docker_compose_image_overrides = $value;
         $this->syncOriginalAttribute('docker_compose_image_overrides');
+    }
+
+    /**
+     * Whether a preview renames its Compose services to "<name>-pr-<id>". The legacy parser (version 1 and 2)
+     * always does. On the predefined network and on a Compose network with a fixed name (`name:` or
+     * `external:`), the services of the preview and of production share one network, where Docker Compose
+     * gives each container its service name as a hostname: without the rename, a preview service would
+     * also answer for the production service.
+     */
+    public function renamesPreviewComposeServices(): bool
+    {
+        if ((int) $this->compose_parsing_version < 3 || (bool) data_get($this, 'settings.connect_to_docker_network')) {
+            return true;
+        }
+
+        try {
+            $networks = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'networks', []);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return collect(is_array($networks) ? $networks : [])
+            ->contains(fn ($network) => filled(data_get($network, 'name')) || (bool) data_get($network, 'external'));
+    }
+
+    /**
+     * Warnings for a preview that shares a network with production: an environment value that uses the
+     * name of a Compose service as a hostname (`db`, `db:5432`, `postgres://user@db/app`) can reach the
+     * container of production on that network.
+     *
+     * @return list<string>
+     */
+    public function previewSharedNetworkHostnameWarnings(): array
+    {
+        if ((int) $this->compose_parsing_version < 3 || ! $this->renamesPreviewComposeServices()) {
+            return [];
+        }
+        try {
+            $services = data_get(parseDockerComposeYaml((string) $this->docker_compose_raw), 'services', []);
+        } catch (\Throwable) {
+            return [];
+        }
+        if (! is_array($services) || $services === []) {
+            return [];
+        }
+
+        $values = collect($this->environment_variables_preview()->get())
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [$variable->key => (string) $variable->value]);
+        foreach ($services as $service) {
+            $environment = data_get($service, 'environment', []);
+            foreach (is_array($environment) ? $environment : [] as $key => $value) {
+                if (is_int($key) && is_string($value) && str_contains($value, '=')) {
+                    [$key, $value] = explode('=', $value, 2);
+                }
+                if (is_string($key) && is_scalar($value)) {
+                    $values->put($key, (string) $value);
+                }
+            }
+        }
+
+        $warnings = [];
+        foreach ($values as $key => $value) {
+            foreach (array_keys($services) as $serviceName) {
+                $name = preg_quote((string) $serviceName, '/');
+                // The whole value (`db`, `db:5432`), or the host of a URL (`http://db/`, `postgres://user@db:5432/app`).
+                if (preg_match('/^'.$name.'(:\d+)?$|(\/\/|@)'.$name.'(?=[:\/?]|$)/', $value) !== 1) {
+                    continue;
+                }
+                $variable = 'SERVICE_NAME_'.str((string) $serviceName)->replace('-', '_')->replace('.', '_')->upper();
+                $warnings[] = "This preview shares a network with production. The variable {$key} uses the service name \"{$serviceName}\" as a hostname, which can reach the production container. Use \${{$variable}} as the hostname instead.";
+            }
+        }
+
+        return $warnings;
     }
 
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)

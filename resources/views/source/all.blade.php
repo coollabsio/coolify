@@ -66,7 +66,6 @@
         @else
             @php
                 $items = $sources->map(function ($source) {
-                    $isGitlab = $source->getMorphClass() === 'App\\Models\\GitlabApp';
                     return [
                         'name' => $source->name,
                         'provider' => match ($source->getMorphClass()) {
@@ -74,7 +73,11 @@
                             'App\\Models\\GiteaApp' => 'Gitea / Forgejo',
                             default => 'GitLab',
                         },
-                        'organization' => $isGitlab ? $source->group_name : $source->organization,
+                        'organization' => match ($source->getMorphClass()) {
+                            'App\\Models\\GithubApp' => $source->accountName(),
+                            'App\\Models\\GitlabApp' => $source->group_name,
+                            default => $source->organization,
+                        },
                         'status' => $source->isConnected() ? 'Connected' : 'Setup incomplete',
                     ];
                 })->values();
@@ -89,7 +92,7 @@
             <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($sources as $source)
                     @if ($source->getMorphClass() === 'App\Models\GithubApp')
-                        <a x-show="matches(@js([$source->name, 'GitHub', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'GitHub', $source->accountName(), $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">
@@ -102,7 +105,7 @@
                                         {{ $source->name }}
                                     </h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $source->organization ? "GitHub · {$source->organization}" : 'GitHub' }}
+                                        {{ $source->accountName() ? "GitHub · {$source->accountName()}" : 'GitHub' }}
                                     </p>
                                 </div>
                             </div>
@@ -177,7 +180,7 @@
                 @foreach ($sources as $source)
                     @php
                         [$provider, $organization, $href] = match ($source->getMorphClass()) {
-                            'App\\Models\\GithubApp' => ['GitHub', $source->organization, route('source.github.show', ['github_app_uuid' => $source->uuid])],
+                            'App\\Models\\GithubApp' => ['GitHub', $source->accountName(), route('source.github.show', ['github_app_uuid' => $source->uuid])],
                             'App\\Models\\GiteaApp' => ['Gitea', $source->organization, route('source.gitea.show', ['gitea_app_uuid' => $source->uuid])],
                             default => ['GitLab', $source->group_name, route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid])],
                         };

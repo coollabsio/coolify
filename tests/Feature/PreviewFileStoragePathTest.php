@@ -60,7 +60,7 @@ it('keeps the paths of the application file storages when it parses a pull reque
         '/app/data' => "{$this->workdir}/data",
         '/etc/app.conf' => "{$this->workdir}/config/app.conf",
     ]);
-    $volumes = collect(data_get($preview, 'services.app-pr-7.volumes'))
+    $volumes = collect(data_get($preview, 'services.app.volumes'))
         ->map(fn ($volume) => is_array($volume) ? $volume['source'].':'.$volume['target'] : $volume)
         ->all();
     expect($volumes)->toContain("{$this->workdir}/data-pr-7:/app/data")

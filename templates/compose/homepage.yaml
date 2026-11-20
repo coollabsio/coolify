@@ -7,7 +7,7 @@
 
 services:
   homepage:
-    image: ghcr.io/gethomepage/homepage:latest
+    image: ghcr.io/gethomepage/homepage:v2.8.0
     environment:
       - SERVICE_URL_HOMEPAGE_3000
       - HOMEPAGE_VAR_BASE=${SERVICE_URL_HOMEPAGE}

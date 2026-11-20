@@ -7,7 +7,7 @@
 
 services:
   ntfy:
-    image: binwiederhier/ntfy
+    image: binwiederhier/ntfy:v2.38.0
     command:
       - serve
     environment:

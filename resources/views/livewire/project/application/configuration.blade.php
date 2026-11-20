@@ -16,7 +16,7 @@
                 <livewire:project.application.domains :application="$application" />
             @elseif ($currentRoute === 'project.application.maintenance')
                 <livewire:project.shared.maintenance :resource="$application" />
-            @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
+            @elseif ($currentRoute === 'project.application.swarm' && $application->destination?->server?->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />

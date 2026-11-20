@@ -305,7 +305,7 @@ class Server extends BaseModel
                 $updated = ApplicationDeploymentQueue::query()
                     ->whereKey($deployment->id)
                     ->where('status', ApplicationDeploymentStatus::QUEUED->value)
-                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value, 'finished_at' => now()]);
 
                 if ($updated > 0) {
                     $deployment->addLogEntry('The server was deleted.', 'stderr');
@@ -951,7 +951,7 @@ class Server extends BaseModel
         instant_remote_process(["mkdir -p $path"], $this);
         $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
         instant_remote_process([
-            dockerNetworkEnsureCommand('coolify'),
+            dockerProxyNetworkEnsureCommand('coolify'),
             "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
             // A proxy on custom networks only must still reach the error page container.
             'docker network connect coolify coolify-proxy >/dev/null 2>&1 || true',
@@ -1845,9 +1845,9 @@ $siteAddress {
         $containers = collect([]);
         $containerReplicates = collect([]);
         if ($this->isSwarm()) {
-            $containers = instant_remote_process_with_timeout(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker service inspect $('.remoteCommandWithTimeout('docker service ls -q', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
-            $containerReplicates = instant_remote_process_with_timeout(["docker service ls --format '{{json .}}'"], $this, false);
+            $containerReplicates = instant_remote_process_with_timeout([remoteCommandWithTimeout("docker service ls --format '{{json .}}'")], $this, false);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
                 foreach ($containerReplicates as $containerReplica) {
@@ -1871,7 +1871,7 @@ $siteAddress {
                 }
             }
         } else {
-            $containers = instant_remote_process_with_timeout(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker container inspect $('.remoteCommandWithTimeout('docker container ls -aq', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
@@ -1885,7 +1885,7 @@ $siteAddress {
     public function loadAllContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
 
             return collect($containers);
@@ -1897,7 +1897,7 @@ $siteAddress {
     public function loadUnmanagedContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
             $containers = $containers->map(function ($container) {
                 $labels = data_get($container, 'Labels');
@@ -2546,6 +2546,10 @@ $siteAddress {
 
     public function sendUnreachableNotification()
     {
+        if ($this->team->getEnabledChannels('server_unreachable') === []) {
+            return;
+        }
+
         NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
@@ -2803,7 +2807,7 @@ $siteAddress {
         if ($isSwarm) {
             return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
         } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
+            return instant_remote_process([dockerProxyNetworkEnsureCommand('coolify')], $this, false);
         }
     }
 

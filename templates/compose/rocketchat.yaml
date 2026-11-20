@@ -7,7 +7,7 @@
 
 services:
   rocketchat:
-    image: 'registry.rocket.chat/rocketchat/rocket.chat:8.0.1'
+    image: 'registry.rocket.chat/rocketchat/rocket.chat:9.0.0'
     environment:
       - SERVICE_URL_ROCKETCHAT_3000
       - 'MONGO_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/${MONGODB_DATABASE:-rocketchat}?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}'
@@ -29,7 +29,7 @@ services:
       timeout: 10s
       retries: 15
   mongodb:
-    image: 'mongo:7'
+    image: 'mongo:8.0'
     volumes:
       - 'mongodb_data:/data/db'
     command: "sh -c \"\n  mongod --replSet ${MONGODB_REPLICA_SET_NAME:-rs0} --bind_ip_all &\n  sleep 5 &&\n  mongosh --eval 'rs.initiate({_id:\\\"${MONGODB_REPLICA_SET_NAME:-rs0}\\\", members:[{_id:0, host:\\\"mongodb:27017\\\"}]})' ||\n  true &&\n  wait\n\"\n"

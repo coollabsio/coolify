@@ -3,7 +3,7 @@
 use Dotenv\Dotenv;
 
 /**
- * Runs the install script's update_env_var and quote_env_value helpers for the root user
+ * Runs the install script's set_env_var and quote_env_value helpers for the root user
  * credentials against a temporary .env file, then parses that file the way Laravel does.
  *
  * @param  array<string, string>  $credentials
@@ -12,21 +12,21 @@ use Dotenv\Dotenv;
 function writeRootUserCredentialsWithInstallScript(string $scriptPath, array $credentials, string $initialEnv): array
 {
     $script = file_get_contents(dirname(__DIR__, 2).'/'.$scriptPath);
-    preg_match('/^update_env_var\(\) \{.*?^\}$/ms', $script, $updateEnvVar);
+    preg_match('/^set_env_var\(\) \{.*?^\}$/ms', $script, $setEnvVar);
     preg_match('/^quote_env_value\(\) \{.*?^\}$/ms', $script, $quoteEnvValue);
-    expect($updateEnvVar)->not->toBeEmpty()
+    expect($setEnvVar)->not->toBeEmpty()
         ->and($quoteEnvValue)->not->toBeEmpty();
 
     $envFile = tempnam(sys_get_temp_dir(), 'coolify-install-env-');
     file_put_contents($envFile, $initialEnv);
 
     $commands = array_map(
-        fn (string $key, string $value) => "update_env_var {$key} \"\$(quote_env_value ".escapeshellarg($value).')"',
+        fn (string $key, string $value) => "set_env_var {$key} \"\$(quote_env_value ".escapeshellarg($value).')"',
         array_keys($credentials),
         $credentials,
     );
     $process = proc_open(
-        ['bash', '-c', implode("\n", ['set -e', 'ENV_FILE='.escapeshellarg($envFile), $updateEnvVar[0], $quoteEnvValue[0], ...$commands])],
+        ['bash', '-c', implode("\n", ['set -e', 'ENV_FILE='.escapeshellarg($envFile), $setEnvVar[0], $quoteEnvValue[0], ...$commands])],
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes
     );
@@ -62,8 +62,12 @@ it('writes root user credentials that parse back unchanged into a missing variab
     expect($env)->toBe(['APP_NAME' => 'Coolify', $key => $value]);
 })->with($installScripts)->with($credentials);
 
-it('keeps root user credentials that are already set', function (string $scriptPath) {
-    $env = writeRootUserCredentialsWithInstallScript($scriptPath, ['ROOT_USERNAME' => 'New Name'], "ROOT_USERNAME='Old Name'\n");
+it('replaces root user credentials that are already set, so a new run can correct them', function (string $scriptPath) {
+    $env = writeRootUserCredentialsWithInstallScript(
+        $scriptPath,
+        ['ROOT_USER_PASSWORD' => 'N3w-Strong|Pass!'],
+        "ROOT_USER_PASSWORD='weak'\nAPP_ENV=production\n",
+    );
 
-    expect($env)->toBe(['ROOT_USERNAME' => 'Old Name']);
+    expect($env)->toBe(['ROOT_USER_PASSWORD' => 'N3w-Strong|Pass!', 'APP_ENV' => 'production']);
 })->with($installScripts);

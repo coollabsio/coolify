@@ -68,8 +68,7 @@ function composePreviewEnvironmentValues(Application $application, int $pullRequ
         ])->id;
     }
 
-    $serviceName = $pullRequestId === 0 ? 'web' : "web-pr-{$pullRequestId}";
-    $environment = collect(data_get($application->fresh()->parse(pull_request_id: $pullRequestId, preview_id: $previewId)->toArray(), "services.{$serviceName}.environment"));
+    $environment = collect(data_get($application->fresh()->parse(pull_request_id: $pullRequestId, preview_id: $previewId)->toArray(), 'services.web.environment'));
 
     return $environment->only(['CHANGED_FOR_PREVIEW', 'SAME_AS_PRODUCTION', 'FROM_TEAM'])->all();
 }

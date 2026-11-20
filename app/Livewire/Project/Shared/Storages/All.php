@@ -269,7 +269,7 @@ class All extends Component
             ? $this->resource->destination->server
             : $this->resource->service->server;
         try {
-            $output = (string) instant_remote_process(["docker ps -a --no-trunc --format '{{.Names}} {{.Mounts}}'"], $server, false, maxAttempts: 1);
+            $output = (string) instant_remote_process([remoteCommandWithTimeout("docker ps -a --no-trunc --format '{{.Names}} {{.Mounts}}'", 30)], $server, false, timeout: 45, maxAttempts: 1);
         } catch (\Throwable) {
             return;
         }

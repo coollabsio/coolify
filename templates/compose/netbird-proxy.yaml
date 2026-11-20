@@ -1,0 +1,41 @@
+# documentation: https://docs.netbird.io/selfhosted/migration/enable-reverse-proxy
+# slogan: NetBird reverse proxy. Expose services of your NetBird network to the internet, with automatic TLS certificates.
+# category: vpn
+# tags: wireguard, reverse-proxy, vpn, zero-trust-network-access, open source
+# logo: svgs/netbird.png
+
+services:
+  netbird-proxy:
+    image: 'netbirdio/reverse-proxy:0.83.1' # Released on 13 November 2026
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      - 'NB_PROXY_TOKEN=${NB_PROXY_TOKEN:?}'
+      # NetBird Cloud by default. For a self-hosted NetBird server, set its URL, for example https://netbird.example.com:443
+      - 'NB_PROXY_MANAGEMENT_ADDRESS=${NB_PROXY_MANAGEMENT_ADDRESS:-https://api.netbird.io:443}'
+      # The domain of the proxy. Services get subdomains of it.
+      - 'NB_PROXY_DOMAIN=${NB_PROXY_DOMAIN:?}'
+      - 'NB_PROXY_PRIVATE=${NB_PROXY_PRIVATE:-true}'
+      - 'NB_PROXY_ACME_CERTIFICATES=${NB_PROXY_ACME_CERTIFICATES:-true}'
+      # Set to true only when the management URL uses plain http (gRPC without TLS).
+      - 'NB_PROXY_ALLOW_INSECURE=${NB_PROXY_ALLOW_INSECURE:-false}'
+      - 'NB_PROXY_LOG_LEVEL=${NB_PROXY_LOG_LEVEL:-info}'
+      - NB_PROXY_ADDRESS=:443
+      - NB_PROXY_CERTIFICATE_DIRECTORY=/certs
+      - NB_PROXY_HEALTH_ADDRESS=127.0.0.1:8080
+    volumes:
+      - 'netbird-proxy-certs:/certs'
+    # /healthz/ready only returns 200 when the proxy is connected to the management server.
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '-q'
+        - '-O'
+        - /dev/null
+        - 'http://127.0.0.1:8080/healthz/ready'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s

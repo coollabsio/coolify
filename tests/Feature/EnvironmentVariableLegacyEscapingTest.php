@@ -142,6 +142,37 @@ test('legacy multiline json variables get a line that docker compose can read', 
     'plain' => [[]],
 ]);
 
+test('legacy plain variables with a multiline value get a line that docker compose can read (#4595)', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'SSH_KEY',
+        'value' => "-----BEGIN KEY-----\nab+c/d=\n-----END KEY-----\n",
+        'is_multiline' => true,
+        'type' => 'project',
+        'project_id' => $this->environment->project_id,
+        'team_id' => $this->team->id,
+    ]);
+    $serviceVariable = legacyVariable($this->service, ['key' => 'SSH_KEY', 'value' => '{{project.SSH_KEY}}']);
+    $application = Application::factory()->create($this->resourceAttributes);
+    $applicationVariable = legacyVariable($application, ['key' => 'SSH_KEY', 'value' => '{{project.SSH_KEY}}']);
+
+    expect($this->service->composeEnvironmentFileLine($serviceVariable))->toBe("SSH_KEY=\"-----BEGIN KEY-----\nab+c/d=\n-----END KEY-----\n\"")
+        ->and($application->useExactEscaping($applicationVariable))->toBeTrue()
+        ->and($this->service->legacyEscapingChangesValue($serviceVariable))->toBeFalse();
+});
+
+test('legacy plain variables with only a trailing line break keep the old env file line', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'TOKEN',
+        'value' => "abc\n",
+        'type' => 'project',
+        'project_id' => $this->environment->project_id,
+        'team_id' => $this->team->id,
+    ]);
+    $variable = legacyVariable($this->service, ['key' => 'TOKEN', 'value' => '{{project.TOKEN}}']);
+
+    expect($this->service->useExactEscaping($variable))->toBeFalse();
+});
+
 test('legacy database variables keep the old compose environment format', function () {
     $database = StandalonePostgresql::forceCreate([
         'uuid' => 'postgres-legacy-test',

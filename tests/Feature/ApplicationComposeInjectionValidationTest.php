@@ -295,6 +295,8 @@ test('API update does not accept docker_compose_raw', function () {
 });
 
 test('a deployment stops with a visible log line when the repository Compose file is not safe', function (int $pullRequestId) {
+    // A public preview reads the Compose file of the base branch, as a production deployment does.
+    $this->application->settings->update(['is_pr_deployments_public_enabled' => $pullRequestId !== 0]);
     fakeRepositoryCompose(composeInjectionPayloads()['service name command substitution'][0]);
     $logEntries = [];
     $job = composeDeploymentJob($this->application, $pullRequestId, $logEntries);

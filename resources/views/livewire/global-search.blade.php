@@ -777,6 +777,12 @@
                                                             ARM only
                                                         </span>
                                                     </template>
+                                                    <template x-if="item.outdated">
+                                                        <span class="command-palette-arch-badge"
+                                                            title="The image of this service has not been updated in the last 2 months">
+                                                            Outdated
+                                                        </span>
+                                                    </template>
                                                     <span class="command-palette-quickcommand"
                                                         x-text="(item.quickcommand || '').replace(/^\(type:\s*/i, '').replace(/\)$/, '')"
                                                         x-show="item.quickcommand"></span>

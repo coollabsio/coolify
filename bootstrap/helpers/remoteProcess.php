@@ -163,13 +163,22 @@ function runSshProcess(string $sshCommand, int $timeout, ?string $input = null):
  */
 function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
 {
-    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    instant_remote_process_with_input($server, ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null', $content, $throwError);
+}
+
+/**
+ * Run one command on a server with content on its stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. The command is not passed
+ * through the sudo parser: add `sudo` for non-root servers yourself.
+ */
+function instant_remote_process_with_input(Server $server, string $remoteCommand, string $input, bool $throwError = true): void
+{
     $timeout = (int) config('constants.ssh.command_timeout');
 
     SshRetryHandler::retry(
-        function () use ($server, $remoteCommand, $content, $timeout) {
+        function () use ($server, $remoteCommand, $input, $timeout) {
             $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
-            $process = runSshProcess($sshCommand, $timeout, $content);
+            $process = runSshProcess($sshCommand, $timeout, $input);
             SshMultiplexingHelper::noticeHostKeyMismatch($server, $process);
 
             if ($process->exitCode() !== 0) {
@@ -178,11 +187,21 @@ function instant_remote_write_file(Server $server, string $path, string $content
         },
         [
             'server' => $server->ip,
-            'dest' => $path,
-            'function' => 'instant_remote_write_file',
+            'command_preview' => substr($remoteCommand, 0, 100),
+            'function' => 'instant_remote_process_with_input',
         ],
         $throwError
     );
+}
+
+/**
+ * Bound one remote command with `timeout` (GNU coreutils or BusyBox). Without a bound, a command that
+ * waits on a hung or slow dockerd keeps running on the server after the local wait ends, and each
+ * periodic check adds one more process. The local wait must be longer than $seconds plus the 5s kill-after.
+ */
+function remoteCommandWithTimeout(string $command, int $seconds = 20): string
+{
+    return "timeout -k 5s {$seconds}s {$command}";
 }
 
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
@@ -284,12 +303,9 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
     $serverTimezone = getServerTimezone(data_get($application, 'destination.server'));
 
-    // Members should never see debug logs, even if an admin enabled debug mode
-    if ($is_debug_enabled && auth()->check()) {
-        $teamId = $application?->team()?->id;
-        if (is_null($teamId) || ! auth()->user()->isAdminOfTeam($teamId)) {
-            $is_debug_enabled = false;
-        }
+    // Debug logs can hold secrets, so only users who can change the application see them
+    if ($is_debug_enabled && auth()->check() && (is_null($application) || auth()->user()->cannot('update', $application))) {
+        $is_debug_enabled = false;
     }
 
     $logs = data_get($application_deployment_queue, 'logs');

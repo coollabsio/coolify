@@ -166,6 +166,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $warning = null;
+            $uploadFailed = false;
             $s3Uploaded = false;
             $s3CleanupPending = false;
             $localStorageDeleted = $streamToS3;
@@ -176,6 +177,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execution->refreshS3Summary();
                 $this->execution->update(['s3_cleanup_pending' => false]);
             } elseif ($this->backup->save_s3 && $destinations->isEmpty()) {
+                $uploadFailed = true;
                 $warning = 'Storage upload failed: The selected backup storage no longer exists.';
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
@@ -186,6 +188,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if ($s3Uploaded) {
                     $s3CleanupPending = false;
                 } else {
+                    $uploadFailed = true;
                     $warning = 'Storage upload failed: '.implode(' ', $uploadErrors);
 
                     try {
@@ -274,7 +277,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             BackupCreated::dispatch($team->id);
         }
 
-        $team->notify(new BackupSuccess($this->backup, $warning));
+        $team->notify(new BackupSuccess($this->backup, $warning, $uploadFailed));
         if ($warning === null) {
             $this->notifyIfRecovered($team);
         }
@@ -473,7 +476,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         if (! $s3->isS3()) {
             $transfer = new RcloneTransfer($s3, $server, $containerName);
             try {
-                $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
+                $transfer->start([$backupLocation => $backupLocation], timeout: $this->timeout);
                 $transfer->upload($backupLocation, $backupLocation, $this->timeout);
             } finally {
                 instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
@@ -486,8 +489,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' -v '
-                    .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' '
+                    .dockerReadOnlyFileMountOption($backupLocation, $backupLocation).' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
             if ($s3->usesCurlTransfer()) {
                 $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, ltrim($backupDirectory, '/').'/'.basename($backupLocation));

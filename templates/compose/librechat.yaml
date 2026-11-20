@@ -129,7 +129,7 @@ services:
       start_period: 10s
 
   rag-api:
-    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:v0.7.3
+    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:v0.9.0
     environment:
       - POSTGRES_DB=rag
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}

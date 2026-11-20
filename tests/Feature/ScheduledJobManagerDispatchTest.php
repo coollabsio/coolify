@@ -201,6 +201,24 @@ it('does not publish a task occurrence when its application is not running', fun
         ->toBeFalse();
 });
 
+it('does not run a task occurrence skipped during a deployment when the application runs again', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $application->update(['status' => 'restarting']);
+    $task = createScheduledApplicationTask($application, ['frequency' => 'daily']);
+
+    (new ScheduledJobManager)->handle();
+
+    $application->update(['status' => 'running:healthy']);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 6, 0, 'UTC'));
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertNotPushed(ScheduledTaskJob::class);
+});
+
 it('publishes a pending occurrence after a previous publisher interruption', function () {
     config(['constants.coolify.self_hosted' => true]);
     Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));

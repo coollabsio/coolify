@@ -7,7 +7,7 @@
 
 services:
   dozzle:
-    image: amir20/dozzle:latest
+    image: amir20/dozzle:v11.4.3
     environment:
       - SERVICE_URL_DOZZLE_8080
       - DOZZLE_AUTH_PROVIDER=simple

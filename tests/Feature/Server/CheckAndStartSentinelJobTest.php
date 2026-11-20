@@ -84,7 +84,7 @@ it('uses sudo for the status check on a non-root server', function () {
 
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'sudo docker ps -a'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'sudo timeout -k 5s 20s docker ps -a'));
 });
 
 it('restarts an unhealthy Sentinel and remembers why', function () {
@@ -164,8 +164,8 @@ it('reads the push status with the token from inside the Sentinel container on a
 
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'docker exec coolify-sentinel sh -c '\\''curl")
-        && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf -H @-'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'timeout -k 5s 20s docker exec coolify-sentinel sh -c '\\''curl -s --max-time 5")
+        && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf --max-time 5 -H @-'));
 });
 
 it('does not restart a starting Sentinel whose API does not answer yet', function () {

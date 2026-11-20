@@ -117,3 +117,29 @@ it('makes the custom config file readable by the container user before the conta
         ->and(strpos($commands, "tee {$path}"))->toBeLessThan(strpos($commands, "chmod 644 {$path}"))
         ->and(strpos($commands, "chmod 644 {$path}"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
 })->with('database-start-actions-with-custom-config-files');
+
+it('makes PostgreSQL init scripts readable by the postgres user before the container starts', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination);
+    $database->update(['init_scripts' => [['index' => 0, 'filename' => 'init.sql', 'content' => 'SELECT 1;']]]);
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    $path = escapeshellarg($database->workdir().'/docker-entrypoint-initdb.d/init.sql');
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 644 {$path}")
+        ->and(strpos($commands, "tee {$path}"))->toBeLessThan(strpos($commands, "chmod 644 {$path}"))
+        ->and(strpos($commands, "chmod 644 {$path}"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
+});
+
+it('makes the MongoDB default database init script readable by the mongodb user before the container starts', function () {
+    $database = create_standalone_mongodb($this->environment->id, $this->destination);
+
+    StartMongodb::run($database->fresh(), new Activity);
+
+    $directory = $database->workdir().'/docker-entrypoint-initdb.d';
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 755 {$directory}\n")
+        ->toContain("chmod 644 {$directory}/01-default-database.js")
+        ->and(strpos($commands, "tee {$directory}/01-default-database.js"))->toBeLessThan(strpos($commands, "chmod 644 {$directory}/01-default-database.js"))
+        ->and(strpos($commands, "chmod 644 {$directory}/01-default-database.js"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
+});
