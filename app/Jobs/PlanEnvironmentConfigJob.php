@@ -15,6 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Reads coolify.json from the linked branch, plans it, and applies it when the plan is safe.
@@ -49,33 +50,52 @@ class PlanEnvironmentConfigJob implements ShouldBeEncrypted, ShouldQueue
         }
         $heldDeployments = array_map(fn (string $uuid) => ['application_uuid' => $uuid, 'commit_sha' => $this->commit], $this->heldApplicationUuids);
 
-        if ($this->commit !== null && $link->pending_commit_sha !== null && $link->pending_commit_sha !== $this->commit) {
-            EnvironmentConfigRevision::create([
-                'link_id' => $link->id,
-                'trigger' => $this->trigger,
-                'commit_sha' => $this->commit,
-                'status' => ConfigRevisionStatus::Skipped,
-                'error' => 'A newer push replaced this one.',
-            ]);
-            // The held deploys wait for the file of the newest push instead.
-            if ($this->heldApplicationUuids !== []) {
-                self::dispatch($link, $this->trigger, $link->pending_commit_sha, $this->heldApplicationUuids);
-            }
-
+        if ($this->replacedByNewerPush($link)) {
             return;
         }
 
         try {
             $file = $reader->read($link, $this->commit);
-            $revision = $file->missing
-                ? $this->failed($link, $file->commitSha, "coolify.json was not found at {$link->file_path} on {$link->branch}.", $heldDeployments)
-                : $revisions->record($link, (string) $file->contents, $this->trigger, $file->commitSha, heldDeployments: $heldDeployments);
         } catch (RepositoryFileException $e) {
-            $revision = $this->failed($link, $this->commit, $e->getMessage(), $heldDeployments);
+            $file = $e;
         }
 
-        $revisions->supersedeOlder($revision);
-        $links->dispatchWhenPlanned($revision->refresh());
+        // The read can take long. Publish one plan of the link at a time, and only when no newer push came in meanwhile.
+        Cache::lock("project-config:plan:{$link->id}", 120)->block(60, function () use ($link, $file, $revisions, $links, $heldDeployments) {
+            $link->refresh();
+            if ($this->replacedByNewerPush($link)) {
+                return;
+            }
+            $revision = match (true) {
+                $file instanceof RepositoryFileException => $this->failed($link, $this->commit, $file->getMessage(), $heldDeployments),
+                $file->missing => $this->failed($link, $file->commitSha, "coolify.json was not found at {$link->file_path} on {$link->branch}.", $heldDeployments),
+                default => $revisions->record($link, (string) $file->contents, $this->trigger, $file->commitSha, heldDeployments: $heldDeployments),
+            };
+            $revisions->supersedeOlder($revision);
+            $links->dispatchWhenPlanned($revision->refresh());
+        });
+    }
+
+    /**
+     * Records a skipped revision when a newer push of the branch replaced this one. Its held deploys wait for the newest push.
+     */
+    private function replacedByNewerPush(EnvironmentConfigLink $link): bool
+    {
+        if ($this->commit === null || $link->pending_commit_sha === null || $link->pending_commit_sha === $this->commit) {
+            return false;
+        }
+        EnvironmentConfigRevision::create([
+            'link_id' => $link->id,
+            'trigger' => $this->trigger,
+            'commit_sha' => $this->commit,
+            'status' => ConfigRevisionStatus::Skipped,
+            'error' => 'A newer push replaced this one.',
+        ]);
+        if ($this->heldApplicationUuids !== []) {
+            self::dispatch($link, $this->trigger, $link->pending_commit_sha, $this->heldApplicationUuids);
+        }
+
+        return true;
     }
 
     private function failed(EnvironmentConfigLink $link, ?string $commit, string $error, array $heldDeployments): EnvironmentConfigRevision

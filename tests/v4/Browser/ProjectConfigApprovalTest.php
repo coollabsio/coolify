@@ -33,17 +33,15 @@ it('approves a destructive plan with data deletion', function () {
         ->assertSee('Projects');
 
     $page->navigate("/project/project-config/environment/{$this->stack['environment']->uuid}/configuration")
-        ->assertSee('Waiting for approval')
-        ->assertSee('destructive')
+        ->assertSee('Changes waiting for approval')
+        ->assertSee('Removed')
         ->check('input[value="worker"]')
-        ->click('button:visible:has-text("Approve plan")')
+        ->click('button:visible:has-text("Approve and apply")')
         ->wait(1)
         ->screenshot(filename: 'project-config-approval-modal');
 
-    $page->click('button:visible:has-text("Continue")')
-        ->wait(1)
-        ->fill('input[type="password"]:visible', 'password')
-        ->click('button:visible:has-text("Confirm")')
+    // Two-step confirmation is off, so the modal has one Confirm step and no password step.
+    $page->click('button:visible:has-text("Confirm")')
         ->wait(2)
         ->screenshot(filename: 'project-config-approved');
 

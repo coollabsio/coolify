@@ -10564,7 +10564,7 @@ paths:
       tags:
         - 'Project config'
       summary: 'Resume a link'
-      description: 'Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies.'
+      description: 'Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies, which needs the deploy ability.'
       operationId: resume-config-link
       parameters:
         -
@@ -10623,6 +10623,8 @@ paths:
       responses:
         '202':
           description: 'Planned again.'
+        '403':
+          description: 'Needs the deploy ability.'
       security:
         -
           bearerAuth: []

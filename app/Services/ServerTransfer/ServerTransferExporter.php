@@ -177,7 +177,7 @@ class ServerTransferExporter
             ],
             'warnings' => $warnings,
             // Manual steps after the transfer. The source replaces {target_url} with the URL of the target.
-            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications),
+            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications, $applications->concat($databases)->concat($services)),
             // Back-compat: single server key
             'private_key' => $this->exportPrivateKey($privateKey),
             // All keys needed by server, apps, and git sources
@@ -578,12 +578,13 @@ class ServerTransferExporter
      *
      * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
      * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $resources  applications, databases, and services
      * @return list<string>
      */
-    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
+    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications, Collection $resources): array
     {
         $steps = [];
-        if ($applications->contains(fn (Application $application) => filled($application->config_key))) {
+        if ($resources->contains(fn (Model $resource) => filled($resource->config_key))) {
             $steps[] = 'Some resources were managed by coolify.json. Link their environments again on {target_url}: the link does not move with the server.';
         }
         // A manual webhook is set in the repository itself, so its URL still points to this instance. Every

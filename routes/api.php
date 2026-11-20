@@ -268,7 +268,7 @@ Route::group([
     Route::post('/config/links/{uuid}/resume', [ProjectConfigController::class, 'resume'])->middleware(['api.ability:write']);
     Route::post('/config/revisions/{uuid}/approve', [ProjectConfigController::class, 'approve'])->middleware(['api.ability:write', 'api.ability:deploy', 'api.ability:delete']);
     Route::post('/config/revisions/{uuid}/release', [ProjectConfigController::class, 'release'])->middleware(['api.ability:write']);
-    Route::post('/config/revisions/{uuid}/retry', [ProjectConfigController::class, 'retry'])->middleware(['api.ability:write']);
+    Route::post('/config/revisions/{uuid}/retry', [ProjectConfigController::class, 'retry'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
     Route::get('/tags', [TagsController::class, 'tags'])->middleware(['api.ability:read']);
     Route::post('/tags', [TagsController::class, 'create'])->middleware(['api.ability:write']);

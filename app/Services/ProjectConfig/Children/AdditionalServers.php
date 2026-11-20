@@ -2,6 +2,7 @@
 
 namespace App\Services\ProjectConfig\Children;
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -9,6 +10,7 @@ use App\Services\ProjectConfig\ApplyContext;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -36,16 +38,20 @@ class AdditionalServers implements ChildRecords
             return null;
         }
         $result = [];
-        foreach ($owner->additional_servers()->orderBy('servers.name')->get() as $server) {
+        foreach ($owner->additional_networks()->get() as $destination) {
+            /** @var StandaloneDocker $destination */
+            $server = Server::query()->find($destination->pivot->server_id);
+            if ($server === null) {
+                continue;
+            }
             $entry = ['server' => $server->name];
-            /** @var Server $server */
             if ($server->destinations()->count() > 1) {
-                $entry['destination'] = StandaloneDocker::query()->find($server->pivot->standalone_docker_id)?->network;
+                $entry['destination'] = $destination->network;
             }
             $result[] = $entry;
         }
 
-        return $result === [] ? null : $result;
+        return $this->canonical($result);
     }
 
     public function canonical(mixed $desired): ?array
@@ -59,7 +65,7 @@ class AdditionalServers implements ChildRecords
 
             return $entry;
         }, $desired);
-        usort($entries, fn ($a, $b) => strcmp($a['server'], $b['server']));
+        usort($entries, fn ($a, $b) => [$a['server'], $a['destination'] ?? ''] <=> [$b['server'], $b['destination'] ?? '']);
 
         return $entries;
     }
@@ -93,8 +99,20 @@ class AdditionalServers implements ChildRecords
             if ($destination === null) {
                 throw new LogicException("No destination for server \"{$entry['server']}\".");
             }
-            $sync[$server->id] = ['standalone_docker_id' => $destination->id];
+            $sync[$destination->id] = ['server_id' => $server->id];
         }
-        $owner->additional_servers()->sync($sync);
+
+        $before = $owner->additional_networks()->get()->pluck('pivot.server_id')->unique();
+        $owner->additional_networks()->sync($sync);
+
+        // Like removing a server in the UI: stop the containers on servers that no longer run the application.
+        $kept = collect($sync)->pluck('server_id');
+        $mainServerId = $owner->destination?->server_id;
+        foreach ($before->diff($kept)->reject(fn ($id) => $id == $mainServerId) as $serverId) {
+            $server = Server::query()->find($serverId);
+            if ($server !== null) {
+                DB::afterCommit(fn () => StopApplicationOneServer::dispatch($owner, $server));
+            }
+        }
     }
 }

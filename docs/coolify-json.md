@@ -101,8 +101,9 @@ Same-repository pull requests get a plan comment. Forks get nothing. Roll back w
 | `GET /config/links/{uuid}`, `GET /config/links/{uuid}/revisions` | `read` |
 | `DELETE /config/links/{uuid}` | `write` + `delete` |
 | `POST /config/links/{uuid}/apply` | `write` + `deploy` |
-| `POST /config/links/{uuid}/suspend`, `/resume` | `write` |
+| `POST /config/links/{uuid}/suspend`, `/resume` | `write` (`/resume?confirm=1` also needs `deploy`) |
 | `POST /config/revisions/{uuid}/approve` | `write` + `deploy` + `delete` |
-| `POST /config/revisions/{uuid}/release`, `/retry` | `write` |
+| `POST /config/revisions/{uuid}/release` | `write` |
+| `POST /config/revisions/{uuid}/retry` | `write` + `deploy` |
 
 A link in `api` mode has no repository: `POST /config/links/{uuid}/apply` with the file applies it. For a git link, `apply` without a file plans the head of the branch.

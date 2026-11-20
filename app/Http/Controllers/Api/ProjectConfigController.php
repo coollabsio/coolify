@@ -306,7 +306,7 @@ class ProjectConfigController extends Controller
         return response()->json(self::serializeLink($link->fresh()));
     }
 
-    #[OA\Post(summary: 'Resume a link', description: 'Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies.', path: '/config/links/{uuid}/resume', operationId: 'resume-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
+    #[OA\Post(summary: 'Resume a link', description: 'Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies, which needs the deploy ability.', path: '/config/links/{uuid}/resume', operationId: 'resume-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'confirm', in: 'query', schema: new OA\Schema(type: 'boolean'))],
         responses: [new OA\Response(response: 200, description: 'The plan, or the link and its new revision.'), new OA\Response(response: 403, description: 'Team admins only.')]
     )]
@@ -315,6 +315,10 @@ class ProjectConfigController extends Controller
         $link = $this->adminLink($request, $uuid);
         if ($link instanceof JsonResponse) {
             return $link;
+        }
+        // A confirmed resume applies the file and deploys, like /apply.
+        if ($request->boolean('confirm') && ! $request->user()->tokenCan('root') && ! $request->user()->tokenCan('deploy')) {
+            return response()->json(['message' => 'Resuming with confirm=1 needs the deploy ability.'], 403);
         }
         $result = $links->resume($link, $request->user(), $request->boolean('confirm'));
 
@@ -345,7 +349,7 @@ class ProjectConfigController extends Controller
 
     #[OA\Post(summary: 'Retry a revision', path: '/config/revisions/{uuid}/retry', operationId: 'retry-config-revision', security: [['bearerAuth' => []]], tags: ['Project config'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
-        responses: [new OA\Response(response: 202, description: 'Planned again.')]
+        responses: [new OA\Response(response: 202, description: 'Planned again.'), new OA\Response(response: 403, description: 'Needs the deploy ability.')]
     )]
     public function retry(Request $request, string $uuid, ConfigLinks $links): JsonResponse
     {

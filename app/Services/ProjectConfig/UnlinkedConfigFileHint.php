@@ -13,6 +13,16 @@ class UnlinkedConfigFileHint
 {
     public const MESSAGE = 'coolify.json found, not linked. Export this environment and link it to start using the file.';
 
+    /**
+     * The flag stays after a link is made, because later deployments skip the check. Show it only while nothing is linked.
+     */
+    public function shows(Application $application): bool
+    {
+        return (bool) $application->settings?->has_unlinked_config_file
+            && $application->config_key === null
+            && ! EnvironmentConfigLink::query()->where('environment_id', $application->environment_id)->exists();
+    }
+
     public function shouldCheck(Application $application, int $pullRequestId): bool
     {
         return $pullRequestId === 0

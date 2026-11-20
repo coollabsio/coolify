@@ -1999,6 +1999,14 @@ test('the checklist asks to move manual webhooks of git applications without a p
         ->toContain('{target_url}/webhooks/source/gitea/events/manual');
 });
 
+test('the checklist asks to link the environment again when only a database or service is managed by coolify.json', function () {
+    $this->service->forceFill(['config_key' => 'cache'])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->toContain('Some resources were managed by coolify.json.');
+});
+
 test('the checklist does not ask about manual webhooks for an application that deploys through a private GitHub App', function () {
     $githubApp = GithubApp::create([
         'name' => 'private-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com',

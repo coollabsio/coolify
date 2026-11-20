@@ -18,14 +18,20 @@ use Illuminate\Database\Eloquent\Model;
  */
 class HeldDeployments
 {
+    /**
+     * Queues the deployment. When the queue of the server is full, records a failed deployment, so the push is not lost silently.
+     */
     public function deploy(Application $application, ?string $commit): void
     {
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: new_public_id(),
             commit: $commit,
             is_webhook: true,
         );
+        if (data_get($result, 'status') === 'queue_full') {
+            $this->recordFailedDeployment($application, $commit, 'The deployment after the coolify.json apply was not queued: '.data_get($result, 'message'));
+        }
     }
 
     /**
@@ -86,20 +92,24 @@ class HeldDeployments
             if ($application === null) {
                 continue;
             }
-            $server = $application->destination?->server;
-            $deployment = ApplicationDeploymentQueue::create([
-                'application_id' => $application->id,
-                'application_name' => $application->name,
-                'server_id' => $server?->id,
-                'server_name' => $server?->name,
-                'destination_id' => $application->destination_id,
-                'deployment_uuid' => new_public_id(),
-                'commit' => $held['commit_sha'] ?? 'HEAD',
-                'is_webhook' => true,
-                'status' => ApplicationDeploymentStatus::FAILED->value,
-            ]);
-            $deployment->addLogEntry("coolify.json was not applied: {$reason}", 'stderr');
+            $this->recordFailedDeployment($application, $held['commit_sha'] ?? null, "coolify.json was not applied: {$reason}");
         }
+    }
+
+    private function recordFailedDeployment(Application $application, ?string $commit, string $message): void
+    {
+        $server = $application->destination?->server;
+        ApplicationDeploymentQueue::create([
+            'application_id' => $application->id,
+            'application_name' => $application->name,
+            'server_id' => $server?->id,
+            'server_name' => $server?->name,
+            'destination_id' => $application->destination_id,
+            'deployment_uuid' => new_public_id(),
+            'commit' => $commit ?? 'HEAD',
+            'is_webhook' => true,
+            'status' => ApplicationDeploymentStatus::FAILED->value,
+        ])->addLogEntry($message, 'stderr');
     }
 
     private function application(EnvironmentConfigLink $link, string $uuid): ?Application

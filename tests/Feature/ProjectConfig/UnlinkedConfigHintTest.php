@@ -56,3 +56,12 @@ it('shows the hint on the General page', function () {
     Livewire::test(General::class, ['application' => $this->application->fresh()])
         ->assertSee('coolify.json found, not linked');
 });
+
+it('hides the hint on the General page after the environment is linked', function () {
+    $this->application->settings->forceFill(['has_unlinked_config_file' => true])->save();
+    EnvironmentConfigLink::factory()->create(['environment_id' => $this->fx['environment']->id]);
+    $this->actingAs($this->fx['user']);
+
+    Livewire::test(General::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('coolify.json found, not linked');
+});

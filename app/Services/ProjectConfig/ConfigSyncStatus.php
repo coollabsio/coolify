@@ -32,6 +32,7 @@ final class ConfigSyncStatus
         }
 
         $revision = $link->revisions()
+            ->select(['id', 'uuid', 'link_id', 'status', 'commit_sha', 'error', 'plan'])
             ->whereNotIn('status', [ConfigRevisionStatus::Skipped->value, ConfigRevisionStatus::Superseded->value])
             ->latest('id')
             ->first();

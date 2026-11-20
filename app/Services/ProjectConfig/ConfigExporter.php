@@ -19,23 +19,27 @@ class ConfigExporter
         $resources = [];
         $imports = [];
 
-        foreach ($this->registry->all() as $adapter) {
-            $models = $adapter->modelClass()::query()
-                ->where('environment_id', $environment->id)
-                ->where('id', '!=', 0)
-                ->orderBy('id')
-                ->get();
-            foreach ($models as $model) {
-                $key = $model->config_key ?? $this->proposeKey((string) $model->name, $resources);
-                $entry = $adapter->read($model, $ctx);
-                if (($entry['name'] ?? null) === $key) {
-                    unset($entry['name']);
-                }
-                $resources[$key] = $entry;
-                if ($model->config_key === null) {
-                    $imports[] = ['to' => $key, 'uuid' => $model->uuid];
-                }
+        $models = collect($this->registry->all())->flatMap(fn ($adapter) => $adapter->modelClass()::query()
+            ->where('environment_id', $environment->id)
+            ->where('id', '!=', 0)
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($model) => [$adapter, $model]));
+        // Managed resources keep their keys, so a proposed key never takes one of them.
+        $taken = $models->pluck('1.config_key')->filter()->flip()->all();
+
+        foreach ($models as [$adapter, $model]) {
+            $key = $model->config_key;
+            if ($key === null) {
+                $key = $this->proposeKey((string) $model->name, $taken);
+                $taken[$key] = true;
+                $imports[] = ['to' => $key, 'uuid' => $model->uuid];
             }
+            $entry = $adapter->read($model, $ctx);
+            if (($entry['name'] ?? null) === $key) {
+                unset($entry['name']);
+            }
+            $resources[$key] = $entry;
         }
 
         $link = $environment->configLink;
@@ -48,7 +52,7 @@ class ConfigExporter
             '$schema' => 'https://coolify.io/schemas/coolify.v1.json',
             'version' => ConfigParser::FORMAT_VERSION,
             'project' => $environment->project->name,
-            'resources' => $resources,
+            'resources' => $resources === [] ? new \stdClass : $resources,
             'environments' => [$environment->name => $environmentEntry],
         ];
     }
@@ -67,19 +71,25 @@ class ConfigExporter
         return $link;
     }
 
+    /**
+     * A key that matches ConfigParser::KEY_PATTERN (at most 63 characters, also with its prefix and suffix).
+     */
     private function proposeKey(string $name, array $taken): string
     {
-        $base = Str::of($name)->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->substr(0, 60)->value();
+        $base = Str::of($name)->lower()->replaceMatches('/[^a-z0-9]+/', '-')->trim('-')->value();
         if ($base === '' || ! preg_match('/^[a-z]/', $base)) {
             $base = 'resource'.($base === '' ? '' : '-'.$base);
         }
-        $key = $base;
-        $suffix = 2;
-        while (array_key_exists($key, $taken)) {
-            $key = "{$base}-{$suffix}";
-            $suffix++;
+        $key = self::limitKey($base, '');
+        for ($suffix = 2; array_key_exists($key, $taken); $suffix++) {
+            $key = self::limitKey($base, "-{$suffix}");
         }
 
         return $key;
+    }
+
+    private static function limitKey(string $base, string $suffix): string
+    {
+        return rtrim(substr($base, 0, 63 - strlen($suffix)), '-').$suffix;
     }
 }

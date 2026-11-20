@@ -185,3 +185,19 @@ it('lists revision plans without values for a token without read:sensitive', fun
         ->and($changes->pluck('to')->filter()->all())->toBe([])
         ->and(collect(linkApi('GET', "/config/links/{$uuid}/revisions")->json('0.plan.changes'))->pluck('to')->filter())->not->toBeEmpty();
 });
+
+it('needs the deploy ability to resume with confirm and to retry', function () {
+    $uuid = linkApiCreate();
+    linkApi('POST', "/config/links/{$uuid}/apply", ['file' => linkApiFile(['api' => linkApiApp()])])->assertAccepted();
+    linkApi('POST', "/config/links/{$uuid}/suspend")->assertOk();
+    $link = EnvironmentConfigLink::where('uuid', $uuid)->first();
+    $failed = EnvironmentConfigRevision::factory()->create(['link_id' => $link->id, 'status' => ConfigRevisionStatus::Failed, 'file_contents' => linkApiFile(['api' => linkApiApp()])]);
+    $writeToken = $this->fx['user']->createToken('w', ['read', 'write'], teamId: $this->fx['team']->id)->plainTextToken;
+
+    linkApi('POST', "/config/links/{$uuid}/resume", [], $writeToken)->assertOk();
+    linkApi('POST', "/config/links/{$uuid}/resume?confirm=1", [], $writeToken)->assertForbidden();
+    linkApi('POST', "/config/revisions/{$failed->uuid}/retry", [], $writeToken)->assertForbidden();
+
+    expect($link->fresh()->isSuspended())->toBeTrue()
+        ->and(EnvironmentConfigRevision::where('link_id', $link->id)->count())->toBe(2);
+});
