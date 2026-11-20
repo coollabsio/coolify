@@ -211,6 +211,7 @@
                 $currentSourceIsGithub = $currentSourceMorph === \App\Models\GithubApp::class;
                 $currentSourceIsGitlab = $currentSourceMorph === \App\Models\GitlabApp::class;
                 $currentSourceIsGitea = $currentSourceMorph === \App\Models\GiteaApp::class;
+                $currentSourceIsOrigin = $currentSourceMorph === \App\Models\OriginApp::class;
                 $currentSourceSubtitle = match (true) {
                     $currentSourceIsGithub && filled($currentSource->accountName()) => 'GitHub · '.$currentSource->accountName(),
                     $currentSourceIsGithub => data_get($currentSource, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
@@ -218,6 +219,8 @@
                     $currentSourceIsGitlab => 'GitLab · Personal account',
                     $currentSourceIsGitea && filled(data_get($currentSource, 'organization')) => 'Gitea · '.$currentSource->organization,
                     $currentSourceIsGitea => 'Gitea · Personal account',
+                    $currentSourceIsOrigin && filled(data_get($currentSource, 'namespace_slug')) => 'Origin · '.$currentSource->namespace_slug,
+                    $currentSourceIsOrigin => 'Origin',
                     default => 'Connected source',
                 };
             @endphp
@@ -251,6 +254,7 @@
                             $sourceIsGithub = $sourceMorph === \App\Models\GithubApp::class;
                             $sourceIsGitlab = $sourceMorph === \App\Models\GitlabApp::class;
                             $sourceIsGitea = $sourceMorph === \App\Models\GiteaApp::class;
+                            $sourceIsOrigin = $sourceMorph === \App\Models\OriginApp::class;
                             $sourceSubtitle = match (true) {
                                 $sourceIsGithub && filled($source->accountName()) => 'GitHub · '.$source->accountName(),
                                 $sourceIsGithub => data_get($source, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
@@ -258,6 +262,8 @@
                                 $sourceIsGitlab => 'GitLab · Personal account',
                                 $sourceIsGitea && filled($source->organization) => 'Gitea · '.$source->organization,
                                 $sourceIsGitea => 'Gitea · Personal account',
+                                $sourceIsOrigin && filled($source->namespace_slug) => 'Origin · '.$source->namespace_slug,
+                                $sourceIsOrigin => 'Origin',
                                 default => 'Git source',
                             };
                         @endphp

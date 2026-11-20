@@ -4,6 +4,7 @@ use App\Http\Controllers\Webhook\Bitbucket;
 use App\Http\Controllers\Webhook\Gitea;
 use App\Http\Controllers\Webhook\Github;
 use App\Http\Controllers\Webhook\Gitlab;
+use App\Http\Controllers\Webhook\Origin;
 use App\Http\Controllers\Webhook\Stripe;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,7 @@ Route::middleware(['web', 'auth', 'throttle:60,1'])->group(function () {
     Route::get('/source/github/install', [Github::class, 'install']);
     Route::get('/source/gitlab/redirect', [Gitlab::class, 'redirect']);
     Route::get('/source/gitea/redirect', [Gitea::class, 'redirect']);
+    Route::get('/source/origin/install', [Origin::class, 'install']);
 });
 
 Route::post('/source/github/events', [Github::class, 'normal']);
@@ -19,6 +21,8 @@ Route::post('/source/github/events/manual', [Github::class, 'manual']);
 
 Route::post('/source/gitlab/events', [Gitlab::class, 'normal']);
 Route::post('/source/gitlab/events/manual', [Gitlab::class, 'manual']);
+
+Route::post('/source/origin/events', [Origin::class, 'normal']);
 
 Route::post('/source/bitbucket/events/manual', [Bitbucket::class, 'manual']);
 

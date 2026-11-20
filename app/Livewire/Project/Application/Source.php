@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\OriginApp;
 use App\Models\PrivateKey;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
@@ -302,7 +303,7 @@ class Source extends Component
             if ($source instanceof GithubApp) {
                 return ! is_null($source->app_id);
             }
-            if ($source instanceof GitlabApp || $source instanceof GiteaApp) {
+            if ($source instanceof GitlabApp || $source instanceof GiteaApp || $source instanceof OriginApp) {
                 return $source->isConnected();
             }
 
@@ -388,15 +389,18 @@ class Source extends Component
         try {
             $this->authorize('update', $this->application);
             $this->authorize('useTeamCredentials', $this->application);
-            $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class];
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class, GiteaApp::class, OriginApp::class];
             abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
             $teamId = $this->application->team()->id;
             $source = $sourceType::query()
                 ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
+                ->when($sourceType === OriginApp::class, fn ($query) => $query->whereNotNull('app_id')->whereNotNull('installation_id'))
                 ->findOrFail($sourceId);
             $this->application->update([
                 'source_id' => $source->id,
                 'source_type' => $sourceType,
+                // Origin repository IDs are strings; Origin webhooks match on git_repository instead.
+                ...($sourceType === OriginApp::class ? ['repository_project_id' => null] : []),
             ]);
             $this->dispatch('configurationChanged');
 

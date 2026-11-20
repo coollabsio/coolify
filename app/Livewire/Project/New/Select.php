@@ -195,6 +195,12 @@ class Select extends Component
                 'description' => 'Deploy public or private Gitea, Forgejo, or Codeberg repositories through a Gitea / Forgejo App, with automatic webhooks and pull request previews.',
                 'logo' => asset('svgs/gitea.svg'),
             ],
+            [
+                'id' => 'private-origin-app',
+                'name' => 'Git Repository (with Origin App)',
+                'description' => 'Deploy repositories hosted on Cursor Origin through an Origin App, with automatic webhooks and pull request previews.',
+                'logo' => asset('svgs/resources/origin-app.svg'),
+            ],
         ];
         $dockerBasedApplications = [
             [
