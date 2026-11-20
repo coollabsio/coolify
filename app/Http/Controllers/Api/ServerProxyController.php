@@ -404,7 +404,7 @@ class ServerProxyController extends Controller
             return response()->json(['message' => 'Server is not functional.'], 400);
         }
 
-        SaveProxyConfiguration::run($server, $configuration);
+        SaveProxyConfiguration::run($server, $configuration, 'api');
 
         auditLog('api.server.proxy.configuration_saved', [
             'team_id' => $teamId,

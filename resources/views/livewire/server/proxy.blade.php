@@ -188,6 +188,12 @@
                             </div>
                         @endif
                     </x-application.settings-section>
+
+                    @if ($proxySettings && $this->configurationVersions->isNotEmpty())
+                        @include('livewire.server.proxy-configuration-history', [
+                            'versions' => $this->configurationVersions,
+                        ])
+                    @endif
                 @endif
                 </fieldset>
             </form>
