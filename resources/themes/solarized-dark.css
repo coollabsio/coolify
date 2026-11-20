@@ -1,0 +1,49 @@
+html.dark {
+    --theme-base-color: #268bd2 !important;
+    --theme-bright-color: #268bd2;
+    --theme-accent-foreground: #002b36 !important;
+    --theme-scrollbar-thumb: #144956;
+    --theme-border-color: #144956;
+    --theme-placeholder-color: #657b83;
+
+    --color-accent: #268bd2;
+    --color-accent-foreground: #002b36;
+    --color-coollabs: #268bd2;
+    --color-coollabs-100: color-mix(in oklab, #268bd2 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #268bd2 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #268bd2 70%, black);
+    --color-warning: #268bd2;
+
+    --color-app: #00212b;
+    --color-panel: #002b36;
+    --color-surface: #073642;
+    --color-raised: #0b3d4a;
+    --color-selected: #144956;
+    --color-coolgray-100: #073642;
+    --color-coolgray-200: #0b3d4a;
+    --color-coolgray-300: #144956;
+    --color-coolgray-400: #144956;
+    --color-coolgray-500: color-mix(in oklab, #144956 85%, white);
+    --coollabs-canvas: #00212b;
+    --coollabs-elevated: #073642;
+    --coollabs-recessed: #0b3d4a;
+    --coollabs-base: #073642;
+    --color-content-surface: #073642;
+    --coollabs-fill: #144956;
+    --coollabs-line: #144956;
+    --coollabs-hairline: color-mix(in srgb, #144956 60%, #002b36);
+    --color-hairline: color-mix(in srgb, #eee8d5 10%, transparent);
+    --color-log: #00212b;
+    --color-log-toolbar: #002b36;
+
+    --color-fg: #eee8d5;
+    --color-fg-dim: #93a1a1;
+    --color-fg-faint: #657b83;
+    --coollabs-subtle: #93a1a1;
+    --color-nav-text: #93a1a1;
+    --color-nav-muted: #657b83;
+    --color-nav-active: #eee8d5;
+
+    --color-success: #859900;
+    --color-error: #dc322f;
+}
