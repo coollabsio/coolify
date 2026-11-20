@@ -125,7 +125,7 @@ class CheckProxy
                 $result = $results[$index] ?? null;
 
                 if ($result) {
-                    $conflicts[$port] = $this->parsePortCheckResult($result, $port, $proxyContainerName);
+                    $conflicts[$port] = $this->parsePortCheckResult($result);
                 } else {
                     // If process failed, assume no conflict to avoid false positives
                     $conflicts[$port] = false;
@@ -166,7 +166,7 @@ class CheckProxy
         $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
         $socketPort = escapeshellarg(':'.$port);
         $portSuffixPattern = escapeshellarg(':'.$port.' ');
-        $portArgument = escapeshellarg((string) $port);
+        $listenerInProcNet = $this->listenerInProcNetCommand($port);
 
         // First check if our own proxy is using this port (which is fine)
         $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
@@ -196,11 +196,6 @@ class CheckProxy
                     echo 'port_free';
                     exit 0;
                 fi;
-                # Check for dual-stack or docker processes
-                if [ \$count -le 2 ] && (echo \"\$ss_output\" | grep -q 'docker\\|coolify'); then
-                    echo 'port_free';
-                    exit 0;
-                fi;
                 echo \"port_conflict|\$ss_output\";
                 exit 0;
             fi;
@@ -217,17 +212,13 @@ class CheckProxy
                     echo 'port_free';
                     exit 0;
                 fi;
-                if [ \$count -le 2 ] && (echo \"\$netstat_output\" | grep -q 'docker\\|coolify'); then
-                    echo 'port_free';
-                    exit 0;
-                fi;
                 echo \"port_conflict|\$netstat_output\";
                 exit 0;
             fi;
             
-            # Final fallback using nc
-            if nc -z -w1 127.0.0.1 $portArgument >/dev/null 2>&1; then
-                echo 'port_conflict|nc_detected';
+            # Final fallback without tools: the kernel socket table
+            if $listenerInProcNet; then
+                echo 'port_conflict|proc_net_tcp';
             else
                 echo 'port_free';
             fi;
@@ -239,46 +230,15 @@ class CheckProxy
     /**
      * Parse the result from port check command
      */
-    private function parsePortCheckResult($processResult, int $port, string $proxyContainerName): bool
+    private function parsePortCheckResult($processResult): bool
     {
-        $exitCode = $processResult->exitCode();
-        $output = trim($processResult->output());
-        $errorOutput = trim($processResult->errorOutput());
-
-        if ($exitCode !== 0) {
-            return false;
-        }
-
-        if ($output === 'proxy_using_port' || $output === 'port_free') {
-            return false; // No conflict
-        }
-
-        if (str_starts_with($output, 'port_conflict|')) {
-            $details = substr($output, strlen('port_conflict|'));
-
-            // Additional logic to detect dual-stack scenarios
-            if ($details !== 'nc_detected') {
-                // Check for dual-stack scenario - typically 1-2 listeners (IPv4+IPv6)
-                $lines = explode("\n", $details);
-                if (count($lines) <= 2) {
-                    // Look for IPv4 and IPv6 in the listing
-                    if ((strpos($details, '0.0.0.0:'.$port) !== false && strpos($details, ':::'.$port) !== false) ||
-                        (strpos($details, '*:'.$port) !== false && preg_match('/\*:'.$port.'.*IPv[46]/', $details))) {
-
-                        return false; // This is just a normal dual-stack setup
-                    }
-                }
-            }
-
-            return true; // Real port conflict
-        }
-
-        return false;
+        return $processResult->exitCode() === 0
+            && str_starts_with(trim($processResult->output()), 'port_conflict|');
     }
 
     /**
-     * Smart port checker that handles dual-stack configurations
-     * Returns true only if there's a real port conflict (not just dual-stack)
+     * Sequential fallback of the parallel port check.
+     * Returns true when something other than our proxy container listens on the port.
      */
     private function isPortConflict(Server $server, int $port, string $proxyContainerName): bool
     {
@@ -328,16 +288,6 @@ class CheckProxy
                     "echo \"\$netstat_output\" | grep $portSuffixPattern | grep -c 'LISTEN'",
                 ],
             ],
-            // Set 3: Use lsof as last resort
-            [
-                'available' => 'command -v lsof >/dev/null 2>&1',
-                'check' => [
-                    // Get process using the port
-                    "lsof -i $socketPort -P -n | grep 'LISTEN'",
-                    // Count listeners
-                    "lsof -i $socketPort -P -n | grep 'LISTEN' | wc -l",
-                ],
-            ],
         ];
 
         // Try each command set until we find one available
@@ -358,44 +308,7 @@ class CheckProxy
                     return false;
                 }
 
-                // Try to detect if this is our coolify-proxy
-                if (strpos($details, 'docker') !== false || strpos($details, $proxyContainerName) !== false) {
-                    // It's likely our docker or proxy, which is fine
-                    return false;
-                }
-
-                // Check for dual-stack scenario - typically 1-2 listeners (IPv4+IPv6)
-                // If exactly 2 listeners and both have same port, likely dual-stack
-                if ($count <= 2) {
-                    // Check if it looks like a standard dual-stack setup
-                    $isDualStack = false;
-
-                    // Look for IPv4 and IPv6 in the listing (ss output format)
-                    if (preg_match('/LISTEN.*:'.$port.'\s/', $details) &&
-                        (preg_match('/\*:'.$port.'\s/', $details) ||
-                         preg_match('/:::'.$port.'\s/', $details))) {
-                        $isDualStack = true;
-                    }
-
-                    // For netstat format
-                    if (strpos($details, '0.0.0.0:'.$port) !== false &&
-                        strpos($details, ':::'.$port) !== false) {
-                        $isDualStack = true;
-                    }
-
-                    // For lsof format (IPv4 and IPv6)
-                    if (strpos($details, '*:'.$port) !== false &&
-                        preg_match('/\*:'.$port.'.*IPv4/', $details) &&
-                        preg_match('/\*:'.$port.'.*IPv6/', $details)) {
-                        $isDualStack = true;
-                    }
-
-                    if ($isDualStack) {
-                        return false; // This is just a normal dual-stack setup
-                    }
-                }
-
-                // If we get here, it's likely a real port conflict
+                // Any other listener blocks the proxy. Our own proxy container was already checked above.
                 return true;
 
             } catch (\Throwable $e) {
@@ -404,10 +317,8 @@ class CheckProxy
             }
         }
 
-        // Fallback to simpler check if all above methods fail
         try {
-            // Just try to bind to the port directly to see if it's available
-            $checkCommand = "nc -z -w1 127.0.0.1 $port >/dev/null 2>&1 && echo 'in-use' || echo 'free'";
+            $checkCommand = $this->listenerInProcNetCommand($port)." && echo 'in-use' || echo 'free'";
             $result = instant_remote_process([$checkCommand], $server, true);
 
             return trim($result) === 'in-use';
@@ -415,5 +326,16 @@ class CheckProxy
             // If everything fails, assume the port is free to avoid false positives
             return false;
         }
+    }
+
+    /**
+     * Shell condition that is true when a TCP socket listens on the port on any address.
+     * It reads the kernel socket table, which lists the sockets of all users and needs no tool or root.
+     */
+    private function listenerInProcNetCommand(int $port): string
+    {
+        $listenPattern = escapeshellarg(sprintf('^ *[0-9]+: [0-9A-F]+:%04X [0-9A-F]+:[0-9A-F]+ 0A ', $port));
+
+        return "cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -qE $listenPattern";
     }
 }
