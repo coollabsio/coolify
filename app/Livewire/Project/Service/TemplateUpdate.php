@@ -3,11 +3,13 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Models\ServiceTemplateRevision;
 use App\Services\ComposeDiff;
 use App\Services\TemplateUpdateChecker;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -209,7 +211,7 @@ class TemplateUpdate extends Component
         $this->editorContent = null;
         $this->editorSeededSignature = null;
         $this->mode = 'review';
-        unset($this->hunks, $this->hasHunks, $this->hasSelectedHunks, $this->updateAvailable);
+        unset($this->hunks, $this->hasHunks, $this->hasSelectedHunks, $this->updateAvailable, $this->revisions);
     }
 
     private function mergedFromSelection(): string
@@ -223,8 +225,41 @@ class TemplateUpdate extends Component
         return ComposeDiff::apply((string) $this->service->docker_compose_raw, $this->latestCompose, $accepted);
     }
 
-    private function persistCompose(string $compose): void
+    public function restoreRevision(int $revisionId): void
     {
+        try {
+            $this->authorize('update', $this->service);
+            $revision = $this->service->templateRevisions()->findOrFail($revisionId);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return;
+        }
+
+        $this->persistCompose(
+            $revision->docker_compose_raw,
+            $revision->template_reference_hash,
+            $revision,
+            'Compose restored. Redeploy the service for it to take effect.',
+        );
+    }
+
+    /** @return Collection<int, ServiceTemplateRevision> */
+    public function getRevisionsProperty(): Collection
+    {
+        return $this->service->templateRevisions()->limit(ServiceTemplateRevision::KEEP)->get();
+    }
+
+    /**
+     * Save the compose, keeping the previous one in the revision history. A restored
+     * revision becomes the current compose, so it leaves the history.
+     */
+    private function persistCompose(
+        string $compose,
+        ?string $newHash = null,
+        ?ServiceTemplateRevision $restoring = null,
+        string $successMessage = 'Template changes applied. Redeploy the service for them to take effect.',
+    ): void {
         try {
             $this->authorize('update', $this->service);
 
@@ -236,11 +271,18 @@ class TemplateUpdate extends Component
                 return;
             }
 
-            $newHash = $this->reviewedTemplateHash;
+            $newHash = $restoring ? $newHash : $this->reviewedTemplateHash;
 
             // parse() materializes any new env vars via firstOrCreate, so values
             // the user has already set are never overwritten.
-            DB::transaction(function () use ($compose, $newHash): void {
+            DB::transaction(function () use ($compose, $newHash, $restoring): void {
+                $this->service->templateRevisions()->create([
+                    'docker_compose_raw' => (string) $this->service->docker_compose_raw,
+                    'template_reference_hash' => $this->service->template_reference_hash,
+                ]);
+                $restoring?->delete();
+                $this->service->templateRevisions()->skip(ServiceTemplateRevision::KEEP)->take(PHP_INT_MAX)->get()->each->delete();
+
                 $this->service->docker_compose_raw = $compose;
                 $this->service->template_reference_hash = $newHash;
                 $this->service->template_dismissed_hash = null;
@@ -251,7 +293,7 @@ class TemplateUpdate extends Component
             $this->service->refresh();
             $this->resetReviewState();
 
-            $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
+            $this->dispatch('success', $successMessage);
             $this->dispatch('refreshEnvs');
             $this->dispatch('refreshServices');
         } catch (\Throwable $e) {

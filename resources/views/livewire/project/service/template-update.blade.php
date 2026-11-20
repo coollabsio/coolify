@@ -168,6 +168,36 @@
                     </div>
                 @endif
             </x-application.settings-section>
+
+            {{-- Revision history --}}
+            <x-application.settings-section title="History"
+                helper="Your compose before each of the last {{ \App\Models\ServiceTemplateRevision::KEEP }} template changes or restores. Restoring keeps the current compose in the history, so you can undo it.">
+                @forelse ($this->revisions as $revision)
+                    <details wire:key="template-revision-{{ $revision->id }}" @class([
+                        'group overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.08]',
+                        'mt-3' => !$loop->first,
+                    ])>
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-[13px]">
+                            <span class="inline-flex min-w-0 items-center gap-2">
+                                <x-reicon name="chevron-down" class="size-3.5 shrink-0 -rotate-90 transition-transform group-open:rotate-0" />
+                                <span class="truncate" title="{{ $revision->created_at }}">
+                                    Before the change {{ $revision->created_at->diffForHumans() }}
+                                </span>
+                            </span>
+                            <x-forms.button wire:click="restoreRevision({{ $revision->id }})" canGate="update"
+                                :canResource="$service"
+                                wire:confirm="Replace your current compose with this version? The current compose stays in the history.">
+                                Restore
+                            </x-forms.button>
+                        </summary>
+                        <pre class="max-h-96 overflow-auto border-t border-neutral-200 p-3 font-mono text-xs leading-5 text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim">{{ $revision->docker_compose_raw }}</pre>
+                    </details>
+                @empty
+                    <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                        No template changes applied yet.
+                    </p>
+                @endforelse
+            </x-application.settings-section>
         @endif
     </div>
 </div>

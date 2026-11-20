@@ -291,3 +291,77 @@ it('forbids a team member from applying template changes', function () {
 
     expect($service->refresh()->docker_compose_raw)->toContain('nginx:1');
 });
+
+it('keeps the previous compose in the history when template changes are applied', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('replaceAll')
+        ->assertSee('History')
+        ->assertSee('image: nginx:1');
+
+    $revision = $service->templateRevisions()->sole();
+    expect($revision->docker_compose_raw)->toBe("services:\n  app:\n    image: nginx:1\n")
+        ->and($revision->template_reference_hash)->toBe('stale');
+});
+
+it('keeps only the newest five revisions', function () {
+    $service = makeDemoService();
+    $component = Livewire::test(TemplateUpdate::class, ['service' => $service]);
+
+    foreach (range(1, 7) as $version) {
+        $component->call('setMode', 'edit')
+            ->set('editorContent', "services:\n  app:\n    image: nginx:custom-{$version}\n")
+            ->call('applyEditor');
+    }
+
+    $kept = $service->templateRevisions()->pluck('docker_compose_raw');
+    expect($kept)->toHaveCount(5)
+        ->and($kept->first())->toContain('nginx:custom-6')
+        ->and($kept->last())->toContain('nginx:custom-2');
+});
+
+it('restores a revision and keeps the replaced compose so the restore can be undone', function () {
+    $service = makeDemoService();
+    $component = Livewire::test(TemplateUpdate::class, ['service' => $service])->call('replaceAll');
+    $revision = $service->templateRevisions()->sole();
+
+    $component->call('restoreRevision', $revision->id)->assertDispatched('success');
+
+    $service->refresh();
+    expect($service->docker_compose_raw)->toContain('nginx:1')
+        ->and($service->template_reference_hash)->toBe('stale')
+        ->and(TemplateUpdateChecker::updateAvailable($service))->toBeTrue();
+
+    $undo = $service->templateRevisions()->sole();
+    expect($undo->docker_compose_raw)->toContain('nginx:2')
+        ->and($undo->template_reference_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
+});
+
+it('does not restore a revision of another service', function () {
+    $service = makeDemoService();
+    $other = makeDemoService();
+    Livewire::test(TemplateUpdate::class, ['service' => $other])->call('replaceAll');
+    $foreignRevision = $other->templateRevisions()->sole();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('restoreRevision', $foreignRevision->id);
+
+    expect($service->refresh()->docker_compose_raw)->toContain('nginx:1')
+        ->and($service->templateRevisions()->count())->toBe(0);
+});
+
+it('forbids a team member from restoring a revision', function () {
+    $service = makeDemoService();
+    Livewire::test(TemplateUpdate::class, ['service' => $service])->call('replaceAll');
+    $revision = $service->templateRevisions()->sole();
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('restoreRevision', $revision->id);
+
+    expect($service->refresh()->docker_compose_raw)->toContain('nginx:2');
+});

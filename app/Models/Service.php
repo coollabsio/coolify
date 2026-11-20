@@ -1637,6 +1637,12 @@ class Service extends BaseModel
         return $this->redact_all_env_values_in_logs ?? true;
     }
 
+    /** Composes before a template change, newest first. */
+    public function templateRevisions(): HasMany
+    {
+        return $this->hasMany(ServiceTemplateRevision::class)->latest('id');
+    }
+
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
