@@ -57,8 +57,12 @@ it('loads unique sorted Docker volumes from the resource server', function () {
     ]);
 
     Livewire::test(Storage::class, ['resource' => $this->application])
+        ->assertSet('existingVolumesLoaded', false)
+        ->assertSee('Loading volumes from the server')
         ->call('loadExistingVolumes')
-        ->assertSet('existingVolumes', ['alpha-volume', 'zeta-volume']);
+        ->assertSet('existingVolumes', ['alpha-volume', 'zeta-volume'])
+        ->assertSet('existingVolumesLoaded', true)
+        ->assertSee('alpha-volume');
 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume ls --format '{{.Name}}'"));
 });
@@ -73,7 +77,9 @@ it('attaches an existing volume without changing its Docker name', function () {
         ->set('existing_volume', 'shared-database-data')
         ->set('mount_path', '/var/lib/data')
         ->call('submitPersistentVolume')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertSet('existingVolumesLoaded', true)
+        ->assertSet('existingVolumes', []);
 
     $storage = $this->application->persistentStorages()->sole();
 
@@ -82,6 +88,58 @@ it('attaches an existing volume without changing its Docker name', function () {
         ->and($storage->host_path)->toBeNull()
         ->and($storage->is_external)->toBeTrue()
         ->and($storage->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('ends the loading state when the server cannot list its volumes', function () {
+    Process::fake([
+        '*' => Process::result(errorOutput: 'SSH connection failed', exitCode: 255),
+    ]);
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->call('loadExistingVolumes')
+        ->assertSet('existingVolumes', [])
+        ->assertSet('existingVolumesLoaded', true);
+});
+
+it('does not list or mount the volumes of Coolify itself', function () {
+    Process::fake([
+        '*' => Process::result(output: "coolify-db\ncoolify-redis\ncoolify\ncoolify_dev_coolify_data\ncoolifyapp-data\nshared-app-data\n"),
+    ]);
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->call('loadExistingVolumes')
+        ->assertSet('existingVolumes', ['coolifyapp-data', 'shared-app-data'])
+        ->set('existingVolumes', ['coolify-db'])
+        ->set('existing_volume', 'coolify-db')
+        ->set('mount_path', '/var/lib/data')
+        ->call('submitPersistentVolume')
+        ->assertDispatched('error');
+
+    expect($this->application->persistentStorages()->count())->toBe(0);
+});
+
+it('does not list or mount a volume that the resource already mounts', function () {
+    LocalPersistentVolume::create([
+        'name' => 'shared-app-data',
+        'mount_path' => '/app/data',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_external' => true,
+    ]);
+    Process::fake([
+        '*' => Process::result(output: "shared-app-data\nsecond-app-data\n"),
+    ]);
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->call('loadExistingVolumes')
+        ->assertSet('existingVolumes', ['second-app-data'])
+        ->set('existingVolumes', ['shared-app-data'])
+        ->set('existing_volume', 'shared-app-data')
+        ->set('mount_path', '/var/lib/other')
+        ->call('submitPersistentVolume')
+        ->assertDispatched('error');
+
+    expect($this->application->persistentStorages()->count())->toBe(1);
 });
 
 it('rejects an existing volume that was not returned by the server', function () {

@@ -128,22 +128,28 @@
                                                     An existing volume keeps its name.
                                                 </p>
                                                 <div class="flex flex-col gap-4">
-                                                    <div wire:key="existing-volumes-{{ md5(json_encode($existingVolumes)) }}">
-                                                        <x-forms.listbox searchable live id="existing_volume"
-                                                            label="Existing Volume" placeholder="Create a new volume"
-                                                            searchPlaceholder="Search volumes on this server"
-                                                            searchEmptyText="No matching volume"
-                                                            helper="Select an existing Docker volume, or create a new one."
-                                                            :options="collect($existingVolumes)
-                                                                ->map(fn (string $volume) => ['value' => $volume, 'label' => $volume])
-                                                                ->prepend(['value' => '', 'label' => 'Create a new volume'])
-                                                                ->all()"
-                                                            canGate="update" :canResource="$resource" />
+                                                    <div class="relative" wire:key="existing-volumes-loading"
+                                                        @if ($existingVolumesLoaded) wire:loading.block wire:target="loadExistingVolumes" @endif>
+                                                        <x-forms.listbox htmlId="existing_volume_loading" :wire="false" disabled
+                                                            label="Existing Volume" placeholder="Loading volumes from the server…"
+                                                            helper="Select an existing Docker volume, or create a new one." />
+                                                        <x-loading compact class="pointer-events-none absolute right-8" style="bottom: 0; height: 2rem" />
                                                     </div>
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400"
-                                                        wire:loading wire:target="loadExistingVolumes">
-                                                        Loading volumes from the server...
-                                                    </div>
+                                                    @if ($existingVolumesLoaded)
+                                                        <div wire:key="existing-volumes-{{ md5(json_encode($existingVolumes)) }}"
+                                                            wire:loading.remove wire:target="loadExistingVolumes">
+                                                            <x-forms.listbox searchable live id="existing_volume"
+                                                                label="Existing Volume" placeholder="Create a new volume"
+                                                                searchPlaceholder="Search volumes on this server"
+                                                                searchEmptyText="No matching volume"
+                                                                helper="Select an existing Docker volume, or create a new one."
+                                                                :options="collect($existingVolumes)
+                                                                    ->map(fn (string $volume) => ['value' => $volume, 'label' => $volume])
+                                                                    ->prepend(['value' => '', 'label' => 'Create a new volume'])
+                                                                    ->all()"
+                                                                canGate="update" :canResource="$resource" />
+                                                        </div>
+                                                    @endif
                                                     @if (filled($existing_volume))
                                                         <x-callout type="warning" title="Data corruption risk" class="p-3">
                                                             If another container writes to this volume at the same time, data can become corrupted.

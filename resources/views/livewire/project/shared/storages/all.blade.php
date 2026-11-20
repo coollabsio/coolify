@@ -223,13 +223,16 @@
                             <div class="volumes-cell-name min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
-                                    <div class="min-w-0 flex-1">
-                                        <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared'] || $form['isExternal']" />
-                                    </div>
+                                    @if ($form['isExternal'])
+                                        <span class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
+                                            title="{{ $form['name'] }}">{{ $form['name'] }}</span>
+                                        <x-helper helper="Existing Docker volume. Coolify does not delete, rename, or copy it." />
+                                    @else
+                                        <div class="min-w-0 flex-1">
+                                            <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
+                                        </div>
+                                    @endif
                                 </div>
-                                @if ($form['isExternal'])
-                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Existing Docker volume. Coolify does not delete or copy it.</span>
-                                @endif
                                 @if ($storage->standaloneSqlite)
                                     <a href="{{ $storage->standaloneSqlite->link() }}"
                                         class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
@@ -337,9 +340,13 @@
                                             <x-slot:danger>
                                                 <x-modal-confirmation title="Confirm persistent storage deletion?" buttonFullWidth
                                                     submitAction="delete({{ $id }})" :actions="[
-                                                        'The selected persistent storage/volume will be permanently deleted.',
-                                                        'If the persistent storage/volume is actvily used by a resource data will be lost.',
-                                                    ]" confirmationText="{{ $form['name'] }}"
+                                                        'The volume mount will be removed from this resource.',
+                                                        $form['isExternal']
+                                                            ? 'The existing Docker volume and its data stay on the server.'
+                                                            : 'The Docker volume and its data stay on the server. Delete the volume on the server if you no longer need it.',
+                                                    ]"
+                                                    warningMessage="The resource no longer has access to this volume after the next deployment."
+                                                    confirmationText="{{ $form['name'] }}"
                                                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                                                     shortConfirmationLabel="Storage Name">
                                                     <x-slot:trigger>

@@ -38,6 +38,8 @@ class Storage extends Component
     /** @var array<int, string> */
     public array $existingVolumes = [];
 
+    public bool $existingVolumesLoaded = false;
+
     public string $mount_path = '';
 
     public string $file_storage_path = '';
@@ -286,6 +288,7 @@ class Storage extends Component
 
             if (filled($this->existing_volume)) {
                 $this->existingVolumes = $this->existingVolumesOnServer();
+                $this->existingVolumesLoaded = true;
             }
 
             $this->validate([
@@ -320,6 +323,7 @@ class Storage extends Component
                 'is_preview_suffix_enabled' => blank($this->existing_volume),
             ]);
             $this->auditStorageChange($this->resource, 'created', $volume);
+            $this->existingVolumes = array_values(array_diff($this->existingVolumes, [$name]));
             $this->clearForm();
             $this->activeTab = 'volumes';
             $this->refreshStorages();
@@ -339,6 +343,8 @@ class Storage extends Component
             $this->existingVolumes = $this->existingVolumesOnServer();
         } catch (\Throwable $e) {
             handleError($e, $this);
+        } finally {
+            $this->existingVolumesLoaded = true;
         }
     }
 
@@ -463,7 +469,6 @@ class Storage extends Component
     {
         $this->name = $this->generateDefaultVolumeName();
         $this->existing_volume = null;
-        $this->existingVolumes = [];
         $this->mount_path = '';
         $this->file_storage_path = '';
         $this->file_storage_source = '';
@@ -479,7 +484,13 @@ class Storage extends Component
         }
     }
 
-    /** @return array<int, string> */
+    /**
+     * The Docker volumes of the resource server that a resource can mount. The volumes of Coolify
+     * itself (for example coolify-db and coolify-redis) and the volumes that this resource already
+     * mounts are not in the list.
+     *
+     * @return array<int, string>
+     */
     private function existingVolumesOnServer(): array
     {
         $output = instant_remote_process(
@@ -495,6 +506,8 @@ class Storage extends Component
         return collect(preg_split('/\r\n|\r|\n/', $output))
             ->map(fn (string $volume): string => trim($volume))
             ->filter(fn (string $volume): bool => preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $volume) === 1)
+            ->reject(fn (string $volume): bool => preg_match('/^coolify(?:[-_.]|$)/i', $volume) === 1)
+            ->diff($this->resource->persistentStorages()->pluck('name'))
             ->unique()
             ->sort()
             ->values()
