@@ -662,35 +662,23 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         expect($content)->not->toContain('Webhook secret not configured');
     });
 
-    test('accepts bitbucket data center repo refs changed with valid sha256 hash', function () {
-        $app = createApplicationWithWebhook(
-            repo: '~harrison/fx-data-agents-benchmark-output',
-            branch: 'master',
-            overrides: [
-                'git_repository' => 'ssh://git@code.fineres.com:7999/~harrison/fx-data-agents-benchmark-output.git',
-            ]
-        );
-        $secret = $app->manual_webhook_secret_bitbucket;
+    test('matches a bitbucket data center push by project key and slug', function (string $gitRepository) {
+        $app = createApplicationWithWebhook(branch: 'master', overrides: ['git_repository' => $gitRepository]);
 
+        // Shape of the documented repo:refs_changed payload: the repository has no links.
         $payload = json_encode([
             'eventKey' => 'repo:refs_changed',
-            'repository' => [
-                'slug' => 'fx-data-agents-benchmark-output',
-                'project' => ['key' => '~HARRISON'],
-                'links' => [
-                    'clone' => [
-                        ['href' => 'ssh://git@code.fineres.com:7999/~harrison/fx-data-agents-benchmark-output.git'],
-                    ],
-                ],
-            ],
+            'repository' => ['slug' => 'repo', 'project' => ['key' => '~USER']],
             'changes' => [[
-                'ref' => ['displayId' => 'master'],
+                'ref' => ['id' => 'refs/heads/master', 'displayId' => 'master', 'type' => 'BRANCH'],
+                'refId' => 'refs/heads/master',
+                'fromHash' => 'ecddabb624f6f5ba43816f5926e580a5f680a932',
                 'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
                 'type' => 'UPDATE',
             ]],
+            'commits' => [['message' => 'Fix the build']],
         ]);
-
-        $hmac = hash_hmac('sha256', $payload, $secret);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
 
         $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
             'HTTP_X-Event-Key' => 'repo:refs_changed',
@@ -699,11 +687,12 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         ], $payload);
 
         $response->assertOk();
-        $content = $response->getContent();
-        expect($content)->not->toContain('Invalid signature');
-        expect($content)->not->toContain('Event not handled');
-        expect($content)->not->toContain('No applications found');
-    });
+        expect($response->getContent())->toContain('Server is not functional');
+    })->with([
+        'ssh' => 'ssh://git@bitbucket.example.com:7999/~user/repo.git',
+        'https' => 'https://bitbucket.example.com/scm/~user/repo.git',
+        'https with context path' => 'https://example.com/bitbucket/scm/~user/repo.git',
+    ]);
 });
 
 describe('Gitea Manual Webhook HMAC', function () {

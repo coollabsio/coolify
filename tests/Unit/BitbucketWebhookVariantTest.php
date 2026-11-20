@@ -45,12 +45,12 @@ describe('BitbucketDataCenterWebhookVariant', function () {
                 'project' => ['key' => '~HARRISON'],
                 'links' => [
                     'clone' => [
-                        ['href' => 'ssh://git@code.fineres.com:7999/~harrison/fx-data-agents-benchmark-output.git'],
+                        ['href' => 'ssh://git@bitbucket.example.com:7999/~harrison/fx-data-agents-benchmark-output.git'],
                     ],
                 ],
             ],
             'changes' => [[
-                'ref' => ['displayId' => 'master'],
+                'ref' => ['displayId' => 'master', 'type' => 'BRANCH'],
                 'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
                 'type' => 'UPDATE',
             ]],
@@ -94,5 +94,59 @@ describe('BitbucketDataCenterWebhookVariant pull requests', function () {
             ->and($context->sourceRepository)->toBe(2)
             ->and($context->targetRepository)->toBe(1)
             ->and($context->webhookRepository)->toBe(1);
+    });
+});
+
+describe('BitbucketDataCenterWebhookVariant pushes', function () {
+    function dataCenterPushRequest(array $changes, array $commits = [], array $repository = ['slug' => 'repo', 'project' => ['key' => 'PROJ']]): Request
+    {
+        return Request::create('/webhooks/source/bitbucket/events/manual', 'POST', [
+            'eventKey' => 'repo:refs_changed',
+            'repository' => $repository,
+            'changes' => $changes,
+            'commits' => $commits,
+        ]);
+    }
+
+    test('ignores tag pushes and branch deletions', function (array $change) {
+        expect((new BitbucketDataCenterWebhookVariant)->parse(dataCenterPushRequest([$change])))->toBeNull();
+    })->with([
+        'tag' => [['ref' => ['displayId' => 'main', 'type' => 'TAG'], 'toHash' => str_repeat('a', 40), 'type' => 'UPDATE']],
+        'branch deletion' => [['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('0', 40), 'type' => 'DELETE']],
+    ]);
+
+    test('uses the first created or updated branch change', function () {
+        $context = (new BitbucketDataCenterWebhookVariant)->parse(dataCenterPushRequest([
+            ['ref' => ['displayId' => 'v1.0', 'type' => 'TAG'], 'toHash' => str_repeat('a', 40), 'type' => 'ADD'],
+            ['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('b', 40), 'type' => 'ADD'],
+        ]));
+
+        expect($context->branch)->toBe('main')
+            ->and($context->commit)->toBe(str_repeat('b', 40));
+    });
+
+    test('skips the deployment when every commit asks for it', function (array $commits, bool $skip) {
+        $context = (new BitbucketDataCenterWebhookVariant)->parse(dataCenterPushRequest(
+            [['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('a', 40), 'type' => 'UPDATE']],
+            $commits,
+        ));
+
+        expect($context->skipDeployCommits)->toBe($skip);
+    })->with([
+        'all skip' => [[['message' => 'docs [skip ci]'], ['message' => 'chore [skip cd]']], true],
+        'one deploys' => [[['message' => 'docs [skip ci]'], ['message' => 'Fix the build']], false],
+        'no commits' => [[], false],
+    ]);
+
+    test('limits the number of repository identifiers', function () {
+        $clones = array_map(fn (int $i): array => ['href' => "https://bitbucket.example.com/scm/p{$i}/r{$i}.git"], range(1, 50));
+
+        $context = (new BitbucketDataCenterWebhookVariant)->parse(dataCenterPushRequest(
+            [['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('a', 40), 'type' => 'UPDATE']],
+            repository: ['slug' => 'repo', 'project' => ['key' => 'PROJ'], 'links' => ['clone' => $clones]],
+        ));
+
+        expect($context->repositoryIdentifiers)->toHaveCount(10)
+            ->and($context->repositoryIdentifiers[0])->toBe('PROJ/repo');
     });
 });

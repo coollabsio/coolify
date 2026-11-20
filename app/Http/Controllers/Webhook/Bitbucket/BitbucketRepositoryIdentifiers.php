@@ -7,6 +7,12 @@ use Illuminate\Support\Collection;
 class BitbucketRepositoryIdentifiers
 {
     /**
+     * Each identifier costs one database query before the signature check,
+     * so an unsigned payload must not send an unbounded number of them.
+     */
+    private const MAX_IDENTIFIERS = 10;
+
+    /**
      * @return array<int, string>
      */
     public static function fromPayload(Collection $payload): array
@@ -25,7 +31,7 @@ class BitbucketRepositoryIdentifiers
             ?? data_get($payload, 'pullrequest.fromRef.repository');
 
         if (! is_array($repository)) {
-            return $identifiers->unique()->filter()->values()->all();
+            return $identifiers->unique()->filter()->take(self::MAX_IDENTIFIERS)->values()->all();
         }
 
         $projectKey = data_get($repository, 'project.key');
@@ -58,6 +64,6 @@ class BitbucketRepositoryIdentifiers
             }
         }
 
-        return $identifiers->unique()->filter()->values()->all();
+        return $identifiers->unique()->filter()->take(self::MAX_IDENTIFIERS)->values()->all();
     }
 }

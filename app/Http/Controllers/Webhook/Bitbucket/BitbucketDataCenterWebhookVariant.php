@@ -58,12 +58,18 @@ class BitbucketDataCenterWebhookVariant implements BitbucketWebhookVariant
         $repositoryIdentifiers = BitbucketRepositoryIdentifiers::fromPayload($payload);
 
         if ($rawEvent === 'repo:refs_changed') {
-            $change = data_get($payload, 'changes.0');
-            if (data_get($change, 'type') !== 'UPDATE') {
+            // Only a created or updated branch deploys. Tag pushes and branch
+            // deletions are ignored.
+            $changes = data_get($payload, 'changes');
+            $changeIndex = collect(is_array($changes) ? $changes : [])->search(
+                fn (mixed $change): bool => data_get($change, 'ref.type') === 'BRANCH'
+                    && in_array(data_get($change, 'type'), ['ADD', 'UPDATE'], true)
+            );
+            if ($changeIndex === false) {
                 return null;
             }
 
-            $branch = $this->webhookString(data_get($change, 'ref.displayId'));
+            $branch = $this->webhookString(data_get($changes, "{$changeIndex}.ref.displayId"));
             if ($branch === null) {
                 return null;
             }
@@ -73,7 +79,10 @@ class BitbucketDataCenterWebhookVariant implements BitbucketWebhookVariant
                 action: 'push',
                 branch: $branch,
                 repositoryIdentifiers: $repositoryIdentifiers,
-                commit: $this->webhookCommitSha($payload, 'changes.0.toHash'),
+                commit: $this->webhookCommitSha($payload, "changes.{$changeIndex}.toHash"),
+                // Data Center sends one request per branch change, with up to
+                // 5 of the latest commits in the top-level `commits` list.
+                skipDeployCommits: self::shouldSkipDeploy($this->webhookPushCommitMessages($payload)),
             );
         }
 
