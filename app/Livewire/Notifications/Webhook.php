@@ -25,6 +25,9 @@ class Webhook extends Component
     #[Validate(['required_if:webhookEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $webhookUrl = null;
 
+    #[Validate(['nullable', 'string', 'max:4096', 'not_regex:/[\r\n]/'])]
+    public ?string $webhookAuthorizationHeader = null;
+
     #[Validate(['boolean'])]
     public bool $deploymentSuccessWebhookNotifications = false;
 
@@ -94,6 +97,7 @@ class Webhook extends Component
             $this->validate();
             $this->settings->webhook_enabled = $this->webhookEnabled;
             $this->settings->webhook_url = $this->webhookUrl;
+            $this->settings->webhook_authorization_header = filled($this->webhookAuthorizationHeader) ? $this->webhookAuthorizationHeader : null;
 
             $this->settings->deployment_success_webhook_notifications = $this->deploymentSuccessWebhookNotifications;
             $this->settings->deployment_failure_webhook_notifications = $this->deploymentFailureWebhookNotifications;
@@ -119,9 +123,9 @@ class Webhook extends Component
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
-            $this->webhookUrl = auth()->user()->can('update', $this->settings)
-                ? $this->settings->webhook_url
-                : null;
+            $canUpdate = auth()->user()->can('update', $this->settings);
+            $this->webhookUrl = $canUpdate ? $this->settings->webhook_url : null;
+            $this->webhookAuthorizationHeader = $canUpdate ? $this->settings->webhook_authorization_header : null;
 
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
