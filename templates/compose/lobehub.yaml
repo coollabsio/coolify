@@ -1,0 +1,183 @@
+# documentation: https://lobehub.com/docs/self-hosting/platform/docker-compose
+# slogan: LobeHub — Chief Agent Operator. Database edition with ParadeDB, Redis, RustFS, and SearXNG.
+# category: ai
+# tags: ai, chat, openai, llm, chatbot, agents, lobehub
+# logo: svgs/lobe-chat.png
+# port: 3210
+#
+# After deploy, set JWKS_KEY to a unique RSA JWKS JSON string.
+# Generate one: https://lobehub.com/docs/self-hosting/environment-variables/auth#jwks-key
+#
+# Assign Coolify domains:
+#   lobe     → app URL (port 3210)
+#   rustfs   → S3 endpoint (port 9000, required for chat image uploads)
+#   rustfsconsole (optional) → RustFS console (port 9001)
+
+services:
+  lobe:
+    image: lobehub/lobehub:2.2.14
+    environment:
+      - SERVICE_URL_LOBE_3210
+      - APP_URL=${SERVICE_URL_LOBE}
+      - INTERNAL_APP_URL=http://lobe:3210
+      - KEY_VAULTS_SECRET=${SERVICE_REALBASE64_32_KEYVAULTS}
+      - AUTH_SECRET=${SERVICE_REALBASE64_32_AUTH}
+      - JWKS_KEY=${JWKS_KEY}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/lobechat
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PREFIX=lobechat
+      - REDIS_TLS=0
+      - S3_ENDPOINT=${SERVICE_URL_RUSTFS}
+      - S3_BUCKET=lobe
+      - S3_ENABLE_PATH_STYLE=1
+      - S3_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - S3_ACCESS_KEY_ID=${SERVICE_USER_RUSTFS}
+      - S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - S3_SET_ACL=0
+      - LLM_VISION_IMAGE_USE_BASE64=1
+      - SEARXNG_URL=http://searxng:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AUTH_ALLOWED_EMAILS=${AUTH_ALLOWED_EMAILS}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:3210/api/v1/health >/dev/null 2>&1 || wget -qO- http://127.0.0.1:3210/ >/dev/null 2>&1 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    restart: unless-stopped
+
+  postgresql:
+    image: paradedb/paradedb:latest-pg17
+    command: ["postgres", "-c", "shared_preload_libraries=pg_search"]
+    environment:
+      - POSTGRES_DB=lobechat
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1000 --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    command:
+      [
+        "--access-key",
+        "${SERVICE_USER_RUSTFS}",
+        "--secret-key",
+        "${SERVICE_PASSWORD_RUSTFS}",
+        "/data",
+      ]
+    environment:
+      - SERVICE_URL_RUSTFS_9000
+      - SERVICE_URL_RUSTFSCONSOLE_9001
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
+      - RUSTFS_CORS_ALLOWED_ORIGINS=${SERVICE_URL_LOBE}
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:9000/health >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  rustfs-init:
+    image: minio/mc:latest
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      - RUSTFS_ACCESS_KEY=${SERVICE_USER_RUSTFS}
+      - RUSTFS_SECRET_KEY=${SERVICE_PASSWORD_RUSTFS}
+    volumes:
+      - type: bind
+        source: ./bucket.config.json
+        target: /bucket.config.json
+        content: |
+          {
+            "Id": "",
+            "Statement": [
+              {
+                "Sid": "",
+                "Effect": "Allow",
+                "Principal": { "AWS": ["*"] },
+                "Action": ["s3:GetObject"],
+                "NotAction": [],
+                "Resource": ["arn:aws:s3:::lobe/*"],
+                "NotResource": [],
+                "Condition": {}
+              }
+            ],
+            "Version": "2012-10-17"
+          }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eux
+        mc alias set rustfs "http://rustfs:9000" "$$RUSTFS_ACCESS_KEY" "$$RUSTFS_SECRET_KEY"
+        mc mb "rustfs/lobe" --ignore-existing
+        mc anonymous set-json "/bucket.config.json" "rustfs/lobe"
+    restart: "no"
+    exclude_from_hc: true
+
+  searxng:
+    image: searxng/searxng:latest
+    environment:
+      - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNG}
+    volumes:
+      - type: bind
+        source: ./searxng-settings.yml
+        target: /etc/searxng/settings.yml
+        content: |
+          use_default_settings: true
+          server:
+            limiter: false
+            image_proxy: true
+          search:
+            formats:
+              - html
+              - json
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  rustfs-data:
