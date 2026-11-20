@@ -3227,13 +3227,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->server->isSwarm()) {
                 // Implement healthcheck for swarm
             } else {
+                $isDockerImage = $this->application->build_pack === 'dockerimage';
+                if ($isDockerImage && $this->application->isHealthcheckDisabled() && $this->container_name) {
+                    // Without a Coolify healthcheck, the container runs the HEALTHCHECK of the image (if any).
+                    $this->execute_remote_command([
+                        "docker inspect --format='{{json .Config.Healthcheck}}' ".escapeshellarg($this->container_name),
+                        'hidden' => true,
+                        'save' => 'image_healthcheck',
+                        'ignore_errors' => true,
+                    ]);
+                    $this->application->parseHealthcheckFromImage($this->saved_outputs->get('image_healthcheck'));
+                }
                 if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
                     $this->markNewVersionHealthy(true);
 
                     return;
                 }
                 if ($this->application->isHealthcheckDisabled()) {
-                    $this->application_deployment_queue->addLogEntry('Using the custom healthcheck from the Dockerfile.');
+                    $source = $isDockerImage ? 'image' : 'Dockerfile';
+                    $this->application_deployment_queue->addLogEntry("Using the custom healthcheck from the {$source}.");
                 }
                 if ($this->container_name) {
                     $escapedContainerName = escapeshellarg($this->container_name);
@@ -5651,7 +5663,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     });
                 }
             } else {
-                if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
+                if (! $this->application->isHealthcheckDisabled() && ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage')) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     $this->application_deployment_queue->addLogEntry("WARNING: Dockerfile or Docker Image based deployment detected. The healthcheck needs a curl or wget command to check the health of the application. Please make sure that it is available in the image or turn off healthcheck on Coolify's UI.");
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
