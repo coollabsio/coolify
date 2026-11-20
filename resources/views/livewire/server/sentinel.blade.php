@@ -122,6 +122,17 @@
                 </div>
             </x-application.settings-section>
 
+            <x-application.settings-section id="server-sentinel-container-logs-section" title="Container logs"
+                helper="Sentinel saves the logs of each Coolify container on the server, so you can read them on the Logs page after the container is removed. It keeps up to 7 days and 1 GB. When you turn this off, the saved logs are deleted.">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox canGate="update" :canResource="$server" id="isContainerLogArchiveEnabled"
+                        label="Keep logs of removed containers" onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                </div>
+            </x-application.settings-section>
+
             @if (isDev())
                 <x-application.settings-section id="server-sentinel-development-section"
                     title="Development overrides"

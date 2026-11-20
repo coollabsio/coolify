@@ -53,6 +53,7 @@ use OpenApi\Attributes as OA;
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
+        'is_container_log_archive_enabled' => ['type' => 'boolean', 'description' => 'Sentinel keeps the logs of containers after they are removed.'],
         'is_usable' => ['type' => 'boolean'],
         'logdrain_type' => ['type' => 'string', 'nullable' => true, 'enum' => ['newrelic', 'axiom', 'cloudwatch', 'custom'], 'description' => 'The active log drain, or null when no log drain is enabled.'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
@@ -165,6 +166,7 @@ class ServerSetting extends Model
         'sentinel_custom_url',
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
+        'is_container_log_archive_enabled',
         'server_disk_usage_check_frequency',
         'server_disk_usage_notification_interval_hours',
         'is_terminal_enabled',
@@ -224,6 +226,7 @@ class ServerSetting extends Model
         'is_build_server' => 'boolean',
         'server_role' => ServerRole::class,
         'is_terminal_enabled' => 'boolean',
+        'is_container_log_archive_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
         'is_traffic_analytics_enabled' => 'boolean',
@@ -297,6 +300,7 @@ class ServerSetting extends Model
                 $settings->wasChanged('sentinel_custom_url') ||
                 $settings->wasChanged('is_metrics_enabled') ||
                 $settings->wasChanged('is_sentinel_debug_enabled') ||
+                $settings->wasChanged('is_container_log_archive_enabled') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
                 $settings->wasChanged('sentinel_push_interval_seconds') ||
