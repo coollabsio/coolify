@@ -2,15 +2,28 @@
 
 namespace App\Notifications\Server;
 
+use App\Contracts\ThrottledNotification;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class HighDiskUsage extends CustomEmailNotification
+class HighDiskUsage extends CustomEmailNotification implements ThrottledNotification
 {
+    /**
+     * Percentage points below the threshold that disk usage must reach before a new spike alerts
+     * again, so usage that moves around the threshold does not send an alert on every change.
+     */
+    public const RECOVERY_MARGIN = 5;
+
+    public static function hasRecovered(int|float $diskUsage, int|float $threshold): bool
+    {
+        return $diskUsage <= $threshold - self::RECOVERY_MARGIN;
+    }
+
     public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
     {
         $this->onQueue('high');
@@ -19,6 +32,16 @@ class HighDiskUsage extends CustomEmailNotification
     public function via(object $notifiable): array
     {
         return $notifiable->getEnabledChannels('server_disk_usage');
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->server;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return max(1, (int) data_get($this->server, 'settings.server_disk_usage_notification_interval_hours', 24)) * 60;
     }
 
     public function toMail(): MailMessage

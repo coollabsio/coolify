@@ -2,6 +2,14 @@
 
 cd /var/www/html
 
+. /etc/s6-overlay/scripts/container-role
+role="$(coolify_container_role_value)"
+
+if ! coolify_container_has_role worker && ! coolify_container_has_role scheduler && ! coolify_container_has_role scheduler-worker; then
+    echo "   INFO  Scheduler worker is disabled for role '$role', sleeping."
+    exec sleep infinity
+fi
+
 if grep -qE '^SCHEDULER_ENABLED=false' .env 2>/dev/null; then
     echo "   INFO  Scheduler is disabled, sleeping."
     exec sleep infinity

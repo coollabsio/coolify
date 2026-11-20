@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class TeamPolicy
 {
@@ -24,6 +26,14 @@ class TeamPolicy
     }
 
     /**
+     * Determine whether the user can read the team shared variables (team-wide read).
+     */
+    public function viewSharedVariables(User $user, Team $team): bool
+    {
+        return app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Read, $team->id);
+    }
+
+    /**
      * Determine whether the user can create models.
      */
     public function create(User $user): bool
@@ -37,12 +47,11 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        // Only admins and owners can update team settings
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -50,12 +59,11 @@ class TeamPolicy
      */
     public function delete(User $user, Team $team): bool
     {
-        // Only admins and owners can delete teams
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->roleInTeam($team->id) === 'owner';
     }
 
     /**
@@ -63,12 +71,11 @@ class TeamPolicy
      */
     public function manageMembers(User $user, Team $team): bool
     {
-        // Only admins and owners can manage team members
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -76,12 +83,11 @@ class TeamPolicy
      */
     public function viewAdmin(User $user, Team $team): bool
     {
-        // Only admins and owners can view admin panel
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 
     /**
@@ -89,11 +95,10 @@ class TeamPolicy
      */
     public function manageInvitations(User $user, Team $team): bool
     {
-        // Only admins and owners can manage invitations
         if (! $user->teams->contains('id', $team->id)) {
             return false;
         }
 
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdminOfTeam($team->id);
     }
 }

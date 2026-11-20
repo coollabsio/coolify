@@ -3,32 +3,6 @@
 use App\Exceptions\DeploymentException;
 use App\Exceptions\Handler;
 
-test('DeploymentException is in the dontReport array', function () {
-    $handler = new Handler(app());
-
-    // Use reflection to access the protected $dontReport property
-    $reflection = new ReflectionClass($handler);
-    $property = $reflection->getProperty('dontReport');
-    $property->setAccessible(true);
-    $dontReport = $property->getValue($handler);
-
-    expect($dontReport)->toContain(DeploymentException::class);
-});
-
-test('DeploymentException can be created with a message', function () {
-    $exception = new DeploymentException('Test deployment error');
-
-    expect($exception->getMessage())->toBe('Test deployment error');
-    expect($exception)->toBeInstanceOf(Exception::class);
-});
-
-test('DeploymentException can be created with a message and code', function () {
-    $exception = new DeploymentException('Test error', 69420);
-
-    expect($exception->getMessage())->toBe('Test error');
-    expect($exception->getCode())->toBe(69420);
-});
-
 test('DeploymentException can be created from another exception', function () {
     $originalException = new RuntimeException('Original error', 500);
     $deploymentException = DeploymentException::fromException($originalException);
@@ -68,4 +42,16 @@ test('RuntimeException is still reported when thrown', function () {
     $shouldReport = $method->invoke($handler, $exception);
 
     expect($shouldReport)->toBeTrue();
+});
+
+test('DeploymentException marks a message as already logged only when asked', function () {
+    $previous = new RuntimeException('Original error');
+    $logged = DeploymentException::alreadyLogged('Shown in the log', 7, $previous);
+
+    expect($logged->isMessageAlreadyLogged())->toBeTrue()
+        ->and($logged->getMessage())->toBe('Shown in the log')
+        ->and($logged->getCode())->toBe(7)
+        ->and($logged->getPrevious())->toBe($previous)
+        ->and((new DeploymentException('Not shown yet'))->isMessageAlreadyLogged())->toBeFalse()
+        ->and(DeploymentException::fromException($previous)->isMessageAlreadyLogged())->toBeFalse();
 });

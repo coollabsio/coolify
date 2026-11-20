@@ -42,7 +42,7 @@ test('is queued on the high priority queue', function () {
 });
 
 test('marks activity as error on permanent failure', function () {
-    $exception = new \RuntimeException('SSH connection failed');
+    $exception = new RuntimeException('SSH connection failed');
 
     $this->job->failed($exception);
 

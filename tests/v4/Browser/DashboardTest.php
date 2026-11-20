@@ -2,53 +2,19 @@
 
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
-use App\Models\InstanceSettings;
-use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
-use App\Models\User;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_sponsorship_popup_enabled' => false]);
-
-    $this->user = User::factory()->create([
-        'id' => 0,
-        'name' => 'Root User',
-        'email' => 'test@example.com',
-        'password' => Hash::make('password'),
-    ]);
-
-    PrivateKey::create([
-        'id' => 1,
-        'uuid' => 'ssh-test',
-        'team_id' => 0,
-        'name' => 'Test Key',
-        'description' => 'Test SSH key',
-        'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
-hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
-AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
-uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
------END OPENSSH PRIVATE KEY-----',
-    ]);
-
-    Server::create([
-        'id' => 0,
-        'uuid' => 'localhost',
-        'name' => 'localhost',
-        'description' => 'This is a test docker container in development mode',
-        'ip' => 'coolify-testing-host',
-        'team_id' => 0,
-        'private_key_id' => 1,
-        'proxy' => [
-            'type' => ProxyTypes::TRAEFIK->value,
-            'status' => ProxyStatus::EXITED->value,
-        ],
+    $this->stack = seedBrowserResourceStack([
+        'projectUuid' => 'project-1',
+        'projectName' => 'My first project',
+        'projectDescription' => 'This is a test project in development',
+        'serverDescription' => 'This is a test docker container in development mode',
     ]);
 
     Server::create([
@@ -78,13 +44,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     ]);
 
     Project::create([
-        'uuid' => 'project-1',
-        'name' => 'My first project',
-        'description' => 'This is a test project in development',
-        'team_id' => 0,
-    ]);
-
-    Project::create([
         'uuid' => 'project-2',
         'name' => 'Production API',
         'description' => 'Backend services for production',
@@ -107,23 +66,28 @@ it('redirects to login when not authenticated', function () {
 });
 
 it('shows onboarding after first login', function () {
+    // seedBrowserResourceStack disables boarding for most browser flows; re-enable for this case.
+    Team::query()->whereKey(0)->update(['show_boarding' => true]);
+
     $page = visit('/login');
 
     $page->fill('email', 'test@example.com')
         ->fill('password', 'password')
         ->click('Login')
+        ->wait(1.5)
         ->assertSee('Welcome to Coolify')
-        ->assertSee("Let's go!")
-        ->assertSee('Skip Setup')
-        ->screenshot();
+        ->assertSee('Continue')
+        ->assertSee('Skip setup')
+        ->screenshot(filename: 'dashboard-onboarding-after-login');
 });
 
 it('shows dashboard after skipping onboarding', function () {
     $page = loginAndSkipBoarding();
 
     $page->assertSee('Dashboard')
-        ->assertSee('Your self-hosted infrastructure.')
-        ->screenshot();
+        ->assertSee('Projects')
+        ->assertSee('Servers')
+        ->screenshot(filename: 'dashboard-after-onboarding');
 });
 
 it('shows all projects on dashboard', function () {

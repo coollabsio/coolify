@@ -33,8 +33,9 @@ class Create extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'personal_team' => false,
+                'is_mcp_server_enabled' => true,
             ]);
-            auth()->user()->teams()->attach($team, ['role' => 'admin']);
+            auth()->user()->teams()->attach($team, ['role' => 'owner']);
             refreshSession($team);
 
             return redirectRoute($this, 'team.index');

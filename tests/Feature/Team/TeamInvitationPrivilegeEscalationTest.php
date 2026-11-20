@@ -1,14 +1,19 @@
 <?php
 
 use App\Livewire\Team\InviteLink;
+use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], ['fqdn' => null]));
+
     // Create a team with owner, admin, and member
     $this->team = Team::factory()->create();
 
@@ -159,6 +164,51 @@ describe('privilege escalation prevention', function () {
             'role' => 'owner',
             'team_id' => $this->team->id,
         ]);
+    });
+
+    test('new user invitation magic link uses instance fqdn when configured', function () {
+        InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+            ['id' => 0],
+            ['fqdn' => 'https://coolify.example.com']
+        ));
+
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(InviteLink::class)
+            ->set('email', 'fqdn-invitee@example.com')
+            ->set('role', 'member')
+            ->call('viaLink')
+            ->assertDispatched('success');
+
+        $invitation = TeamInvitation::whereEmail('fqdn-invitee@example.com')->firstOrFail();
+
+        expect($invitation->link)->toStartWith('https://coolify.example.com/auth/link?token=');
+    });
+
+    test('new user invitation magic link ignores a spoofed request host when instance fqdn is not configured', function () {
+        InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(
+            ['id' => 0],
+            ['fqdn' => null, 'public_ipv4' => null, 'public_ipv6' => null]
+        ));
+        config(['app.url' => 'http://coolify.internal:8000']);
+
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        // A forwarded Host header from the client sets the request root URL.
+        URL::forceRootUrl('http://evil.example');
+
+        Livewire::test(InviteLink::class)
+            ->set('email', 'fallback-invitee@example.com')
+            ->set('role', 'member')
+            ->call('viaLink')
+            ->assertDispatched('success');
+
+        $invitation = TeamInvitation::whereEmail('fallback-invitee@example.com')->firstOrFail();
+
+        expect($invitation->link)->toStartWith('http://coolify.internal:8000/auth/link?token=')
+            ->not->toContain('evil.example');
     });
 
     test('member cannot bypass policy by calling viaEmail', function () {

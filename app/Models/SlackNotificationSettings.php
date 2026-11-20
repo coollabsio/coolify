@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class SlackNotificationSettings extends Model
 {
-    use Notifiable;
+    use Notifiable, TracksDeliveryFailures;
 
     public $timestamps = false;
 
@@ -20,6 +21,7 @@ class SlackNotificationSettings extends Model
         'deployment_success_slack_notifications',
         'deployment_failure_slack_notifications',
         'status_change_slack_notifications',
+        'restart_limit_reached_slack_notifications',
         'backup_success_slack_notifications',
         'backup_failure_slack_notifications',
         'scheduled_task_success_slack_notifications',
@@ -30,7 +32,13 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications',
         'server_unreachable_slack_notifications',
         'server_patch_slack_notifications',
+        'server_auto_update_slack_notifications',
         'traefik_outdated_slack_notifications',
+        'image_vulnerabilities_slack_notifications',
+    ];
+
+    protected $hidden = [
+        'slack_webhook_url',
     ];
 
     protected $casts = [
@@ -40,6 +48,7 @@ class SlackNotificationSettings extends Model
         'deployment_success_slack_notifications' => 'boolean',
         'deployment_failure_slack_notifications' => 'boolean',
         'status_change_slack_notifications' => 'boolean',
+        'restart_limit_reached_slack_notifications' => 'boolean',
         'backup_success_slack_notifications' => 'boolean',
         'backup_failure_slack_notifications' => 'boolean',
         'scheduled_task_success_slack_notifications' => 'boolean',
@@ -49,7 +58,9 @@ class SlackNotificationSettings extends Model
         'server_reachable_slack_notifications' => 'boolean',
         'server_unreachable_slack_notifications' => 'boolean',
         'server_patch_slack_notifications' => 'boolean',
+        'server_auto_update_slack_notifications' => 'boolean',
         'traefik_outdated_slack_notifications' => 'boolean',
+        'image_vulnerabilities_slack_notifications' => 'boolean',
     ];
 
     public function team()
@@ -60,5 +71,15 @@ class SlackNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->slack_enabled;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Slack';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->slack_enabled = false;
     }
 }

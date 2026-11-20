@@ -2,6 +2,8 @@
 
 namespace App\Traits;
 
+use App\Models\Environment;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 trait AuthorizesResourceCreation
@@ -9,12 +11,12 @@ trait AuthorizesResourceCreation
     use AuthorizesRequests;
 
     /**
-     * Authorize creation of all supported resources.
+     * Authorize creation of all supported resources, in the environment when one is given.
      *
-     * @throws \Illuminate\Auth\Access\AuthorizationException
+     * @throws AuthorizationException
      */
-    protected function authorizeResourceCreation(): void
+    protected function authorizeResourceCreation(?Environment $environment = null): void
     {
-        $this->authorize('createAnyResource');
+        $this->authorize('createAnyResource', [$environment]);
     }
 }

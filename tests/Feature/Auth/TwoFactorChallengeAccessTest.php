@@ -1,12 +1,18 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Route;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->user = User::factory()->create();
     $this->team = Team::factory()->personal()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -59,7 +65,38 @@ it('renders 419 error page with login link instead of previous url', function ()
     $view = view('errors.419')->render();
 
     expect($view)->toContain('/login');
-    expect($view)->toContain('Back to Login');
+    expect($view)->toContain('Back to login');
     expect($view)->toContain('This page is definitely old, not like you!');
+    expect($view)->toContain('error-shell');
     expect($view)->not->toContain('url()->previous()');
+});
+
+it('redirects an authenticated stale two-factor submission home instead of showing 419', function () {
+    $request = Request::create('/two-factor-challenge', 'POST');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+    $request->setUserResolver(fn () => $this->user);
+
+    $response = app(ExceptionHandler::class)->render($request, new TokenMismatchException('CSRF token mismatch.'));
+
+    expect($response->getStatusCode())->toBe(302)
+        ->and($response->headers->get('Location'))->toBe(url('/'));
+});
+
+it('still returns 419 for a stale two-factor submission without an authenticated session', function () {
+    $request = Request::create('/two-factor-challenge', 'POST');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+
+    $response = app(ExceptionHandler::class)->render($request, new TokenMismatchException('CSRF token mismatch.'));
+
+    expect($response->getStatusCode())->toBe(419);
+});
+
+it('keeps the 419 for stale tokens on routes other than login and the two-factor challenge', function () {
+    $request = Request::create('/two-factor-challenge', 'GET');
+    $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
+    $request->setUserResolver(fn () => $this->user);
+
+    $response = app(ExceptionHandler::class)->render($request, new TokenMismatchException('CSRF token mismatch.'));
+
+    expect($response->getStatusCode())->toBe(419);
 });

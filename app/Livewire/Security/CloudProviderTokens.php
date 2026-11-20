@@ -13,20 +13,17 @@ class CloudProviderTokens extends Component
 
     public $tokens;
 
-    public function mount()
+    public function mount(): void
     {
-        try {
-            $this->authorize('viewAny', CloudProviderToken::class);
-            $this->loadTokens();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        $this->authorize('viewAny', CloudProviderToken::class);
+        $this->loadTokens();
     }
 
     public function getListeners()
     {
         return [
             'tokenAdded' => 'loadTokens',
+            'securityResourceChanged' => 'loadTokens',
         ];
     }
 
@@ -54,6 +51,20 @@ class CloudProviderTokens extends Component
                     $this->dispatch('success', 'DigitalOcean token is valid.');
                 } else {
                     $this->dispatch('error', 'DigitalOcean token validation failed. Please check the token.');
+                }
+            } elseif ($token->provider === 'vultr') {
+                $isValid = $this->validateVultrToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Vultr token is valid.');
+                } else {
+                    $this->dispatch('error', 'Vultr token validation failed. Please check the token.');
+                }
+            } elseif ($token->provider === 'hostinger') {
+                $isValid = $this->validateHostingerToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Hostinger token is valid.');
+                } else {
+                    $this->dispatch('error', 'Hostinger token validation failed. Please check the token.');
                 }
             } else {
                 $this->dispatch('error', 'Unknown provider.');
@@ -97,6 +108,32 @@ class CloudProviderTokens extends Component
         }
     }
 
+    private function validateVultrToken(string $token): bool
+    {
+        try {
+            $response = Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.vultr.com/v2/account');
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateHostingerToken(string $token): bool
+    {
+        try {
+            return Http::withToken($token)
+                ->acceptJson()
+                ->timeout(10)
+                ->get('https://developers.hostinger.com/api/vps/v1/virtual-machines')
+                ->successful();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function deleteToken(int $tokenId)
     {
         try {
@@ -132,6 +169,8 @@ class CloudProviderTokens extends Component
 
     public function render()
     {
-        return view('livewire.security.cloud-provider-tokens');
+        return view('livewire.security.cloud-provider-tokens', [
+            'tokens' => $this->tokens ?? collect(),
+        ]);
     }
 }

@@ -2,80 +2,72 @@
     <x-slot:title>
         Transactional Email | Coolify
     </x-slot>
-    <x-settings.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-2 pb-4">
-        <div class="flex items-center gap-2">
-            <h2>Transactional Email</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-            @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
-                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
-                    <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress"
-                            label="Recipient" required />
-                        <x-forms.button type="submit" @click="modalOpen=false">
-                            Send Email
-                        </x-forms.button>
-                    </form>
-                </x-modal-input>
-            @endif
-        </div>
-        <div class="pb-4">Instance wide email settings for password resets, invitations, etc.</div>
-        <div class="flex gap-2">
-            <x-forms.input required id="smtpFromName" helper="Name used in emails." label="From Name" />
-            <x-forms.input required id="smtpFromAddress" helper="Email address used in emails." label="From Address" />
-        </div>
-    </form>
-    <div class="flex flex-col gap-4">
-        <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-            <form wire:submit.prevent="submitSmtp" class="flex flex-col">
-                <div class="flex gap-2">
-                    <h3>SMTP Server</h3>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                </div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("SMTP")' id="smtpEnabled" label="Enabled" />
-                </div>
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
-                        <x-forms.input required id="smtpPort" type="number" placeholder="587" label="Port" />
-                        <x-forms.select required id="smtpEncryption" label="Encryption">
-                            <option value="starttls">StartTLS</option>
-                            <option value="tls">TLS/SSL</option>
-                            <option value="none">None</option>
-                        </x-forms.select>
+
+    <x-settings.layout>
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
+        {{-- One bar for the whole page. Save validates only the provider that is selected. --}}
+        <x-unsaved-bar action="submit"
+            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey,resendFromName,resendFromAddress,notificationFromName,notificationFromAddress" />
+
+        <form wire:submit="submit">
+            <x-application.settings-section title="Email delivery"
+                description="Only one provider sends email. Select a provider to see its settings.">
+                <x-slot:badges>
+                    <div class="w-40">
+                        <x-forms.listbox id="emailProvider" onChange="selectEmailProvider"
+                            :options="collect(email_provider_labels())
+                                ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])
+                                ->values()
+                                ->all()" />
                     </div>
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input id="smtpUsername" label="SMTP Username" />
-                        <x-forms.input id="smtpPassword" type="password" label="SMTP Password"
-                            autocomplete="new-password" />
-                        <x-forms.input id="smtpTimeout" type="number" helper="Timeout value for sending emails." label="Timeout" />
-                    </div>
+                </x-slot:badges>
+                <x-slot:actions>
+                    @include('livewire.partials.settings-email-send-test')
+                </x-slot:actions>
+                <div class="grid gap-4 lg:grid-cols-3">
+                    @if ($emailProvider === 'none')
+                        <p class="text-sm text-neutral-500 lg:col-span-3 dark:text-neutral-400">
+                            Coolify does not send email. Select a provider next to the title to set it up.
+                        </p>
+                    @endif
+
+                    @if ($emailProvider !== $this->activeEmailProvider)
+                        <div class="lg:col-span-3">
+                            <x-callout type="warning" title="Not active yet">
+                                Enter the {{ email_provider_labels()[$emailProvider] }} settings and save.
+                                @if ($this->activeEmailProvider === 'none')
+                                    Until then, Coolify does not send email.
+                                @else
+                                    Until then, Coolify sends email with
+                                    {{ email_provider_labels()[$this->activeEmailProvider] }}.
+                                @endif
+                            </x-callout>
+                        </div>
+                    @endif
+
+                    @if ($emailProvider === 'smtp')
+                        @include('livewire.partials.smtp-server-picker')
+                    @elseif ($emailProvider === 'resend')
+                        <x-forms.input required type="password" id="resendApiKey" placeholder="API key"
+                            label="Resend API key" autocomplete="new-password" />
+                        <x-forms.input required id="resendFromName" helper="Name shown in email from Resend."
+                            label="From name" />
+                        <x-forms.input required id="resendFromAddress"
+                            helper="Address used in email from Resend. It must be on a domain verified in Resend."
+                            label="From address" />
+                    @endif
+
+                    @if ($emailProvider !== 'none')
+                        <x-forms.input id="notificationFromName" placeholder="Uses the from name when empty"
+                            helper="Name shown in notification emails (deployments, backups, server alerts) to teams that use the instance email settings."
+                            label="Notification from name" />
+                        <x-forms.input id="notificationFromAddress" placeholder="Uses the from address when empty"
+                            helper="Address used for notification emails. Password resets and invitations still use the from address. Use a separate subdomain (for example alerts@notifications.example.com) to keep the reputation of the two senders apart. Your SMTP provider or Resend must allow this address."
+                            label="Notification from address" />
+                    @endif
                 </div>
-            </form>
-        </div>
-        <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-            <form wire:submit.prevent="submitResend" class="flex flex-col">
-                <div class="flex gap-2">
-                    <h3>Resend</h3>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                </div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("Resend")' id="resendEnabled" label="Enabled" />
-                </div>
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" id="resendApiKey" placeholder="API key" required label="API Key"
-                            autocomplete="new-password" />
-                    </div>
-                </div>
-            </form>
-        </div>
+            </x-application.settings-section>
+        </form>
     </div>
+    </x-settings.layout>
 </div>

@@ -1,0 +1,231 @@
+<div x-data="{
+    search: @js($search),
+    typeFilter: 'all',
+    sortBy: 'target_asc',
+    filterOpen: false,
+    sortOpen: false,
+    backups: @js($backups->map(fn ($backup) => [
+        'id' => (string) $backup->id,
+        'name' => strtolower($backup->targetName()),
+        'type' => strtolower($backup->targetType()),
+        'frequency' => strtolower($backup->frequency),
+        'status' => match ($backup->latestExecution?->status) {
+            'running' => 'in progress',
+            'success' => 'success',
+            'failed' => 'failed',
+            default => $backup->enabled ? 'waiting' : 'disabled',
+        },
+        's3' => $backup->save_s3 ? ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->count() : -1,
+        'lastRunAt' => $backup->latestExecution?->finished_at?->timestamp ?? ($backup->latestExecution?->status === 'running' ? now()->timestamp : 0),
+        'executions' => $backup->executions_count,
+    ])->values()),
+    filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
+        $backups->map(fn ($backup) => [
+            'value' => strtolower($backup->targetType()),
+            'label' => $backup->targetType(),
+        ])->unique('value')->values()
+    )->values()),
+    get filteredBackups() {
+        const query = this.search.toLowerCase();
+        const filtered = this.backups.filter((backup) => {
+            const matchesSearch = !query || backup.name.includes(query) || backup.type.includes(query) || backup.frequency.includes(query);
+            const matchesType = this.typeFilter === 'all' || backup.type === this.typeFilter;
+            return matchesSearch && matchesType;
+        });
+        const [column, direction] = this.sortBy.split('_');
+        const sortValues = {
+            target: (backup) => backup.name,
+            type: (backup) => backup.type,
+            schedule: (backup) => backup.frequency,
+            status: (backup) => backup.status,
+            s3: (backup) => backup.s3,
+            lastrun: (backup) => backup.lastRunAt,
+            executions: (backup) => backup.executions,
+        };
+        const sortValue = sortValues[column] || sortValues.target;
+        const order = direction === 'desc' ? -1 : 1;
+        return filtered.sort((left, right) => {
+            const leftValue = sortValue(left);
+            const rightValue = sortValue(right);
+            return order * (typeof leftValue === 'number' ? leftValue - rightValue : leftValue.localeCompare(rightValue)) ||
+                left.name.localeCompare(right.name);
+        });
+    },
+    isVisible(id) {
+        return this.filteredBackups.some((backup) => backup.id === String(id));
+    },
+    backupOrder(id) {
+        return this.filteredBackups.findIndex((backup) => backup.id === String(id));
+    },
+}">
+    <x-slot:title>
+        {{ data_get_str($application, 'name')->limit(10) }} > Backups | Coolify
+    </x-slot>
+    <livewire:project.shared.configuration-checker :resource="$application" />
+    <livewire:project.application.heading :application="$application"
+        wire:key="application-heading-backup-index-{{ $application->id }}" />
+
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+            <x-application.configuration-sidebar :application="$application"
+                current-route="project.application.backup.index" />
+
+            <div class="application-settings-form flex min-w-0 flex-col gap-6">
+            <x-application.settings-section title="Storage backups"
+                helper="Schedule backups for persistent volumes and directory mounts attached to this application.">
+                @can('update', $application)
+                    <x-slot:actions>
+                        <x-modal-input title="New scheduled backup" :wireIgnore="false">
+                            <x-slot:content>
+                                <button type="button"
+                                    class="button button-highlighted">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    Add
+                                </button>
+                            </x-slot:content>
+                            <livewire:project.application.backup.create :application="$application"
+                                wire:key="create-volume-backup-{{ $application->id }}" />
+                        </x-modal-input>
+                    </x-slot:actions>
+                @endcan
+
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Schedules</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->count() }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Enabled</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->where('enabled', true)->count() }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Total executions</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->sum('executions_count') }}
+                        </p>
+                    </div>
+                </div>
+            </x-application.settings-section>
+
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative w-full sm:max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="search" placeholder="Search backups" aria-label="Search backups"
+                        class="input h-8! w-full py-0! pr-8! pl-8!" />
+                    <button x-cloak x-show="search" x-on:click="search = ''" type="button"
+                        class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                        aria-label="Clear search">
+                        <span class="text-sm leading-none">×</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
+                                    stroke-linecap="round" />
+                            </svg>
+                            Filter
+                        </button></x-slot:trigger>
+                            <template x-for="option in filterOptions" :key="option.value">
+                                <button type="button"
+                                    class="listbox-option"
+                                    x-on:click="typeFilter = option.value; close()">
+                                    <span class="flex-1" x-text="option.label"></span>
+                                    <svg x-show="typeFilter === option.value" class="size-3.5 text-black dark:text-fg"
+                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+                            </template>
+                    </x-table.dropdown>
+                </div>
+            </div>
+
+            <x-application.settings-section title="Schedules"
+                helper="Persistent volume and directory backup schedules for this application."
+                :flush="$backups->isNotEmpty()">
+                <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
+                    <x-empty size="sm" title="No backups found"
+                        description="No scheduled backups match your search." />
+                </div>
+
+                @if ($backups->isNotEmpty())
+                    <div class="data-table flex w-full flex-col overflow-x-auto" x-show="filteredBackups.length > 0">
+                        <div class="data-table-header backup-table-grid">
+                            <x-table.sort-header label="Target" asc="target_asc" desc="target_desc" />
+                            <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" />
+                            <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" />
+                            <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" />
+                            <x-table.sort-header label="S3" asc="s3_asc" desc="s3_desc" />
+                            <x-table.sort-header label="Last run" asc="lastrun_asc" desc="lastrun_desc" first="desc" />
+                            <x-table.sort-header label="Executions" asc="executions_asc" desc="executions_desc" first="desc"
+                                class="justify-self-end" />
+                        </div>
+
+                        @foreach ($backups as $backup)
+                            @php
+                                $latestExecution = $backup->latestExecution;
+                                $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name');
+                                $status = $latestExecution?->status;
+                                $statusLabel = match ($status) {
+                                    'running' => 'In progress',
+                                    'success' => 'Success',
+                                    'failed' => 'Failed',
+                                    default => $backup->enabled ? 'Waiting' : 'Disabled',
+                                };
+                                $statusType = match ($status) {
+                                    'running' => 'warning',
+                                    'success' => 'success',
+                                    'failed' => 'error',
+                                    default => 'neutral',
+                                };
+                            @endphp
+                            <a wire:key="volume-backup-{{ $backup->uuid }}"
+                                x-show="isVisible(@js((string) $backup->id))"
+                                x-bind:style="{ order: backupOrder(@js((string) $backup->id)) }"
+                                href="{{ route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}"
+                                {{ wireNavigate() }}
+                                class="data-table-row backup-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
+                                <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
+                                    title="{{ $backup->targetName() }}">
+                                    {{ $backup->targetName() }}
+                                </span>
+                                <span class="min-w-0">
+                                    <span role="button" tabindex="0" class="table-filter-value"
+                                        title="Filter by {{ $backup->targetType() }}"
+                                        x-on:click.prevent.stop="typeFilter = typeFilter === @js(strtolower($backup->targetType())) ? 'all' : @js(strtolower($backup->targetType()))"
+                                        x-on:keydown.enter.prevent.stop="$el.click()">{{ $backup->targetType() }}</span>
+                                </span>
+                                <span>{{ $backup->frequency }}</span>
+                                <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
+                                <span class="min-w-0">
+                                    <x-backup-s3-storage :enabled="$backup->save_s3" :names="$s3StorageNames"
+                                        :tooltip="$backup->save_s3 ? ($s3StorageNames->isNotEmpty() ? 'S3 storage: '.$s3StorageNames->join(', ') : 'S3 storage: Unavailable') : 'S3 storage: Not configured'" />
+                                </span>
+                                <span>
+                                    {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
+                                </span>
+                                <span class="text-right tabular-nums text-neutral-950 dark:text-fg">
+                                    {{ $backup->executions_count }}
+                                </span>
+                            </a>
+                        @endforeach
+                    </div>
+                @else
+                    <x-empty size="sm" title="No scheduled backups"
+                        description="Add a persistent volume or directory backup schedule to protect application data."
+                        icon-name="storages" />
+                @endif
+            </x-application.settings-section>
+        </div>
+        </div>
+    </section>
+</div>

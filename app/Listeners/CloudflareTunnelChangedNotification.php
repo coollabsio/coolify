@@ -16,9 +16,17 @@ class CloudflareTunnelChangedNotification
     public function handle(CloudflareTunnelChanged $event): void
     {
         $server_id = data_get($event, 'data.server_id');
+        $team_id = data_get($event, 'data.team_id');
         $ssh_domain = data_get($event, 'data.ssh_domain');
+        if (is_null($server_id) || is_null($team_id)) {
+            return;
+        }
 
-        $this->server = Server::where('id', $server_id)->firstOrFail();
+        $server = Server::where('id', $server_id)->where('team_id', $team_id)->first();
+        if (is_null($server) || $server->isTransferredAway()) {
+            return;
+        }
+        $this->server = $server;
 
         // Check if cloudflare tunnel is running (container is healthy) - try 3 times with 5 second intervals
         $cloudflareHealthy = false;
@@ -26,7 +34,7 @@ class CloudflareTunnelChangedNotification
 
         for ($i = 1; $i <= $attempts; $i++) {
             \Log::debug("Cloudflare health check attempt {$i}/{$attempts}", ['server_id' => $server_id]);
-            $result = instant_remote_process_with_timeout(['docker inspect coolify-cloudflared | jq -e ".[0].State.Health.Status == \"healthy\""'], $this->server, false, 10);
+            $result = instant_remote_process_with_timeout(['docker inspect coolify-cloudflared | jq -e ".[0].State.Health.Status == \"healthy\""'], $this->server, false);
 
             if (blank($result)) {
                 \Log::debug("Cloudflare Tunnels container not found on attempt {$i}", ['server_id' => $server_id]);

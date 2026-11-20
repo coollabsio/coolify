@@ -7,14 +7,15 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneDragonfly;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?Server $server = null;
 
@@ -44,18 +45,9 @@ class General extends Component
 
     public function getListeners(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
-        }
-        $team = $user->currentTeam();
-        if (! $team) {
-            return [];
-        }
-
-        return [
-            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
-        ];
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
     }
 
     public function mount()
@@ -73,10 +65,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->dragonflyPassword = '';
-        }
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
     }
 
     protected function rules(): array
@@ -115,13 +104,16 @@ class General extends Component
         );
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->dragonfly_password = $this->dragonflyPassword;
+            // After the first start the password is read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->dragonfly_password = $this->dragonflyPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
@@ -130,16 +122,18 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->dragonflyPassword = $this->database->dragonfly_password;
+            $this->dragonflyPassword = $canSeeCredentials ? $this->database->dragonfly_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
         }
     }
@@ -191,6 +185,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 

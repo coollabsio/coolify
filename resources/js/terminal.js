@@ -6,9 +6,159 @@ import {
     TERMINAL_SESSION_WARNING_SECONDS,
     formatTerminalSessionRemainingTime,
 } from './terminal-session-timer.js';
+import {
+    TERMINAL_CONNECT_TIMEOUT_MS,
+    TERMINAL_CONNECTION_ERRORS,
+    isTerminalOutputFrame,
+    isTerminalSessionEndedNotice,
+    isTerminalStartupRejection,
+    resolveTerminalCloseOutcome,
+    terminalSessionStartMethods,
+} from './terminal-connection.js';
 import { FitAddon } from '@xterm/addon-fit';
 
-const terminalDebugEnabled = import.meta.env.DEV;
+const terminalDebugParameter = new URLSearchParams(window.location.search).get('terminal-debug');
+
+if (terminalDebugParameter === '1' || terminalDebugParameter === '0') {
+    localStorage.setItem('coolify-terminal-debug', terminalDebugParameter);
+}
+
+const terminalDebugEnabled = import.meta.env.DEV
+    || localStorage.getItem('coolify-terminal-debug') === '1';
+
+const baseApplicationTerminalTheme = {
+    black: '#675f70',
+    red: '#ef7272',
+    green: '#7bd88f',
+    yellow: '#e7bd68',
+    blue: '#85aacb',
+    magenta: '#c792ea',
+    cyan: '#72d5d0',
+    white: '#d8d2df',
+    brightBlack: '#8a8292',
+    brightRed: '#ff9b9b',
+    brightGreen: '#a5e7b2',
+    brightYellow: '#f2d596',
+    brightBlue: '#b0c8df',
+    brightMagenta: '#ddb3f4',
+    brightCyan: '#a7e8e4',
+    brightWhite: '#ffffff',
+    foreground: '#eee9f2',
+    background: '#00000000',
+    overviewRulerBorder: '#00000000',
+};
+
+function createApplicationTerminalTheme(accent, colors = {}) {
+    return {
+        ...baseApplicationTerminalTheme,
+        cursor: accent,
+        cursorAccent: '#101012',
+        selectionBackground: `${accent}66`,
+        ...colors,
+    };
+}
+
+function customThemeAccent() {
+    const color = localStorage.getItem('themeColor') || '#6b16ed';
+
+    if (!/^#[0-9a-f]{6}$/i.test(color)) {
+        return '#7c3aed';
+    }
+
+    const channels = color.match(/[a-f\d]{2}/gi).map((channel) => (
+        Math.round(parseInt(channel, 16) * 0.85 + 255 * 0.15)
+    ));
+
+    return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// A custom theme can be light or dark: it sets only the cursor accent, and the page brightness picks the text colors.
+function createSystemTerminalTheme() {
+    const isCustomTheme = document.documentElement.dataset.theme === 'custom';
+
+    if (document.documentElement.classList.contains('dark')) {
+        return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#8C8E9C');
+    }
+
+    return createApplicationTerminalTheme(isCustomTheme ? customThemeAccent() : '#52525b', {
+        black: '#18181b',
+        red: '#dc2626',
+        green: '#15803d',
+        yellow: '#a16207',
+        blue: '#2563eb',
+        magenta: '#9333ea',
+        cyan: '#0e7490',
+        white: '#52525b',
+        brightBlack: '#71717a',
+        brightRed: '#b91c1c',
+        brightGreen: '#166534',
+        brightYellow: '#854d0e',
+        brightBlue: '#1d4ed8',
+        brightMagenta: '#7e22ce',
+        brightCyan: '#155e75',
+        brightWhite: '#18181b',
+        foreground: '#18181b',
+    });
+}
+
+const applicationTerminalThemes = {
+    'system': createSystemTerminalTheme(),
+    'shadows-midnight': createApplicationTerminalTheme('#6d7a7c', {
+        blue: '#7392ad',
+        cyan: '#7fa3a6',
+        brightBlue: '#9bb4c9',
+        brightCyan: '#a8c4c6',
+    }),
+    'shadows-golden-hour': createApplicationTerminalTheme('#bf8c3c', {
+        yellow: '#d9a759',
+        red: '#df7756',
+        brightYellow: '#edc987',
+        brightRed: '#efa086',
+    }),
+    'shadows-cosmic-purple': createApplicationTerminalTheme('#A76DBE', {
+        blue: '#8f86d9',
+        magenta: '#c58ad8',
+        brightBlue: '#b1a9ed',
+        brightMagenta: '#ddb0e9',
+    }),
+    'shadows-neon-glow': createApplicationTerminalTheme('#DB425A', {
+        red: '#ed5d72',
+        magenta: '#f35fc2',
+        brightRed: '#ff8c9d',
+        brightMagenta: '#ff93d7',
+    }),
+    'shadows-icy-mist': createApplicationTerminalTheme('#93b7c4', {
+        blue: '#8fb7d0',
+        cyan: '#9acbd0',
+        brightBlue: '#b9d5e5',
+        brightCyan: '#c0e3e5',
+    }),
+    'shadows-tropical-storm': createApplicationTerminalTheme('#1fa771', {
+        green: '#45c98b',
+        cyan: '#4ec7ad',
+        brightGreen: '#7de0ad',
+        brightCyan: '#80dfcc',
+    }),
+    'shadows-golden-nebula': createApplicationTerminalTheme('#d4a20e', {
+        yellow: '#e5bb35',
+        red: '#ee755f',
+        blue: '#718fc1',
+        brightYellow: '#f4d375',
+    }),
+    'shadows-cosmic-lagoon': createApplicationTerminalTheme('#00b5b8', {
+        blue: '#668de0',
+        magenta: '#ba6ad0',
+        cyan: '#38c6c8',
+        brightCyan: '#76e0e2',
+    }),
+    'shadows-neon-nebula': createApplicationTerminalTheme('#ff55aa', {
+        blue: '#6f91dd',
+        magenta: '#ff72c1',
+        cyan: '#51d5d5',
+        brightMagenta: '#ffa1d4',
+    }),
+    'shadows-transparent': createApplicationTerminalTheme('#8C8E9C'),
+};
 
 function logTerminal(level, message, ...context) {
     if (!terminalDebugEnabled) {
@@ -23,6 +173,7 @@ export function initializeTerminalComponent() {
         return {
             fullscreen: false,
             terminalActive: false,
+            starting: false,
             message: '(connection closed)',
             term: null,
             fitAddon: null,
@@ -41,6 +192,11 @@ export function initializeTerminalComponent() {
             maxReconnectDelay: 30000,
             connectionTimeout: 10000,
             connectionTimeoutId: null,
+            // Shown instead of "connecting…" once a connection or session start failed.
+            connectionError: null,
+            // Set when the server rejected authentication; disables automatic reconnects.
+            authRejected: false,
+            sessionStartTimeoutId: null,
             lastPingTime: null,
             pingTimeout: 35000, // 5 seconds longer than ping interval
             pingTimeoutId: null,
@@ -48,10 +204,6 @@ export function initializeTerminalComponent() {
             maxHeartbeatMisses: 3,
             // Command buffering for race condition prevention
             pendingCommand: null,
-            // Last successfully sent SSH command — replayed after a transient reconnect
-            // so the PTY respawns automatically. Cleared on intentional terminations
-            // (pty-exited, unprocessable).
-            lastSentCommand: null,
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
@@ -59,11 +211,107 @@ export function initializeTerminalComponent() {
             isDocumentVisible: true,
             wasConnectedBeforeHidden: false,
             mobileToolbarCollapsed: false,
+            terminalModifier: null,
+            // Console (attach) mode — line-oriented command input, like a game-server panel.
+            consoleCommand: '',
+            consoleHistory: [],
+            consoleHistoryIndex: -1,
+            // Lines from a multi-line paste, waiting for the user to confirm with Enter.
+            consolePendingLines: [],
+            consoleSentFlash: false,
+            consoleSentFlashTimeout: null,
+            consoleForegroundColor: '#ffffff',
+            keyboardInset: 0,
+            keyboardAnchorTop: 0,
+            keyboardViewportHeight: 0,
+            keyboardViewportWidth: 0,
+            keyboardInsetSettleTimeout: null,
+            updateKeyboardInset: null,
+            syncKeyboardInset: null,
+            // Inline style snapshots for ancestors unlocked while fullscreen (no DOM reparenting).
+            fullscreenAncestorPatches: null,
+            pageScrollLocked: false,
+            scrollLockY: 0,
+            scrollLockStyles: null,
+            preventPageScrollHandler: null,
+            themeObserver: null,
             terminalSessionStartedAt: null,
             terminalSessionRemainingSeconds: null,
             terminalSessionCountdownInterval: null,
+            selectedTheme: applicationTerminalThemes[localStorage.getItem('coolify-console-theme')]
+                ? localStorage.getItem('coolify-console-theme')
+                : 'system',
+
+            ...terminalSessionStartMethods,
 
             init() {
+                this.starting = this.$el.dataset.autoStart === 'true';
+                // Auto-start requests a token without a user action. If no token or error
+                // arrives, the session-start timeout ends "connecting…" with an error.
+                if (this.starting) {
+                    this.armTerminalSessionStartTimeout();
+                }
+                this.updateKeyboardInset = () => {
+                    const viewport = window.visualViewport;
+                    const viewportWidth = viewport?.width ?? window.innerWidth;
+                    const layoutHeight = Math.max(
+                        window.innerHeight,
+                        document.documentElement.clientHeight,
+                        viewport ? viewport.height + viewport.offsetTop : 0,
+                    );
+
+                    // Track the tallest viewport seen at this width — an open software
+                    // keyboard shrinks the visual viewport well below it. A large width
+                    // change (rotation) resets the baseline.
+                    if (Math.abs(this.keyboardViewportWidth - viewportWidth) > 80) {
+                        this.keyboardViewportHeight = layoutHeight;
+                    } else {
+                        this.keyboardViewportHeight = Math.max(this.keyboardViewportHeight, layoutHeight);
+                    }
+                    this.keyboardViewportWidth = viewportWidth;
+
+                    const visualBottom = viewport ? viewport.height + viewport.offsetTop : layoutHeight;
+                    this.keyboardInset = window.innerWidth < 640 && viewport
+                        ? Math.max(0, Math.round(this.keyboardViewportHeight - visualBottom))
+                        : 0;
+                    // position:fixed resolves `top` against the layout viewport and
+                    // visualViewport.offsetTop is relative to it, so offsetTop + height
+                    // is the exact bottom edge of the visible area — a toolbar pinned at
+                    // this anchor rides on top of the keyboard no matter how the browser
+                    // reports keyboard geometry (iOS overlay or Android layout resize).
+                    this.keyboardAnchorTop = Math.round(visualBottom);
+
+                    this.syncFullscreenShellWithKeyboard(viewport);
+
+                    if (this.fullscreen) {
+                        this.$nextTick(() => this.resizeTerminal());
+                    }
+                };
+                this.syncKeyboardInset = () => {
+                    // iOS fires viewport events mid keyboard animation — re-measure once
+                    // the keyboard settles.
+                    this.updateKeyboardInset();
+                    clearTimeout(this.keyboardInsetSettleTimeout);
+                    this.keyboardInsetSettleTimeout = setTimeout(this.updateKeyboardInset, 250);
+                };
+                this.updateKeyboardInset();
+                window.visualViewport?.addEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.addEventListener('scroll', this.syncKeyboardInset);
+                window.addEventListener('resize', this.syncKeyboardInset);
+                this.themeObserver = new MutationObserver(() => {
+                    if (this.selectedTheme === 'system') {
+                        applicationTerminalThemes.system = createSystemTerminalTheme();
+                        this.setTerminalTheme('system');
+                    }
+                });
+                this.themeObserver.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class', 'data-theme', 'style'],
+                });
+
+                // Recover if a previous portal build left the terminal on <body>.
+                this.$nextTick(() => this.salvageStrayFullscreenNodes());
+
                 this.setupTerminal();
 
                 // Add a small delay for initial connection to ensure everything is ready
@@ -73,15 +321,33 @@ export function initializeTerminalComponent() {
 
                 this.setupTerminalEventListeners();
 
-                this.$wire.on('send-back-command', (command) => {
-                    this.sendCommandWhenReady({ command: command });
+                this.$wire.on('send-terminal-token', ([token]) => {
+                    // A token requested before the rejection arrived must not reconnect;
+                    // only a user-initiated start (terminal-starting) retries.
+                    if (this.authRejected) {
+                        logTerminal('warn', '[Terminal] Ignoring terminal token after authentication was rejected.');
+                        return;
+                    }
+                    this.applyConsoleMode();
+                    this.beginTerminalSessionStart();
+                    this.sendCommandWhenReady({ terminalToken: token });
+                });
+
+                // Coolify did not issue a token (container stopped, no shell, access denied).
+                this.$wire.on('terminal-session-failed', ({ message }) => {
+                    this.failTerminalSessionStart(message);
+                });
+
+                // The page shows a container picker; nothing starts until the user chooses.
+                this.$wire.on('terminal-auto-start-cancelled', () => {
+                    this.cancelTerminalAutoStart();
                 });
 
                 this.$wire.on('terminal-should-focus', () => {
                     // Wait for terminal to be ready, then focus
                     const focusWhenReady = () => {
                         if (this.terminalActive && this.term) {
-                            this.term.focus();
+                            this.focusActiveInput();
                         } else {
                             setTimeout(focusWhenReady, 100);
                         }
@@ -95,7 +361,7 @@ export function initializeTerminalComponent() {
                     }
                     this.$nextTick(() => {
                         if (active) {
-                            this.$refs.terminalWrapper.style.display = 'block';
+                            this.$refs.terminalWrapper.style.removeProperty('display');
                             this.resizeTerminal();
 
                             // Start observing terminal wrapper for resize changes
@@ -103,7 +369,12 @@ export function initializeTerminalComponent() {
                                 this.resizeObserver.observe(this.$refs.terminalWrapper);
                             }
                         } else {
-                            this.$refs.terminalWrapper.style.display = 'none';
+                            const terminalElement = document.getElementById('terminal');
+                            if (terminalElement?.dataset.terminalStyle === 'application') {
+                                this.$refs.terminalWrapper.style.removeProperty('display');
+                            } else {
+                                this.$refs.terminalWrapper.style.display = 'none';
+                            }
 
                             // Stop observing when terminal is inactive
                             if (this.resizeObserver) {
@@ -141,11 +412,18 @@ export function initializeTerminalComponent() {
             },
 
             cleanup() {
+                window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);
+                window.removeEventListener('resize', this.syncKeyboardInset);
+                clearTimeout(this.keyboardInsetSettleTimeout);
                 this.checkIfProcessIsRunningAndKillIt();
                 this.clearAllTimers();
+                this.clearSessionStartTimeout();
                 this.connectionState = 'disconnected';
                 this.pendingCommand = null;
                 this.resetTerminalSessionCountdown();
+                this.exitFullscreen();
+                this.unlockPageScroll();
                 if (this.socket) {
                     this.socket.close(1000, 'Client cleanup');
                 }
@@ -232,6 +510,69 @@ export function initializeTerminalComponent() {
                 return 'text-neutral-300 bg-black/70 border-white/10';
             },
 
+            setTerminalTheme(themeName) {
+                if (!applicationTerminalThemes[themeName]) {
+                    logTerminal('warn', '[Terminal Theme] Unknown theme', {
+                        requestedTheme: themeName,
+                        availableThemes: Object.keys(applicationTerminalThemes),
+                    });
+                    return;
+                }
+
+                logTerminal('log', '[Terminal Theme] Applying theme', this.terminalThemeDebugSnapshot(themeName));
+
+                if (themeName === 'system') {
+                    applicationTerminalThemes.system = createSystemTerminalTheme();
+                }
+
+                this.selectedTheme = themeName;
+                localStorage.setItem('coolify-console-theme', themeName);
+
+                if (this.term) {
+                    const cursorBlink = this.term.options.cursorBlink;
+                    this.term.options.cursorBlink = false;
+                    this.term.options.theme = { ...applicationTerminalThemes[themeName] };
+                    this.syncConsoleForeground();
+                    this.term.refresh(0, Math.max(0, this.term.rows - 1));
+
+                    requestAnimationFrame(() => {
+                        if (!this.term) {
+                            return;
+                        }
+
+                        this.term.options.cursorBlink = cursorBlink;
+                        this.term.refresh(0, Math.max(0, this.term.rows - 1));
+                        this.focusActiveInput();
+                        logTerminal('log', '[Terminal Theme] Theme applied', this.terminalThemeDebugSnapshot(themeName));
+                    });
+                }
+            },
+
+            terminalThemeDebugSnapshot(themeName) {
+                const shell = this.$el.closest('.application-console-shell');
+                const viewport = this.term?.element?.querySelector('.xterm-viewport');
+                const screen = this.term?.element?.querySelector('.xterm-screen');
+
+                return {
+                    requestedTheme: themeName,
+                    selectedTheme: this.selectedTheme,
+                    terminalExists: Boolean(this.term),
+                    terminalOpened: Boolean(this.term?.element),
+                    terminalActive: this.terminalActive,
+                    connectionState: this.connectionState,
+                    shellTheme: shell?.dataset.consoleTheme,
+                    shellBackground: shell ? getComputedStyle(shell).background : null,
+                    shellThemeBackground: shell ? getComputedStyle(shell).getPropertyValue('--console-theme-background') : null,
+                    shellThemeOpacity: shell ? getComputedStyle(shell).getPropertyValue('--console-theme-opacity') : null,
+                    shellPseudoBackground: shell ? getComputedStyle(shell, '::before').background : null,
+                    viewportBackground: viewport ? getComputedStyle(viewport).background : null,
+                    screenBackground: screen ? getComputedStyle(screen).background : null,
+                    xtermBackground: this.term?.options.theme?.background,
+                    xtermForeground: this.term?.options.theme?.foreground,
+                    xtermCursor: this.term?.options.theme?.cursor,
+                };
+            },
+
             resetTerminal() {
                 if (this.term) {
                     this.$wire.dispatch('error', 'Terminal websocket connection lost. Reconnecting...');
@@ -257,7 +598,7 @@ export function initializeTerminalComponent() {
                     // Force a refresh
                     this.$nextTick(() => {
                         this.resizeTerminal();
-                        this.term.focus();
+                        this.focusActiveInput();
                     });
                 }
             },
@@ -265,15 +606,26 @@ export function initializeTerminalComponent() {
             setupTerminal() {
                 const terminalElement = document.getElementById('terminal');
                 if (terminalElement) {
+                    const isApplicationConsole = terminalElement.dataset.terminalStyle === 'application';
                     this.term = new Terminal({
                         cols: 80,
                         rows: 30,
                         fontFamily: '"Geist Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace, "Powerline Extra Symbols"',
+                        fontSize: isApplicationConsole ? 13 : 14,
+                        fontWeight: isApplicationConsole ? 550 : 'normal',
+                        fontWeightBold: 700,
+                        lineHeight: isApplicationConsole ? 1.15 : 1,
                         cursorBlink: true,
+                        cursorStyle: 'block',
                         rendererType: 'canvas',
                         convertEol: true,
-                        disableStdin: false
+                        disableStdin: false,
+                        scrollback: 5000,
+                        theme: isApplicationConsole
+                            ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes.system
+                            : undefined
                     });
+                    this.syncConsoleForeground();
                     this.fitAddon = new FitAddon();
                     this.term.loadAddon(this.fitAddon);
                     this.$nextTick(() => {
@@ -323,14 +675,19 @@ export function initializeTerminalComponent() {
 
                 try {
                     this.socket = new WebSocket(url);
+                    // PTY output arrives in binary frames; text frames are control messages.
+                    this.socket.binaryType = 'arraybuffer';
 
                     // Set connection timeout - increased for initial connection
-                    const timeoutMs = this.reconnectAttempts === 0 ? 15000 : this.connectionTimeout;
+                    const timeoutMs = this.reconnectAttempts === 0 ? TERMINAL_CONNECT_TIMEOUT_MS : this.connectionTimeout;
                     this.connectionTimeoutId = setTimeout(() => {
                         if (this.connectionState === 'connecting') {
                             logTerminal('error', `[Terminal] Connection timeout after ${timeoutMs}ms`);
+                            if (this.isTerminalSessionPending()) {
+                                this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
+                            }
+                            // The resulting close event schedules the (bounded) reconnect.
                             this.socket.close();
-                            this.handleConnectionError('Connection timeout');
                         }
                     }, timeoutMs);
 
@@ -358,15 +715,13 @@ export function initializeTerminalComponent() {
                     this.connectionTimeoutId = null;
                 }
 
-                // Flush any buffered command from before WebSocket was ready, otherwise
-                // replay the last command so a transient reconnect respawns the PTY
-                // automatically without requiring the user to click Connect again.
+                // Flush a token that was issued before the WebSocket was ready. Issued
+                // tokens are single-use and must never be replayed after a reconnect.
                 if (this.pendingCommand) {
                     this.sendMessage(this.pendingCommand);
                     this.pendingCommand = null;
-                } else if (this.lastSentCommand) {
-                    logTerminal('log', '[Terminal] Replaying last command after reconnect.');
-                    this.sendMessage(this.lastSentCommand);
+                    this.connectionError = null;
+                    this.starting = true;
                 }
 
                 // (Re)start application-level keepalive on every successful connect.
@@ -387,7 +742,11 @@ export function initializeTerminalComponent() {
                 logTerminal('error', '[Terminal] WebSocket error:', error);
                 logTerminal('error', '[Terminal] WebSocket state:', this.socket ? this.socket.readyState : 'No socket');
                 logTerminal('error', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
-                this.handleConnectionError('WebSocket error occurred');
+                // Browsers always follow an error event with a close event, which
+                // schedules the reconnect. Only surface the failure here.
+                if (this.isTerminalSessionPending()) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
+                }
             },
 
             handleSocketClose(event) {
@@ -395,9 +754,30 @@ export function initializeTerminalComponent() {
                 logTerminal('log', '[Terminal] Was clean close:', event.code === 1000);
                 logTerminal('log', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
 
+                const outcome = resolveTerminalCloseOutcome({
+                    code: event.code,
+                    sessionPending: this.isTerminalSessionPending(),
+                    reconnectAttempts: this.reconnectAttempts,
+                    maxReconnectAttempts: this.maxReconnectAttempts,
+                });
+
                 this.connectionState = 'disconnected';
                 this.clearAllTimers();
                 this.resetTerminalSessionCountdown();
+
+                if (outcome.authRejected) {
+                    // Reconnecting would be rejected again; wait for a reload or a new session request.
+                    logTerminal('error', '[Terminal] Server rejected terminal authentication:', event.reason);
+                    this.authRejected = true;
+                    this.pendingCommand = null;
+                    if (this.terminalActive) {
+                        this.exitFullscreen();
+                        this.terminalActive = false;
+                        this.$wire.dispatch('terminalDisconnected');
+                    }
+                    this.failTerminalConnection(outcome.error, { override: true });
+                    return;
+                }
 
                 // Only reset terminal and reconnect if it wasn't a clean close
                 if (event.code !== 1000) {
@@ -407,6 +787,9 @@ export function initializeTerminalComponent() {
                         this.message = '(connection closed)';
                         this.terminalActive = false;
                     }
+                    if (outcome.error) {
+                        this.failTerminalConnection(outcome.error);
+                    }
                     this.scheduleReconnect();
                 }
             },
@@ -415,19 +798,45 @@ export function initializeTerminalComponent() {
                 logTerminal('error', `[Terminal] Connection error: ${reason} (attempt ${this.reconnectAttempts + 1})`);
                 this.connectionState = 'disconnected';
 
-                // Only dispatch error to UI after a few failed attempts to avoid immediate error on page load
-                if (this.reconnectAttempts >= 2) {
-                    this.$wire.dispatch('error', `Terminal connection error: ${reason}`);
+                if (this.isTerminalSessionPending() || this.reconnectAttempts >= 2) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                 }
 
                 this.scheduleReconnect();
             },
 
+            /** Reconnect immediately for a user-requested session if the socket is closed. */
+            ensureWebSocketConnection() {
+                if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+                    return;
+                }
+
+                if (this.reconnectInterval) {
+                    clearTimeout(this.reconnectInterval);
+                    this.reconnectInterval = null;
+                }
+                this.reconnectAttempts = 0;
+                this.initializeWebSocket();
+            },
+
+            reloadTerminalPage() {
+                window.location.reload();
+            },
+
             scheduleReconnect() {
+                if (this.authRejected) {
+                    return;
+                }
+
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                     logTerminal('error', '[Terminal] Max reconnection attempts reached');
                     this.message = '(connection failed - max retries exceeded)';
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                     return;
+                }
+
+                if (this.reconnectInterval) {
+                    return; // A reconnect is already scheduled.
                 }
 
                 this.connectionState = 'reconnecting';
@@ -441,6 +850,7 @@ export function initializeTerminalComponent() {
                 logTerminal('warn', `[Terminal] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
 
                 this.reconnectInterval = setTimeout(() => {
+                    this.reconnectInterval = null;
                     this.reconnectAttempts++;
                     this.initializeWebSocket();
                 }, delay);
@@ -449,9 +859,6 @@ export function initializeTerminalComponent() {
             sendMessage(message) {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.socket.send(JSON.stringify(message));
-                    if (message && message.command) {
-                        this.lastSentCommand = message;
-                    }
                 } else {
                     logTerminal('warn', '[Terminal] WebSocket not ready, message not sent:', message);
                 }
@@ -465,7 +872,175 @@ export function initializeTerminalComponent() {
                 }
             },
 
+            isConsoleMode() {
+                return this.$wire?.terminalMode === 'attach';
+            },
+
+            // Focus the console command box in attach mode, otherwise the xterm.
+            focusActiveInput() {
+                if (this.isConsoleMode()) {
+                    this.$refs.consoleInput?.focus();
+                } else {
+                    this.term?.focus();
+                }
+            },
+
+            // Keep the xterm read-only while in console mode and load its command history.
+            applyConsoleMode() {
+                const consoleMode = this.isConsoleMode();
+                if (this.term) {
+                    this.term.options.disableStdin = consoleMode;
+                    this.term.options.cursorBlink = !consoleMode;
+                    // The output cannot take input, so do not draw a cursor in it.
+                    this.term.options.cursorInactiveStyle = consoleMode ? 'none' : 'outline';
+                }
+                if (consoleMode) {
+                    this.loadConsoleHistory();
+                    this.$nextTick(() => this.$refs.consoleInput?.focus());
+                }
+                // Let the header mode selector reflect the container's current state.
+                window.dispatchEvent(new CustomEvent('terminal-mode-updated', {
+                    detail: {
+                        attachAvailable: Boolean(this.$wire?.attachAvailable),
+                        hasShell: this.$wire?.hasShell ?? true,
+                        mode: this.$wire?.terminalMode ?? 'shell',
+                    },
+                }));
+            },
+
+            loadConsoleHistory() {
+                // Keep commands in this connection only: names can be reused, and
+                // localStorage is shared by users and teams on the same browser.
+                this.consoleHistory = [];
+                this.consoleHistoryIndex = -1;
+                this.consoleCommand = '';
+                this.consolePendingLines = [];
+                try {
+                    for (let index = localStorage.length - 1; index >= 0; index--) {
+                        const key = localStorage.key(index);
+                        if (key?.startsWith('coolify-console-history:')) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                } catch (_) {
+                    // History does not depend on browser storage being available.
+                }
+            },
+
+            // Text colour for the command box: the active terminal theme's foreground.
+            syncConsoleForeground() {
+                this.consoleForegroundColor = this.term?.options.theme?.foreground || '#ffffff';
+            },
+
+            canSubmitConsoleCommand() {
+                return this.consolePendingLines.length > 0 || this.consoleCommand.trim() !== '';
+            },
+
+            // Send one printable command line to the process stdin, never terminal control bytes.
+            sendConsoleLine(command) {
+                if (command.trim() === '' || /[\x00-\x1f\x7f]/.test(command)) {
+                    return false;
+                }
+                // Send the whole line plus a newline to the process stdin.
+                this.sendMessage({ message: `${command}\n` });
+
+                if (this.consoleHistory[this.consoleHistory.length - 1] !== command) {
+                    this.consoleHistory.push(command);
+                    this.consoleHistory = this.consoleHistory.slice(-50);
+                }
+
+                return true;
+            },
+
+            submitConsoleCommand() {
+                if (!this.terminalActive || !this.isConsoleMode()) {
+                    return;
+                }
+
+                const lines = this.consolePendingLines.length > 0 ? this.consolePendingLines : [this.consoleCommand];
+                const sent = lines.filter((line) => this.sendConsoleLine(line)).length;
+
+                this.consolePendingLines = [];
+                this.consoleHistoryIndex = -1;
+                if (sent > 0) {
+                    this.consoleCommand = '';
+                    this.flashConsoleSent();
+                    // Show the response even when the user scrolled up to read older output.
+                    this.term?.scrollToBottom();
+                }
+                // Clicking Send moves focus to the button; return it to the input.
+                this.$refs.consoleInput?.focus();
+            },
+
+            flashConsoleSent() {
+                clearTimeout(this.consoleSentFlashTimeout);
+                this.consoleSentFlash = true;
+                this.consoleSentFlashTimeout = setTimeout(() => {
+                    this.consoleSentFlash = false;
+                }, 300);
+            },
+
+            // A multi-line paste waits for confirmation, so pasted logs are not sent to the process by mistake.
+            pasteConsoleText(event) {
+                const text = event.clipboardData?.getData('text') ?? '';
+                if (!/[\r\n]/.test(text)) {
+                    return;
+                }
+                event.preventDefault();
+
+                const lines = text.split(/\r?\n|\r/).filter((line) => line.trim() !== '');
+                if (lines.length === 1) {
+                    this.consoleCommand += lines[0];
+                    return;
+                }
+                if (this.consoleCommand.trim() !== '') {
+                    lines[0] = this.consoleCommand + lines[0];
+                }
+                this.consolePendingLines = lines;
+                this.consoleCommand = '';
+            },
+
+            // Esc cancels a pending paste first, then clears the input.
+            cancelConsoleInput() {
+                if (this.consolePendingLines.length > 0) {
+                    this.consolePendingLines = [];
+                    return;
+                }
+                this.consoleCommand = '';
+                this.consoleHistoryIndex = -1;
+            },
+
+            // Ctrl+L clears the visible output only; nothing is sent to the process.
+            clearConsoleOutput() {
+                this.term?.clear();
+            },
+
+            // Clicking the read-only output moves focus to the command box, unless the user is selecting text.
+            focusConsoleFromOutput() {
+                if (this.isConsoleMode() && !this.term?.hasSelection()) {
+                    this.$refs.consoleInput?.focus();
+                }
+            },
+
+            recallConsoleCommand(direction) {
+                if (this.consoleHistory.length === 0) {
+                    return;
+                }
+                if (this.consoleHistoryIndex === -1) {
+                    this.consoleHistoryIndex = this.consoleHistory.length;
+                }
+                let index = this.consoleHistoryIndex + direction;
+                index = Math.max(0, Math.min(this.consoleHistory.length, index));
+                this.consoleHistoryIndex = index;
+                this.consoleCommand = index >= this.consoleHistory.length ? '' : this.consoleHistory[index];
+            },
+
             handleSocketMessage(event) {
+                if (isTerminalOutputFrame(event.data)) {
+                    this.writeTerminalOutput(new Uint8Array(event.data));
+                    return;
+                }
+
                 // Handle pong responses
                 if (event.data === 'pong') {
                     this.heartbeatMissed = 0;
@@ -479,6 +1054,7 @@ export function initializeTerminalComponent() {
                 }
 
                 if (event.data === 'pty-ready') {
+                    this.completeTerminalSessionStart();
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
@@ -495,7 +1071,9 @@ export function initializeTerminalComponent() {
                     }
                     this.terminalActive = true;
                     this.startTerminalSessionCountdown();
-                    this.term.focus();
+                    // In console (attach) mode the user types into the command box, not the
+                    // read-only xterm, so keep focus on that input instead of the terminal.
+                    this.focusActiveInput();
                     document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
 
                     // Initial resize after terminal is ready
@@ -506,58 +1084,64 @@ export function initializeTerminalComponent() {
                         this.resizeTerminal();
                     }, 200);
 
-                    // Ensure terminal gets focus after connection with multiple attempts
+                    // Ensure focus after connection with multiple attempts
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 100);
-                    
+
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 500);
 
                     // Notify parent component that terminal is connected
                     this.$wire.dispatch('terminalConnected');
                 } else if (event.data === 'unprocessable') {
+                    this.starting = false;
+                    this.clearSessionStartTimeout();
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
-                    this.lastSentCommand = null;
                     this.resetTerminalSessionCountdown();
                     this.message = '(sorry, something went wrong, please try again)';
 
                     // Notify parent component that terminal connection failed
                     this.$wire.dispatch('terminalDisconnected');
                 } else if (event.data === 'pty-exited') {
-                    this.fullscreen = false;
+                    this.starting = false;
+                    this.exitFullscreen();
                     this.mobileToolbarCollapsed = false;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
                     this.term.reset();
                     this.commandBuffer = '';
-                    this.lastSentCommand = null;
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
-                } else if (
-                    typeof event.data === 'string' &&
-                    (event.data.startsWith('Unauthorized:') || event.data.startsWith('Invalid SSH command:'))
-                ) {
-                    logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
+                } else if (isTerminalSessionEndedNotice(event.data)) {
+                    // The server ends the PTY next; 'pty-exited' then resets the terminal.
                     this.$wire.dispatch('error', event.data);
+                } else if (isTerminalStartupRejection(event.data)) {
+                    logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
+                    this.pendingCommand = null;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
+                    this.failTerminalConnection(event.data, { override: true });
                 } else {
-                    try {
-                        this.pendingWrites++;
-                        this.term.write(event.data, (err) => {
-                            if (err) {
-                                logTerminal('error', '[Terminal] Write error:', err);
-                            }
-                            this.flowControlCallback();
-                        });
-                    } catch (error) {
-                        logTerminal('error', '[Terminal] Write operation failed:', error);
-                        this.pendingWrites = Math.max(0, this.pendingWrites - 1);
-                    }
+                    logTerminal('warn', '[Terminal] Ignoring unknown control message:', event.data);
+                }
+            },
+
+            writeTerminalOutput(data) {
+                try {
+                    this.pendingWrites++;
+                    this.term.write(data, (err) => {
+                        if (err) {
+                            logTerminal('error', '[Terminal] Write error:', err);
+                        }
+                        this.flowControlCallback();
+                    });
+                } catch (error) {
+                    logTerminal('error', '[Terminal] Write operation failed:', error);
+                    this.pendingWrites = Math.max(0, this.pendingWrites - 1);
                 }
             },
 
@@ -580,6 +1164,11 @@ export function initializeTerminalComponent() {
                 if (!this.term) return;
 
                 this.term.onData((data) => {
+                    // Console (attach) mode is read-only: commands go through the input box,
+                    // so raw keystrokes (including Ctrl-C) are never sent to the process.
+                    if (this.isConsoleMode()) {
+                        return;
+                    }
                     this.sendMessage({ message: data });
                     if (data === '\r') {
                         this.commandBuffer = '';
@@ -590,6 +1179,14 @@ export function initializeTerminalComponent() {
 
                 // Copy and paste functionality
                 this.term.attachCustomKeyEventHandler((arg) => {
+                    // The console output is read-only: move typed characters to the command box.
+                    if (this.isConsoleMode() && arg.type === 'keydown' && arg.key.length === 1
+                        && !arg.ctrlKey && !arg.metaKey && !arg.altKey) {
+                        // Moving focus during keydown makes the browser type this key into the input.
+                        this.$refs.consoleInput?.focus();
+                        return false;
+                    }
+
                     if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
                         return false;
                     }
@@ -605,13 +1202,26 @@ export function initializeTerminalComponent() {
                 });
             },
 
+            destroy() {
+                this.clearSessionStartTimeout();
+                this.themeObserver?.disconnect();
+                window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);
+                window.removeEventListener('resize', this.syncKeyboardInset);
+                clearTimeout(this.keyboardInsetSettleTimeout);
+            },
+
 
             sendTerminalInput(data) {
                 if (!this.term || !this.terminalActive) {
                     return;
                 }
 
-                this.term.focus();
+                // Console (attach) mode only accepts commands from the input box.
+                if (this.isConsoleMode()) {
+                    return;
+                }
+
                 this.sendMessage({ message: data });
             },
 
@@ -623,12 +1233,34 @@ export function initializeTerminalComponent() {
                     arrowLeft: '\x1b[D',
                     tab: '\t',
                     escape: '\x1b',
-                    ctrlC: '\x03'
+                    ctrlC: '\x03',
+                    ctrlD: '\x04',
+                    ctrlBackslash: '\x1c',
+                    ctrlS: '\x13',
+                    ctrlZ: '\x1a'
                 };
 
                 if (terminalSequences[sequence]) {
+                    this.terminalModifier = null;
                     this.sendTerminalInput(terminalSequences[sequence]);
                 }
+            },
+
+            toggleTerminalModifier(modifier) {
+                this.terminalModifier = this.terminalModifier === modifier ? null : modifier;
+            },
+
+            sendTerminalKey(key) {
+                let input = key;
+
+                if (this.terminalModifier === 'ctrl') {
+                    input = String.fromCharCode(key.toUpperCase().charCodeAt(0) & 31);
+                } else if (this.terminalModifier === 'alt') {
+                    input = `\x1b${key}`;
+                }
+
+                this.terminalModifier = null;
+                this.sendTerminalInput(input);
             },
 
             async pasteFromClipboard() {
@@ -666,7 +1298,7 @@ export function initializeTerminalComponent() {
             keepAlive() {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.sendMessage({ ping: true });
-                } else if (this.connectionState === 'disconnected') {
+                } else if (this.connectionState === 'disconnected' && !this.authRejected) {
                     // Attempt to reconnect if we're disconnected
                     this.initializeWebSocket();
                 }
@@ -706,7 +1338,7 @@ export function initializeTerminalComponent() {
                                 // ignore — close handler will run on its own
                             }
                         }, 5000);
-                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
+                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected' && !this.authRejected) {
                         // Was connected before but now disconnected - attempt reconnection
                         this.reconnectAttempts = 0;
                         this.initializeWebSocket();
@@ -734,74 +1366,378 @@ export function initializeTerminalComponent() {
                 this.sendMessage({ checkActive: 'force' });
             },
 
-            makeFullscreen() {
-                this.fullscreen = !this.fullscreen;
-                this.$nextTick(() => {
-                    // Force a layout reflow to ensure DOM changes are applied
-                    this.$refs.terminalWrapper.offsetHeight;
+            /**
+             * While the software keyboard is open, shrink the fullscreen shell to the
+             * visual viewport so xterm rows and the mobile key row stay visible above
+             * the keyboard. Inline !important is required to outrank the stylesheet's
+             * `inset: 0 !important` / `height: auto !important` fullscreen rules.
+             */
+            syncFullscreenShellWithKeyboard(viewport) {
+                const wrapper = this.$refs.terminalWrapper;
+                if (!wrapper) {
+                    return;
+                }
 
-                    // Add a small delay to ensure CSS transitions complete
-                    setTimeout(() => {
+                if (this.fullscreen && viewport && this.keyboardInset > 0) {
+                    wrapper.style.setProperty('top', `${Math.round(viewport.offsetTop)}px`, 'important');
+                    wrapper.style.setProperty('height', `${Math.round(viewport.height)}px`, 'important');
+                    wrapper.style.setProperty('bottom', 'auto', 'important');
+                } else {
+                    wrapper.style.removeProperty('top');
+                    wrapper.style.removeProperty('height');
+                    wrapper.style.removeProperty('bottom');
+                }
+            },
+
+            makeFullscreen() {
+                if (this.fullscreen) {
+                    this.exitFullscreen();
+                } else {
+                    this.enterFullscreen();
+                }
+            },
+
+            /**
+             * Keep the terminal in-place (no document.body reparent). Livewire morphs
+             * recreate missing children when nodes leave the component tree, which left
+             * an empty console shell and dumped the real xterm below the page.
+             *
+             * Instead, neutralize ancestor isolation/transform/filter/overflow so
+             * position:fixed + z-index can cover the viewport above sidebar/top bar.
+             */
+            enterFullscreen() {
+                const wrapper = this.$refs.terminalWrapper;
+                if (!wrapper || this.fullscreen) {
+                    return;
+                }
+
+                this.salvageStrayFullscreenNodes();
+                this.patchAncestorsForFullscreen(wrapper);
+                this.lockPageScroll();
+
+                wrapper.style.removeProperty('display');
+                wrapper.style.removeProperty('height');
+                wrapper.style.removeProperty('min-height');
+
+                this.fullscreen = true;
+                document.documentElement.classList.add('terminal-is-fullscreen');
+                document.body.classList.add('terminal-is-fullscreen');
+                this.updateKeyboardInset?.();
+                this.scheduleTerminalResize();
+            },
+
+            exitFullscreen() {
+                const wrapper = this.$refs.terminalWrapper;
+
+                this.restoreAncestorsAfterFullscreen();
+                this.unlockPageScroll();
+                this.fullscreen = false;
+                document.documentElement.classList.remove('terminal-is-fullscreen');
+                document.body.classList.remove('terminal-is-fullscreen');
+
+                if (wrapper) {
+                    wrapper.style.removeProperty('display');
+                    wrapper.style.removeProperty('height');
+                    wrapper.style.removeProperty('min-height');
+                }
+
+                // Recover from older portal builds that left the terminal on <body>.
+                this.salvageStrayFullscreenNodes();
+                this.updateKeyboardInset?.();
+                this.scheduleTerminalResize();
+            },
+
+            /**
+             * Freeze document scroll while fullscreen. Only xterm's own viewport may scroll.
+             * Uses position:fixed scroll-lock so nested overflow:visible ancestors cannot
+             * re-enable page scrolling under the overlay.
+             */
+            lockPageScroll() {
+                if (this.pageScrollLocked) {
+                    return;
+                }
+
+                this.pageScrollLocked = true;
+                this.scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+                this.scrollLockStyles = {
+                    htmlOverflow: document.documentElement.style.getPropertyValue('overflow'),
+                    htmlOverscroll: document.documentElement.style.getPropertyValue('overscroll-behavior'),
+                    bodyOverflow: document.body.style.getPropertyValue('overflow'),
+                    bodyPosition: document.body.style.getPropertyValue('position'),
+                    bodyTop: document.body.style.getPropertyValue('top'),
+                    bodyLeft: document.body.style.getPropertyValue('left'),
+                    bodyRight: document.body.style.getPropertyValue('right'),
+                    bodyWidth: document.body.style.getPropertyValue('width'),
+                    bodyPaddingRight: document.body.style.getPropertyValue('padding-right'),
+                    bodyOverscroll: document.body.style.getPropertyValue('overscroll-behavior'),
+                };
+
+                const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+                document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+                document.documentElement.style.setProperty('overscroll-behavior', 'none', 'important');
+                document.body.style.setProperty('overflow', 'hidden', 'important');
+                document.body.style.setProperty('overscroll-behavior', 'none', 'important');
+                document.body.style.setProperty('position', 'fixed', 'important');
+                document.body.style.setProperty('top', `-${this.scrollLockY}px`, 'important');
+                document.body.style.setProperty('left', '0', 'important');
+                document.body.style.setProperty('right', '0', 'important');
+                document.body.style.setProperty('width', '100%', 'important');
+                if (scrollbarGap > 0) {
+                    document.body.style.setProperty('padding-right', `${scrollbarGap}px`, 'important');
+                }
+
+                this.preventPageScrollHandler = (event) => {
+                    const target = event.target;
+                    if (!(target instanceof Element)) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    // Allow terminal scrollback and mobile toolbar touches only.
+                    if (
+                        target.closest('.xterm-viewport') ||
+                        target.closest('[data-terminal-mobile-toolbar]') ||
+                        target.closest('.terminal-fullscreen-btn')
+                    ) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                };
+
+                window.addEventListener('wheel', this.preventPageScrollHandler, { passive: false });
+                window.addEventListener('touchmove', this.preventPageScrollHandler, { passive: false });
+            },
+
+            unlockPageScroll() {
+                if (!this.pageScrollLocked) {
+                    return;
+                }
+
+                this.pageScrollLocked = false;
+
+                if (this.preventPageScrollHandler) {
+                    window.removeEventListener('wheel', this.preventPageScrollHandler);
+                    window.removeEventListener('touchmove', this.preventPageScrollHandler);
+                    this.preventPageScrollHandler = null;
+                }
+
+                const restore = (el, prop, value) => {
+                    if (value) {
+                        el.style.setProperty(prop, value);
+                    } else {
+                        el.style.removeProperty(prop);
+                    }
+                };
+
+                const styles = this.scrollLockStyles ?? {};
+                restore(document.documentElement, 'overflow', styles.htmlOverflow);
+                restore(document.documentElement, 'overscroll-behavior', styles.htmlOverscroll);
+                restore(document.body, 'overflow', styles.bodyOverflow);
+                restore(document.body, 'position', styles.bodyPosition);
+                restore(document.body, 'top', styles.bodyTop);
+                restore(document.body, 'left', styles.bodyLeft);
+                restore(document.body, 'right', styles.bodyRight);
+                restore(document.body, 'width', styles.bodyWidth);
+                restore(document.body, 'padding-right', styles.bodyPaddingRight);
+                restore(document.body, 'overscroll-behavior', styles.bodyOverscroll);
+
+                this.scrollLockStyles = null;
+                window.scrollTo(0, this.scrollLockY || 0);
+                this.scrollLockY = 0;
+            },
+
+            patchAncestorsForFullscreen(fromEl) {
+                this.restoreAncestorsAfterFullscreen();
+                this.fullscreenAncestorPatches = [];
+
+                let node = fromEl.parentElement;
+                while (node && node !== document.documentElement) {
+                    this.fullscreenAncestorPatches.push({
+                        el: node,
+                        isolation: node.style.getPropertyValue('isolation'),
+                        transform: node.style.getPropertyValue('transform'),
+                        filter: node.style.getPropertyValue('filter'),
+                        backdropFilter: node.style.getPropertyValue('backdrop-filter'),
+                        contain: node.style.getPropertyValue('contain'),
+                        overflow: node.style.getPropertyValue('overflow'),
+                        overflowX: node.style.getPropertyValue('overflow-x'),
+                        overflowY: node.style.getPropertyValue('overflow-y'),
+                        willChange: node.style.getPropertyValue('will-change'),
+                        perspective: node.style.getPropertyValue('perspective'),
+                        zIndex: node.style.getPropertyValue('z-index'),
+                        position: node.style.getPropertyValue('position'),
+                    });
+
+                    // Drop fixed-position containing blocks + nested stacking contexts.
+                    // Critical: CSS classes like .application-console-block { z-index: 1 }
+                    // trap position:fixed descendants under the sidebar (z-40) / top bar (z-50)
+                    // unless z-index is forced back to auto on the whole ancestor chain.
+                    node.style.setProperty('isolation', 'auto', 'important');
+                    node.style.setProperty('transform', 'none', 'important');
+                    node.style.setProperty('filter', 'none', 'important');
+                    node.style.setProperty('backdrop-filter', 'none', 'important');
+                    node.style.setProperty('contain', 'none', 'important');
+                    node.style.setProperty('perspective', 'none', 'important');
+                    node.style.setProperty('will-change', 'auto', 'important');
+                    node.style.setProperty('overflow', 'visible', 'important');
+                    node.style.setProperty('overflow-x', 'visible', 'important');
+                    node.style.setProperty('overflow-y', 'visible', 'important');
+                    node.style.setProperty('z-index', 'auto', 'important');
+
+                    node = node.parentElement;
+                }
+
+                // Sidebar/top bar are layout siblings of <main>, not ancestors. Elevate
+                // main so the fullscreen stacking context paints above z-50 chrome.
+                const main = fromEl.closest('main');
+                if (main) {
+                    const existing = this.fullscreenAncestorPatches.find((patch) => patch.el === main);
+                    if (!existing) {
+                        this.fullscreenAncestorPatches.push({
+                            el: main,
+                            isolation: main.style.getPropertyValue('isolation'),
+                            transform: main.style.getPropertyValue('transform'),
+                            filter: main.style.getPropertyValue('filter'),
+                            backdropFilter: main.style.getPropertyValue('backdrop-filter'),
+                            contain: main.style.getPropertyValue('contain'),
+                            overflow: main.style.getPropertyValue('overflow'),
+                            overflowX: main.style.getPropertyValue('overflow-x'),
+                            overflowY: main.style.getPropertyValue('overflow-y'),
+                            willChange: main.style.getPropertyValue('will-change'),
+                            perspective: main.style.getPropertyValue('perspective'),
+                            zIndex: main.style.getPropertyValue('z-index'),
+                            position: main.style.getPropertyValue('position'),
+                        });
+                    }
+
+                    if (getComputedStyle(main).position === 'static') {
+                        main.style.setProperty('position', 'relative', 'important');
+                    }
+                    main.style.setProperty('z-index', '100001', 'important');
+                }
+            },
+
+            restoreAncestorsAfterFullscreen() {
+                if (!this.fullscreenAncestorPatches?.length) {
+                    this.fullscreenAncestorPatches = null;
+                    return;
+                }
+
+                for (const patch of this.fullscreenAncestorPatches) {
+                    const el = patch.el;
+                    if (!el?.style) {
+                        continue;
+                    }
+
+                    const entries = [
+                        ['isolation', patch.isolation],
+                        ['transform', patch.transform],
+                        ['filter', patch.filter],
+                        ['backdrop-filter', patch.backdropFilter],
+                        ['contain', patch.contain],
+                        ['overflow', patch.overflow],
+                        ['overflow-x', patch.overflowX],
+                        ['overflow-y', patch.overflowY],
+                        ['will-change', patch.willChange],
+                        ['perspective', patch.perspective],
+                        ['z-index', patch.zIndex],
+                        ['position', patch.position],
+                    ];
+
+                    for (const [prop, value] of entries) {
+                        if (value) {
+                            el.style.setProperty(prop, value);
+                        } else {
+                            el.style.removeProperty(prop);
+                        }
+                    }
+                }
+
+                this.fullscreenAncestorPatches = null;
+            },
+
+            /**
+             * Older fullscreen code reparented the wrapper to document.body. Livewire then
+             * recreated an empty shell in-place. Pull any stray terminal hosts back home.
+             */
+            salvageStrayFullscreenNodes() {
+                const host = document.getElementById('terminal-container');
+                if (!host) {
+                    return;
+                }
+
+                const wrapper = this.$refs.terminalWrapper;
+                if (wrapper && wrapper.parentElement === document.body) {
+                    host.appendChild(wrapper);
+                }
+
+                document.querySelectorAll('body > .terminal-fullscreen-shell').forEach((node) => {
+                    if (node === wrapper) {
+                        host.appendChild(node);
+                        return;
+                    }
+                    if (node.querySelector('#terminal') || node.id === 'terminal') {
+                        host.appendChild(node);
+                    } else {
+                        node.remove();
+                    }
+                });
+            },
+
+            scheduleTerminalResize() {
+                this.$nextTick(() => {
+                    // Multi-pass fit: Alpine class swaps need a couple frames before the
+                    // host has a stable clientHeight for FitAddon.
+                    this.resizeTerminal();
+                    requestAnimationFrame(() => {
                         this.resizeTerminal();
-                    }, 100);
+                        setTimeout(() => this.resizeTerminal(), 50);
+                        setTimeout(() => this.resizeTerminal(), 150);
+                    });
                 });
             },
 
             resizeTerminal() {
-                if (!this.terminalActive || !this.term || !this.fitAddon) return;
+                if (!this.terminalActive || !this.term || !this.fitAddon) {
+                    return;
+                }
 
                 try {
-                    // Force a refresh of the fit addon dimensions
+                    const terminalElement = document.getElementById('terminal');
+                    if (!terminalElement || !this.term.element) {
+                        return;
+                    }
+
+                    // Host must already be laid out; otherwise FitAddon under-reads and
+                    // later the canvas keeps a wrong pixel height (page stretches on exit).
+                    if (terminalElement.clientHeight < 24 || terminalElement.clientWidth < 24) {
+                        setTimeout(() => this.resizeTerminal(), 50);
+                        return;
+                    }
+
+                    const previousCols = this.term.cols;
+                    const previousRows = this.term.rows;
+
                     this.fitAddon.fit();
 
-                    // Get fresh dimensions from the terminal element itself. The mobile
-                    // toolbar can live beside the terminal in normal flow, so wrapper dimensions
-                    // would include controls that should not be counted as terminal rows.
-                    const terminalElement = document.getElementById('terminal');
-                    const terminalHeight = terminalElement?.clientHeight || this.$refs.terminalWrapper.clientHeight;
-                    const terminalWidth = terminalElement?.clientWidth || this.$refs.terminalWrapper.clientWidth;
-
-                    // Account for terminal container padding. In fullscreen mobile mode,
-                    // the fixed toolbar sits over the terminal container, so reserve its height
-                    // when calculating rows to keep the prompt above the controls.
-                    const horizontalPadding = 16; // px-2 = 8px * 2 (left + right)
-                    const verticalPadding = 8; // py-1 = 4px * 2 (top + bottom)
-                    const height = terminalHeight - verticalPadding;
-                    const width = terminalWidth - horizontalPadding;
-
-                    // Check if dimensions are valid
-                    if (height <= 0 || width <= 0) {
-                        logTerminal('warn', '[Terminal] Invalid wrapper dimensions, retrying...', { height, width });
-                        setTimeout(() => this.resizeTerminal(), 100);
-                        return;
+                    // Keep the xterm chrome inside the host so overflow becomes scrollback,
+                    // not document growth after leaving fullscreen.
+                    if (this.term.element) {
+                        this.term.element.style.width = '100%';
+                        this.term.element.style.height = '100%';
+                        this.term.element.style.maxHeight = '100%';
                     }
 
-                    const charSize = this.term._core._renderService._charSizeService;
-
-                    if (!charSize.height || !charSize.width) {
-                        // Fallback values if char size not available yet
-                        logTerminal('warn', '[Terminal] Character size not available, retrying...');
-                        setTimeout(() => this.resizeTerminal(), 100);
-                        return;
-                    }
-
-                    // Calculate new dimensions with padding considerations
-                    const rows = Math.floor(height / charSize.height) - 1;
-                    const cols = Math.floor(width / charSize.width) - 1;
-
-                    if (rows > 0 && cols > 0) {
-                        // Check if dimensions actually changed to avoid unnecessary resizes
-                        const currentCols = this.term.cols;
-                        const currentRows = this.term.rows;
-
-                        if (cols !== currentCols || rows !== currentRows) {
-                            this.term.resize(cols, rows);
-                            this.sendMessage({
-                                resize: { cols: cols, rows: rows }
-                            });
-                        }
-                    } else {
-                        logTerminal('warn', '[Terminal] Invalid calculated dimensions:', { rows, cols, height, width, charSize });
+                    if (
+                        this.term.cols > 0 &&
+                        this.term.rows > 0 &&
+                        (this.term.cols !== previousCols || this.term.rows !== previousRows)
+                    ) {
+                        this.sendMessage({
+                            resize: { cols: this.term.cols, rows: this.term.rows },
+                        });
                     }
                 } catch (error) {
                     logTerminal('error', '[Terminal] Resize error:', error);

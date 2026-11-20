@@ -5,8 +5,12 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,7 +19,7 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -77,6 +81,124 @@ function backupHeaders(): array
 }
 
 describe('POST /api/v1/databases/{uuid}/backups', function () {
+    test('does not save to S3 when save_s3 is not sent', function () {
+        $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$this->database->uuid}/backups", ['frequency' => 'daily'])
+            ->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::firstOrFail();
+        expect((bool) $backup->save_s3)->toBeFalse()
+            ->and($backup->s3_storage_id)->toBeNull();
+    });
+
+    test('rejects backup configurations for unsupported database types', function () {
+        $database = StandaloneRedis::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Redis DB',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertUnprocessable()
+            ->assertJson([
+                'message' => 'Scheduled backups are not supported for this database type.',
+            ]);
+
+        expect(ScheduledDatabaseBackup::count())->toBe(0);
+    });
+
+    test('defaults clickhouse backups to its configured database', function () {
+        $database = StandaloneClickhouse::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'ClickHouse DB',
+            'clickhouse_admin_user' => 'default',
+            'clickhouse_admin_password' => 'password',
+            'clickhouse_db' => 'analytics',
+            'image' => 'clickhouse/clickhouse-server:25.11',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('analytics')
+            ->and($backup->database_type)->toBe(StandaloneClickhouse::class);
+    });
+
+    test('defaults influxdb backups to its configured bucket', function () {
+        $database = StandaloneInfluxdb::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'InfluxDB DB',
+            'influxdb_admin_user' => 'influx',
+            'influxdb_admin_password' => 'password',
+            'influxdb_admin_token' => 'token',
+            'influxdb_org' => 'coolify',
+            'influxdb_bucket' => 'metrics',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('metrics')
+            ->and($backup->database_type)->toBe(StandaloneInfluxdb::class);
+    });
+
+    test('leaves sqlite backup files unset so every configured file is backed up at run time', function () {
+        $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBeNull()
+            ->and($backup->database_type)->toBe(StandaloneSqlite::class);
+    });
+
+    test('keeps explicitly selected sqlite backup files', function () {
+        $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+                'databases_to_backup' => 'jobs.db',
+            ]);
+
+        $response->assertCreated();
+
+        expect(ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail()->databases_to_backup)->toBe('jobs.db');
+    });
+
     test('creates backup configuration with valid frequency', function () {
         $response = $this->withHeaders(backupHeaders())
             ->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
@@ -193,7 +315,7 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
         $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->first();
         expect($backup)->not->toBeNull();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
         expect($backup->team_id)->toBe($this->team->id);
     });
 
@@ -241,7 +363,7 @@ describe('PATCH /api/v1/databases/{uuid}/backups/{scheduled_backup_uuid}', funct
         $response->assertStatus(200);
         $backup->refresh();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
     });
 
     test('rejects s3_storage_uuid from another team on update', function () {

@@ -22,11 +22,21 @@ class CloudInitScripts extends Component
     {
         return [
             'scriptSaved' => 'loadScripts',
+            'securityResourceChanged' => 'loadScripts',
         ];
     }
 
     public function loadScripts()
     {
+        $this->authorize('viewAny', CloudInitScript::class);
+
+        CloudInitScript::ownedByCurrentTeam()
+            ->whereNull('uuid')
+            ->get()
+            ->each(function (CloudInitScript $script): void {
+                $script->forceFill(['uuid' => new_public_id()])->save();
+            });
+
         $this->scripts = CloudInitScript::ownedByCurrentTeam()->orderBy('created_at', 'desc')->get();
     }
 

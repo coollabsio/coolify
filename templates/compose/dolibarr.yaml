@@ -27,6 +27,7 @@ services:
       - dolibarr_custom:/var/www/html/custom
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      start_period: 120s
       interval: 2s
       timeout: 10s
       retries: 15

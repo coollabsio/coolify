@@ -4,6 +4,7 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
@@ -21,8 +22,13 @@ beforeEach(function () {
         'project_id' => $this->project->id,
     ]);
 
+    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = $this->server->standaloneDockers()->firstOrFail();
+
     $this->application = Application::factory()->create([
         'environment_id' => $this->environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ]);
 });
 
@@ -62,6 +68,19 @@ test('resolveSharedEnvironmentVariables resolves team-scoped variable', function
 
     $resolved = resolveSharedEnvironmentVariables('{{team.GLOBAL_API_KEY}}', $this->application);
     expect($resolved)->toBe('sk-123456');
+});
+
+test('resolveSharedEnvironmentVariables resolves server-scoped variable', function () {
+    SharedEnvironmentVariable::create([
+        'key' => 'COMMON_PG_HOST',
+        'value' => 'postgres.coolify',
+        'type' => 'server',
+        'server_id' => $this->server->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    $resolved = resolveSharedEnvironmentVariables('{{server.COMMON_PG_HOST}}', $this->application);
+    expect($resolved)->toBe('postgres.coolify');
 });
 
 test('resolveSharedEnvironmentVariables returns original when no match found', function () {

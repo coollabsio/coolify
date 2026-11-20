@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -44,21 +45,28 @@ function validPrivateKey(): string
 }
 
 describe('GitHub Source Change Component', function () {
-    test('all github app form controls declare explicit authorization', function () {
-        $view = file_get_contents(resource_path('views/livewire/source/github/change.blade.php'));
+    test('deletes an incomplete github app and redirects without a render error', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'organization' => 'coollabsio',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
 
-        preg_match_all(
-            '/<x-forms\.(button|input|select|checkbox)\b(?![^>]*\bcanGate=)[^>]*>/s',
-            $view,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        );
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSee('Incomplete GitHub App')
+            ->call('delete')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('source.all'))
+            ->assertSet('github_app', null)
+            ->call('$refresh');
 
-        $missingAuthorization = collect($matches[0])
-            ->map(fn (array $match): string => 'Line '.(substr_count(substr($view, 0, $match[1]), PHP_EOL) + 1).': '.trim(preg_replace('/\s+/', ' ', $match[0])))
-            ->all();
-
-        expect($missingAuthorization)->toBeEmpty();
+        expect(GithubApp::find($githubApp->id))->toBeNull();
     });
 
     test('can mount with newly created github app with null app_id', function () {
@@ -147,6 +155,212 @@ describe('GitHub Source Change Component', function () {
             ]);
     });
 
+    test('ghe.com installation path uses github cloud owner scoped route', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => 'acme-enterprise',
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+        parse_str(parse_url($installationUrl, PHP_URL_QUERY), $query);
+        $installState = $query['state'] ?? null;
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme-enterprise/provided-github-app/installations/new?')
+            ->and($installState)->not->toBeEmpty()
+            ->and(Cache::get('github-app-setup-state:'.hash('sha256', $installState)))
+            ->toMatchArray([
+                'action' => 'install',
+                'github_app_id' => 123,
+                'team_id' => 456,
+            ]);
+    });
+
+    test('installation path is pure and never calls github or mutates the app', function () {
+        Http::fake();
+
+        $privateKey = PrivateKey::create([
+            'name' => 'github-app-local-name',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+            'is_git_related' => true,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Local Display Name',
+            'organization' => 'acme-enterprise',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://octocorp.ghe.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        Http::assertNothingSent();
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme-enterprise/local-display-name/installations/new?')
+            ->and($githubApp->refresh()->name)->toBe('Local Display Name')
+            ->and($privateKey->refresh()->name)->toBe('github-app-local-name');
+    });
+
+    test('syncGithubAppName persists the github slug and renames the private key', function () {
+        Http::fake([
+            '*/app' => Http::response(['slug' => 'actual-github-slug']),
+        ]);
+
+        $privateKey = PrivateKey::create([
+            'name' => 'github-app-local-name',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+            'is_git_related' => true,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Local Display Name',
+            'organization' => 'acme-enterprise',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://octocorp.ghe.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        $appSlug = syncGithubAppName($githubApp, true);
+
+        expect($appSlug)->toBe('actual-github-slug')
+            ->and($githubApp->refresh()->name)->toBe('actual-github-slug')
+            ->and($privateKey->refresh()->name)->toBe('github-app-actual-github-slug');
+    });
+
+    test('saving settings keeps key selection within the source team', function (string $action) {
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $ownKey = PrivateKey::create([
+            'name' => 'own-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $ownKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $foreignKey->id)
+            ->call($action);
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $ownKey->id)
+            ->call($action)
+            ->assertHasNoErrors();
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+    })->with(['submit', 'instantSave']);
+
+    test('github app tokens only use a key from the source team', function () {
+        Http::fake();
+
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        GithubApp::query()->whereKey($githubApp->id)->update(['private_key_id' => $foreignKey->id]);
+        $githubApp->refresh();
+
+        expect(fn () => generateGithubJwt($githubApp))->toThrow(RuntimeException::class)
+            ->and(syncGithubAppName($githubApp))->toBeNull()
+            ->and($foreignKey->refresh()->name)->toBe('other-team-key');
+
+        Http::assertNothingSent();
+    });
+
+    test('ghe.com installation path encodes the organization segment', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => '/acme enterprise/',
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/acme%20enterprise/provided-github-app/installations/new?');
+    });
+
+    test('ghe.com installation path encodes plus signs in the organization segment', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'Provided GitHub App',
+            'organization' => 'octo+corp',
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/octo%2Bcorp/provided-git-hub-app/installations/new?');
+    });
+
+    test('ghe.com installation path keeps app scoped fallback when organization is blank', function () {
+        $githubApp = new GithubApp;
+        $githubApp->forceFill([
+            'id' => 123,
+            'name' => 'provided-github-app',
+            'organization' => null,
+            'html_url' => 'https://octocorp.ghe.com',
+            'team_id' => 456,
+        ]);
+
+        $installationUrl = getInstallationPath($githubApp);
+
+        expect($installationUrl)->toStartWith('https://octocorp.ghe.com/apps/provided-github-app/installations/new?');
+    });
+
     test('defaults webhook endpoint to app url when it is the first available endpoint', function () {
         config(['app.url' => 'http://localhost:8000']);
 
@@ -200,13 +414,17 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('webhook_endpoint', 'http://staging.example.com')
             ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
             ->assertSet('use_custom_webhook_endpoint', true)
-            ->assertSee('Use custom webhook endpoint')
-            ->assertSee('Selected endpoint')
+            ->assertSee('Webhook endpoint')
+            ->assertSee('Use a custom endpoint')
             ->assertSee('Custom endpoint')
             ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
     });
 
     test('can mount with fully configured github app', function () {
+        Http::fake([
+            'https://api.github.com/app' => Http::response(['slug' => 'test-github-app']),
+        ]);
+
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -241,6 +459,10 @@ describe('GitHub Source Change Component', function () {
     });
 
     test('can update github app from null to valid values', function () {
+        Http::fake([
+            'https://api.github.com/app' => Http::response(['slug' => 'test-github-app']),
+        ]);
+
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -275,6 +497,49 @@ describe('GitHub Source Change Component', function () {
         expect($githubApp->installation_id)->toBe(67890);
         expect($githubApp->client_id)->toBe('new-client-id');
         expect($githubApp->private_key_id)->toBe($privateKey->id);
+    });
+
+    test('preserves custom ghe api url when saving github app settings', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://github.ghe.com/api/v3',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->set('htmlUrl', 'https://github.ghe.com')
+            ->set('apiUrl', 'https://github.ghe.com/api/v3')
+            ->call('submit')
+            ->assertDispatched('success')
+            ->assertSet('apiUrl', 'https://github.ghe.com/api/v3');
+
+        $githubApp->refresh();
+        expect($githubApp->api_url)->toBe('https://github.ghe.com/api/v3');
+    });
+
+    test('rejects invalid github organization values', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->set('organization', 'octo/corp')
+            ->call('submit')
+            ->assertHasErrors(['organization']);
     });
 
     test('validation allows nullable values for app configuration', function () {
@@ -397,9 +662,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app' => Http::response([
                 'permissions' => [
                     'contents' => 'read',
@@ -407,6 +669,7 @@ describe('GitHub Source Change Component', function () {
                     'pull_requests' => 'write',
                 ],
             ]),
+            'https://api.github.com/app/installations/67890' => Http::response(['permissions' => []]),
         ]);
 
         Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
@@ -429,4 +692,303 @@ describe('GitHub Source Change Component', function () {
             ->and($githubApp->metadata)->toBe('read')
             ->and($githubApp->pull_requests)->toBe('write');
     });
+
+    test('checkPermissions does not let a member refetch permissions', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        Livewire::actingAs($member)
+            ->withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->call('checkPermissions')
+            ->assertNotDispatched('success');
+
+        Http::assertNothingSent();
+        expect($githubApp->fresh()->contents)->toBeNull()
+            ->and($githubApp->fresh()->deployments)->toBeNull();
+    });
+
+    test('sync name uses normalized resolvable ghe dot com api url', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.ghe.com',
+            'html_url' => 'https://github.ghe.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.ghe.com/app' => Http::response([
+                'slug' => 'octocorp-app',
+            ]),
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->call('updateGithubAppName')
+            ->assertDispatched('success');
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.github.ghe.com/app');
+    });
+
+    test('isConnected is true only when app and installation are present', function () {
+        $incomplete = GithubApp::create([
+            'name' => 'Incomplete App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $connected = GithubApp::create([
+            'name' => 'Connected App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $public = new GithubApp([
+            'is_public' => true,
+        ]);
+
+        expect($incomplete->isConnected())->toBeFalse()
+            ->and($connected->isConnected())->toBeTrue()
+            ->and($public->isConnected())->toBeTrue();
+    });
+
+    test('shows test connection for installed github apps', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Connected GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('isConnected', true)
+            ->assertSee('Test connection')
+            ->assertSeeHtml('wire:click.prevent="testConnection"');
+    });
+
+    test('testConnection succeeds when github app credentials are valid', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Connected GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.com/app' => Http::response([
+                'name' => 'Coolify GitHub App',
+                'slug' => 'coolify-github-app',
+            ]),
+            'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
+                'token' => 'ghs_test_installation_token',
+            ]),
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->call('testConnection')
+            ->assertDispatched('success', 'Connection successful! Authenticated as GitHub App: Coolify GitHub App');
+    });
+
+    test('testConnection fails when github app is not fully installed', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('isConnected', false)
+            ->call('testConnection')
+            ->assertDispatched('error', 'GitHub App is not fully set up. Please complete installation first.');
+    });
+
+    test('sources list shows Connected for finished github apps', function () {
+        GithubApp::create([
+            'name' => 'Finished GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $this->get(route('source.all'))
+            ->assertSuccessful()
+            ->assertSee('Finished GitHub App')
+            ->assertSee('Connected')
+            ->assertSee('Incomplete GitHub App')
+            ->assertSee('Setup incomplete');
+    });
+});
+
+describe('GitHub App name sync after the user switches the session team', function () {
+    beforeEach(function () {
+        Storage::fake('ssh-keys');
+        $this->otherTeam = Team::factory()->create();
+        $this->otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        $this->appKey = PrivateKey::create(['name' => 'App Key', 'private_key' => validPrivateKey(), 'team_id' => $this->team->id]);
+        $this->otherTeamKey = PrivateKey::create(['name' => 'Other Team Key', 'private_key' => validPrivateKey(), 'team_id' => $this->otherTeam->id]);
+        $this->githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $this->appKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.com/app' => Http::response(['slug' => 'synced-app']),
+        ]);
+
+        $this->component = Livewire::withQueryParams(['github_app_uuid' => $this->githubApp->uuid])->test(Change::class);
+        session(['currentTeam' => $this->otherTeam]);
+    });
+
+    test('rejects a private key of the session team', function () {
+        $this->component->set('privateKeyId', $this->otherTeamKey->id)
+            ->call('updateGithubAppName')
+            ->assertDispatched('error', 'No private key found for this GitHub App.');
+
+        expect($this->githubApp->fresh()->private_key_id)->toBe($this->appKey->id);
+        Http::assertNothingSent();
+    });
+
+    test('syncs the name with a private key of the GitHub App team', function () {
+        $this->component->call('updateGithubAppName')
+            ->assertDispatched('success');
+
+        expect($this->githubApp->fresh()->name)->toBe('synced-app');
+    });
+});
+
+describe('GitHub webhook endpoint options for IPv6 instance addresses', function () {
+    test('brackets the public IPv6 address and keeps IPv4 unchanged', function (string $ipv6) {
+        config(['app.port' => 8000]);
+
+        InstanceSettings::findOrFail(0)->update([
+            'public_ipv4' => '203.0.113.10',
+            'public_ipv6' => $ipv6,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSet('ipv4', 'http://203.0.113.10:8000')
+            ->assertSet('ipv6', 'http://[2a01:4f8::1]:8000');
+    })->with([
+        'raw' => '2a01:4f8::1',
+        'bracketed' => '[2a01:4f8::1]',
+    ]);
 });

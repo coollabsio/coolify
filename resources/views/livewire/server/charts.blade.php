@@ -2,314 +2,398 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Metrics | Coolify
     </x-slot>
-    <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
-        <x-server.sidebar :server="$server" activeMenu="metrics" />
-        <div class="w-full">
-            <div class="flex items-center gap-2">
-                <h2>Metrics</h2>
-                @if ($server->isMetricsEnabled())
-                    <x-forms.button canGate="update" :canResource="$server" wire:click='toggleMetrics'>
-                        Disable Metrics
-                    </x-forms.button>
-                @elseif ($server->isSentinelEnabled())
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='toggleMetrics'>
-                        Enable Metrics
-                    </x-forms.button>
-                @endif
-            </div>
-            <div class="pb-4">Basic metrics for your server.</div>
-            @if ($server->isMetricsEnabled())
-                <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
-                    <x-forms.select label="Interval" wire:change="setInterval" id="interval">
-                        <option value="5">5 minutes (live)</option>
-                        <option value="10">10 minutes (live)</option>
-                        <option value="30">30 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="720">12 hours</option>
-                        <option value="10080">1 week</option>
-                        <option value="43200">30 days</option>
-                    </x-forms.select>
-                    <h4 class="pt-4">CPU Usage</h4>
-                    <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
+    <livewire:server.navbar :server="$server" />
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="metrics" />
+
+        <div class="application-settings-form flex w-full flex-col gap-6"
+            @if ($server->isMetricsEnabled()) x-init="$wire.loadData()" @endif>
+            @if ($server->isMetricsEnabled())
+                @if ($this->pollSeconds())
+                    <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
+                @endif
+                <form wire:submit.prevent="saveMetricsSettings" class="contents">
+                    <x-unsaved-bar action="saveMetricsSettings"
+                        targets="sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
+
+                    <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
+                        helper="Inspect recent CPU and memory usage reported by Sentinel.">
+                        <x-slot:actions>
+                            <div class="flex items-center gap-2">
+                                <x-live-toggle :active="$live" storageKey="server-metrics-live" />
+                                <x-forms.button canGate="update" :canResource="$server" wire:click="toggleMetrics">
+                                    Disable metrics
+                                </x-forms.button>
+                            </div>
+                        </x-slot:actions>
+
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                                id="sentinelMetricsRefreshRateSeconds" label="Collection rate" required
+                                helper="Seconds between metric samples." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                                id="sentinelMetricsHistoryDays" label="History retention" required
+                                helper="Days of CPU and memory history to retain." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
+                                id="sentinelPushIntervalSeconds" label="Push interval" required
+                                helper="Seconds between health reports sent to Coolify." />
+                        </div>
+
+                        <div class="mt-4 max-w-xs">
+                            <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
+                                ['value' => 5, 'label' => 'Last 5 minutes'],
+                                ['value' => 10, 'label' => 'Last 10 minutes'],
+                                ['value' => 30, 'label' => 'Last 30 minutes'],
+                                ['value' => 60, 'label' => 'Last hour'],
+                                ['value' => 720, 'label' => 'Last 12 hours'],
+                                ['value' => 10080, 'label' => 'Last week'],
+                                ['value' => 43200, 'label' => 'Last 30 days'],
+                            ]" />
+                        </div>
+                        <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                            Ranges up to one hour refresh live every five seconds. Longer ranges load once; turn on live refresh to update them every minute.
+                        </p>
+                    </x-application.settings-section>
+                </form>
+
+                {{-- CPU is the primary signal, so it spans full width; the other four
+                     charts fall into a 2x2 below (mirrors the fleet /metrics layout). --}}
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
+                        helper="Average usage of all CPU cores on this server. 100% means that all cores are fully busy. For example, on a server with 8 cores, one fully busy core shows as 12.5%.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
+                        <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
+                        helper="Percentage of physical memory currently used by this server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-memory-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
+                        <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-network-metrics-section" title="Network throughput"
+                        helper="Receive and transmit rate across the server's network interfaces.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-network-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
+                        <div wire:ignore id="{!! $chartId !!}-network" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-load-metrics-section" title="Load average"
+                        helper="One minute load average reported by the server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-load-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
+                        <div wire:ignore id="{!! $chartId !!}-load" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-disk-metrics-section" title="Disk usage"
+                        helper="Percentage of the root filesystem used by this server.">
+                        <x-slot:actions>
+                            <div wire:ignore id="{!! $chartId !!}-disk-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+                        </x-slot:actions>
+                        <div wire:ignore id="{!! $chartId !!}-disk" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+                </div>
+
+                @script
                     <script>
-                        (function() {
+                        (() => {
                             checkTheme();
-                            const optionsServerCpu = {
-                                stroke: {
-                                    curve: 'straight',
-                                    width: 2,
-                                },
+
+                            const formatPercent = value => {
+                                const number = Number(value);
+                                const precision = Math.abs(number) < 1 ? 2 : 1;
+
+                                return `${Number(number.toFixed(precision))}%`;
+                            };
+
+                            const formatNumber = value => Number(Number(value).toFixed(2)).toLocaleString();
+                            const formatBytes = value => {
+                                const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                                let amount = Number(value) || 0;
+                                let unit = 0;
+                                while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit++; }
+                                return `${Number(amount.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
+                            };
+                            const formatRate = value => `${formatBytes(value)}/s`;
+
+
+                            const chartOptions = (name, color, loadingText, formatter = formatPercent) => ({
                                 chart: {
-                                    height: '150px',
-                                    id: '{!! $chartId !!}-cpu',
+                                    height: 240,
                                     type: 'area',
                                     toolbar: {
-                                        show: true,
-                                        tools: {
-                                            download: false,
-                                            selection: false,
-                                            zoom: true,
-                                            zoomin: false,
-                                            zoomout: false,
-                                            pan: false,
-                                            reset: true
-                                        },
+                                        show: false
+                                    },
+                                    zoom: {
+                                        enabled: false
                                     },
                                     animations: {
-                                        enabled: true,
+                                        enabled: true
                                     },
+                                    background: 'transparent',
+                                },
+                                series: [{
+                                    name,
+                                    data: [],
+                                }],
+                                colors: [color],
+                                stroke: {
+                                    curve: 'smooth',
+                                    width: 2,
                                 },
                                 fill: {
                                     type: 'gradient',
+                                    gradient: {
+                                        opacityFrom: 0.28,
+                                        opacityTo: 0.02,
+                                        stops: [0, 90, 100],
+                                    },
                                 },
                                 dataLabels: {
                                     enabled: false,
-                                    offsetY: -10,
-                                    style: {
-                                        colors: ['#FCD452'],
-                                    },
-                                    background: {
-                                        enabled: false,
-                                    }
                                 },
-                                 grid: {
-                                     show: true,
-                                     borderColor: '',
-                                 },
-                                 colors: [cpuColor],
-                                 xaxis: {
-                                     type: 'datetime',
-                                 },
-                                 series: [{
-                                     name: 'CPU %',
-                                    data: []
-                                }],
+                                grid: {
+                                    borderColor: 'rgba(128, 128, 128, 0.14)',
+                                    strokeDashArray: 4,
+                                },
+                                legend: {
+                                    show: false,
+                                },
+                                xaxis: {
+                                    type: 'datetime',
+                                    labels: {
+                                        datetimeUTC: false,
+                                        style: {
+                                            colors: textColor,
+                                        },
+                                    },
+                                },
+                                yaxis: {
+                                    min: 0,
+                                    max: max => max > 0 ? max * 1.2 : 1,
+                                    forceNiceScale: true,
+                                    tickAmount: 4,
+                                    labels: {
+                                        style: {
+                                            colors: textColor,
+                                        },
+                                        formatter,
+                                    },
+                                },
                                 noData: {
-                                    text: 'Loading...',
+                                    text: loadingText,
                                     style: {
                                         color: textColor,
-                                    }
+                                    },
                                 },
-                                 tooltip: {
-                                     enabled: true,
-                                     marker: {
-                                         show: false,
-                                     },
-                                     custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                                         const value = series[seriesIndex][dataPointIndex];
-                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
-                                         const date = new Date(timestamp);
-                                         const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
-                                             String(date.getUTCMinutes()).padStart(2, '0') + ':' +
-                                             String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
-                                             date.getUTCFullYear() + '-' +
-                                             String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
-                                             String(date.getUTCDate()).padStart(2, '0');
-                                         return '<div class="apexcharts-tooltip-custom">' +
-                                             '<div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
-                                             '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
-                                             '</div>';
-                                     }
-                                 },
-                                legend: {
-                                    show: false
-                                }
-                            }
-                            const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`),
-                                optionsServerCpu);
-                            serverCpuChart.render();
-                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
-                                checkTheme();
-                                 serverCpuChart.updateOptions({
-                                         series: [{
-                                             data: chartData[0].seriesData,
-                                         }],
-                                         colors: [cpuColor],
-                                        xaxis: {
-                                            type: 'datetime',
-                                            labels: {
-                                                show: true,
-                                                style: {
-                                                    colors: textColor,
-                                                }
-                                            }
-                                        },
-                                         yaxis: {
-                                             show: true,
-                                             labels: {
-                                                 show: true,
-                                                 style: {
-                                                     colors: textColor,
-                                                 },
-                                                 formatter: function(value) {
-                                                     return Math.round(value) + ' %';
-                                                 }
-                                             }
-                                         },
-                                        noData: {
-                                            text: 'Loading...',
-                                            style: {
-                                                color: textColor,
-                                            }
-                                        }
-                                    });
-                                });
-                        })();
-                    </script>
-
-                    <div>
-                        <h4>Memory Usage</h4>
-                        <div wire:ignore id="{!! $chartId !!}-memory"></div>
-
-                        <script>
-                            (function() {
-                                checkTheme();
-                                const optionsServerMemory = {
-                                    stroke: {
-                                        curve: 'straight',
-                                        width: 2,
-                                    },
-                                    chart: {
-                                        height: '150px',
-                                        id: '{!! $chartId !!}-memory',
-                                        type: 'area',
-                                        toolbar: {
-                                            show: true,
-                                            tools: {
-                                                download: false,
-                                                selection: false,
-                                                zoom: true,
-                                                zoomin: false,
-                                                zoomout: false,
-                                                pan: false,
-                                                reset: true
-                                            },
-                                        },
-                                        animations: {
-                                            enabled: true,
-                                        },
-                                    },
-                                    fill: {
-                                        type: 'gradient',
-                                    },
-                                    dataLabels: {
+                                tooltip: {
+                                    shared: false,
+                                    intersect: false,
+                                    followCursor: false,
+                                    fixed: {
                                         enabled: false,
-                                        offsetY: -10,
-                                        style: {
-                                            colors: ['#FCD452'],
-                                        },
-                                        background: {
-                                            enabled: false,
-                                        }
                                     },
-                                     grid: {
-                                         show: true,
-                                         borderColor: '',
-                                     },
-                                     colors: [ramColor],
-                                     xaxis: {
-                                         type: 'datetime',
-                                         labels: {
-                                             show: true,
+                                    marker: {
+                                        show: false,
+                                    },
+                                    custom: ({
+                                        series,
+                                        seriesIndex,
+                                        dataPointIndex,
+                                        w
+                                    }) => {
+                                        const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                        const values = series.map((values, index) => values[dataPointIndex] === undefined ? '' :
+                                            `<div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames?.[index] ?? name}: <span class="apexcharts-tooltip-value-bold">${formatter(values[dataPointIndex])}</span></div>`);
+
+                                        return `<div class="apexcharts-tooltip-custom">
+                                            ${values.join('')}
+                                            ${window.chartTooltipTime(timestamp)}
+                                        </div>`;
+                                    },
+                                },
+                            });
+
+                            const cpuChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-cpu'),
+                                chartOptions('CPU', cpuColor, 'Loading CPU metrics…'),
+                            );
+                            const memoryChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-memory'),
+                                chartOptions('Memory', ramColor, 'Loading memory metrics…'),
+                            );
+
+                            const diskChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-disk'),
+                                chartOptions('Disk', '#ef4444', 'Loading disk metrics…', formatPercent),
+                            );
+                            const networkChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-network'),
+                                {
+                                    ...chartOptions('Network', '#10b981', 'Loading network metrics…', formatRate),
+                                    colors: ['#10b981', '#f59e0b'],
+                                },
+                            );
+                            const loadChart = new ApexCharts(
+                                document.getElementById('{!! $chartId !!}-load'),
+                                chartOptions('Load', '#14b8a6', 'Loading load metrics…', formatNumber),
+                            );
+
+                            const renderLegend = (key, items) => renderChartLegend(
+                                document.getElementById(`{!! $chartId !!}-${key}-legend`), items);
+
+                            // Defer to the next frame so the 2x2 grid cells are laid out
+                            // before ApexCharts measures them (a zero-width cell renders blank).
+                            requestAnimationFrame(() => {
+                                cpuChart.render();
+                                memoryChart.render();
+                                diskChart.render();
+                                networkChart.render();
+                                loadChart.render();
+                                window.syncChartTooltips('{!! $chartId !!}-metrics', [cpuChart, memoryChart, networkChart, loadChart, diskChart]);
+                            });
+
+                            Livewire.on('refreshChartData-{!! $chartId !!}-metrics', chartData => {
+                                checkTheme();
+                                const data = Array.isArray(chartData) ? chartData[0] : chartData;
+
+                                cpuChart.updateOptions({
+                                    colors: [cpuColor],
+                                    series: [{
+                                        name: 'CPU',
+                                        data: data.cpuSeries,
+                                    }],
+                                    xaxis: {
+                                        type: 'datetime',
+                                        labels: {
+                                            datetimeUTC: false,
                                             style: {
                                                 colors: textColor,
-                                            }
-                                        }
+                                            },
+                                        },
                                     },
-                                    series: [{
-                                        name: "Memory (%)",
-                                        data: []
-                                    }],
+                                    yaxis: {
+                                        min: 0,
+                                        max: max => max > 0 ? max * 1.2 : 1,
+                                        forceNiceScale: true,
+                                        tickAmount: 4,
+                                        labels: {
+                                            style: {
+                                                colors: textColor,
+                                            },
+                                            formatter: formatPercent,
+                                        },
+                                    },
                                     noData: {
-                                        text: 'Loading...',
+                                        text: 'No CPU metrics available',
                                         style: {
                                             color: textColor,
-                                        }
+                                        },
                                     },
-                                     tooltip: {
-                                         enabled: true,
-                                         marker: {
-                                             show: false,
-                                         },
-                                         custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                                             const value = series[seriesIndex][dataPointIndex];
-                                             const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
-                                             const date = new Date(timestamp);
-                                             const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
-                                                 String(date.getUTCMinutes()).padStart(2, '0') + ':' +
-                                                 String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
-                                                 date.getUTCFullYear() + '-' +
-                                                 String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
-                                                 String(date.getUTCDate()).padStart(2, '0');
-                                             return '<div class="apexcharts-tooltip-custom">' +
-                                                 '<div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
-                                                 '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
-                                                 '</div>';
-                                         }
-                                     },
-                                    legend: {
-                                        show: false
-                                    }
-                                }
-                                const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
-                                    optionsServerMemory);
-                                serverMemoryChart.render();
-                                Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
-                                    checkTheme();
-                                     serverMemoryChart.updateOptions({
-                                             series: [{
-                                                 data: chartData[0].seriesData,
-                                             }],
-                                             colors: [ramColor],
-                                            xaxis: {
-                                                type: 'datetime',
-                                                labels: {
-                                                    show: true,
-                                                    style: {
-                                                        colors: textColor,
-                                                    }
-                                                }
+                                });
+                                memoryChart.updateOptions({
+                                    colors: [ramColor],
+                                    series: [{
+                                        name: 'Memory',
+                                        data: data.memorySeries,
+                                    }],
+                                    xaxis: {
+                                        type: 'datetime',
+                                        labels: {
+                                            datetimeUTC: false,
+                                            style: {
+                                                colors: textColor,
                                             },
-                                             yaxis: {
-                                                 min: 0,
-                                                 show: true,
-                                                 labels: {
-                                                     show: true,
-                                                     style: {
-                                                         colors: textColor,
-                                                     },
-                                                      formatter: function(value) {
-                                                          return Math.round(value) + ' %';
-                                                      }
-                                                 }
-                                             },
-                                            noData: {
-                                                text: 'Loading...',
-                                                style: {
-                                                    color: textColor,
-                                                }
-                                            }
-                                        });
-                                    });
-                            })();
-                        </script>
+                                        },
+                                    },
+                                    yaxis: {
+                                        min: 0,
+                                        max: max => max > 0 ? max * 1.2 : 1,
+                                        forceNiceScale: true,
+                                        tickAmount: 4,
+                                        labels: {
+                                            style: {
+                                                colors: textColor,
+                                            },
+                                            formatter: formatPercent,
+                                        },
+                                    },
+                                    noData: {
+                                        text: 'No memory metrics available',
+                                        style: {
+                                            color: textColor,
+                                        },
+                                    },
+                                });
+                                diskChart.updateOptions({
+                                    series: [{ name: 'Disk', data: data.diskSeries || [] }],
+                                    noData: { text: 'No disk metrics available' },
+                                });
+                                networkChart.updateOptions({
+                                    series: [
+                                        { name: 'RX', data: data.networkRxSeries || [] },
+                                        { name: 'TX', data: data.networkTxSeries || [] },
+                                    ],
+                                    noData: { text: 'No network metrics available' },
+                                });
+                                loadChart.updateOptions({
+                                    series: [{ name: 'Load', data: data.loadSeries || [] }],
+                                    noData: { text: 'No load metrics available' },
+                                });
 
-                    </div>
-                </div>
+                                renderLegend('cpu', [{ name: 'CPU', color: cpuColor, data: data.cpuSeries, formatter: formatPercent }]);
+                                renderLegend('memory', [{ name: 'Memory', color: ramColor, data: data.memorySeries, formatter: formatPercent }]);
+                                renderLegend('network', [
+                                    { name: 'RX', color: '#10b981', data: data.networkRxSeries, formatter: formatRate },
+                                    { name: 'TX', color: '#f59e0b', data: data.networkTxSeries, formatter: formatRate },
+                                ]);
+                                renderLegend('load', [{ name: 'Load', color: '#14b8a6', data: data.loadSeries, formatter: formatNumber }]);
+                                renderLegend('disk', [{ name: 'Disk', color: '#ef4444', data: data.diskSeries, formatter: formatPercent }]);
+                            });
+                        })();
+                    </script>
+                @endscript
+            @elseif ($server->isSentinelEnabled())
+                <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
+                    helper="Inspect recent CPU and memory usage reported by Sentinel.">
+                    <x-empty size="sm" title="Metrics are disabled"
+                        description="Enable metrics to begin collecting CPU and memory history for this server."
+                        icon-name="dashboard">
+                        <x-slot:contents>
+                            <x-forms.button canGate="update" :canResource="$server" isHighlighted
+                                wire:click="toggleMetrics">
+                                Enable metrics
+                            </x-forms.button>
+                        </x-slot:contents>
+                    </x-empty>
+                </x-application.settings-section>
             @else
-                @if ($server->isSentinelEnabled())
-                    <x-callout type="info" title="Metrics Disabled">
-                        Metrics are disabled for this server. Click "Enable Metrics" above to start collecting metrics.
-                    </x-callout>
-                @else
-                    <x-callout type="info" title="Sentinel Required">
-                        Metrics require Sentinel to be enabled.
-                        Please <a class="underline font-semibold" href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}>enable Sentinel</a> first.
-                    </x-callout>
-                @endif
+                <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
+                    helper="Inspect recent CPU and memory usage reported by Sentinel.">
+                    <x-empty size="sm" title="Metrics unavailable"
+                        description="Sentinel metrics are unavailable on build and Swarm servers."
+                        icon-name="dashboard">
+                        <x-slot:contents>
+                            <a class="button"
+                                href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}"
+                                {{ wireNavigate() }}>
+                                View Sentinel
+                                <x-external-link />
+                            </a>
+                        </x-slot:contents>
+                    </x-empty>
+                </x-application.settings-section>
             @endif
+
         </div>
     </div>
 </div>

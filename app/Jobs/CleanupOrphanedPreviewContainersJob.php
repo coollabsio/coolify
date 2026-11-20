@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,6 +29,12 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 600; // 10 minutes max
+
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), instead of after the queue
+     * retry_after, so the next daily run is not blocked.
+     */
+    public int $uniqueFor = 600;
 
     public function __construct() {}
 
@@ -53,11 +60,13 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     /**
      * Get all functional servers to check for orphaned containers.
      */
-    private function getServersToCheck(): \Illuminate\Support\Collection
+    private function getServersToCheck(): Collection
     {
         $query = Server::whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_reachable', true)
-            ->where('ip', '!=', '1.2.3.4');
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->whereNotIn('ip', Server::PLACEHOLDER_IPS);
 
         if (isCloud()) {
             $query = $query->whereRelation('team.subscription', 'stripe_invoice_paid', true);
@@ -99,7 +108,7 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     /**
      * Get all PR containers on a server (containers with pullRequestId > 0).
      */
-    private function getPRContainersOnServer(Server $server): \Illuminate\Support\Collection
+    private function getPRContainersOnServer(Server $server): Collection
     {
         try {
             $output = instant_remote_process([
@@ -138,16 +147,11 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     }
 
     /**
-     * Extract application ID from container labels.
+     * Id of the application that owns the container (see resolveContainerApplicationId()).
      */
     private function extractApplicationId($container): ?int
     {
-        $labels = data_get($container, 'Labels', '');
-        if (preg_match('/coolify\.applicationId=(\d+)/', $labels, $matches)) {
-            return (int) $matches[1];
-        }
-
-        return null;
+        return resolveContainerApplicationId(collect(), (string) data_get($container, 'Labels', ''));
     }
 
     /**

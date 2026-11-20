@@ -6,25 +6,12 @@
 # port: 3002
 
 services:
-  rybbit:
-    image: 'ghcr.io/rybbit-io/rybbit-client:v2.2.3'
-    environment:
-      - SERVICE_URL_RYBBIT_3002
-      - NODE_ENV=production
-      - 'NEXT_PUBLIC_BACKEND_URL=${SERVICE_URL_RYBBIT}'
-      - 'NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}'
-    depends_on:
-      - rybbit_backend
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 3002"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
+  # rybbit_backend must stay before rybbit: the last SERVICE_URL_RYBBIT declaration sets SERVICE_URL_RYBBIT,
+  # and BASE_URL needs the root URL of the client, not the /api URL of the backend.
   rybbit_backend:
     image: 'ghcr.io/rybbit-io/rybbit-backend:v2.2.3'
     environment:
+      - SERVICE_URL_RYBBIT_3001=/api
       - NODE_ENV=production
       - TRUST_PROXY=true
       - 'BASE_URL=${SERVICE_URL_RYBBIT}'
@@ -50,6 +37,22 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  rybbit:
+    image: 'ghcr.io/rybbit-io/rybbit-client:v2.2.3'
+    environment:
+      - SERVICE_URL_RYBBIT_3002
+      - NODE_ENV=production
+      - 'NEXT_PUBLIC_BACKEND_URL=${SERVICE_URL_RYBBIT}'
+      - 'NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}'
+    depends_on:
+      - rybbit_backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 3002"]
       interval: 30s
       timeout: 10s
       retries: 3

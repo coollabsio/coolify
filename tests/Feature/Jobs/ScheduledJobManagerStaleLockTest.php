@@ -3,44 +3,45 @@
 use App\Jobs\ScheduledJobManager;
 use Illuminate\Support\Facades\Redis;
 
+function scheduledJobManagerLockKey(): string
+{
+    return config('cache.prefix').'laravel-queue-overlap:'.ScheduledJobManager::class.':scheduled-job-manager';
+}
+
 it('clears stale lock when TTL is -1', function () {
-    $cachePrefix = config('cache.prefix');
-    $lockKey = $cachePrefix.'laravel-queue-overlap:'.ScheduledJobManager::class.':scheduled-job-manager';
+    $lockKey = scheduledJobManagerLockKey();
 
-    $redis = Redis::connection('default');
-    $redis->set($lockKey, 'stale-owner');
+    $redis = Mockery::mock();
+    $redis->shouldReceive('ttl')->once()->with($lockKey)->andReturn(-1);
+    $redis->shouldReceive('del')->once()->with($lockKey)->andReturn(1);
 
-    expect($redis->ttl($lockKey))->toBe(-1);
+    Redis::shouldReceive('connection')->with('default')->andReturn($redis);
 
     $job = new ScheduledJobManager;
     $job->middleware();
-
-    expect($redis->exists($lockKey))->toBe(0);
 });
 
 it('preserves valid lock with positive TTL', function () {
-    $cachePrefix = config('cache.prefix');
-    $lockKey = $cachePrefix.'laravel-queue-overlap:'.ScheduledJobManager::class.':scheduled-job-manager';
+    $lockKey = scheduledJobManagerLockKey();
 
-    $redis = Redis::connection('default');
-    $redis->set($lockKey, 'active-owner');
-    $redis->expire($lockKey, 60);
+    $redis = Mockery::mock();
+    $redis->shouldReceive('ttl')->once()->with($lockKey)->andReturn(60);
+    $redis->shouldNotReceive('del');
 
-    expect($redis->ttl($lockKey))->toBeGreaterThan(0);
+    Redis::shouldReceive('connection')->with('default')->andReturn($redis);
 
     $job = new ScheduledJobManager;
     $job->middleware();
-
-    expect($redis->exists($lockKey))->toBe(1);
-
-    $redis->del($lockKey);
 });
 
 it('does not fail when no lock exists', function () {
-    $cachePrefix = config('cache.prefix');
-    $lockKey = $cachePrefix.'laravel-queue-overlap:'.ScheduledJobManager::class.':scheduled-job-manager';
+    $lockKey = scheduledJobManagerLockKey();
 
-    Redis::connection('default')->del($lockKey);
+    $redis = Mockery::mock();
+    $redis->shouldReceive('ttl')->once()->with($lockKey)->andReturn(-2);
+    $redis->shouldNotReceive('del');
+
+    Redis::shouldReceive('connection')->with('default')->andReturn($redis);
 
     $job = new ScheduledJobManager;
     $middleware = $job->middleware();

