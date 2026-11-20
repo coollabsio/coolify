@@ -263,7 +263,7 @@
                                         <span>PR suffix</span>
                                         <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
                                     </div>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal :options="[
+                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal live :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
                                     ]" canGate="update" :canResource="$resource" />
@@ -296,20 +296,16 @@
 
                             <div
                                 class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
-                                <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Update</button>
+                                <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Save</button>
                                 @php
                                     $hasBackupAction = auth()->user()?->can('update', $resource)
                                         && (($showBackupAction && ! $form['isShared'])
                                             || (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable()));
                                 @endphp
                                 @if ($form['isShared'] && ! $hasBackupAction)
-                                    <button type="button" wire:click="submit({{ $id }})" class="icon-button shrink-0"
-                                        title="Update storage" aria-label="Update {{ $form['name'] }}">
-                                        <x-reicon name="check" class="size-3.5" />
-                                    </button>
+                                    <span class="data-table-cell-dash">-</span>
                                 @else
                                     <x-table.row-actions label="Storage actions">
-                                        <x-table.row-action wire:click="submit({{ $id }})">Update</x-table.row-action>
                                         @can('update', $resource)
                                             @if ($showBackupAction && ! $form['isShared'])
                                                 <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
@@ -414,4 +410,8 @@
         </div>
     @endif
 
+    @if ($canUpdate)
+        <x-unsaved-bar action="submit"
+            dirty="Object.values($wire.forms ?? {}).some((form) => ! form.isReadOnly && (form.name !== form.savedName || form.mountPath !== form.savedMountPath))" />
+    @endif
 </div>
