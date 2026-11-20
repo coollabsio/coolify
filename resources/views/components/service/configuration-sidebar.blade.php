@@ -9,6 +9,8 @@
 
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
+        ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'visible' => filled($service->service_type),
+            'attention' => \App\Services\TemplateUpdateChecker::showBadge($service) ? 'Template update available' : null],
         ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
         ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
         ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
@@ -21,8 +23,6 @@
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'webhook'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Maintenance Mode', 'route' => 'project.service.maintenance', 'icon' => 'bandage'],
-        ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'visible' => filled($service->service_type),
-            'hasWarning' => \App\Services\TemplateUpdateChecker::showBadge($service), 'warningClass' => 'bg-coollabs dark:bg-warning', 'warningTitle' => 'Template update available'],
         ['label' => 'Security', 'route' => 'project.service.vulnerabilities', 'icon' => 'shield-alert',
             'security' => \App\Services\ImageScan\SecurityStatus::stored($service)->status->value],
         ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
@@ -38,10 +38,10 @@
         ]);
 
     $menuGroups = [
-        'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+        'Settings' => ['General', 'Template', 'Domains', 'Environment Variables', 'Persistent Storage'],
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics', 'Security'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-        'Operations' => ['Resource Operations', 'Maintenance Mode', 'Template', 'Tags'],
+        'Operations' => ['Resource Operations', 'Maintenance Mode', 'Tags'],
         'Danger Zone' => ['Danger Zone'],
     ];
 
@@ -83,9 +83,10 @@
                         <x-experimental-icon class="ml-auto shrink-0" />
                     @endif
                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
-                    @if ($menuItem['hasWarning'] ?? false)
-                        <span class="ml-auto size-2 shrink-0 rounded-full {{ $menuItem['warningClass'] ?? 'bg-error' }}"
-                            title="{{ $menuItem['warningTitle'] ?? 'Required environment variables missing' }}"></span>
+                    @if ($menuItem['attention'] ?? null)
+                        <x-attention-mark :label="$menuItem['attention']" />
+                    @elseif ($menuItem['hasWarning'] ?? false)
+                        <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                     @endif
                 </a>
                 <x-starred-menu.toggle menu="service" :page="$menuItem['route']" :label="$menuItem['label']" />
