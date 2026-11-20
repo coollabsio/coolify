@@ -7,6 +7,14 @@
     $showInterpolation = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showBuildtime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showRuntime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
+    $showContainers = !$isSharedVariable && !$isMagicVariable && $this->composeServiceNames !== [];
+    $savedContainers = $showContainers ? ($env->compose_services ?? []) : [];
+    $staleContainers = $showContainers ? $this->staleComposeServices : [];
+    $staleContainersWarning = match (true) {
+        $staleContainers === [] => null,
+        count($staleContainers) === count($savedContainers) => 'No container gets this variable: '.implode(', ', $staleContainers).' '.(count($staleContainers) === 1 ? 'is' : 'are').' not in the Compose file.',
+        default => 'Not used by: '.implode(', ', $staleContainers).' (not in the Compose file).',
+    };
 @endphp
 <div class="env-table-item" data-env-key="{{ $env->key }}"
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
@@ -43,6 +51,11 @@
             @if ($composeInfo)
                 <span class="table-badge shrink-0"
                     title="Used by Compose services: {{ implode(', ', $composeInfo['services']) }}">Used by Compose</span>
+            @endif
+            @if ($staleContainersWarning)
+                <span class="table-badge table-badge-warning shrink-0" title="{{ $staleContainersWarning }}">Missing container</span>
+            @elseif ($savedContainers !== [])
+                <span class="table-badge min-w-0 truncate" title="Only these containers get this variable: {{ implode(', ', $savedContainers) }}">{{ implode(', ', $savedContainers) }}</span>
             @endif
         </div>
         @if (! $isSharedVariable)
@@ -220,6 +233,38 @@
                                 Compose requires this variable to have a value.
                             @endif
                         </x-callout>
+                    @endif
+
+                    @if ($showContainers)
+                        <fieldset class="flex flex-col gap-2">
+                            <legend class="mb-2 flex items-center gap-1.5 text-sm text-black dark:text-fg">
+                                Containers
+                                <x-helper helper="The containers that get this variable, at runtime and during the build. A ${VARIABLE} reference in the Compose file works in every container." />
+                            </legend>
+                            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                                <x-forms.checkbox id="allContainers" label="All containers" fullWidth live
+                                    :disabled="! $canUpdate" />
+                                @unless ($allContainers)
+                                    <div class="ml-4 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                                        @foreach ([...$this->composeServiceNames, ...$staleContainers] as $containerName)
+                                            <x-forms.checkbox id="compose_services_{{ $loop->index }}" fullWidth
+                                                :label="in_array($containerName, $staleContainers, true) ? e($containerName).' <span class=\'text-warning\'>(not in the Compose file)</span>' : e($containerName)"
+                                                :domValue="$containerName" wire:model="compose_services"
+                                                wire:key="compose-service-{{ $env->uuid }}-{{ $containerName }}"
+                                                :disabled="! $canUpdate" />
+                                        @endforeach
+                                    </div>
+                                @endunless
+                            </div>
+                            @error('compose_services')
+                                <p class="text-xs text-error">{{ $message }}</p>
+                            @enderror
+                            @if ($staleContainersWarning)
+                                <x-callout type="warning" title="Missing container">
+                                    {{ $staleContainersWarning }} Remove {{ count($staleContainers) === 1 ? 'it' : 'them' }} from Containers, or add the service to the Compose file again.
+                                </x-callout>
+                            @endif
+                        </fieldset>
                     @endif
 
                     @if ($showValueType || $showInterpolation || $showBuildtime || $showRuntime)

@@ -1319,8 +1319,10 @@ function formatEnvValueForDevView(?string $value): ?string
  * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
  * line above it when a flag is not its default. A variable that the view cannot edit gets a
  * placeholder line and no directive.
+ *
+ * @param  bool  $withContainers  write a "containers=" flag when the variable is limited to some Compose services
  */
-function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue, bool $withContainers = false): string
 {
     if (! $canViewValue) {
         return "{$variable->key}=(Hidden, only admins can view)";
@@ -1342,6 +1344,9 @@ function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariab
             $flags[] = $default ? "{$flag}=false" : $flag;
         }
     }
+    if ($withContainers && $variable instanceof EnvironmentVariable && $variable->compose_services !== null) {
+        $flags[] = 'containers='.implode(',', $variable->compose_services);
+    }
     $line = "{$variable->key}={$value}";
 
     return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
@@ -1353,12 +1358,17 @@ function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariab
  * attributes (for example ['is_literal' => true]). A key without a directive gets empty
  * settings, so its current flags stay.
  *
+ * With $allowContainers, the "containers=app,db" flag sets 'compose_services'. A directive
+ * without that flag sets 'compose_services' => null (all Compose services). A key without a
+ * directive keeps its scope, like its other flags. The caller checks that the names are
+ * services of the Compose file.
+ *
  * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
- * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool|list<string>|null>}>
  *
  * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
  */
-function parseEnvDevView(?string $contents, array $flagDefaults): array
+function parseEnvDevView(?string $contents, array $flagDefaults, bool $allowContainers = false): array
 {
     $contents ??= '';
     $settingsByKey = [];
@@ -1372,7 +1382,11 @@ function parseEnvDevView(?string $contents, array $flagDefaults): array
         }
 
         if ($isKeyLine) {
-            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $settings = $directive ?? [];
+            if ($allowContainers && $directive !== null) {
+                $settings += ['compose_services' => null];
+            }
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $settings;
             $directive = null;
         } elseif (str_starts_with($line, '# coolify:')) {
             $directiveLine = $index + 1;
@@ -1384,8 +1398,18 @@ function parseEnvDevView(?string $contents, array $flagDefaults): array
             $directive = [];
             foreach ($flags as $flag) {
                 [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if ($allowContainers && $name === 'containers') {
+                    $containers = array_values(array_unique(explode(',', $value)));
+                    if ($value === 'true' || in_array('', $containers, true)) {
+                        throw new InvalidArgumentException("Line {$directiveLine}: \"containers\" needs Compose service names, for example containers=app,db.");
+                    }
+                    $directive['compose_services'] = $containers;
+
+                    continue;
+                }
                 if (! array_key_exists($name, $flagDefaults)) {
-                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                    $allowedFlags = [...array_keys($flagDefaults), ...($allowContainers ? ['containers'] : [])];
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', $allowedFlags).'.');
                 }
                 if ($value !== 'true' && $value !== 'false') {
                     throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");

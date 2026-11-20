@@ -3,6 +3,7 @@
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Service;
@@ -142,6 +143,73 @@ function composeResourceDirectory(Application|Service $resource): string
     }
 
     return $resource->workdir();
+}
+
+/**
+ * The runtime env file that Coolify adds to env_file: of one Compose service. It holds only the variables
+ * that reach the service. .env keeps all variables, but Compose reads it only for ${VAR} interpolation.
+ */
+function composeServiceEnvironmentFile(string $serviceName): string
+{
+    return '.coolify.'.preg_replace('/[^A-Za-z0-9._-]/', '_', $serviceName).'.env';
+}
+
+/**
+ * The Compose service names that a variable of the resource can be limited to. Empty when the resource
+ * is not a Compose resource or its Compose file does not parse.
+ *
+ * @return list<string>
+ */
+function composeServiceNamesForEnvironmentScope(mixed $resource): array
+{
+    $isCompose = $resource instanceof Service || ($resource instanceof Application && $resource->build_pack === 'dockercompose');
+    if (! $isCompose || blank($resource->docker_compose_raw)) {
+        return [];
+    }
+
+    try {
+        $services = data_get(parseDockerComposeYaml($resource->docker_compose_raw), 'services');
+    } catch (Throwable) {
+        return [];
+    }
+
+    return is_array($services) ? array_map('strval', array_keys($services)) : [];
+}
+
+/**
+ * @param  iterable<EnvironmentVariable>  $environmentVariables
+ * @return array<string, list<string>> The keys that only some Compose services get, with those services.
+ */
+function composeEnvironmentVariableScopes(iterable $environmentVariables): array
+{
+    $scopes = [];
+    foreach ($environmentVariables as $environmentVariable) {
+        if ($environmentVariable->compose_services !== null) {
+            $scopes[$environmentVariable->key] = $environmentVariable->compose_services;
+        }
+    }
+
+    return $scopes;
+}
+
+/**
+ * @param  array<string, list<string>>  $scopes  From composeEnvironmentVariableScopes(). A key without a scope goes to all services.
+ */
+function composeVariableReachesService(string $key, array $scopes, string $serviceName): bool
+{
+    return ! array_key_exists($key, $scopes) || in_array($serviceName, $scopes[$key], true);
+}
+
+/**
+ * @param  Collection<int, string>  $lines  Env file lines in KEY=VALUE format.
+ * @param  array<string, list<string>>  $scopes
+ * @return Collection<int, string>
+ */
+function composeEnvironmentLinesForService(Collection $lines, array $scopes, string $serviceName): Collection
+{
+    return $lines
+        ->filter(fn (string $line): bool => composeVariableReachesService(explode('=', $line, 2)[0], $scopes, $serviceName))
+        ->values();
 }
 
 /**
@@ -2325,11 +2393,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
+        // The env file of this service holds the Coolify variables that reach it (see composeServiceEnvironmentFile()).
         $existingEnvFiles = data_get($service, 'env_file');
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push(composeServiceEnvironmentFile(addPreviewDeploymentSuffix($serviceName, $pullRequestId)))
             ->unique()
             ->values();
 
@@ -3659,11 +3726,10 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
+        // The env file of this service holds the Coolify variables that reach it (see composeServiceEnvironmentFile()).
         $existingEnvFiles = data_get($service, 'env_file');
         $envFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
-            ->push('.env')
+            ->push(composeServiceEnvironmentFile($serviceName))
             ->unique()
             ->values();
 

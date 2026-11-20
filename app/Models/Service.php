@@ -134,6 +134,12 @@ class Service extends BaseModel
 
         $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
+        // Only added when a variable is scoped, so the hash of an unscoped service stays the same.
+        $scopes = composeEnvironmentVariableScopes($this->environment_variables()->whereNotNull('compose_services')->get());
+        if ($scopes !== []) {
+            ksort($scopes);
+            $newConfigHash .= json_encode($scopes);
+        }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -1662,11 +1668,12 @@ class Service extends BaseModel
         $envs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
+        $composeServiceNames = [];
         if ($this->docker_compose) {
             try {
                 $dockerCompose = parseDockerComposeYaml($this->docker_compose);
-                $services = data_get($dockerCompose, 'services', []);
-                foreach ($services as $serviceName => $_) {
+                $composeServiceNames = array_map('strval', array_keys(data_get($dockerCompose, 'services', [])));
+                foreach ($composeServiceNames as $serviceName) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
@@ -1691,7 +1698,15 @@ class Service extends BaseModel
             $envs->push($this->composeEnvironmentFileLine($env));
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
-        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+        $moves = ["mv {$environmentFile} $workdir/.env"];
+
+        $scopes = composeEnvironmentVariableScopes($envs_from_coolify);
+        foreach ($composeServiceNames as $serviceName) {
+            $serviceEnvironmentFile = "$workdir/".new_public_id().'.env.tmp';
+            instant_remote_write_file($this->server, $serviceEnvironmentFile, composeEnvironmentLinesForService($envs, $scopes, $serviceName)->implode("\n"));
+            $moves[] = 'mv '.escapeshellarg($serviceEnvironmentFile).' '.escapeshellarg("$workdir/".composeServiceEnvironmentFile($serviceName));
+        }
+        instant_remote_process($moves, $this->server);
     }
 
     /**
