@@ -12,6 +12,7 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
+use App\Support\StaticSiteArchive;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Exception;
@@ -414,7 +415,10 @@ class General extends Component
             $this->application->fqdn = $this->fqdn;
             $this->application->git_repository = $this->gitRepository;
             $this->application->git_branch = $this->gitBranch;
-            $this->application->git_commit_sha = $this->gitCommitSha;
+            // The site version of an archive site changes with each upload, also outside this page.
+            if (! $this->application->is_archive_source) {
+                $this->application->git_commit_sha = $this->gitCommitSha;
+            }
             $this->application->install_command = $this->installCommand;
             $this->application->build_command = $this->buildCommand;
             $this->application->start_command = $this->startCommand;
@@ -731,6 +735,35 @@ class General extends Component
                 $this->resetDefaultLabels();
                 $this->dispatch('success', 'Wildcard domain generated.');
             }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Deploys an archive that the dropzone staged as a new version of this archive site.
+     */
+    public function deployUpload(string $uploadId)
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->authorize('deploy', $this->application);
+            if (! $this->application->is_archive_source) {
+                throw new Exception('This application is not deployed from an uploaded archive.');
+            }
+            $result = StaticSiteArchive::publish($this->application, (int) $this->application->team()->id, $uploadId, deploy: true);
+            if (blank($result['deployment_uuid'])) {
+                $this->dispatch('error', $result['message'] ?? 'The deployment could not be queued.');
+
+                return;
+            }
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'],
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

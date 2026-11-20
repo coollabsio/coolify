@@ -13,6 +13,7 @@ use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Support\StaticSiteArchive;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
@@ -33,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -101,6 +103,7 @@ use Symfony\Component\Yaml\Yaml;
         'private_key_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Private key identifier.'],
         'environment_id' => ['type' => 'integer', 'description' => 'Environment identifier.'],
         'dockerfile' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile content. Used for dockerfile build pack.'],
+        'is_archive_source' => ['type' => 'boolean', 'description' => 'The static site is deployed from uploaded archives instead of a Git repository.'],
         'dockerfile_location' => ['type' => 'string', 'description' => 'Dockerfile location.'],
         'custom_labels' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom labels.'],
         'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile target build.'],
@@ -229,6 +232,7 @@ class Application extends BaseModel
         'redirect',
         'compose_parsing_version',
         'custom_nginx_configuration',
+        'is_archive_source',
         'custom_network_aliases',
         'custom_healthcheck_found',
         'nixpkgsarchive',
@@ -325,6 +329,7 @@ class Application extends BaseModel
             'is_maintenance_enabled' => 'boolean',
             'health_check_enabled' => 'boolean',
             'custom_healthcheck_found' => 'boolean',
+            'is_archive_source' => 'boolean',
         ];
     }
 
@@ -451,6 +456,7 @@ class Application extends BaseModel
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
+            Storage::deleteDirectory(StaticSiteArchive::storageDirectory($application));
             $application->settings()->delete();
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
@@ -1591,7 +1597,7 @@ class Application extends BaseModel
 
     public function git_based(): bool
     {
-        if ($this->dockerfile) {
+        if ($this->dockerfile || $this->is_archive_source) {
             return false;
         }
         if ($this->build_pack === 'dockerimage') {

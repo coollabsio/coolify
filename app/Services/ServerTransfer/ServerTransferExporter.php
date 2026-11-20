@@ -463,6 +463,10 @@ class ServerTransferExporter
             $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
         }
 
+        if ($applications->contains('is_archive_source', true)) {
+            $warnings[] = 'The uploaded archives of static sites are not transferred. A redeploy of the current version uses the image on the server, but a rebuild needs the archive. Upload it again on the target instance.';
+        }
+
         $hasActivePreviewGithubDeployments = ApplicationDeploymentQueue::query()
             ->whereIn('application_id', $applications->pluck('id'))
             ->where('pull_request_id', '!=', 0)

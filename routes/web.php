@@ -632,6 +632,7 @@ Route::middleware(['auth', 'access.team-wide'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
+    Route::post('/upload/static-archive', [UploadController::class, 'uploadStaticArchive'])->name('upload.static-archive');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $exeuctionId = request()->route('executionId');
