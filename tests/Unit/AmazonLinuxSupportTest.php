@@ -4,8 +4,8 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
 
 it('includes amzn in the supported OS list', function () {
-    $rhel = collect(SUPPORTED_OS)->first(fn ($os) => str($os)->contains('amzn'));
-    expect($rhel)->not->toBeNull();
+    $amzn = collect(SUPPORTED_OS)->first(fn ($os) => str($os)->contains('amzn'));
+    expect($amzn)->not->toBeNull();
 });
 
 it('install script handles amazon linux prerequisites', function () {
@@ -42,26 +42,17 @@ it('nightly install script handles amazon linux docker installation separately f
         ->toContain('dnf install docker -y');
 });
 
-it('InstallPrerequisites uses findutils for amazon linux', function () {
-    $action = new InstallPrerequisites;
-    $reflection = new ReflectionClass($action);
+it('InstallPrerequisites installs findutils (xargs) for the rhel family', function () {
+    $source = file_get_contents((new ReflectionClass(InstallPrerequisites::class))->getFileName());
 
-    $source = file_get_contents($reflection->getFileName());
-
-    expect($source)
-        ->toContain("contains('amzn')")
-        ->toContain('findutils');
+    expect($source)->toContain('command -v xargs >/dev/null || dnf install -y findutils');
 });
 
-it('InstallDocker uses native amazon repos not centos docker repo', function () {
-    $action = new InstallDocker;
-    $reflection = new ReflectionClass($action);
-
-    $source = file_get_contents($reflection->getFileName());
+it('InstallDocker picks amazon linux by distro ID, not by the rhel family group', function () {
+    $source = file_get_contents((new ReflectionClass(InstallDocker::class))->getFileName());
 
     expect($source)
-        ->toContain("contains('amzn')")
-        ->toContain('getAmazonLinuxDockerInstallCommand')
-        ->toContain('dnf install -y docker')
-        ->not->toContain('DOCKER_CONFIG=${DOCKER_CONFIG');
+        ->not->toContain("contains('amzn')")
+        ->toContain('[ "$ID" = "amzn" ]')
+        ->toContain('dnf install -y docker &&');
 });
