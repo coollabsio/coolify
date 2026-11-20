@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Deployments\Index;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -11,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -63,4 +65,32 @@ it('lists only the current team deployments', function () {
         ->assertOk()
         ->assertSee('mine-app')
         ->assertDontSee('theirs-app');
+});
+
+it('filters deployments by project', function () {
+    $mine = makeDeploymentForTeam($this->team, 'first-app', $this->privateKey);
+    makeDeploymentForTeam($this->team, 'second-app', $this->privateKey);
+
+    Livewire::test(Index::class)
+        ->assertSee('first-app')
+        ->assertSee('second-app')
+        ->set('project', (string) $mine->application->environment->project_id)
+        ->assertSee('first-app')
+        ->assertDontSee('second-app');
+});
+
+it('forbids a member whose access is limited to some projects', function () {
+    $deployment = makeDeploymentForTeam($this->team, 'mine-app', $this->privateKey);
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, [
+        'role' => 'member',
+        'access' => json_encode([
+            ['scope' => 'project', 'uuid' => $deployment->application->environment->project->uuid, 'levels' => ['read']],
+        ]),
+    ]);
+
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $this->get('/deployments')->assertForbidden();
 });

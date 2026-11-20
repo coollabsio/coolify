@@ -3,11 +3,13 @@
 namespace App\Livewire\Deployments;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -36,8 +38,8 @@ class Index extends Component
 
     public function render(): View
     {
-        $serverIds = Server::ownedByCurrentTeamCached()->pluck('id');
-        $base = ApplicationDeploymentQueue::query()->whereIn('server_id', $serverIds);
+        // Scoped by application, like the dashboard: a transferred server keeps the old team's deployment rows.
+        $base = ApplicationDeploymentQueue::query()->ownedByTeam(currentTeam()->id);
 
         $projects = Project::ownedByCurrentTeam()->orderBy('name')->get(['id', 'name']);
         $servers = Server::ownedByCurrentTeamCached()->sortBy('name')->values();
@@ -45,11 +47,14 @@ class Index extends Component
         $statuses = collect(ApplicationDeploymentStatus::cases())->pluck('value');
 
         $deployments = (clone $base)
-            ->with(['application.environment.project'])
-            ->when($this->project !== 'all', fn (Builder $q) => $q->whereHas('application.environment', fn (Builder $e) => $e->where('project_id', $this->project)))
-            ->when($this->server !== 'all', fn (Builder $q) => $q->where('server_id', $this->server))
-            ->when($this->source !== 'all', fn (Builder $q) => $q->where('git_type', $this->source))
-            ->when($this->status !== 'all', fn (Builder $q) => $q->where('status', $this->status))
+            ->with([
+                'application' => fn ($query) => $query->withoutGlobalScope('withRelations')->select(['id', 'environment_id']),
+                'application.environment.project',
+            ])
+            ->when($this->project !== 'all', fn (Builder $query) => $query->whereIn('application_id', $this->projectApplicationIds()))
+            ->when($this->server !== 'all', fn (Builder $query) => $query->where('server_id', (int) $this->server))
+            ->when($this->source !== 'all', fn (Builder $query) => $query->where('git_type', $this->source))
+            ->when($this->status !== 'all', fn (Builder $query) => $query->where('status', $this->status))
             ->orderByDesc('id')
             ->paginate($this->perPage);
 
@@ -65,5 +70,19 @@ class Index extends Component
             'sourceOptions' => $sources->count() > 1 ? $options($sources->map(fn ($s) => ['value' => $s, 'label' => Str::headline($s)]), 'All sources') : null,
             'statusOptions' => $options($statuses->map(fn ($s) => ['value' => $s, 'label' => Str::headline($s)]), 'All statuses'),
         ]);
+    }
+
+    /**
+     * application_id is varchar, so a whereHas join to applications.id (bigint) fails on PostgreSQL.
+     *
+     * @return Collection<int, string>
+     */
+    private function projectApplicationIds(): Collection
+    {
+        return Application::withTrashed()
+            ->withoutGlobalScope('withRelations')
+            ->whereRelation('environment', 'project_id', (int) $this->project)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
     }
 }

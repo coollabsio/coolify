@@ -1,5 +1,10 @@
 @php
-    $deploymentStatusMeta = function (string $status): array {
+    $deploymentStatusMeta = function (\App\Models\ApplicationDeploymentQueue $deployment): array {
+        $status = (string) $deployment->status;
+        if ($deployment->isImageScanBlocked()) {
+            return ['Blocked', 'error'];
+        }
+
         $label = match ($status) {
             'finished' => 'Success',
             'in_progress' => 'In progress',
@@ -33,7 +38,7 @@
     </header>
 
     <div
-        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
         <div
             class="grid grid-cols-2 gap-2 border-b border-neutral-200 p-3 sm:flex sm:items-center dark:border-white/[0.08]">
             @if ($projectOptions)
@@ -60,7 +65,7 @@
             <div class="transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
                 wire:target="project,server,source,status,setPage,previousPage,nextPage">
                 <div
-                    class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <span>Application</span>
                     <span>Environment</span>
                     <span>Server</span>
@@ -70,7 +75,7 @@
 
                 @foreach ($deployments as $deployment)
                     @php
-                        [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                        [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
                         $projectName = $deployment->application?->environment?->project?->name;
                         $environmentName = $deployment->application?->environment?->name;
                         $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -78,7 +83,7 @@
 
                     <a wire:key="deployment-{{ $deployment->deployment_uuid }}" href="{{ $deployment->deployment_url }}"
                         {{ wireNavigate() }}
-                        class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
+                        class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-coollabs/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-brand/10 dark:focus-visible:ring-brand-light">
                         <div class="min-w-0">
                             <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                 {{ $deployment->application_name }}
@@ -97,7 +102,7 @@
                             {{ $deployment->server_name ?: '-' }}
                         </p>
                         <span class="hidden md:block">
-                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                         </span>
                         <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim"
                             title="{{ $deployment->created_at?->toDayDateTimeString() }}">
@@ -105,7 +110,7 @@
                         </p>
 
                         <div class="mt-3 flex min-w-0 items-center gap-3 md:hidden">
-                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
+                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
                             <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                 {{ $environmentPath ?: '-' }}
                                 <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
