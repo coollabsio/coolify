@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\Ai\RecordToolApproval;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -10,6 +11,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Laravel\Ai\Events\ToolApprovalResolved;
 use Laravel\Fortify\Events\RecoveryCodesGenerated;
 use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Fortify\Events\TwoFactorAuthenticationDisabled;
@@ -29,6 +31,9 @@ use SocialiteProviders\Zitadel\ZitadelExtendSocialite;
 class EventServiceProvider extends ServiceProvider
 {
     protected $listen = [
+        ToolApprovalResolved::class => [
+            RecordToolApproval::class,
+        ],
         SocialiteWasCalled::class => [
             AzureExtendSocialite::class.'@handle',
             AuthentikExtendSocialite::class.'@handle',

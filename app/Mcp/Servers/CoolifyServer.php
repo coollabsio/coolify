@@ -89,10 +89,12 @@ use App\Mcp\Tools\ManageStorage;
 use App\Mcp\Tools\ManageTags;
 use App\Mcp\Tools\RollbackApplication;
 use App\Mcp\Tools\SearchResources;
+use App\Models\User;
 use App\Services\Access\AccessResolver;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 class CoolifyServer extends Server
 {
@@ -295,4 +297,26 @@ MD;
         TroubleshootApplication::class,
         ExplainFailedDeploy::class,
     ];
+
+    /**
+     * Read-only tools that the in-app AI assistant may run without approval. Only tools
+     * annotated #[IsReadOnly] qualify, so a new write tool is never exposed by default.
+     * Env values stay out of the assistant, and team-level tools follow the same access rule as tokens.
+     *
+     * @return array<int, class-string<Tool>>
+     */
+    public static function assistantReadToolClasses(User $user, int $teamId): array
+    {
+        $tools = array_filter(self::TOOLS, function (string $class): bool {
+            $attribute = (new \ReflectionClass($class))->getAttributes(IsReadOnly::class)[0] ?? null;
+
+            return $attribute !== null && $attribute->newInstance()->value === true && $class !== GetEnvValues::class;
+        });
+
+        if (! app(AccessResolver::class)->coversWholeTeam($user, $teamId)) {
+            $tools = array_diff($tools, self::TEAM_LEVEL_TOOLS);
+        }
+
+        return array_values($tools);
+    }
 }

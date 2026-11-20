@@ -2,6 +2,8 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Models\AiConversation;
+use App\Models\AiProviderCredential;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -355,6 +357,8 @@ final class ServerTransferCoverage
      */
     public const NOT_TRANSFERRED = [
         Team::class => 'Instance-wide: the target imports into one of its own teams.',
+        AiConversation::class => 'Team data, not server data: AI assistant conversations stay on the source instance.',
+        AiProviderCredential::class => 'Team data, not server data: AI provider keys stay on the source instance.',
         User::class => 'Instance-wide: users are not moved with a server.',
         TeamInvitation::class => 'Team data, not server data.',
         Subscription::class => 'Billing of the source instance.',

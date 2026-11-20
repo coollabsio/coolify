@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Concerns;
 
+use App\Ai\Support\AssistantActor;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Models\Server;
 use App\Services\Access\AccessResolver;
@@ -21,6 +22,9 @@ trait ResolvesTeam
         }
 
         $token = $user->currentAccessToken();
+        if (! $token && AssistantActor::is($user)) {
+            return $this->ensureAssistantAbility($request, $ability, $tool);
+        }
         if (! $token || $token->team_id === null) {
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'invalid_token']);
 
@@ -75,11 +79,35 @@ trait ResolvesTeam
         return $token->team_id !== null && $user->isAdminOfTeam((int) $token->team_id);
     }
 
+    /**
+     * The assistant reads with the user's session team and makes changes only through its
+     * approval-gated native tools, so it may use read abilities only.
+     */
+    private function ensureAssistantAbility(Request $request, string $ability, ?string $tool): ?Response
+    {
+        if ($this->resolveTeamId($request) === null) {
+            $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'no_team']);
+
+            return Response::error('No accessible team.');
+        }
+
+        if ($ability === 'read') {
+            return null;
+        }
+
+        $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'assistant_read_only', 'required_ability' => $ability]);
+
+        return Response::error("Missing required permissions: {$ability}");
+    }
+
     protected function resolveTeamId(Request $request): ?int
     {
         $user = $request->user();
         $token = $user?->currentAccessToken();
         $teamId = $token?->team_id;
+        if (! $token && AssistantActor::is($user)) {
+            $teamId = currentTeam()?->id;
+        }
 
         if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
             return null;

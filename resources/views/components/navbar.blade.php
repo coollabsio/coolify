@@ -125,6 +125,7 @@
                             ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities')],
                         ]],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
+                        ['label' => 'Assistant', 'icon' => 'feedback', 'href' => route('ai.assistant'), 'active' => request()->is('assistant*'), 'visible' => isAiAssistantEnabled()],
                     ],
                     'Infrastructure' => [
                         ['label' => 'Servers', 'icon' => 'servers', 'href' => '/servers', 'active' => request()->is('server/*', 'servers', 'servers/*'), 'visible' => $teamWide],
@@ -168,14 +169,16 @@
                         ]],
                         ['label' => 'Subscription', 'icon' => 'subscription', 'href' => isCloud() ? route('subscription.show') : '', 'active' => request()->is('subscription*'), 'visible' => $teamWide && isCloud() && auth()->user()->isAdmin()],
                         ['label' => 'Tags', 'icon' => 'tags', 'href' => route('tags.show'), 'active' => request()->is('tags*', 'canvas/tags'), 'visible' => $teamWide],
-                        ['label' => 'Settings', 'icon' => 'settings', 'visible' => $teamWide && isInstanceAdmin(), 'children' => [
-                            ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings')],
-                            ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced')],
-                            ['label' => 'Updates', 'icon' => 'refresh3', 'href' => route('settings.updates'), 'active' => request()->is('settings/updates')],
-                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('settings.image-scanning'), 'active' => request()->is('settings/image-scanning')],
-                            ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true],
-                            ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email')],
-                            ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup')],
+                        // Team admins only see the team-scoped AI page; the other pages are instance-wide.
+                        ['label' => 'Settings', 'icon' => 'settings', 'visible' => $teamWide && (isInstanceAdmin() || auth()->user()?->isAdmin()), 'children' => [
+                            ['label' => 'General', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->is('settings'), 'visible' => isInstanceAdmin()],
+                            ['label' => 'Advanced', 'icon' => 'grid', 'href' => route('settings.advanced'), 'active' => request()->is('settings/advanced'), 'visible' => isInstanceAdmin()],
+                            ['label' => 'AI Assistant', 'icon' => 'feedback', 'href' => route('settings.ai'), 'active' => request()->is('settings/ai')],
+                            ['label' => 'Updates', 'icon' => 'refresh3', 'href' => route('settings.updates'), 'active' => request()->is('settings/updates'), 'visible' => isInstanceAdmin()],
+                            ['label' => 'Image Scanning', 'icon' => 'shield-alert', 'href' => route('settings.image-scanning'), 'active' => request()->is('settings/image-scanning'), 'visible' => isInstanceAdmin()],
+                            ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true, 'visible' => isInstanceAdmin()],
+                            ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email'), 'visible' => isInstanceAdmin()],
+                            ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup'), 'visible' => isInstanceAdmin()],
                         ]],
                     ],
                 ])->map(fn (array $items) => collect($items)

@@ -104,6 +104,10 @@
             "version": "2.1.1",
             "hash": "tree-v2:5cc304e8a530449d8c745eaec902384554d1740d4e083032d5f9ce3ac1cf25e3"
         },
+        "laravel/ai": {
+            "version": "v0.11.2",
+            "hash": "tree-v2:0a26ef0d0502ddbe57b37e7af3a65ddf1d3b9d2684741c75f3fdd8f6305864cd"
+        },
         "laravel/fortify": {
             "version": "v1.40.0",
             "hash": "tree-v2:be1c2def5d70383bc18e9893861ecb3f4c0418961dc381549b583a187e6b8d33"

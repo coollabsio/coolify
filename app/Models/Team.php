@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Laravel\Ai\Concerns\HasConversations;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -48,7 +49,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute;
+    use Auditable, HasConversations, HasFactory, HasNotificationSettings, HasSafeStringAttribute;
     use Notifiable {
         notify as sendNotification;
     }
@@ -63,6 +64,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled',
         'is_two_factor_required',
         'scan_images_on_new_servers',
+        'is_ai_assistant_enabled',
     ];
 
     protected $attributes = [
@@ -70,6 +72,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
         'scan_images_on_new_servers' => false,
+        'is_ai_assistant_enabled' => true,
     ];
 
     protected $casts = [
@@ -78,6 +81,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled' => 'boolean',
         'is_two_factor_required' => 'boolean',
         'scan_images_on_new_servers' => 'boolean',
+        'is_ai_assistant_enabled' => 'boolean',
     ];
 
     protected static function booted()

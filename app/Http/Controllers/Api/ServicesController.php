@@ -140,6 +140,23 @@ class ServicesController extends Controller
             ->each(fn (ServiceApplication $application) => $cleanup->queueReleaseOfRemovedHostnames($application, $previousHostnames[$application->id], $teamId));
     }
 
+    /**
+     * Roll back a service that failed validation after parse(isNew: true) already stored its
+     * applications, databases, and env vars. A plain soft delete would orphan them, so run the
+     * delete endpoint cleanup. The service never ran, so docker and network cleanup are skipped.
+     */
+    private function discardUndeployedService(Service $service): void
+    {
+        $service->delete();
+        DeleteResourceJob::dispatch(
+            resource: $service,
+            deleteVolumes: true,
+            deleteConnectedNetworks: false,
+            deleteConfigurations: true,
+            dockerCleanup: false,
+        );
+    }
+
     private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
     {
         $errors = [];
@@ -586,7 +603,7 @@ class ServicesController extends Controller
                 if ($request->has('urls') && is_array($request->urls)) {
                     $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
                     if ($urlResult !== null) {
-                        $service->delete();
+                        $this->discardUndeployedService($service);
                         if (isset($urlResult['errors'])) {
                             return response()->json([
                                 'message' => 'Validation failed.',
@@ -778,7 +795,7 @@ class ServicesController extends Controller
             if ($request->has('urls') && is_array($request->urls)) {
                 $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
                 if ($urlResult !== null) {
-                    $service->delete();
+                    $this->discardUndeployedService($service);
                     if (isset($urlResult['errors'])) {
                         return response()->json([
                             'message' => 'Validation failed.',

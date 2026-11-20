@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\Ai\RefreshCoolifyDocs;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -85,6 +86,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new CheckMissingVolumeBackupsJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
+        $this->scheduleInstance->job(new RefreshCoolifyDocs)->daily()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

@@ -7,6 +7,9 @@
     <!-- Global search component - included once to prevent keyboard shortcut duplication -->
     <livewire:global-search />
     @auth
+        @persist('assistant')
+            <livewire:ai.assistant />
+        @endpersist
         <div x-data="{
             open: false,
             // New users start expanded.

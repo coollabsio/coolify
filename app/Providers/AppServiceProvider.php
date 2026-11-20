@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Ai\Storage\AuthoredConversationStore;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Livewire\Livewire;
@@ -40,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
         // Requests must never read a partly written cache file. See AtomicFilesystem.
         $this->app->extend(ConfigCacheCommand::class, fn () => new ConfigCacheCommand(new AtomicFilesystem));
         $this->app->extend(RouteCacheCommand::class, fn () => new RouteCacheCommand(new AtomicFilesystem));
+        // Swap the SDK conversation store so user turns are stamped with author_user_id.
+        $this->app->singleton(ConversationStore::class, fn () => new AuthoredConversationStore(
+            config('ai.conversations.connection'),
+        ));
     }
 
     public function boot(): void

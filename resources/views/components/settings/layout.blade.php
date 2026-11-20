@@ -1,15 +1,18 @@
 @php
+    // Team admins can open only the team-scoped AI page; hide the instance pages from their search.
+    $instanceOnly = ! isInstanceAdmin();
     $settingsMenuSections = [
         'Configuration' => [
-            ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings'],
-            ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid'],
-            ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3'],
-            ['label' => 'Image Scanning', 'route' => 'settings.image-scanning', 'icon' => 'shield-alert'],
+            ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings', 'disabled' => $instanceOnly],
+            ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid', 'disabled' => $instanceOnly],
+            ['label' => 'AI Assistant', 'route' => 'settings.ai', 'icon' => 'feedback'],
+            ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3', 'disabled' => $instanceOnly],
+            ['label' => 'Image Scanning', 'route' => 'settings.image-scanning', 'icon' => 'shield-alert', 'disabled' => $instanceOnly],
         ],
         'Instance' => [
-            ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
-            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
-            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
+            ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys', 'disabled' => $instanceOnly],
+            ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail', 'disabled' => $instanceOnly],
+            ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database', 'disabled' => $instanceOnly],
         ],
     ];
 @endphp
