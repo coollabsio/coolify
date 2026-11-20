@@ -202,7 +202,7 @@ class StandaloneSqlite extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            if ($storage->isSharedWithAnotherResource()) {
+            if ($storage->is_external || $storage->isSharedWithAnotherResource()) {
                 continue;
             }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);

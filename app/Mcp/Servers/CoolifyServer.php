@@ -27,6 +27,7 @@ use App\Mcp\Tools\GetEnvValues;
 use App\Mcp\Tools\GetInfrastructureOverview;
 use App\Mcp\Tools\GetLogs;
 use App\Mcp\Tools\GetProject;
+use App\Mcp\Tools\GetResourceMetrics;
 use App\Mcp\Tools\GetServer;
 use App\Mcp\Tools\GetServerDomains;
 use App\Mcp\Tools\GetServerMetrics;
@@ -34,6 +35,7 @@ use App\Mcp\Tools\GetServerResources;
 use App\Mcp\Tools\GetService;
 use App\Mcp\Tools\GetServiceApplication;
 use App\Mcp\Tools\GetServiceDatabase;
+use App\Mcp\Tools\GetTrafficAnalytics;
 use App\Mcp\Tools\GetVulnerabilities;
 use App\Mcp\Tools\ListApplicationPreviews;
 use App\Mcp\Tools\ListApplications;
@@ -120,6 +122,7 @@ Then: list_*/get_* for details. Debug is DB-first:
 - list_deployments → get_deployment(include_log_summary=true)
 - list_env_keys / list_shared_env_keys (names only, never values)
 - get_logs only if status is running; on failure use reason + next_tools (do not loop)
+- get_server_metrics / get_resource_metrics — Sentinel CPU and memory history of a server, or of one application or database container; get_traffic_analytics — requests, visitors, latency, and top paths of one application or service
 - get_vulnerabilities — image vulnerability scan results (list for the team, resource for one app/service/database); manage_image_scanning turns scanning on or off
 
 Lifecycle (requires token ability **deploy**):
@@ -221,6 +224,8 @@ MD;
         ManageNotifications::class,
         ListAuditEvents::class,
         GetServerMetrics::class,
+        GetResourceMetrics::class,
+        GetTrafficAnalytics::class,
         GetVulnerabilities::class,
         ManageImageScanning::class,
     ];
