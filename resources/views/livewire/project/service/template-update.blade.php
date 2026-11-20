@@ -106,12 +106,15 @@
                             isHighlighted>
                             Apply selected changes
                         </x-forms.button>
-                        <x-forms.button wire:click="replaceAll" canGate="update" :canResource="$service"
-                            :disabled="!$this->hasHunks"
-                            :tooltip="$canUpdate && !$this->hasHunks ? 'Your compose already matches the latest template.' : null"
-                            wire:confirm="Replace your entire compose with the latest template? Your compose customizations will be lost.">
-                            Replace with latest
-                        </x-forms.button>
+                        {{-- The modal is wire:ignore, so the key re-renders it when its disabled state changes. --}}
+                        <x-modal-confirmation :wire:key="'replace-latest-' . ($this->hasHunks ? 'on' : 'off')"
+                            title="Replace with the latest template?" buttonTitle="Replace with latest"
+                            submitAction="replaceAll" :actions="[
+                                'Your entire compose is replaced with the latest template.',
+                                'Your compose customizations are removed.',
+                            ]" warningMessage="You can undo this: the History section keeps your current compose." :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Replace"
+                            canGate="update" :canResource="$service" :disabled="!$this->hasHunks"
+                            :disabledTooltip="$canUpdate ? 'Your compose already matches the latest template.' : null" />
                     </div>
                     </div>
                 @else
@@ -184,11 +187,11 @@
                                     Before the change {{ $revision->created_at->diffForHumans() }}
                                 </span>
                             </span>
-                            <x-forms.button wire:click="restoreRevision({{ $revision->id }})" canGate="update"
-                                :canResource="$service"
-                                wire:confirm="Replace your current compose with this version? The current compose stays in the history.">
-                                Restore
-                            </x-forms.button>
+                            <x-modal-confirmation title="Restore this compose?" buttonTitle="Restore"
+                                submitAction="restoreRevision({{ $revision->id }})" :actions="[
+                                    'Your current compose is replaced with this version.',
+                                ]" warningMessage="You can undo this: the History section keeps your current compose." :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restore"
+                                canGate="update" :canResource="$service" />
                         </summary>
                         <pre class="max-h-96 overflow-auto border-t border-neutral-200 p-3 font-mono text-xs leading-5 text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim">{{ $revision->docker_compose_raw }}</pre>
                     </details>
