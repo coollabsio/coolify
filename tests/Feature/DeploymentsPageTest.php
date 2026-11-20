@@ -94,3 +94,13 @@ it('forbids a member whose access is limited to some projects', function () {
 
     $this->get('/deployments')->assertForbidden();
 });
+
+it('searches deployments by application name, ignoring case', function () {
+    makeDeploymentForTeam($this->team, 'billing-api', $this->privateKey);
+    makeDeploymentForTeam($this->team, 'storefront', $this->privateKey);
+
+    Livewire::test(Index::class)
+        ->set('search', 'BILLING')
+        ->assertSee('billing-api')
+        ->assertDontSee('storefront');
+});

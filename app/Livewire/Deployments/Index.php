@@ -18,6 +18,8 @@ class Index extends Component
 {
     use WithPagination;
 
+    public string $search = '';
+
     public string $project = 'all';
 
     public string $server = 'all';
@@ -30,7 +32,7 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['project', 'server', 'source', 'status', 'perPage'], true)) {
+        if (in_array($property, ['search', 'project', 'server', 'source', 'status', 'perPage'], true)) {
             $this->perPage = max(10, min(100, $this->perPage));
             $this->resetPage();
         }
@@ -46,11 +48,18 @@ class Index extends Component
         $sources = (clone $base)->whereNotNull('git_type')->distinct()->orderBy('git_type')->pluck('git_type');
         $statuses = collect(ApplicationDeploymentStatus::cases())->pluck('value');
 
+        $search = trim($this->search);
+
         $deployments = (clone $base)
             ->with([
                 'application' => fn ($query) => $query->withoutGlobalScope('withRelations')->select(['id', 'environment_id']),
                 'application.environment.project',
             ])
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->whereLike('application_name', "%{$search}%")
+                ->orWhereLike('server_name', "%{$search}%")
+                ->orWhereLike('commit', "%{$search}%")
+                ->orWhereLike('commit_message', "%{$search}%")))
             ->when($this->project !== 'all', fn (Builder $query) => $query->whereIn('application_id', $this->projectApplicationIds()))
             ->when($this->server !== 'all', fn (Builder $query) => $query->where('server_id', (int) $this->server))
             ->when($this->source !== 'all', fn (Builder $query) => $query->where('git_type', $this->source))

@@ -40,98 +40,111 @@
     <div
         class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
         <div
-            class="grid grid-cols-2 gap-2 border-b border-neutral-200 p-3 sm:flex sm:items-center dark:border-white/[0.08]">
-            @if ($projectOptions)
-                <div class="sm:w-44">
-                    <x-forms.listbox id="project" live :options="$projectOptions" />
-                </div>
-            @endif
-            @if ($serverOptions)
-                <div class="sm:w-44">
-                    <x-forms.listbox id="server" live :options="$serverOptions" />
-                </div>
-            @endif
-            @if ($sourceOptions)
+            class="flex flex-col gap-2 border-b border-neutral-200 p-3 sm:flex-row sm:items-center dark:border-white/[0.08]">
+            <div class="relative min-w-0 flex-1 sm:max-w-sm">
+                <x-reicon name="search"
+                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                <input wire:model.live.debounce.300ms="search" type="search"
+                    placeholder="Search application, server or commit" aria-label="Search deployments"
+                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+            </div>
+            <div class="grid grid-cols-2 gap-2 sm:flex">
+                @if ($projectOptions)
+                    <div class="sm:w-44">
+                        <x-forms.listbox id="project" live :options="$projectOptions" />
+                    </div>
+                @endif
+                @if ($serverOptions)
+                    <div class="sm:w-44">
+                        <x-forms.listbox id="server" live :options="$serverOptions" />
+                    </div>
+                @endif
+                @if ($sourceOptions)
+                    <div class="sm:w-40">
+                        <x-forms.listbox id="source" live :options="$sourceOptions" />
+                    </div>
+                @endif
                 <div class="sm:w-40">
-                    <x-forms.listbox id="source" live :options="$sourceOptions" />
+                    <x-forms.listbox id="status" live :options="$statusOptions" />
                 </div>
-            @endif
-            <div class="sm:w-40">
-                <x-forms.listbox id="status" live :options="$statusOptions" />
             </div>
         </div>
 
-        @if ($deployments->isNotEmpty())
-            <div class="transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
-                wire:target="project,server,source,status,setPage,previousPage,nextPage">
-                <div
-                    class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <span>Application</span>
-                    <span>Environment</span>
-                    <span>Server</span>
-                    <span>Status</span>
-                    <span>Started</span>
-                </div>
+        <div class="relative">
+            <x-table.loading target="search,project,server,source,status,perPage,setPage,previousPage,nextPage"
+                text="Loading deployments..." />
 
-                @foreach ($deployments as $deployment)
-                    @php
-                        [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
-                        $projectName = $deployment->application?->environment?->project?->name;
-                        $environmentName = $deployment->application?->environment?->name;
-                        $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
-                    @endphp
+            @if ($deployments->isNotEmpty())
+                <div>
+                    <div
+                        class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                        <span>Application</span>
+                        <span>Environment</span>
+                        <span>Server</span>
+                        <span>Status</span>
+                        <span>Started</span>
+                    </div>
 
-                    <a wire:key="deployment-{{ $deployment->deployment_uuid }}" href="{{ $deployment->deployment_url }}"
-                        {{ wireNavigate() }}
-                        class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-coollabs/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-brand/10 dark:focus-visible:ring-brand-light">
-                        <div class="min-w-0">
-                            <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
-                                {{ $deployment->application_name }}
-                            </p>
-                            @if ($deployment->pull_request_id)
-                                <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    Pull request #{{ $deployment->pull_request_id }}
+                    @foreach ($deployments as $deployment)
+                        @php
+                            [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment);
+                            $projectName = $deployment->application?->environment?->project?->name;
+                            $environmentName = $deployment->application?->environment?->name;
+                            $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
+                        @endphp
+
+                        <a wire:key="deployment-{{ $deployment->deployment_uuid }}" href="{{ $deployment->deployment_url }}"
+                            {{ wireNavigate() }}
+                            class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-coollabs/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-brand/10 dark:focus-visible:ring-brand-light">
+                            <div class="min-w-0">
+                                <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
+                                    {{ $deployment->application_name }}
                                 </p>
-                            @endif
-                        </div>
+                                @if ($deployment->pull_request_id)
+                                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        Pull request #{{ $deployment->pull_request_id }}
+                                    </p>
+                                @endif
+                            </div>
 
-                        <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
-                            {{ $environmentPath ?: '-' }}
-                        </p>
-                        <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
-                            {{ $deployment->server_name ?: '-' }}
-                        </p>
-                        <span class="hidden md:block">
-                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
-                        </span>
-                        <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim"
-                            title="{{ $deployment->created_at?->toDayDateTimeString() }}">
-                            {{ $deployment->created_at?->diffForHumans() ?? '-' }}
-                        </p>
-
-                        <div class="mt-3 flex min-w-0 items-center gap-3 md:hidden">
-                            <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
-                            <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                            <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
                                 {{ $environmentPath ?: '-' }}
-                                <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
+                            </p>
+                            <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
                                 {{ $deployment->server_name ?: '-' }}
                             </p>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
+                            <span class="hidden md:block">
+                                <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
+                            </span>
+                            <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim"
+                                title="{{ $deployment->created_at?->toDayDateTimeString() }}">
+                                {{ $deployment->created_at?->diffForHumans() ?? '-' }}
+                            </p>
 
-            <x-table-pagination :from="$deployments->firstItem() ?? 0" :to="$deployments->lastItem() ?? 0"
-                :total="$deployments->total()" :current-page="$deployments->currentPage()"
-                :last-page="$deployments->lastPage()" wire-target="setPage,previousPage,nextPage"
-                previous-action="previousPage" next-action="nextPage">
-                <x-slot:pageSize>
-                    <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.deployments" />
-                </x-slot:pageSize>
-            </x-table-pagination>
-        @else
-            <x-empty title="No deployments found"
-                description="Deployments of this team's applications will appear here." icon-name="time-back" size="sm" />
-        @endif
+                            <div class="mt-3 flex min-w-0 items-center gap-3 md:hidden">
+                                <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" :spinning="$deployment->status === 'in_progress'" />
+                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $environmentPath ?: '-' }}
+                                    <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
+                                    {{ $deployment->server_name ?: '-' }}
+                                </p>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+
+                <x-table-pagination :from="$deployments->firstItem() ?? 0" :to="$deployments->lastItem() ?? 0"
+                    :total="$deployments->total()" :current-page="$deployments->currentPage()"
+                    :last-page="$deployments->lastPage()" wire-target="setPage,previousPage,nextPage"
+                    previous-action="previousPage" next-action="nextPage">
+                    <x-slot:pageSize>
+                        <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.deployments" />
+                    </x-slot:pageSize>
+                </x-table-pagination>
+            @else
+                <x-empty title="No deployments found"
+                    description="Deployments of this team's applications will appear here." icon-name="time-back" size="sm" />
+            @endif
+        </div>
     </div>
 </div>
