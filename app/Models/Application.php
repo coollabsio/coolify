@@ -27,6 +27,7 @@ use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -554,6 +555,60 @@ class Application extends BaseModel
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
         return Application::whereRelation('environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    /**
+     * Filter the applications of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no application.
+     * Status and name are case-insensitive substring matches.
+     *
+     * @param  array{tag?: ?string, project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, status?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $tag = $filters['tag'] ?? null;
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $status = $filters['status'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($tag !== null, fn (Builder $query) => $query->whereHas('tags', fn (Builder $q) => $q->where('name', $tag)))
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($standaloneDockerIds, $swarmDockerIds) {
+                    $q->where(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
+                });
+            })
+            ->when($status !== null, fn (Builder $query) => $query->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']))
+            ->when($name !== null, fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
     }
 
     /**
