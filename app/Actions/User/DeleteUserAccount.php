@@ -18,21 +18,25 @@ use RuntimeException;
  *
  * Deletion is refused while the user still owns data that would be lost or
  * orphaned. The user must resolve each blocker first, the same way team
- * deletion requires an empty team. With $removeTeamResources, the servers,
- * resources, projects, and Git sources of teams where the user is the only
- * member are removed from Coolify instead. Nothing is stopped on the servers.
+ * deletion requires an empty team. When removesTeamResources() allows it, the
+ * servers, resources, projects, and Git sources of teams where the user is the
+ * only member are removed from Coolify instead. Nothing is stopped on the servers.
+ *
+ * $cancelledTeam is the team whose subscription the calling action cancels
+ * together with the account deletion. Its subscriptions count as not paying.
  */
 class DeleteUserAccount
 {
     /**
      * @return list<string>
      */
-    public function blockers(User $user, bool $removeTeamResources = false): array
+    public function blockers(User $user, ?Team $cancelledTeam = null): array
     {
         if ($user->id === 0) {
             return ['The root user cannot be deleted.'];
         }
 
+        $removeTeamResources = $this->removesTeamResources($user, $cancelledTeam);
         $blockers = [];
 
         foreach ($user->teams()->with('members')->get() as $team) {
@@ -71,9 +75,9 @@ class DeleteUserAccount
         return $blockers;
     }
 
-    public function handle(User $user, bool $removeTeamResources = false): void
+    public function handle(User $user, ?Team $cancelledTeam = null): void
     {
-        if ($blockers = $this->blockers($user, $removeTeamResources)) {
+        if ($blockers = $this->blockers($user, $cancelledTeam)) {
             throw new RuntimeException(implode(' ', $blockers));
         }
 
@@ -85,15 +89,15 @@ class DeleteUserAccount
             }
         }
 
-        DB::transaction(function () use ($user, $removeTeamResources): void {
+        DB::transaction(function () use ($user, $cancelledTeam): void {
             $user = User::query()->lockForUpdate()->findOrFail($user->id);
 
-            if ($blockers = $this->blockers($user, $removeTeamResources)) {
+            if ($blockers = $this->blockers($user, $cancelledTeam)) {
                 throw new RuntimeException(implode(' ', $blockers));
             }
 
-            // Without $removeTeamResources the blockers above guarantee these teams hold no
-            // projects, servers, or sources.
+            // Unless removesTeamResources() holds, the blockers above guarantee these teams hold
+            // no projects, servers, or sources.
             $this->singleMemberTeams($user)->each(fn (Team $team) => app(DeleteTeamData::class)->handle($team));
 
             // Promotes an admin where the user was the only owner, and removes
@@ -110,13 +114,13 @@ class DeleteUserAccount
     /**
      * @return list<string>
      */
-    public function confirmationActions(User $user): array
+    public function confirmationActions(User $user, ?Team $cancelledTeam = null): array
     {
-        $removedTeams = $this->removesTeamResources($user)
+        $removedTeams = $this->removesTeamResources($user, $cancelledTeam)
             ? $this->singleMemberTeams($user)->reject(fn (Team $team): bool => $team->isEmpty())
             : collect();
 
-        return $this->subscriptionConfirmationActions($user)
+        return $this->subscriptionConfirmationActions($user, $cancelledTeam)
             ->concat($removedTeams->map(fn (Team $team): string => "The servers, projects, and Git sources of the team \"{$team->name}\" will be removed from Coolify. Nothing is stopped on the servers."))
             ->push('Your account will be permanently deleted from Coolify.')
             ->values()
@@ -127,11 +131,14 @@ class DeleteUserAccount
      * Whether self-service deletion removes the data of the user's single-member teams instead of
      * asking the user to delete it first. On Coolify Cloud, a team without a paid or past-due
      * subscription cannot open its project and server pages, so the user could not do that.
+     * One paying single-member team is enough to keep the data of all of them. $cancelledTeam
+     * does not count as paying.
      */
-    public function removesTeamResources(User $user): bool
+    public function removesTeamResources(User $user, ?Team $cancelledTeam = null): bool
     {
         return isCloud() && $this->singleMemberTeams($user)->every(
-            fn (Team $team): bool => ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying())
+            fn (Team $team): bool => $team->is($cancelledTeam)
+                || ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying())
         );
     }
 
@@ -192,19 +199,21 @@ class DeleteUserAccount
 
     /**
      * The Profile page renders this on each request, so the Stripe lookup is cached for a short time.
-     * handle() looks up the subscriptions again.
+     * handle() looks up the subscriptions again. The subscriptions of $cancelledTeam are left out,
+     * because the calling action announces that cancellation itself.
      *
      * @return Collection<int, string>
      */
-    private function subscriptionConfirmationActions(User $user): Collection
+    private function subscriptionConfirmationActions(User $user, ?Team $cancelledTeam = null): Collection
     {
         if (! isCloud()) {
             return collect();
         }
 
-        return collect(Cache::remember("account-deletion-subscriptions:{$user->id}", 60, function () use ($user): array {
+        return collect(Cache::remember("account-deletion-subscriptions:{$user->id}:{$cancelledTeam?->id}", 60, function () use ($user, $cancelledTeam): array {
             try {
                 return $this->subscriptionsToCancel($user)
+                    ->reject(fn (?Team $team): bool => $team !== null && $team->is($cancelledTeam))
                     ->map(fn (?Team $team, string $subscriptionId): string => $team
                         ? "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required."
                         : "The Stripe subscription {$subscriptionId} of your email, which is not linked to a team, will be cancelled immediately. This is required.")

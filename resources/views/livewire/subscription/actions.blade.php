@@ -226,7 +226,8 @@
                         @php
                             $deleteAccountCheckbox = [
                                 'id' => 'deleteAccount',
-                                'label' => 'Delete my account. Servers, projects, and Git sources of teams where I am the only member are removed from Coolify. Nothing is stopped on the servers.',
+                                'label' => 'Delete my account',
+                                'actions' => $deleteAccountActions,
                             ];
                         @endphp
                         @if ($isRefundEligible)
@@ -266,6 +267,8 @@
                 </div>
                 @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                     <p class="text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
+                @elseif (isCloud() && $deleteAccountBlockers)
+                    <p class="text-sm text-neutral-500">To also delete your account, first: {{ implode(' ', $deleteAccountBlockers) }}</p>
                 @endif
             </section>
 
