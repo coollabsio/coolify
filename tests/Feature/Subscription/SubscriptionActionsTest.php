@@ -28,6 +28,7 @@ beforeEach(function () {
     config()->set('constants.coolify.self_hosted', false);
     config()->set('subscription.provider', 'stripe');
     config()->set('subscription.stripe_api_key', 'sk_test_fake');
+    fakeOpenStripeSubscriptions();
 
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
 
@@ -113,7 +114,6 @@ describe('password confirmation', function () {
 
 describe('cancelImmediately with account deletion', function () {
     beforeEach(function () {
-        fakeOpenStripeSubscriptions();
         $this->stripe = Mockery::mock(StripeClient::class);
         $this->stripe->subscriptions = Mockery::mock(SubscriptionService::class);
         $this->instance(StripeClient::class, $this->stripe);
@@ -214,6 +214,69 @@ describe('cancelImmediately with account deletion', function () {
 
         expect(User::find($this->user->id))->not->toBeNull()
             ->and($this->team->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_123');
+    });
+
+    test('keeps another paying team of the user and does not cancel', function () {
+        $otherTeam = Team::factory()->create(['name' => 'Other Team']);
+        $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        Subscription::create([
+            'team_id' => $otherTeam->id,
+            'stripe_subscription_id' => 'sub_other_team',
+            'stripe_customer_id' => 'cus_other_team',
+            'stripe_invoice_paid' => true,
+        ]);
+        $privateKey = PrivateKey::factory()->create(['team_id' => $otherTeam->id]);
+        $server = Server::factory()->create(['team_id' => $otherTeam->id, 'private_key_id' => $privateKey->id]);
+        Project::factory()->create(['team_id' => $this->team->id]);
+        $this->stripe->subscriptions->shouldNotReceive('cancel');
+
+        Livewire::test(Actions::class)
+            ->assertSet('canDeleteAccount', false)
+            ->assertSee('To also delete your account, first: Delete all projects, servers, and Git sources of the team &quot;Other Team&quot;.', false)
+            ->call('cancelImmediately', 'password', ['deleteAccount'])
+            ->assertReturned(fn (mixed $returned): bool => $returned === 'Delete all projects, servers, and Git sources of the team "Other Team".');
+
+        expect(User::find($this->user->id))->not->toBeNull()
+            ->and(Team::find($otherTeam->id))->not->toBeNull()
+            ->and(Server::find($server->id))->not->toBeNull()
+            ->and($otherTeam->subscription->fresh()->stripe_subscription_id)->toBe('sub_other_team')
+            ->and($this->team->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_123');
+    });
+
+    test('lists the other team whose data the account deletion removes', function () {
+        $this->team->update(['name' => 'Team A']);
+        $otherTeam = Team::factory()->create(['name' => 'Other Team']);
+        $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        Project::factory()->create(['team_id' => $otherTeam->id]);
+
+        Livewire::test(Actions::class)
+            ->assertSet('canDeleteAccount', true)
+            ->assertSet('deleteAccountActions', [
+                'The servers, projects, and Git sources of the team "Other Team" will be removed from Coolify. Nothing is stopped on the servers.',
+                'Your account will be permanently deleted from Coolify.',
+            ])
+            ->assertSeeInOrder([
+                '<span>Your subscription will be cancelled immediately.</span>',
+                '<span>The servers, projects, and Git sources of the team &quot;Other Team&quot; will be removed from Coolify. Nothing is stopped on the servers.</span>',
+                '<span>Your account will be permanently deleted from Coolify.</span>',
+            ], false)
+            ->assertDontSee('To also delete your account')
+            ->assertDontSee('teams where I am the only member');
+    });
+
+    test('removes the data of another team without a paying subscription', function () {
+        $this->stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_test_123');
+        $otherTeam = Team::factory()->create(['name' => 'Other Team']);
+        $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        $project = Project::factory()->create(['team_id' => $otherTeam->id]);
+
+        Livewire::test(Actions::class)
+            ->call('cancelImmediately', 'password', ['deleteAccount'])
+            ->assertRedirect(route('login'));
+
+        expect(User::find($this->user->id))->toBeNull()
+            ->and(Team::find($otherTeam->id))->toBeNull()
+            ->and(Project::find($project->id))->toBeNull();
     });
 
     test('keeps the account when delete my account is not selected', function () {
