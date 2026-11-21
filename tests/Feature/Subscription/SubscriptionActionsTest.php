@@ -216,6 +216,32 @@ describe('cancelImmediately with account deletion', function () {
             ->and($this->team->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_123');
     });
 
+    test('keeps another paying team of the user and does not cancel', function () {
+        $otherTeam = Team::factory()->create(['name' => 'Other Team']);
+        $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        Subscription::create([
+            'team_id' => $otherTeam->id,
+            'stripe_subscription_id' => 'sub_other_team',
+            'stripe_customer_id' => 'cus_other_team',
+            'stripe_invoice_paid' => true,
+        ]);
+        $privateKey = PrivateKey::factory()->create(['team_id' => $otherTeam->id]);
+        $server = Server::factory()->create(['team_id' => $otherTeam->id, 'private_key_id' => $privateKey->id]);
+        $this->stripe->subscriptions->shouldNotReceive('cancel');
+
+        Livewire::test(Actions::class)
+            ->assertSet('canDeleteAccount', false)
+            ->assertSee('To also delete your account, first: Delete all projects, servers, and Git sources of the team &quot;Other Team&quot;.', false)
+            ->call('cancelImmediately', 'password', ['deleteAccount'])
+            ->assertReturned(fn (mixed $returned): bool => $returned === 'Delete all projects, servers, and Git sources of the team "Other Team".');
+
+        expect(User::find($this->user->id))->not->toBeNull()
+            ->and(Team::find($otherTeam->id))->not->toBeNull()
+            ->and(Server::find($server->id))->not->toBeNull()
+            ->and($otherTeam->subscription->fresh()->stripe_subscription_id)->toBe('sub_other_team')
+            ->and($this->team->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_123');
+    });
+
     test('keeps the account when delete my account is not selected', function () {
         $this->stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_test_123');
 
