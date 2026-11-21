@@ -227,6 +227,7 @@ describe('cancelImmediately with account deletion', function () {
         ]);
         $privateKey = PrivateKey::factory()->create(['team_id' => $otherTeam->id]);
         $server = Server::factory()->create(['team_id' => $otherTeam->id, 'private_key_id' => $privateKey->id]);
+        Project::factory()->create(['team_id' => $this->team->id]);
         $this->stripe->subscriptions->shouldNotReceive('cancel');
 
         Livewire::test(Actions::class)

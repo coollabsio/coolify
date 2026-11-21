@@ -18,9 +18,9 @@ use RuntimeException;
  *
  * Deletion is refused while the user still owns data that would be lost or
  * orphaned. The user must resolve each blocker first, the same way team
- * deletion requires an empty team. When removesTeamResources() allows it, the
- * servers, resources, projects, and Git sources of teams where the user is the
- * only member are removed from Coolify instead. Nothing is stopped on the servers.
+ * deletion requires an empty team. When removesDataOf() allows it, the servers,
+ * resources, projects, and Git sources of a team where the user is the only
+ * member are removed from Coolify instead. Nothing is stopped on the servers.
  *
  * $cancelledTeam is the team whose subscription the calling action cancels
  * together with the account deletion. Its subscriptions count as not paying.
@@ -36,7 +36,6 @@ class DeleteUserAccount
             return ['The root user cannot be deleted.'];
         }
 
-        $removeTeamResources = $this->removesTeamResources($user, $cancelledTeam);
         $blockers = [];
 
         foreach ($user->teams()->with('members')->get() as $team) {
@@ -56,7 +55,7 @@ class DeleteUserAccount
             }
 
             if ($isAlone) {
-                if (! $removeTeamResources && ! $team->isEmpty()) {
+                if (! $this->removesDataOf($team, $cancelledTeam) && ! $team->isEmpty()) {
                     $blockers[] = "Delete all projects, servers, and Git sources of the team \"{$team->name}\".";
                 }
 
@@ -96,8 +95,8 @@ class DeleteUserAccount
                 throw new RuntimeException(implode(' ', $blockers));
             }
 
-            // Unless removesTeamResources() holds, the blockers above guarantee these teams hold
-            // no projects, servers, or sources.
+            // Unless removesDataOf() holds for a team, the blockers above guarantee it holds no
+            // projects, servers, or sources.
             $this->singleMemberTeams($user)->each(fn (Team $team) => app(DeleteTeamData::class)->handle($team));
 
             // Promotes an admin where the user was the only owner, and removes
@@ -116,9 +115,8 @@ class DeleteUserAccount
      */
     public function confirmationActions(User $user, ?Team $cancelledTeam = null): array
     {
-        $removedTeams = $this->removesTeamResources($user, $cancelledTeam)
-            ? $this->singleMemberTeams($user)->reject(fn (Team $team): bool => $team->isEmpty())
-            : collect();
+        $removedTeams = $this->singleMemberTeams($user)
+            ->filter(fn (Team $team): bool => $this->removesDataOf($team, $cancelledTeam) && ! $team->isEmpty());
 
         return $this->subscriptionConfirmationActions($user, $cancelledTeam)
             ->concat($removedTeams->map(fn (Team $team): string => "The servers, projects, and Git sources of the team \"{$team->name}\" will be removed from Coolify. Nothing is stopped on the servers."))
@@ -128,18 +126,15 @@ class DeleteUserAccount
     }
 
     /**
-     * Whether self-service deletion removes the data of the user's single-member teams instead of
-     * asking the user to delete it first. On Coolify Cloud, a team without a paid or past-due
-     * subscription cannot open its project and server pages, so the user could not do that.
-     * One paying single-member team is enough to keep the data of all of them. $cancelledTeam
-     * does not count as paying.
+     * Whether self-service deletion removes the data of a single-member team instead of asking the
+     * user to delete it first. On Coolify Cloud, a team without a paid or past-due subscription
+     * cannot open its project and server pages, so the user could not do that. The data of a
+     * paying team stays until the user deletes it. $cancelledTeam does not count as paying.
      */
-    public function removesTeamResources(User $user, ?Team $cancelledTeam = null): bool
+    private function removesDataOf(Team $team, ?Team $cancelledTeam): bool
     {
-        return isCloud() && $this->singleMemberTeams($user)->every(
-            fn (Team $team): bool => $team->is($cancelledTeam)
-                || ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying())
-        );
+        return isCloud() && ($team->is($cancelledTeam)
+            || ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying()));
     }
 
     private function singleMemberTeams(User $user): Collection

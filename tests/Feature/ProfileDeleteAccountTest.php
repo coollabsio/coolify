@@ -382,6 +382,29 @@ it('still asks a cloud owner with a paying subscription to delete servers and pr
     'past due' => [['stripe_past_due' => true]],
 ]);
 
+it('removes the data of an unpaid cloud team while another team of the user pays and is empty', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $unpaidTeam = $user->teams()->first();
+    $unpaidProject = Project::factory()->create(['team_id' => $unpaidTeam->id]);
+    $payingTeam = Team::factory()->create(['name' => 'Paying']);
+    $payingTeam->members()->attach($user->id, ['role' => 'owner']);
+    Subscription::factory()->create(['team_id' => $payingTeam->id, 'stripe_subscription_id' => 'sub_paying', 'stripe_invoice_paid' => true]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_paying')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_paying', 'status' => 'active']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_paying', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    expect(app(DeleteUserAccount::class)->blockers($user))->toBe([]);
+
+    app(DeleteUserAccount::class)->handle($user);
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Project::find($unpaidProject->id))->toBeNull()
+        ->and(Team::find($payingTeam->id))->toBeNull();
+});
+
 it('cancels the Stripe subscriptions of the email that Coolify does not record, except those of a team the user does not own', function () {
     config(['constants.coolify.self_hosted' => false]);
     $user = deleteAccountUser();
