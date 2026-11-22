@@ -689,6 +689,7 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
+      web-data: {}
     -
       fs_path: /srv/web/default/logs
       mount_path: /var/log/web
@@ -1445,6 +1446,7 @@
     SERVICE_URL_MY_APP: 'https://my-app.example.com'
     SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
+      web-data: {}
     SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
@@ -2247,6 +2249,7 @@
           - '/data/coolify/applications/referenceapplication0001/selinux-pr-8:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
           - '/srv/web/default/logs-pr-8:/var/log/web'
+      web-data: {}
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8
@@ -2629,3 +2632,4 @@
       referenceapplication0001-8:
         name: referenceapplication0001-8
         external: true
+      web-data: {}

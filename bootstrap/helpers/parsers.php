@@ -1370,17 +1370,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     if (! $keepsApplicationRows) {
         ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
     }
-    // If there are predefined volumes, make sure they are not null
-    if ($topLevel->get('volumes')->count() > 0) {
-        $temp = collect([]);
-        foreach ($topLevel['volumes'] as $volumeName => $volume) {
-            if (is_null($volume)) {
-                continue;
-            }
-            $temp->put($volumeName, $volume);
-        }
-        $topLevel['volumes'] = $temp;
-    }
+    // A volume without options ("data:") stays declared: a service from `extends` can mount it as written.
+    $topLevel->put('volumes', $topLevel->get('volumes')->map(fn ($volume) => $volume ?? []));
     // Get the base docker network
     $baseNetwork = collect([$uuid]);
     if ($isPullRequest) {

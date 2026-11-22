@@ -812,6 +812,7 @@
       is_directory: true
   environment_variables:
     BARE_PASSTHROUGH: null
+      web-data: {}
     BUILD_VERSION: null
     DASH_DEFAULT_VAR: null
     MAGIC_DEFAULT_HOST: null
@@ -1740,6 +1741,7 @@
         environment:
           SERVICE_URL_WEB_3000: ''
           LITERAL: plain-value
+      web-data: {}
           BARE_PASSTHROUGH: ''
           WITH_DEFAULT: '${WITH_DEFAULT:-fallback}'
           REQUIRED: '${REQUIRED:?REQUIRED must be set}'
@@ -2721,6 +2723,7 @@
             fluentd-async: 'true'
             fluentd-sub-second-precision: 'true'
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
+      web-data: {}
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
           - .env
@@ -3162,3 +3165,4 @@
       coolify:
         name: coolify
         external: true
+      web-data: {}
