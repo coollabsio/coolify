@@ -492,15 +492,18 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' '
                     .dockerReadOnlyFileMountOption($backupLocation, $backupLocation).' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
+            $key = ltrim($backupDirectory, '/').'/'.basename($backupLocation);
+            $isUploaded = fn (): bool => false;
             if ($s3->usesCurlTransfer()) {
-                $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, ltrim($backupDirectory, '/').'/'.basename($backupLocation));
+                $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, $key);
             } else {
                 $resolveOptions = $s3->minioClientResolveOptions($server, $image);
                 $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
                 $uploadCommand = 'docker exec '.S3Storage::minioClientPartSizeOption($size).' '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
                     .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/');
+                $isUploaded = fn (): bool => $s3->minioClientObjectHasSize($server, $containerName, $key, $size, $resolveOptions);
             }
-            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([$uploadCommand], $server, timeout: $this->timeout, disableMultiplexing: true));
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([$uploadCommand], $server, timeout: $this->timeout, disableMultiplexing: true), $isUploaded);
         } finally {
             instant_remote_process(
                 ['docker rm -f '.escapeshellarg($containerName)],
