@@ -132,6 +132,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         labels:
@@ -174,6 +175,7 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -210,6 +212,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         ports:
@@ -245,6 +248,7 @@
           - 'caddy_0=http://api-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -278,6 +282,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-20260102T030405
@@ -302,6 +307,7 @@
           - 'caddy_0=http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -321,6 +327,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
+          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -347,6 +354,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -380,6 +388,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         networks:
@@ -439,6 +448,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-20260102T030405
@@ -463,6 +473,7 @@
           - 'caddy_0=http://blog-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -496,6 +507,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         volumes:
@@ -521,6 +533,55 @@
           - coolify.serviceName=reference
           - coolify.environmentName=production
           - coolify.pullRequestId=0
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceapplication0001: null
+        container_name: cache-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=cache-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: cache-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'http://web-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_WEB: web-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_API: 'http://api-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_API: api-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_MY_APP: 'http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_MY_APP: my-app-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_ADMIN: 'http://admin-referenceapplication0001.10.0.0.1.sslip.io'
+          SERVICE_FQDN_ADMIN: admin-referenceapplication0001.10.0.0.1.sslip.io
+          SERVICE_URL_BLOG: 'http://blog-referenceapplication0001.10.0.0.1.sslip.io/blog:2368'
+          SERVICE_FQDN_BLOG: blog-referenceapplication0001.10.0.0.1.sslip.io
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
       sidecar:
@@ -566,6 +627,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -603,6 +665,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         depends_on:
@@ -621,10 +684,12 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
     volumes:
+      web-data: {}
       db-data:
         driver_opts:
           type: none
@@ -689,7 +754,6 @@
       content: |
         #!/bin/sh
         echo "application reference fixture"
-      web-data: {}
     -
       fs_path: /srv/web/default/logs
       mount_path: /var/log/web
@@ -796,6 +860,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         labels:
@@ -838,6 +903,7 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -876,6 +942,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         ports:
@@ -912,6 +979,7 @@
           - 'caddy_0=https://www.api.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -947,6 +1015,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-20260102T030405
@@ -971,6 +1040,7 @@
           - 'caddy_0=https://my-app.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -998,6 +1068,7 @@
           - 'caddy_0=https://api-v2.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -1028,6 +1099,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -1063,6 +1135,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         networks:
@@ -1124,6 +1197,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-20260102T030405
@@ -1148,6 +1222,7 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1183,6 +1258,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         volumes:
@@ -1208,6 +1284,57 @@
           - coolify.serviceName=reference
           - coolify.environmentName=production
           - coolify.pullRequestId=0
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceapplication0001: null
+        container_name: cache-referenceapplication0001-20260102T030405
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=cache-referenceapplication0001-20260102t030405
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+        environment:
+          COOLIFY_BRANCH: '"main"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: cache-referenceapplication0001-20260102T030405
+          SERVICE_URL_WEB: 'https://web.example.com'
+          SERVICE_FQDN_WEB: web.example.com
+          SERVICE_URL_API: 'https://www.api.example.com'
+          SERVICE_FQDN_API: www.api.example.com
+          SERVICE_URL_MY_APP: 'https://my-app.example.com'
+          SERVICE_FQDN_MY_APP: my-app.example.com
+          SERVICE_URL_ADMIN: 'https://admin.example.com'
+          SERVICE_FQDN_ADMIN: admin.example.com
+          SERVICE_URL_BLOG: 'https://blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: blog.example.com
+          SERVICE_URL_API_V2: 'https://api-v2.example.com'
+          SERVICE_FQDN_API_V2: api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
       sidecar:
@@ -1255,6 +1382,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -1294,6 +1422,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         depends_on:
@@ -1312,10 +1441,12 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
+          internal: null
           referenceapplication0001: null
         env_file:
           - .env
     volumes:
+      web-data: {}
       db-data:
         driver_opts:
           type: none
@@ -1446,7 +1577,6 @@
     SERVICE_URL_MY_APP: 'https://my-app.example.com'
     SERVICE_URL_MY_APP_80: 'https://my-app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
-      web-data: {}
     SERVICE_URL_WEB_3000: 'https://web.example.com:3000'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
@@ -1510,6 +1640,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         labels:
@@ -1553,6 +1684,7 @@
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - web-pr-7
@@ -1593,6 +1725,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         ports:
@@ -1629,6 +1762,7 @@
           - 'caddy_0=https://7.www.api.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - api-pr-7
@@ -1666,6 +1800,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-pr-7
@@ -1691,6 +1826,7 @@
           - 'caddy_0=https://7.my-app.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - my-app-pr-7
@@ -1721,6 +1857,7 @@
           - 'caddy_0=https://7.api-v2.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - api.v2-pr-7
@@ -1753,6 +1890,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -1788,6 +1926,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         networks:
@@ -1852,6 +1991,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-pr-7
@@ -1877,6 +2017,7 @@
           - 'caddy_0=https://7.blog.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - blog-pr-7
@@ -1914,6 +2055,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         volumes:
@@ -1941,6 +2083,59 @@
           - coolify.serviceName=reference
           - coolify.environmentName=production
           - coolify.pullRequestId=7
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceapplication0001-7:
+            aliases:
+              - cache-pr-7
+        container_name: cache-referenceapplication0001-pr-7
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=cache-referenceapplication0001-pr-7
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=7
+        environment:
+          COOLIFY_BRANCH: '"pull/7/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: cache-referenceapplication0001-pr-7
+          SERVICE_URL_WEB: 'https://7.web.example.com'
+          SERVICE_FQDN_WEB: 7.web.example.com
+          SERVICE_URL_API: 'https://7.www.api.example.com'
+          SERVICE_FQDN_API: 7.www.api.example.com
+          SERVICE_URL_MY_APP: 'https://7.my-app.example.com'
+          SERVICE_FQDN_MY_APP: 7.my-app.example.com
+          SERVICE_URL_ADMIN: 'https://7.admin.example.com'
+          SERVICE_FQDN_ADMIN: 7.admin.example.com
+          SERVICE_URL_BLOG: 'https://7.blog.example.com/blog:2368'
+          SERVICE_FQDN_BLOG: 7.blog.example.com
+          SERVICE_URL_API_V2: 'https://7.api-v2.example.com'
+          SERVICE_FQDN_API_V2: 7.api-v2.example.com
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
       sidecar:
@@ -1988,6 +2183,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -2027,6 +2223,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         depends_on:
@@ -2045,12 +2242,14 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
+          internal: null
           referenceapplication0001-7:
             aliases:
               - worker-pr-7
         env_file:
           - .env
     volumes:
+      web-data: {}
       db-data:
         driver_opts:
           type: none
@@ -2228,6 +2427,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         labels:
@@ -2249,7 +2449,6 @@
           - '/data/coolify/applications/referenceapplication0001/selinux-pr-8:/app/selinux:z'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
           - '/srv/web/default/logs-pr-8:/var/log/web'
-      web-data: {}
           -
             type: bind
             source: /data/coolify/applications/referenceapplication0001/web-init.sh-pr-8
@@ -2263,6 +2462,7 @@
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - web-pr-8
@@ -2289,6 +2489,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         ports:
@@ -2316,6 +2517,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - api-pr-8
@@ -2339,6 +2541,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: my-app-referenceapplication0001-pr-8
@@ -2355,6 +2558,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - my-app-pr-8
@@ -2376,6 +2580,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - api.v2-pr-8
@@ -2394,6 +2599,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -2415,6 +2621,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         networks:
@@ -2456,6 +2663,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         container_name: blog-referenceapplication0001-pr-8
@@ -2472,6 +2680,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - blog-pr-8
@@ -2497,6 +2706,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         volumes:
@@ -2524,6 +2734,47 @@
           - coolify.serviceName=reference
           - coolify.environmentName=production
           - coolify.pullRequestId=8
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceapplication0001-8:
+            aliases:
+              - cache-pr-8
+        container_name: cache-referenceapplication0001-pr-8
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.applicationUuid=referenceapplication0001
+          - coolify.type=application
+          - coolify.name=cache-referenceapplication0001-pr-8
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=reference
+          - coolify.environmentName=production
+          - coolify.pullRequestId=8
+        environment:
+          COOLIFY_BRANCH: '"pull/8/head"'
+          COOLIFY_RESOURCE_UUID: referenceapplication0001
+          COOLIFY_CONTAINER_NAME: cache-referenceapplication0001-pr-8
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_API_V2: api.v2
+          SERVICE_NAME_ADMIN: admin
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_WORKER: worker
         env_file:
           - .env
       sidecar:
@@ -2559,6 +2810,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
@@ -2586,6 +2838,7 @@
           SERVICE_NAME_ADMIN: admin
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         depends_on:
@@ -2604,12 +2857,14 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
+          internal: null
           referenceapplication0001-8:
             aliases:
               - worker-pr-8
         env_file:
           - .env
     volumes:
+      web-data: {}
       db-data:
         driver_opts:
           type: none
@@ -2632,4 +2887,3 @@
       referenceapplication0001-8:
         name: referenceapplication0001-8
         external: true
-      web-data: {}

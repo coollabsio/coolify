@@ -1958,10 +1958,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // networks:
                     //  - appwrite
                     $networks_temp->put($network, null);
-                } elseif (gettype($network) === 'array') {
+                } elseif (is_array($network) || is_null($network)) {
                     // networks:
                     //   default:
                     //     ipv4_address: 192.168.203.254
+                    //   internal: null
                     $networks_temp->put($key, $network);
                 }
             }
@@ -3309,10 +3310,11 @@ function serviceParser(Service $resource): Collection
                     // networks:
                     //  - appwrite
                     $networks_temp->put($network, null);
-                } elseif (gettype($network) === 'array') {
+                } elseif (is_array($network) || is_null($network)) {
                     // networks:
                     //   default:
                     //     ipv4_address: 192.168.203.254
+                    //   internal: null
                     $networks_temp->put($key, $network);
                 }
             }
