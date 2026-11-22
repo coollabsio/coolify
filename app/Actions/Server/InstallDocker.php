@@ -119,14 +119,24 @@ class InstallDocker
             ')';
     }
 
+    /**
+     * Docker has no repository for Amazon Linux, so it gets Docker from its own repository and the Compose plugin from GitHub.
+     */
     private function getRhelDockerInstallCommand(): string
     {
-        return 'curl -fsSL https://get.docker.com | sh || ('.
+        $pluginDirectory = '/usr/local/lib/docker/cli-plugins';
+
+        return "sh -c '. /etc/os-release; if [ \"\$ID\" = amzn ]; then ".
+            'dnf install -y docker && '.
+            "mkdir -p {$pluginDirectory} && ".
+            "curl -fsSL \"https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\$(uname -m)\" -o {$pluginDirectory}/docker-compose && ".
+            "chmod +x {$pluginDirectory}/docker-compose; ".
+            'else curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
             'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
-            ')';
+            "); fi'";
     }
 
     private function getSuseDockerInstallCommand(): string
