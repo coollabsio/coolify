@@ -863,6 +863,77 @@ describe('cleanup and reconciliation', function () {
             ->and($execution->error_message)->toBeNull();
     });
 
+    it('cancels the workflow run of a job whose runner stopped and retries the runner removal', function () {
+        Queue::fake();
+        Process::fake();
+        Http::fake([
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/repos/acme/api/actions/jobs/5001' => Http::response(['id' => 5001, 'run_id' => 321, 'status' => 'in_progress']),
+            'https://api.github.com/repos/acme/api/actions/runs/321/cancel' => Http::response([], 202),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(['message' => 'Bad request - Runner coolify-runner-x is currently running a job and cannot be deleted.'], 422),
+        ]);
+        $execution = runnerTestExecution($this->githubApp, [
+            'status' => GithubRunnerStatus::Failed,
+            'server_id' => $this->server->id,
+            'runner_id' => 42,
+            'workflow_job_id' => 5001,
+            'repository_full_name' => 'acme/api',
+            'started_at' => now()->subMinutes(3),
+        ]);
+
+        (new CleanupGithubRunnerJob($execution->id))->handle();
+
+        Http::assertSent(fn ($request) => $request->method() === 'POST' && $request->url() === 'https://api.github.com/repos/acme/api/actions/runs/321/cancel');
+        Queue::assertPushed(DeregisterGithubRunnerJob::class, fn ($job) => $job->runnerId === 42 && $job->delay !== null);
+    });
+
+    it('does not cancel the workflow run of a completed job', function (GithubRunnerStatus $status, string $githubJobStatus) {
+        Queue::fake();
+        Process::fake();
+        Http::fake([
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/repos/acme/api/actions/jobs/5001' => Http::response(['id' => 5001, 'run_id' => 321, 'status' => $githubJobStatus]),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
+        ]);
+        $execution = runnerTestExecution($this->githubApp, [
+            'status' => $status,
+            'server_id' => $this->server->id,
+            'runner_id' => 42,
+            'workflow_job_id' => 5001,
+            'repository_full_name' => 'acme/api',
+            'started_at' => now()->subMinutes(3),
+        ]);
+
+        (new CleanupGithubRunnerJob($execution->id))->handle();
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/cancel'));
+        Queue::assertNotPushed(DeregisterGithubRunnerJob::class);
+    })->with([
+        'reported by the webhook' => [GithubRunnerStatus::Completed, 'in_progress'],
+        'completed on GitHub' => [GithubRunnerStatus::TimedOut, 'completed'],
+    ]);
+
+    it('keeps a failure when the completed webhook reports the run that Coolify cancelled', function () {
+        Queue::fake();
+        $execution = runnerTestExecution($this->githubApp, [
+            'status' => GithubRunnerStatus::Failed,
+            'server_id' => $this->server->id,
+            'runner_name' => 'coolify-runner-late',
+            'error_message' => 'The runner container stopped before GitHub reported a job result.',
+        ]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'completed', [
+            'runner_name' => 'coolify-runner-late',
+            'conclusion' => 'cancelled',
+        ])->assertOk();
+
+        $execution->refresh();
+        expect($execution->status)->toBe(GithubRunnerStatus::Failed)
+            ->and($execution->conclusion)->toBe('cancelled')
+            ->and($execution->error_message)->toContain('runner container stopped');
+        Queue::assertNotPushed(CleanupGithubRunnerJob::class);
+    });
+
     it('times out queued jobs after the wait timeout and retries the others', function () {
         Queue::fake();
         Process::fake(['*' => Process::result(output: '')]);
@@ -944,6 +1015,18 @@ describe('server deletion', function () {
 
         Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/orgs/acme/actions/runners/42'));
     })->with([204, 500]);
+
+    it('retries the runner removal while GitHub refuses it', function () {
+        Http::fake([
+            'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(['message' => 'Runner is currently running a job and cannot be deleted.'], 422),
+        ]);
+        $job = (new DeregisterGithubRunnerJob($this->githubApp->id, 42))->withFakeQueueInteractions();
+
+        $job->handle();
+
+        $job->assertReleased(delay: DeregisterGithubRunnerJob::RETRY_DELAY_SECONDS);
+    });
 
     it('removes runners of servers deleted by older versions during reconciliation', function () {
         Queue::fake();
