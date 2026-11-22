@@ -168,6 +168,30 @@ it('reads the push status with the token from inside the Sentinel container on a
         && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf --max-time 5 -H @-'));
 });
 
+it('replaces an outdated Sentinel that has no push status endpoint', function () {
+    $this->server->forceFill(['sentinel_updated_at' => now()])->save();
+    // Sentinel 0.0.21 answers /api/version, but has no /api/push-status, so `curl -f` exits 22.
+    $bin = sys_get_temp_dir().'/sentinel-curl-stub-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/curl", "#!/bin/sh\ncase \"\$*\" in *api/version*) printf 0.0.21 ;; *) exit 22 ;; esac\n");
+    chmod("{$bin}/curl", 0755);
+    fakeRemoteProcesses([
+        '*docker ps*' => Process::result(output: 'running Up 2 hours (healthy)'),
+        '*api/version*' => function ($process) use ($bin) {
+            preg_match("/coolify-sentinel sh -c '([^']*)'/", remoteProcessScript($process), $matches);
+            exec('PATH='.escapeshellarg("{$bin}:".getenv('PATH')).' TOKEN=secret sh -c '.escapeshellarg($matches[1]), $output, $exitCode);
+
+            return Process::result(output: implode("\n", $output), exitCode: $exitCode);
+        },
+    ]);
+    StartSentinel::shouldRun()->once();
+
+    (new CheckAndStartSentinelJob($this->server))->handle();
+
+    unlink("{$bin}/curl");
+    rmdir($bin);
+});
+
 it('does not restart a starting Sentinel whose API does not answer yet', function () {
     $this->server->forceFill(['sentinel_updated_at' => now()->subDays(5), 'sentinel_waiting_since' => now()])->save();
     fakeRemoteProcesses([
