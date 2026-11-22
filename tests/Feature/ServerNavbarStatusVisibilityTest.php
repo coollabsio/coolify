@@ -130,3 +130,16 @@ it('shows the current proxy status after a background status update', function (
         ->assertSet('proxyStatus', 'running')
         ->assertDontSee('Starting');
 });
+
+it('links the server row of the system status menu to the server page', function () {
+    [$server] = makeNavbarServer(isFunctional: true);
+
+    $html = Livewire::test('server.navbar', ['server' => $server])->html();
+    $serverRow = str($html)
+        ->after('System status')
+        ->before('<span class="flex-1">Server</span>')
+        ->afterLast('<a ')
+        ->toString();
+
+    expect($serverRow)->toContain('href="'.route('server.show', ['server_uuid' => $server->uuid]).'"');
+});
