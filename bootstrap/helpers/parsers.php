@@ -3045,9 +3045,10 @@ function serviceParser(Service $resource): Collection
         }
     }
 
-    $serviceAppsLogDrainEnabledMap = $resource->applications()->get()->keyBy('name')->map(function ($app) {
-        return $app->isLogDrainEnabled();
-    });
+    $serviceLogDrainEnabledMap = $resource->applications()->get()
+        ->concat($resource->databases()->get())
+        ->keyBy('name')
+        ->map(fn (ServiceApplication|ServiceDatabase $servicePart) => $servicePart->isLogDrainEnabled());
 
     // Parse the rest of the services
     foreach ($services as $serviceName => $service) {
@@ -3056,7 +3057,7 @@ function serviceParser(Service $resource): Collection
         $logging = data_get($service, 'logging');
 
         if ($server->isLogDrainEnabled()) {
-            if ($serviceAppsLogDrainEnabledMap->get($serviceName)) {
+            if ($serviceLogDrainEnabledMap->get($serviceName)) {
                 $logging = generate_log_drain_configuration($server);
             }
         }
