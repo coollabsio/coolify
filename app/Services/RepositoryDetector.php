@@ -75,8 +75,9 @@ AWK;
             .'esac; done | jq -sc '.escapeshellarg($summary);
 
         return collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
+            // No `-p` and no `rm -rf` first: mkdir fails when the folder exists, so another user of the server
+            // cannot plant the folder or a symbolic link at the path before the clone.
+            "mkdir /tmp/{$uuid}",
             "cd /tmp/{$uuid}",
             'sh -c '.escapeshellarg($this->application->serverCheckoutCommand($uuid, $checkoutDir)),
             "cd {$checkoutDir}",

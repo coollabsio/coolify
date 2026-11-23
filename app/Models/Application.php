@@ -2932,8 +2932,9 @@ class Application extends BaseModel
         ]);
 
         return collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
+            // No `-p` and no `rm -rf` first: mkdir fails when the folder exists, so another user of the server
+            // cannot plant the folder or a symbolic link at the path before the clone.
+            "mkdir /tmp/{$uuid}",
             "cd /tmp/{$uuid}",
             // One sh -c line: the non-root sudo parser would turn `&& if ...; then` into invalid `&& sudo if`.
             // The submodule step runs in the same script, because a deploy key is removed when the script exits.
