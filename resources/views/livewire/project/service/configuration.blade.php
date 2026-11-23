@@ -15,6 +15,11 @@
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        @if ($currentRoute !== 'project.service.template')
+            <livewire:project.service.template-update-banner :service="$service"
+                :href="route('project.service.template', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid])"
+                :wire:key="'tpl-banner-' . $service->uuid" />
+        @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-service.configuration-sidebar :service="$service" :current-route="$currentRoute"
                 :storage-sections="$storageSections" />
@@ -117,6 +122,8 @@
                     <livewire:project.shared.tags :resource="$service" />
                 @elseif ($currentRoute === 'project.service.danger')
                     <livewire:project.shared.danger :resource="$service" />
+                @elseif ($currentRoute === 'project.service.template')
+                    <livewire:project.service.template-update :service="$service" />
                 @endif
             </div>
         </div>

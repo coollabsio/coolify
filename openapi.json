@@ -16658,6 +16658,318 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application metrics",
+                "description": "Get the CPU and memory history that Sentinel collects for the container of an application. Send minutes, or from with an optional to. The retention period is the one of the server of the application.",
+                "operationId": "get-application-metrics-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container CPU and memory metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ContainerMetrics"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database metrics",
+                "description": "Get the CPU and memory history that Sentinel collects for the container of a database. Send minutes, or from with an optional to. The retention period is the one of the server of the database.",
+                "operationId": "get-database-metrics-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container CPU and memory metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ContainerMetrics"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/traffic": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application traffic",
+                "description": "Get the traffic analytics of an application.",
+                "operationId": "get-application-traffic-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "description": "Time range of the traffic analytics.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "24h",
+                            "enum": [
+                                "24h",
+                                "7d",
+                                "30d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Traffic analytics of the application.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceTraffic"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return traffic analytics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch traffic analytics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/traffic": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get service traffic",
+                "description": "Get the traffic analytics of a service.",
+                "operationId": "get-service-traffic-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "description": "Time range of the traffic analytics.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "24h",
+                            "enum": [
+                                "24h",
+                                "7d",
+                                "30d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Traffic analytics of the service.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceTraffic"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return traffic analytics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch traffic analytics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/resources": {
             "get": {
                 "tags": [
@@ -20163,6 +20475,153 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Get server metrics",
+                "description": "Get the metric history that Sentinel collects for a server owned by the authenticated team. Send minutes, or from with an optional to. The response has only the requested types. Each type is null when metrics are disabled for the server.",
+                "operationId": "get-server-metrics",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    },
+                    {
+                        "name": "types",
+                        "in": "query",
+                        "description": "Comma-separated metric types: cpu, memory, disk, network, load.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "cpu,memory,disk",
+                            "default": "cpu,memory"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Server metrics of the requested types.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "cpu": {
+                                            "$ref": "#\/components\/schemas\/MetricSeries",
+                                            "description": "CPU usage in percent."
+                                        },
+                                        "memory": {
+                                            "$ref": "#\/components\/schemas\/MetricSeries",
+                                            "description": "Memory usage in percent."
+                                        },
+                                        "disk": {
+                                            "description": "Disk usage in percent, keyed by mount path.",
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "example": {
+                                                "\/": [
+                                                    [
+                                                        1787259000000,
+                                                        41.2
+                                                    ]
+                                                ]
+                                            },
+                                            "additionalProperties": {
+                                                "$ref": "#\/components\/schemas\/MetricSeries"
+                                            }
+                                        },
+                                        "network": {
+                                            "description": "Received and sent bytes per second.",
+                                            "properties": {
+                                                "rx": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "tx": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                }
+                                            },
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ]
+                                        },
+                                        "load": {
+                                            "description": "Load averages over 1, 5, and 15 minutes.",
+                                            "properties": {
+                                                "load1": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "load5": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "load15": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                }
+                                            },
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -28635,6 +29094,245 @@
                 },
                 "type": "object"
             },
+            "MetricSeries": {
+                "description": "Data points as [unix_timestamp_ms, value].",
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "example": [
+                    [
+                        1787259000000,
+                        12.5
+                    ],
+                    [
+                        1787259060000,
+                        17.25
+                    ]
+                ]
+            },
+            "ContainerMetrics": {
+                "properties": {
+                    "cpu": {
+                        "$ref": "#\/components\/schemas\/MetricSeries",
+                        "description": "CPU usage of the container in percent. Null when metrics are disabled for the server."
+                    },
+                    "memory": {
+                        "$ref": "#\/components\/schemas\/MetricSeries",
+                        "description": "Memory usage of the container in MB. Null when metrics are disabled for the server."
+                    }
+                },
+                "type": "object"
+            },
+            "ResourceTraffic": {
+                "description": "Traffic analytics that Sentinel records from the proxy access log. When traffic analytics is disabled on the server, enabled is false and every field except range is null.",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "range": {
+                        "type": "string",
+                        "enum": [
+                            "24h",
+                            "7d",
+                            "30d"
+                        ]
+                    },
+                    "overview": {
+                        "properties": {
+                            "requests": {
+                                "type": "integer"
+                            },
+                            "unique_visitors": {
+                                "type": "integer"
+                            },
+                            "bytes_in": {
+                                "type": "integer"
+                            },
+                            "bytes_out": {
+                                "type": "integer"
+                            },
+                            "error_rate": {
+                                "description": "Share of 4xx and 5xx responses in percent.",
+                                "type": "number"
+                            },
+                            "latency": {
+                                "description": "Response time percentiles in milliseconds.",
+                                "properties": {
+                                    "p50": {
+                                        "type": "number"
+                                    },
+                                    "p95": {
+                                        "type": "number"
+                                    },
+                                    "p99": {
+                                        "type": "number"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "status": {
+                                "properties": {
+                                    "s2xx": {
+                                        "type": "integer"
+                                    },
+                                    "s3xx": {
+                                        "type": "integer"
+                                    },
+                                    "s4xx": {
+                                        "type": "integer"
+                                    },
+                                    "s5xx": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "latency_approximate": {
+                        "description": "True when the latency merges several sources and takes the worst value.",
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "uniques_approximate": {
+                        "description": "True when unique visitors are summed over several sources.",
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "series": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "bucket": {
+                                    "description": "Bucket start as a unix timestamp in milliseconds.",
+                                    "type": "integer"
+                                },
+                                "s2xx": {
+                                    "type": "integer"
+                                },
+                                "s3xx": {
+                                    "type": "integer"
+                                },
+                                "s4xx": {
+                                    "type": "integer"
+                                },
+                                "s5xx": {
+                                    "type": "integer"
+                                },
+                                "requests": {
+                                    "type": "integer"
+                                },
+                                "bytes_in": {
+                                    "type": "integer"
+                                },
+                                "bytes_out": {
+                                    "type": "integer"
+                                },
+                                "unique_visitors": {
+                                    "type": "integer"
+                                },
+                                "p95": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "top_paths": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "domain": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "requests": {
+                                    "type": "integer"
+                                },
+                                "bytes_out": {
+                                    "type": "integer"
+                                },
+                                "s4xx": {
+                                    "type": "integer"
+                                },
+                                "s5xx": {
+                                    "type": "integer"
+                                },
+                                "p95": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "breakdowns": {
+                        "description": "Top values per dimension: country, city, referer, browser, os, device, protocol, cache, status, agent, ip, useragent. ip and useragent need the `read:sensitive` or `root` token ability. ip and city are left out when the server does not record IPs.",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "properties": {
+                                    "value": {
+                                        "type": "string"
+                                    },
+                                    "requests": {
+                                        "type": "integer"
+                                    },
+                                    "bytes_out": {
+                                        "type": "integer"
+                                    },
+                                    "lat": {
+                                        "description": "Only for city.",
+                                        "type": "number"
+                                    },
+                                    "lon": {
+                                        "description": "Only for city.",
+                                        "type": "number"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "attribution": {
+                        "description": "GeoIP data attribution to show with country and city data.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
             "SecretManagerSource": {
                 "description": "The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
                 "properties": {
@@ -30663,6 +31361,39 @@
             }
         },
         "parameters": {
+            "MetricsMinutes": {
+                "name": "minutes",
+                "in": "query",
+                "description": "Number of minutes of metric history before now. Cannot be sent with from or to. Cannot exceed the Sentinel metrics retention period of the server.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1
+                }
+            },
+            "MetricsFrom": {
+                "name": "from",
+                "in": "query",
+                "description": "Start of the metric history, as an ISO 8601 date. Cannot be older than the Sentinel metrics retention period of the server. The window length is rounded up to whole minutes, so the history can start up to a minute before from.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-20T08:00:00Z"
+                }
+            },
+            "MetricsTo": {
+                "name": "to",
+                "in": "query",
+                "description": "End of the metric history, as an ISO 8601 date after from. Needs from. Defaults to now.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-20T09:00:00Z"
+                }
+            },
             "VulnerabilityState": {
                 "name": "state",
                 "in": "query",
@@ -30803,6 +31534,10 @@
             "description": "Projects"
         },
         {
+            "name": "Services",
+            "description": "Services"
+        },
+        {
             "name": "Resources",
             "description": "Resources"
         },
@@ -30833,10 +31568,6 @@
         {
             "name": "Service databases",
             "description": "Service databases"
-        },
-        {
-            "name": "Services",
-            "description": "Services"
         },
         {
             "name": "Shared Environment Variables",

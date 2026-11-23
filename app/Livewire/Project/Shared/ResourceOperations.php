@@ -131,6 +131,9 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneInfluxdb::class ||
                 $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
+                foreach ($this->resource->persistentStorages()->get() as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->resource->destination->server, $server);
+                }
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
                     'id',
@@ -159,7 +162,9 @@ class ResourceOperations extends Component
                     $originalName = $volume->name;
                     $newName = '';
 
-                    if (str_starts_with($originalName, 'postgres-data-')) {
+                    if ($volume->is_external) {
+                        $newName = $originalName;
+                    } elseif (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
                         $newName = 'mysql-data-'.$new_resource->uuid;
@@ -200,7 +205,7 @@ class ResourceOperations extends Component
                     ]);
                     $newPersistentVolume->save();
 
-                    if ($this->cloneVolumeData) {
+                    if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                         $pendingVolumeClones[] = new VolumeCloneJob(
                             $volume->name,
                             $newPersistentVolume->name,

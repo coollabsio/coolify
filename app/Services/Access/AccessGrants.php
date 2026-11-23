@@ -9,6 +9,7 @@ use App\Enums\AccessLevel;
  *
  * A grant on a parent applies to its children: team → project → environment → resource.
  * The levels of all matching grants add up.
+ * Server grants (tokens only) are separate: they cover only the server endpoints of that server.
  */
 final class AccessGrants
 {
@@ -20,6 +21,7 @@ final class AccessGrants
      * @param  array<int, int>  $environmentProjects  environment ID => project ID, for granted environments and parents of granted resources
      * @param  array<string, int>  $resourceEnvironments  resource UUID => environment ID
      * @param  list<int>  $projectEnvironmentIds  environments inside granted projects
+     * @param  array<string, array<string, true>>  $serverLevels  server UUID => expanded levels
      */
     public function __construct(
         private readonly array $teamLevels,
@@ -29,6 +31,7 @@ final class AccessGrants
         private readonly array $environmentProjects,
         private readonly array $resourceEnvironments,
         private readonly array $projectEnvironmentIds,
+        private readonly array $serverLevels = [],
     ) {}
 
     public static function unrestricted(): self
@@ -73,6 +76,22 @@ final class AccessGrants
         }
 
         return $resourceUuid !== null && isset($this->resourceLevels[$resourceUuid][$level->value]);
+    }
+
+    /**
+     * True when a team-wide grant or a grant on the server gives the level for the server endpoints.
+     */
+    public function allowsServer(AccessLevel $level, string $serverUuid): bool
+    {
+        return isset($this->teamLevels[$level->value]) || isset($this->serverLevels[$serverUuid][$level->value]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function serverUuids(): array
+    {
+        return array_map('strval', array_keys($this->serverLevels));
     }
 
     /**
