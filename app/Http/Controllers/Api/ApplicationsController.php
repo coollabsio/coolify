@@ -233,6 +233,38 @@ class ApplicationsController extends Controller
         ], 422);
     }
 
+    /**
+     * A site from uploaded archives builds only from the archive, so the build and Git fields do not apply.
+     */
+    private function archiveSiteFieldsResponse(Application $application, Request $request): ?JsonResponse
+    {
+        if (! $application->is_archive_source) {
+            return null;
+        }
+        $fields = collect(array_keys($request->all()))->filter(fn (string $field): bool => Str::startsWith($field, ['git_', 'dockerfile']) || in_array($field, [
+            'build_pack', 'install_command', 'build_command', 'start_command', 'base_directory', 'publish_directory',
+            'pre_deployment_command', 'pre_deployment_command_container', 'post_deployment_command', 'post_deployment_command_container',
+            'custom_docker_run_options', 'static_image',
+        ], true));
+        if ($fields->isEmpty()) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $fields->mapWithKeys(fn (string $field): array => [$field => ['Archive sites do not use this field.']])->all(),
+        ], 422);
+    }
+
+    private function archiveSiteEnvironmentVariablesResponse(Application $application): ?JsonResponse
+    {
+        if (! $application->is_archive_source) {
+            return null;
+        }
+
+        return response()->json(['message' => 'Archive sites do not use environment variables.'], 422);
+    }
+
     private function sharedImageNameValidationResponse(Application $application): ?JsonResponse
     {
         $otherApplication = $application->otherApplicationBuildingSameImage();
@@ -3658,6 +3690,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        if ($response = $this->archiveSiteFieldsResponse($application, $request)) {
+            return $response;
+        }
         $settingsBefore = $application->settings->getAttributes();
 
         if ($request->has('redact_all_env_values_in_logs') || $request->has('include_coolify_default_variables')) {
@@ -4223,6 +4258,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('view', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
@@ -4336,6 +4374,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         if ($request->has('key')) {
             $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
@@ -4500,6 +4541,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
@@ -4694,6 +4738,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         if ($request->has('key')) {
             $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
@@ -4879,6 +4926,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $found_env = EnvironmentVariable::where('uuid', $request->route('env_uuid'))
             ->where('resourceable_type', Application::class)
