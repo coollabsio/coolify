@@ -2915,11 +2915,7 @@ class Application extends BaseModel
         $composeFile = ltrim(rtrim($this->base_directory, '/').$this->docker_compose_location, '/');
         $submoduleCommand = $this->composeFileSubmoduleCommand($git, $composeFile, $checkoutDir);
         // Go into the submodule that contains the Compose file, and read the file from the objects of that submodule.
-        $enterSubmodule = $submoduleCommand === null ? '' : implode(' ', [
-            'while sub=$(git ls-tree -r HEAD | while read -r mode type object path; do',
-            'if [ "$mode" = 160000 ]; then case "$file" in "$path"/*) echo "$path"; break ;; esac; fi; done) && [ -n "$sub" ];',
-            'do cd "$sub" || exit 1; file="${file#"$sub"/}"; done;',
-        ]);
+        $enterSubmodule = $submoduleCommand === null ? '' : ComposeIncludeFlattener::enterSubmoduleScript();
         $readComposeFile = implode(' ', [
             'file='.escapeshellarg($composeFile).';',
             $enterSubmodule,
@@ -2996,7 +2992,7 @@ class Application extends BaseModel
                 throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
             }
             if ($composeFileContent !== null && ComposeIncludeFlattener::hasIncludes($composeFileContent)) {
-                $composeFileContent = (new ComposeIncludeFlattener($this->destination->server, "/tmp/{$uuid}"))
+                $composeFileContent = (new ComposeIncludeFlattener($this->destination->server, "/tmp/{$uuid}/checkout", "/tmp/{$uuid}/flat"))
                     ->flatten(ltrim("{$workdir}{$composeFile}", '/'), trim($workdir, '/'));
             }
         } catch (DeploymentException $e) {

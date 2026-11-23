@@ -75,6 +75,7 @@ function pullRequestComposeJob(Application $application, ?string $checkoutOutput
         'workdir' => '/artifacts/deployment-uuid',
         'docker_compose_location' => '/docker-compose.yml',
         'saved_outputs' => $outputs,
+        'server' => $application->destination->server,
     ] as $property => $value) {
         (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
     }
@@ -167,6 +168,48 @@ test('a preview stops when the Compose file of its pull request cannot be used',
     'empty' => ['', 'is empty.'],
     'not safe' => ["services:\n  'web;touch /tmp/pwned':\n    image: nginx\n", 'is not safe to use, so Coolify did not load it.'],
 ]);
+
+test('a preview resolves the includes of the Compose file of its pull request in the deployment container', function () {
+    Queue::fake();
+    $serverCommands = [];
+    Process::fake(function ($process) use (&$serverCommands) {
+        $command = implode(' ', (array) remoteProcessScript($process));
+        $serverCommands[] = $command;
+
+        return Process::result(output: match (true) {
+            str_contains($command, 'docker compose version') => '2.29.1',
+            str_contains($command, 'git show') && str_contains($command, 'db.yml') => "services:\n  db:\n    image: postgres:17\n",
+            str_contains($command, 'git show') => "include:\n  - db.yml\nservices:\n  web:\n    image: nginx:1.27\n",
+            str_contains($command, 'docker compose') => "services:\n  web:\n    image: nginx:1.27\n  db:\n    image: postgres:17\n",
+            default => '',
+        });
+    });
+    $logEntries = [];
+    $preview = pullRequestComposePreview($this->application);
+    $job = pullRequestComposeJob($this->application, "include:\n  - db.yml\nservices:\n  web:\n    image: nginx:1.27\n", $logEntries, preview: $preview);
+
+    loadComposeForDeployment($job);
+    $parsed = $this->application->parse(pull_request_id: 42, preview_id: $preview->id);
+
+    expect($parsed['services']->keys()->sort()->values()->all())->toBe(['db', 'web'])
+        ->and($this->application->docker_compose_raw)->not->toContain('include')
+        ->and($this->application->fresh()->docker_compose_raw)->toBe(BASE_BRANCH_COMPOSE)
+        ->and(collect($serverCommands)->filter(fn (string $command) => str_contains($command, 'git show') || str_contains($command, 'docker compose'))->all())
+        ->not->toBeEmpty()
+        ->each->toContain('docker exec deployment-uuid')
+        ->and(implode("\n", $serverCommands))->toContain('/artifacts/deployment-uuid');
+});
+
+test('a preview stops when the Compose file of its pull request includes a file outside the repository', function () {
+    Process::fake();
+    $logEntries = [];
+    $job = pullRequestComposeJob($this->application, "include:\n  - ../../etc/compose.yml\n", $logEntries, preview: pullRequestComposePreview($this->application));
+
+    expect(fn () => loadComposeForDeployment($job))
+        ->toThrow(DeploymentException::class, 'Deployment stopped: the Docker Compose file at /docker-compose.yml (pull request #42) has an include that Coolify cannot use');
+
+    expect($this->application->fresh()->docker_compose_raw)->toBe(BASE_BRANCH_COMPOSE);
+});
 
 test('a preview uses the Compose file of the base branch when it can come from a fork or uses raw Compose', function (array $settings, bool $isSameRepository, string $reason) {
     $this->application->settings->update($settings);

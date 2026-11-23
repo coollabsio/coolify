@@ -11,8 +11,10 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Resolves the `include` section of a Compose file from a repository checkout into one Compose file, so the
  * parser, the validation and the deployment see every service. `docker compose config` does the merge and
- * rebases the paths of included files; Coolify only copies the files that it validated into an empty folder
- * first, so Compose cannot read anything outside the repository.
+ * rebases the paths of included files; Coolify only copies the included and extended (`extends.file`) files that
+ * it validated into an empty folder first, so Compose cannot read anything outside the repository. Compose reads
+ * no other file while it loads the model: `env_file`, `label_file` and the `file` of secrets and configs stay as
+ * paths in the output.
  *
  * @see https://docs.docker.com/reference/compose-file/include/
  */
@@ -20,14 +22,27 @@ class ComposeIncludeFlattener
 {
     public const MAX_FILES = 20;
 
+    /**
+     * Older versions read the `env_file` of each service and ignore `--no-path-resolution` and `--no-normalize`,
+     * so the flattened file loses its `env_file` references and gets absolute paths of the flat folder.
+     */
+    public const MIN_COMPOSE_VERSION = '2.25.0';
+
     private const TOO_LARGE_MARKER = '__COOLIFY_COMPOSE_TOO_LARGE__';
 
     private const SYMLINK_MARKER = '__COOLIFY_COMPOSE_SYMLINK__';
 
     /**
-     * @param  string  $workDirectory  Folder on the server that contains the `checkout` folder of the repository
+     * @param  string  $checkoutDirectory  Git checkout of the repository
+     * @param  string  $flatDirectory  Empty folder for the validated files, outside the checkout
+     * @param  string|null  $container  Container on the server that has the checkout, for example the deployment helper
      */
-    public function __construct(private Server $server, private string $workDirectory) {}
+    public function __construct(
+        private Server $server,
+        private string $checkoutDirectory,
+        private string $flatDirectory,
+        private ?string $container = null,
+    ) {}
 
     public static function hasIncludes(string $compose): bool
     {
@@ -49,12 +64,25 @@ class ComposeIncludeFlattener
      */
     public function flatten(string $composeFile, string $projectDirectory): string
     {
+        $this->ensureComposeVersion();
         // Compose resolves the includes of a file against the project directory of each entry that reaches it.
         $pending = [[$composeFile, $projectDirectory]];
         $queued = ["{$composeFile}|{$projectDirectory}" => true];
         $files = [$composeFile => true];
         $contents = [];
         $envFiles = [];
+        $queue = function (string $file, string $directory) use (&$queued, &$files, &$pending) {
+            $key = "{$file}|{$directory}";
+            if (isset($queued[$key])) {
+                return;
+            }
+            if (! isset($files[$file]) && count($files) >= self::MAX_FILES) {
+                throw new DeploymentException('A Docker Compose file can include and extend at most '.(self::MAX_FILES - 1).' files.');
+            }
+            $files[$file] = true;
+            $queued[$key] = true;
+            $pending[] = [$file, $directory];
+        };
         while ($pending !== []) {
             [$file, $directory] = array_shift($pending);
             $content = $contents[$file] ??= $this->copyFile($file);
@@ -71,17 +99,11 @@ class ComposeIncludeFlattener
             foreach (self::includeEntries($compose, $directory) as $entry) {
                 $envFiles = [...$envFiles, ...$entry['envFiles']];
                 foreach ($entry['files'] as $included) {
-                    $key = "{$included}|{$entry['projectDirectory']}";
-                    if (isset($queued[$key])) {
-                        continue;
-                    }
-                    if (! isset($files[$included]) && count($files) >= self::MAX_FILES) {
-                        throw new DeploymentException('A Docker Compose file can include at most '.(self::MAX_FILES - 1).' files.');
-                    }
-                    $files[$included] = true;
-                    $queued[$key] = true;
-                    $pending[] = [$included, $entry['projectDirectory']];
+                    $queue($included, $entry['projectDirectory']);
                 }
+            }
+            foreach (self::extendsFiles($compose, $directory) as $extended) {
+                $queue($extended, self::directoryOf($extended));
             }
         }
 
@@ -91,7 +113,12 @@ class ComposeIncludeFlattener
             throw new RuntimeException('docker compose config returned no Compose file.');
         }
 
-        return Yaml::dump(self::prefixRelativeBindSources($compose), 10, 2);
+        $flattened = Yaml::dump(self::prefixRelativeBindSources($compose), 10, 2);
+        if (strlen($flattened) > Application::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
+            throw new DeploymentException('The Docker Compose file with its included files exceeds the 5 MiB size limit.');
+        }
+
+        return $flattened;
     }
 
     /**
@@ -134,6 +161,29 @@ class ComposeIncludeFlattener
         }
 
         return $entries;
+    }
+
+    /**
+     * The `extends.file` references of the services, as repository paths. Docker Compose reads these files while
+     * it loads the model, so Coolify validates and copies them like included files. A path resolves against the
+     * project directory of the file; the references of an extended file resolve against its own folder.
+     *
+     * @param  array<mixed>  $compose
+     * @return list<string>
+     *
+     * @throws DeploymentException If a file is not a relative path inside the repository
+     */
+    public static function extendsFiles(array $compose, string $projectDirectory): array
+    {
+        $files = [];
+        foreach (is_array($compose['services'] ?? null) ? $compose['services'] : [] as $service) {
+            $file = is_array($service) && is_array($service['extends'] ?? null) ? ($service['extends']['file'] ?? null) : null;
+            if ($file !== null) {
+                $files[] = self::repositoryPath($file, $projectDirectory, 'extends file');
+            }
+        }
+
+        return array_values(array_unique($files));
     }
 
     /**
@@ -204,41 +254,73 @@ class ComposeIncludeFlattener
         return $directory === '.' ? '' : $directory;
     }
 
-    private function checkoutDirectory(): string
+    /**
+     * Runs the script as one `sh -c` line, so the non-root sudo parser runs the redirects as root too.
+     */
+    private function run(string $script): string
     {
-        return "{$this->workDirectory}/checkout";
+        $command = 'sh -c '.escapeshellarg($script);
+        if ($this->container !== null) {
+            $command = executeInDocker($this->container, $command);
+        }
+
+        return (string) instant_remote_process([$command], $this->server);
     }
 
-    private function flatDirectory(): string
+    /**
+     * Shell that goes into the submodule that contains `$file` (relative to the current Git repository), and
+     * strips the submodule path from `$file`, so the next Git command reads the commit that the gitlink selects.
+     * It fails when the submodule is not checked out, so the read cannot fall back to the superproject.
+     */
+    public static function enterSubmoduleScript(): string
     {
-        return "{$this->workDirectory}/flat";
+        return implode(' ', [
+            'while sub=$(git ls-tree -r HEAD | while read -r mode type object path; do',
+            'if [ "$mode" = 160000 ]; then case "$file" in "$path"/*) echo "$path"; break ;; esac; fi; done) && [ -n "$sub" ];',
+            'do { cd "$sub" && [ -e .git ]; } || { echo "The Git submodule $sub is not checked out." >&2; exit 1; }; file="${file#"$sub"/}"; done;',
+        ]);
+    }
+
+    /**
+     * @throws DeploymentException If the Docker Compose version of the server is too old
+     */
+    protected function ensureComposeVersion(): void
+    {
+        $command = $this->container === null ? 'docker compose version --short' : executeInDocker($this->container, 'docker compose version --short');
+        $version = ltrim(trim((string) instant_remote_process([$command], $this->server, false)), 'v');
+        if (preg_match('/^\d+\.\d+\.\d+/', $version) !== 1 || version_compare($version, self::MIN_COMPOSE_VERSION, '<')) {
+            $found = $version === '' ? 'no Docker Compose' : "Docker Compose {$version}";
+            throw new DeploymentException('The include section needs Docker Compose '.self::MIN_COMPOSE_VERSION." or later on the server. The server has {$found}.");
+        }
     }
 
     /**
      * Writes the file from the Git object store as a regular file into the flat folder and returns its content.
-     * Only regular files (mode 100644 or 100755) are copied; a symbolic link (mode 120000) is rejected.
+     * `git show` prints the target of a symbolic link instead of following it.
      */
     protected function copyFile(string $file): string
     {
-        $target = escapeshellarg("{$this->flatDirectory()}/{$file}");
-        $limit = Application::MAX_DOCKER_COMPOSE_SIZE_BYTES;
-        $script = 'cd '.escapeshellarg($this->checkoutDirectory())
-            .' && mode=$(git ls-tree HEAD -- '.escapeshellarg($file).' | cut -c1-6)'
-            .' && case "$mode" in 100644|100755) ;; 120000) echo '.self::SYMLINK_MARKER.'; exit 0 ;; *) echo '.escapeshellarg("No such file: {$file}").' >&2; exit 1 ;; esac'
-            .' && mkdir -p '.escapeshellarg(dirname("{$this->flatDirectory()}/{$file}"))
-            .' && git cat-file blob '.escapeshellarg("HEAD:{$file}")." > {$target}"
-            ." && if [ \"$(wc -c < {$target})\" -gt {$limit} ]; then echo ".self::TOO_LARGE_MARKER."; else cat {$target}; fi";
-
-        // One sh -c line, so the non-root sudo parser runs the redirects as root too.
-        $content = (string) instant_remote_process(['sh -c '.escapeshellarg($script)], $this->server);
-        if ($content === self::SYMLINK_MARKER) {
-            throw new DeploymentException("{$file} is a symbolic link. Symbolic links are not supported.");
-        }
+        $content = $this->run(self::copyFileScript($this->checkoutDirectory, $this->flatDirectory, $file));
         if ($content === self::TOO_LARGE_MARKER) {
             throw new DeploymentException("{$file} exceeds the 5 MiB size limit.");
         }
 
         return $content;
+    }
+
+    /**
+     * A file in a Git submodule is read from the submodule, at the commit that the superproject selects.
+     */
+    public static function copyFileScript(string $checkoutDirectory, string $flatDirectory, string $file): string
+    {
+        $target = escapeshellarg("{$flatDirectory}/{$file}");
+        $limit = Application::MAX_DOCKER_COMPOSE_SIZE_BYTES;
+
+        return 'mkdir -p '.escapeshellarg(dirname("{$flatDirectory}/{$file}"))
+            .' && cd '.escapeshellarg($checkoutDirectory)
+            .' && file='.escapeshellarg($file).'; '.self::enterSubmoduleScript()
+            .' git show "HEAD:$file" > '.$target
+            ." && if [ \"$(wc -c < {$target})\" -gt {$limit} ]; then echo ".self::TOO_LARGE_MARKER."; else cat {$target}; fi";
     }
 
     /**
@@ -251,18 +333,18 @@ class ComposeIncludeFlattener
     {
         $script = collect($envFiles)
             ->map(function (string $envFile) {
-                $path = escapeshellarg("{$this->flatDirectory()}/{$envFile}");
+                $path = escapeshellarg("{$this->flatDirectory}/{$envFile}");
 
-                return 'mkdir -p '.escapeshellarg(dirname("{$this->flatDirectory()}/{$envFile}"))." && touch {$path}";
+                return 'mkdir -p '.escapeshellarg(dirname("{$this->flatDirectory}/{$envFile}"))." && touch {$path}";
             })
-            ->push('cd '.escapeshellarg($this->flatDirectory())
+            ->push('cd '.escapeshellarg($this->flatDirectory)
                 .' && COMPOSE_EXPERIMENTAL_GIT_REMOTE=0 COMPOSE_EXPERIMENTAL_OCI_REMOTE=0 docker compose'
                 .' --project-directory '.escapeshellarg("./{$projectDirectory}")
                 .' -f '.escapeshellarg("./{$composeFile}")
                 .' config --no-interpolate --no-path-resolution --no-normalize')
             ->implode(' && ');
 
-        $flattened = (string) instant_remote_process(['sh -c '.escapeshellarg($script)], $this->server);
+        $flattened = $this->run($script);
         if (strlen($flattened) > Application::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
             throw new DeploymentException('The Docker Compose file with its included files exceeds the 5 MiB size limit.');
         }

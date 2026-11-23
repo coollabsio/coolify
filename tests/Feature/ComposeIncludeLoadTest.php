@@ -38,34 +38,46 @@ beforeEach(function () {
         'destination_type' => $destination->getMorphClass(),
     ])->fresh();
     $this->serverCommands = new ArrayObject;
+    $this->composeVersion = '2.25.0';
 });
 
 /**
  * A server with the repository files in $files. `docker compose config` prints $flattened.
+ * The SSH command sends the remote script on stdin, so the fake reads the command and the input.
+ * A file read that the fake does not know fails, so a changed read cannot pass with empty output.
  *
  * @param  array<string, string>  $files
  */
 function fakeIncludeRepository(array $files, string $flattened = ''): void
 {
     $log = test()->serverCommands;
-    Process::fake(function ($process) use ($files, $flattened, $log) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+    $composeVersion = test()->composeVersion;
+    Process::fake(function ($process) use ($files, $flattened, $log, $composeVersion) {
+        $command = remoteProcessScript($process);
         $log[] = $command;
         if (str_contains($command, 'git --version')) {
             return Process::result(output: 'git version 2.43.0');
         }
-        if (str_contains($command, 'head -c')) {
-            return Process::result(output: $files['docker-compose.yml']);
+        // The state check of the bind mounts: no path exists on the server yet.
+        if (str_contains($command, 'for path in "$@"')) {
+            return Process::result(output: '1:missing');
+        }
+        if (str_contains($command, 'docker compose version --short')) {
+            return Process::result(output: $composeVersion);
         }
         if (str_contains($command, 'docker compose')) {
             return Process::result(output: $flattened);
         }
         foreach ($files as $path => $content) {
-            if (str_contains($command, "HEAD:{$path}'")) {
+            if (str_contains($command, "file='\\''{$path}'\\'';")) {
                 return Process::result(output: $content);
             }
         }
-        if (str_contains($command, 'git show')) {
+        // The main Compose file is read from the Git objects with `git ls-tree` and `git cat-file`.
+        if (str_contains($command, 'git ls-tree HEAD') && str_contains($command, 'git cat-file blob')) {
+            return Process::result(output: $files['docker-compose.yml']);
+        }
+        if (str_contains($command, 'git show') || str_contains($command, 'git cat-file')) {
             return Process::result(errorOutput: "fatal: path does not exist in 'HEAD'", exitCode: 128);
         }
 
@@ -86,7 +98,7 @@ function includeTestServerCommands(): array
  */
 function includeTestComposeConfigCommands(): array
 {
-    return array_values(array_filter(includeTestServerCommands(), fn (string $command) => str_contains($command, 'docker compose')));
+    return array_values(array_filter(includeTestServerCommands(), fn (string $command) => str_contains($command, 'docker compose') && str_contains($command, ' config ')));
 }
 
 it('flattens included files with docker compose config and saves the result', function () {
@@ -134,8 +146,8 @@ YAML);
         ->and($config[0])->toContain('COMPOSE_EXPERIMENTAL_OCI_REMOTE=0');
 
     $copies = implode("\n", includeTestServerCommands());
-    expect($copies)->toContain('HEAD:backend/compose.yml')
-        ->toContain('HEAD:shared/db.yml')
+    expect($copies)->toContain("file='\\''backend/compose.yml'\\'';")
+        ->toContain("file='\\''shared/db.yml'\\'';")
         ->toContain('shared/db.env');
 });
 
@@ -148,23 +160,48 @@ it('does not run docker compose config when the file has no include section', fu
         ->and(includeTestComposeConfigCommands())->toBe([]);
 });
 
-it('rejects an included file outside the repository and keeps the saved Compose file', function (array $files) {
-    fakeIncludeRepository($files);
+it('rejects an included file outside the repository and restores the saved Compose settings', function (array $files) {
+    // The flattener reads the main file again by its repository path.
+    fakeIncludeRepository([...$files, 'app/compose.yml' => $files['docker-compose.yml']]);
+    $this->application->base_directory = '/app';
+    $this->application->docker_compose_location = '/compose.yml';
 
-    expect(fn () => $this->application->loadComposeFile())
-        ->toThrow(DeploymentException::class, 'The Docker Compose file at /docker-compose.yml (branch: main) has an include that Coolify cannot use');
+    expect(fn () => $this->application->loadComposeFile(restoreBaseDirectory: '/', restoreDockerComposeLocation: '/docker-compose.yml'))
+        ->toThrow(DeploymentException::class, 'The Docker Compose file at /app/compose.yml (branch: main) has an include that Coolify cannot use');
 
-    expect($this->application->refresh()->docker_compose_raw)->toBe(INCLUDE_TEST_PREVIOUS_COMPOSE)
+    $application = $this->application->refresh();
+    expect($application->base_directory)->toBe('/')
+        ->and($application->docker_compose_location)->toBe('/docker-compose.yml')
+        ->and($application->docker_compose_raw)->toBe(INCLUDE_TEST_PREVIOUS_COMPOSE)
         ->and(includeTestComposeConfigCommands())->toBe([]);
 })->with([
-    'parent directory in the main file' => [['docker-compose.yml' => "include:\n  - ../other/compose.yml\n"]],
+    'parent directory in the main file' => [['docker-compose.yml' => "include:\n  - ../../other/compose.yml\n"]],
     'absolute path in a nested file' => [[
         'docker-compose.yml' => "include:\n  - a/compose.yml\n",
-        'a/compose.yml' => "include:\n  - /data/coolify/applications/x/docker-compose.yaml\n",
+        'app/a/compose.yml' => "include:\n  - /data/coolify/applications/x/docker-compose.yaml\n",
     ]],
     'git remote' => [['docker-compose.yml' => "include:\n  - https://github.com/acme/stack.git#main:compose.yml\n"]],
     'project directory outside the repository' => [['docker-compose.yml' => "include:\n  - path: a.yml\n    project_directory: ../..\n"]],
+    'extends file outside the repository' => [[
+        'docker-compose.yml' => "include:\n  - a/compose.yml\n",
+        'app/a/compose.yml' => "services:\n  api:\n    extends:\n      file: /etc/coolify/compose.yml\n      service: api\n",
+    ]],
 ]);
+
+it('stages the extended files of included files before docker compose config', function () {
+    fakeIncludeRepository([
+        'docker-compose.yml' => "include:\n  - a/compose.yml\n",
+        'a/compose.yml' => "services:\n  api:\n    extends:\n      file: ../shared/base.yml\n      service: base\n",
+        'shared/base.yml' => "services:\n  base:\n    extends:\n      file: nested/root.yml\n      service: root\n",
+        'shared/nested/root.yml' => "services:\n  root:\n    image: nginx\n",
+    ], "services:\n  api:\n    image: nginx\n");
+
+    $this->application->loadComposeFile();
+
+    $copied = array_filter(['a/compose.yml', 'shared/base.yml', 'shared/nested/root.yml'], fn (string $file) => collect(includeTestServerCommands())->contains(fn (string $command) => str_contains($command, "file='\\''{$file}'\\'';")));
+    expect($copied)->toHaveCount(3)
+        ->and(includeTestComposeConfigCommands())->toHaveCount(1);
+});
 
 it('rejects a symlinked included file', function () {
     // git show prints the link target of a symlink, which is not a Compose mapping.
@@ -190,3 +227,17 @@ it('validates the flattened file like any other Compose file', function () {
 
     expect($this->application->refresh()->docker_compose_raw)->toBe(INCLUDE_TEST_PREVIOUS_COMPOSE);
 });
+
+it('rejects an include when the server has a Docker Compose version that reads service env files', function (string $version) {
+    $this->composeVersion = $version;
+    fakeIncludeRepository([
+        'docker-compose.yml' => "include:\n  - backend/compose.yml\n",
+        'backend/compose.yml' => "services:\n  api:\n    image: alpine\n    env_file: ./app.env\n",
+    ]);
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(DeploymentException::class, 'The include section needs Docker Compose 2.25.0 or later on the server.');
+
+    expect($this->application->refresh()->docker_compose_raw)->toBe(INCLUDE_TEST_PREVIOUS_COMPOSE)
+        ->and(includeTestComposeConfigCommands())->toBe([]);
+})->with(['2.24.7', '', 'docker: unknown command: docker compose']);
