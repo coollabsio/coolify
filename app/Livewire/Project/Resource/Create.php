@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Resource;
 
 use App\Models\Service;
+use App\Services\TemplateFingerprint;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -140,6 +141,7 @@ class Create extends Component
             'docker_compose_raw' => base64_decode($oneClickService),
             'environment_id' => $environment->id,
             'service_type' => $oneClickServiceName,
+            'template_reference_hash' => TemplateFingerprint::forTemplate(data_get($services, $oneClickServiceName, [])),
             'server_id' => $destination->server_id,
             'destination_id' => $destination->id,
             'destination_type' => $destination->getMorphClass(),

@@ -35,6 +35,7 @@ use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\Canvas as DashboardCanvas;
 use App\Livewire\DeployCanvas;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -234,6 +235,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');
+        Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
         Route::get('/metrics', FleetMetrics::class)->name('metrics');
         Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
         Route::get('/canvas/tags', TagsCanvas::class)->name('tags.canvas');
@@ -530,6 +532,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
+        Route::get('/template', ServiceConfiguration::class)->name('project.service.template');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
