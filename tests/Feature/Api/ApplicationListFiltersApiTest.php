@@ -54,7 +54,11 @@ function listApplications(array $query = []): TestResponse
 
 function listedNames(TestResponse $response): array
 {
-    return collect($response->json())->pluck('name')->all();
+    $body = json_decode($response->getContent(), false, flags: JSON_THROW_ON_ERROR);
+
+    expect($body)->toBeArray();
+
+    return array_column($body, 'name');
 }
 
 test('without parameters it returns all team applications as a plain array without a total header', function () {
@@ -93,7 +97,7 @@ test('it filters by status and name case-insensitively', function () {
 });
 
 test('unknown uuids give an empty list', function (string $parameter) {
-    listApplications([$parameter => 'does-not-exist'])->assertOk()->assertExactJson([]);
+    expect(listedNames(listApplications([$parameter => 'does-not-exist'])->assertOk()))->toBe([]);
 })->with(['project_uuid', 'environment_uuid', 'server_uuid']);
 
 test('uuids of another team give an empty list', function () {
@@ -109,10 +113,10 @@ test('uuids of another team give an empty list', function () {
         'destination_type' => $otherDestination->getMorphClass(),
     ]);
 
-    listApplications(['project_uuid' => $otherProject->uuid])->assertOk()->assertExactJson([]);
-    listApplications(['environment_uuid' => $otherEnvironment->uuid])->assertOk()->assertExactJson([]);
-    listApplications(['server_uuid' => $otherServer->uuid])->assertOk()->assertExactJson([]);
-    expect(listedNames(listApplications()))->not->toContain('Foreign App');
+    expect(listedNames(listApplications(['project_uuid' => $otherProject->uuid])->assertOk()))->toBe([]);
+    expect(listedNames(listApplications(['environment_uuid' => $otherEnvironment->uuid])->assertOk()))->toBe([]);
+    expect(listedNames(listApplications(['server_uuid' => $otherServer->uuid])->assertOk()))->toBe([]);
+    expect(listedNames(listApplications()->assertOk()))->not->toContain('Foreign App');
 });
 
 test('it paginates with a total count header', function () {
@@ -122,7 +126,7 @@ test('it paginates with a total count header', function () {
 
     expect(listedNames($first))->toBe(['Api Backend', 'Web Frontend'])
         ->and(listedNames($second))->toBe(['Worker'])
-        ->and($beyond->json())->toBe([]);
+        ->and(listedNames($beyond))->toBe([]);
 });
 
 test('the total count header counts only the filtered applications', function () {
