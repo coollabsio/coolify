@@ -21,6 +21,13 @@ class StartSentinel
     /** Shorter than the 120 second timeout of CheckAndStartSentinelJob. */
     public const LOCK_WAIT_SECONDS = 90;
 
+    /**
+     * A PEM file of CA certificates in the Sentinel directory of the server (mounted on /app/db).
+     * When it exists, Sentinel gets PUSH_ENDPOINT_CA_PATH and trusts these CAs for HTTPS requests
+     * to Coolify, for an instance with a certificate from a private CA. Older Sentinel versions ignore the variable.
+     */
+    public const PUSH_ENDPOINT_CA_FILE = 'push-endpoint-ca.pem';
+
     public static function lockKey(Server $server): string
     {
         return 'sentinel-start:'.$server->uuid;
@@ -215,6 +222,7 @@ class StartSentinel
                 "touch $envFile",
                 "chmod 600 $envFile",
                 "echo '".base64_encode($envFileContent)."' | base64 -d | tee $envFile > /dev/null",
+                'if [ -f '.escapeshellarg("{$mountDir}/".self::PUSH_ENDPOINT_CA_FILE).' ]; then echo '.escapeshellarg('PUSH_ENDPOINT_CA_PATH=/app/db/'.self::PUSH_ENDPOINT_CA_FILE)." >> $envFile; fi",
                 $dockerCommand,
                 // Docker keeps the environment in the container configuration, so restarts do not read the file again.
                 "rm -f $envFile",
