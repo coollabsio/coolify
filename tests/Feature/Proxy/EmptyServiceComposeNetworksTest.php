@@ -29,6 +29,6 @@ test('an empty service compose contributes no networks and does not block proxy 
     $commands = ensureProxyNetworksExist($server)->implode("\n");
 
     expect($commands)
-        ->toContain("docker network inspect 'coolify'")
-        ->not->toContain("docker network inspect ''");
+        ->toContain(dockerProxyNetworkEnsureCommand('coolify'))
+        ->not->toContain(dockerProxyNetworkEnsureCommand(''));
 });

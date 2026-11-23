@@ -191,7 +191,7 @@ services:
           </clickhouse>
 
   signoz:
-    image: signoz/signoz:v0.137.1
+    image: signoz/signoz:v0.150.0
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -238,7 +238,7 @@ services:
       retries: 3
 
   telemetrystore-migrator:
-    image: signoz/signoz-otel-collector:v0.144.8
+    image: signoz/signoz-otel-collector:v0.144.15
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -247,6 +247,7 @@ services:
       - -c
     command:
       - |
+        /signoz-otel-collector migrate ready --clickhouse-dsn tcp://clickhouse:9000 &&
         /signoz-otel-collector migrate bootstrap --clickhouse-dsn tcp://clickhouse:9000 &&
         /signoz-otel-collector migrate sync up --clickhouse-dsn tcp://clickhouse:9000 &&
         /signoz-otel-collector migrate async up --clickhouse-dsn tcp://clickhouse:9000
@@ -263,7 +264,7 @@ services:
         max-file: "3"
 
   otel-collector:
-    image: signoz/signoz-otel-collector:v0.144.8
+    image: signoz/signoz-otel-collector:v0.144.15
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -307,6 +308,36 @@ services:
             send_batch_size: 20000
             send_batch_max_size: 25000
             timeout: 5s
+          filter/drop_stale:
+            error_mode: ignore
+            logs:
+              log_record:
+                - time_unix_nano != 0 and time < Now() - Duration("360h")
+                - time_unix_nano == 0 and observed_time_unix_nano != 0 and observed_time < Now() - Duration("360h")
+            metrics:
+              datapoint:
+                - time_unix_nano != 0 and time < Now() - Duration("360h")
+            traces:
+              span:
+                - start_time_unix_nano != 0 and start_time < Now() - Duration("360h")
+          signozllmpricing:
+            attrs:
+              cache_read: gen_ai.usage.cache_read.input_tokens
+              cache_write: gen_ai.usage.cache_creation.input_tokens
+              in: gen_ai.usage.input_tokens
+              model: gen_ai.request.model
+              out: gen_ai.usage.output_tokens
+            default_pricing:
+              rules: []
+            output_attrs:
+              cache_read: signoz.gen_ai.usage.cache_read.input_tokens.cost
+              cache_write: signoz.gen_ai.usage.cache_write.input_tokens.cost
+              in: signoz.gen_ai.usage.input_tokens.cost
+              out: signoz.gen_ai.usage.output_tokens.cost
+              total: signoz.gen_ai.usage.tokens.cost
+          signozlogsnormalizer: {}
+          signozspanmapper:
+            groups: []
           signozspanmetrics/delta:
             metrics_exporter: signozclickhousemetrics
             metrics_flush_interval: 60s
@@ -373,15 +404,15 @@ services:
           pipelines:
             traces:
               receivers: [otlp]
-              processors: [signozspanmetrics/delta, batch]
+              processors: [signozspanmetrics/delta, signozspanmapper, signozllmpricing, filter/drop_stale, batch]
               exporters: [clickhousetraces, signozmeter, metadataexporter]
             metrics:
               receivers: [otlp]
-              processors: [batch]
+              processors: [filter/drop_stale, batch]
               exporters: [signozclickhousemetrics, signozmeter, metadataexporter]
             logs:
               receivers: [otlp]
-              processors: [batch]
+              processors: [signozlogsnormalizer, filter/drop_stale, batch]
               exporters: [clickhouselogsexporter, signozmeter, metadataexporter]
             metrics/meter:
               receivers: [signozmeter]

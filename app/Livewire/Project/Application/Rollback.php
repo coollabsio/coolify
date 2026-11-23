@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\GetRollbackImages;
 use App\Models\Application;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -17,7 +18,7 @@ class Rollback extends Component
 
     public $images = [];
 
-    public ?string $current;
+    public ?string $current = null;
 
     public array $parameters;
 
@@ -52,6 +53,11 @@ class Rollback extends Component
         $this->authorize('deploy', $this->application);
 
         $commit = validateGitRef($commit, 'rollback commit');
+        if (! GetRollbackImages::allows($this->application, $commit)) {
+            $this->dispatch('error', 'Rollback did not start.', 'The commit is not a rollback image or a successful deployment of this application.');
+
+            return;
+        }
 
         $deployment_uuid = new_public_id();
 
@@ -82,30 +88,7 @@ class Rollback extends Component
         $this->authorize('view', $this->application);
 
         try {
-            $image = $this->application->docker_registry_image_name ?? $this->application->uuid;
-            if ($this->application->destination->server->isFunctional()) {
-                $output = instant_remote_process([
-                    "docker inspect --format='{{.Config.Image}}' {$this->application->uuid}",
-                ], $this->application->destination->server, throwError: false);
-                $current_tag = str($output)->trim()->explode(':');
-                $this->current = data_get($current_tag, 1);
-
-                $output = instant_remote_process([
-                    "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
-                ], $this->application->destination->server);
-                $this->images = str($output)->trim()->explode("\n")->filter(function ($item) use ($image) {
-                    return str($item)->contains($image);
-                })->map(function ($item) {
-                    $item = str($item)->explode('#');
-                    $is_current = $item[1] === $this->current;
-
-                    return [
-                        'tag' => $item[1],
-                        'created_at' => $item[2],
-                        'is_current' => $is_current,
-                    ];
-                })->toArray();
-            }
+            ['current' => $this->current, 'images' => $this->images] = GetRollbackImages::run($this->application);
             $showToast && $this->dispatch('success', 'Images loaded.');
 
             return [];

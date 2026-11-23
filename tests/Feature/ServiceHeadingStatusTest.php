@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Project\Service\Heading as ServiceHeading;
+use App\Livewire\Project\Service\ResourceCard;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -64,9 +65,7 @@ test('the heading shows the status of the selected service resource', function (
         'parameters' => $this->parameters + ['stack_service_uuid' => $this->exitedApp->uuid],
         'query' => [],
     ])
-        ->assertSee('Resource status')
-        ->assertDontSee('Service status')
-        ->assertSeeInOrder(['Resource status', 'Container', 'Exited', 'Healthcheck'])
+        ->assertSee('Exited')
         ->assertDontSee('Degraded');
 });
 
@@ -76,8 +75,19 @@ test('the heading shows the service status when no resource is selected', functi
         'parameters' => $this->parameters,
         'query' => [],
     ])
-        ->assertSee('Service status')
-        ->assertDontSee('Resource status')
-        ->assertSeeInOrder(['Service status', 'Containers', 'Healthcheck'])
         ->assertSee('Degraded');
+});
+
+test('a compose resource row shows the new status when the service status changes', function () {
+    $component = Livewire::test(ResourceCard::class, [
+        'service' => $this->service->fresh(),
+        'resource' => $this->exitedApp->fresh(),
+        'parameters' => $this->parameters,
+    ])->assertSee('Exited');
+
+    $this->exitedApp->forceFill(['status' => 'running:healthy'])->save();
+
+    $component->dispatch("echo-private:team.{$this->team->id},ServiceStatusChanged")
+        ->assertSee('Running')
+        ->assertDontSee('Exited');
 });

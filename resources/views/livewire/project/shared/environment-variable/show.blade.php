@@ -87,7 +87,13 @@
                 @endif
             @endforeach
         @endif
-        <div class="flex items-center gap-0.5 justify-self-end">
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
+            @if ($this->connectLink)
+                <a href="{{ $this->connectLink }}" class="icon-button shrink-0"
+                    title="Connect {{ $key }} to resources" aria-label="Connect {{ $key }} to resources">
+                    <x-reicon name="link" class="size-3.5" />
+                </a>
+            @endif
             @if (! $isLocked && ! $isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endif
@@ -120,11 +126,10 @@
                                     class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
                             </div>
                         @elseif ($isLocked)
-                            <div class="w-full">
-                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
-                                <input disabled type="text" value="Hidden after locking"
-                                    class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
-                            </div>
+                            <x-forms.input id="newLockedValue" type="password" label="Value" :copyable="false"
+                                placeholder="Hidden after locking. Enter a new value to replace it."
+                                helper="The locked value cannot be shown. Leave this empty to keep it."
+                                :disabled="!$canUpdate || $isDisabled" />
                         @else
                             {{-- Multiline: same shell while loading/loaded to avoid layout jump. --}}
                             <div x-show="isMultiline" x-cloak wire:key="env-show-value-multiline-{{ $env->id }}"
@@ -178,7 +183,7 @@
                             <div x-cloak x-show="!isMultiline" wire:key="env-show-value-tip-{{ $env->id }}"
                                 class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
                                 Tip: Type <span
-                                    class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference
+                                    class="font-mono text-coollabs dark:text-brand-light">{{ '{{' }}</span> to reference
                                 a shared environment variable
                             </div>
                         @endif
@@ -270,8 +275,19 @@
                                 @endcan
                             </div>
                             <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
+                                @if ($this->connectLink)
+                                    <a href="{{ $this->connectLink }}" class="button" title="Add this variable to resources, and see which resources use it">
+                                        <x-reicon name="link" class="size-3.5" />
+                                        Connect to resources
+                                    </a>
+                                @endif
                                 @if ($canUpdate && !$isLocked && !$isMagicVariable)
-                                    <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
+                                    <div wire:key="env-lock-action-{{ $env->id }}">
+                                        <x-modal-confirmation title="Lock Environment Variable?" buttonTitle="Lock"
+                                            submitAction="lock"
+                                            :actions="['The value will be hidden. You cannot see or copy it again.', 'You can still replace the value with a new one, but you cannot unlock the variable.']"
+                                            :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Lock" />
+                                    </div>
                                 @endif
                                 @if ($canUpdate && !$isDisabled)
                                     <fieldset disabled wire:dirty.attr.remove="disabled">

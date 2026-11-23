@@ -4,6 +4,7 @@
 # tags: proxy, neon, postgresql
 # logo: svgs/neon.svg
 # port: 80, 2112
+# outdated: true
 
 services:
   neon-proxy:

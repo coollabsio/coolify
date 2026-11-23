@@ -2,12 +2,13 @@
 
 namespace App\Traits;
 
+use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
-use Carbon\Carbon;
+use App\Services\Security\SensitiveDataRedactor;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Stringable;
@@ -22,51 +23,43 @@ trait ExecuteRemoteCommand
 
     public static int $batch_counter = 0;
 
-    private function redact_sensitive_info($text)
+    /** @var array{known: array<int, string>, locked: array<int, string>}|null */
+    private ?array $logRedactionSecrets = null;
+
+    /** @var array<int, string>|null */
+    private ?array $remoteSecretLogRedactionValues = null;
+
+    private function redact_sensitive_info(string $text): string
     {
         try {
-            $text = remove_iip($text);
-
-            if (! isset($this->application)) {
-                return $text;
-            }
-
-            $lockedVars = collect([]);
-
-            if (isset($this->application->environment_variables)) {
-                $lockedVars = $lockedVars->merge(
-                    $this->application->environment_variables
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
-                $lockedVars = $lockedVars->merge(
-                    $this->application->environment_variables_preview
-                        ->where('is_shown_once', true)
-                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
-                        ->filter()
-                );
-            }
-
-            if (isset($this->remote_secrets_cache)) {
-                $lockedVars = $lockedVars->merge(EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache));
-            }
-
-            foreach ($lockedVars as $key => $value) {
-                $escapedValue = preg_quote($value, '/');
-                $text = preg_replace(
-                    '/'.$escapedValue.'/',
-                    REDACTED,
-                    $text
-                );
-            }
-
-            return is_string($text) ? $text : REDACTED;
+            // Remote secrets come from the job's remote_secrets_cache below, so they are not fetched again.
+            $this->logRedactionSecrets ??= EnvironmentVariable::logRedactionSecretsFor(
+                $this->application ?? null,
+                isset($this->pull_request_id) && $this->pull_request_id !== 0,
+                resolveRemoteSecrets: false,
+            );
         } catch (\Throwable) {
             return REDACTED;
+        }
+
+        $remoteSecrets = isset($this->remote_secrets_cache)
+            ? ($this->remoteSecretLogRedactionValues ??= EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache))
+            : [];
+
+        return app(SensitiveDataRedactor::class)->redactText(
+            $text,
+            $this->logRedactionSecrets['known'],
+            array_merge($this->logRedactionSecrets['locked'], $remoteSecrets),
+        );
+    }
+
+    /**
+     * Remote secrets are never stored in Coolify, so the deployment log model must get them from the job.
+     */
+    private function registerRemoteSecretsForLogs(): void
+    {
+        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
         }
     }
 
@@ -81,9 +74,7 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
-        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
-            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
-        }
+        $this->registerRemoteSecretsForLogs();
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
@@ -96,6 +87,7 @@ trait ExecuteRemoteCommand
             $command_hidden = data_get($single_command, 'command_hidden', false);
             $skip_command_log = data_get($single_command, 'skip_command_log', false);
             $input = data_get($single_command, 'input');
+            $skip_cancellation_check = data_get($single_command, 'skip_cancellation_check', false);
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -105,8 +97,8 @@ trait ExecuteRemoteCommand
                 }
             }
 
-            // Check for cancellation before executing commands
-            if (isset($this->application_deployment_queue)) {
+            // Check for cancellation before executing commands. Cleanup commands must also run after a cancel.
+            if (! $skip_cancellation_check && isset($this->application_deployment_queue)) {
                 $this->application_deployment_queue->refresh();
                 if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                     throw new \RuntimeException('Deployment cancelled by user', 69420);
@@ -118,26 +110,29 @@ trait ExecuteRemoteCommand
             $lastError = null;
             $commandExecuted = false;
 
-            while ($attempt < $maxRetries && ! $commandExecuted) {
+            while (! $commandExecuted) {
                 try {
                     $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log, $input);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
+                    $attemptLimit = $this->sshAttemptLimit($e, $maxRetries);
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $attemptLimit - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
-                            $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+                            $this->addRetryLogEntry($attempt, $attemptLimit, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
-                            $this->application_deployment_queue->refresh();
-                            if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-                                throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                            if (! $skip_cancellation_check) {
+                                $this->application_deployment_queue->refresh();
+                                if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                                    throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                                }
                             }
                         }
 
@@ -160,6 +155,7 @@ trait ExecuteRemoteCommand
                         ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
                         ->update([
                             'status' => ApplicationDeploymentStatus::FAILED->value,
+                            'finished_at' => now(),
                         ]);
                 }
                 throw $lastError;
@@ -168,9 +164,9 @@ trait ExecuteRemoteCommand
     }
 
     /**
-     * Execute the actual command with process handling. With $input, the content goes to the command over
-     * SSH stdin, because Linux limits one exec argument to 128 KiB and generateSshCommand() puts the whole
-     * script into one argument.
+     * Execute the actual command with process handling. Without $input, the command goes to the remote shell
+     * over SSH stdin, so its secrets are not in a command line on the Coolify host. With $input, the command
+     * is the SSH argument and the content goes to it over SSH stdin.
      */
     private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false, ?string $input = null)
     {
@@ -178,60 +174,74 @@ trait ExecuteRemoteCommand
             $this->application_deployment_queue->addLogEntry('[CMD]: '.$this->redact_sensitive_info($command), hidden: true);
         }
 
-        $remote_command = $input === null
-            ? SshMultiplexingHelper::generateSshCommand($this->server, $command)
-            : SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
+        if ($input === null) {
+            $remote_command = SshMultiplexingHelper::generateSshBatchCommand($this->server);
+            $input = SshMultiplexingHelper::sshBatchInput((string) $command);
+        } else {
+            $remote_command = SshMultiplexingHelper::generateSshStdinCommand($this->server, $command);
+        }
+        $addLogEntry = function (string $type, string $output) use ($command, $hidden, $customType, $command_hidden, $skip_command_log): void {
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
-            $sanitized_output = sanitize_utf8_text($output);
-            $log_output = str($sanitized_output)->trim();
+            $log_output = str(sanitize_utf8_text($output))->trim();
             if ($log_output->startsWith('╔')) {
                 $log_output = "\n".$log_output;
             }
 
-            $new_log_entry = [
-                'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
-                'output' => $this->redact_sensitive_info($skip_command_log ? $this->redactSensitiveCommandPayloads((string) $log_output, (string) $command) : $log_output),
-                'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
-                'timestamp' => Carbon::now('UTC'),
-                'hidden' => $hidden,
-                'batch' => static::$batch_counter,
-            ];
-            if (! $this->application_deployment_queue->logs) {
-                $new_log_entry['order'] = 1;
+            $this->application_deployment_queue->addLogEntry(
+                message: $skip_command_log ? $this->redactSensitiveCommandPayloads((string) $log_output, (string) $command) : (string) $log_output,
+                type: $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
+                hidden: $hidden,
+                command: $skip_command_log || $command_hidden ? null : $command,
+                batch: static::$batch_counter,
+            );
+        };
+        // Output is logged per complete line, so a secret split across two output chunks is still redacted.
+        $pending = [];
+        $handleOutput = function (string $type, string $output) use ($addLogEntry, $append, &$pending): void {
+            $pending[$type] = ($pending[$type] ?? '').$output;
+            $complete_output = RunRemoteProcess::takeCompleteOutput($pending[$type]);
+            if ($complete_output !== '') {
+                $addLogEntry($type, $complete_output);
+            }
+
+            $this->saveCommandOutput(sanitize_utf8_text($output), $append);
+        };
+        // The changed host key warning of ssh is left out of logs and saved output; noticeHostKeyMismatch() reads the raw stderr.
+        $heldStderr = '';
+        $releaseHeldStderr = function () use ($handleOutput, &$heldStderr): void {
+            $stderr = SshMultiplexingHelper::filterHostKeyChangedWarning($heldStderr, '', final: true);
+            if ($stderr !== '') {
+                $handleOutput('err', $stderr);
+            }
+        };
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($handleOutput, $releaseHeldStderr, &$heldStderr) {
+            if ($type === 'err') {
+                $output = SshMultiplexingHelper::filterHostKeyChangedWarning($heldStderr, $output);
+                if ($output === '') {
+                    return;
+                }
             } else {
-                try {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                } catch (\JsonException $e) {
-                    // If existing logs are corrupted, start fresh
-                    $previous_logs = [];
-                    $new_log_entry['order'] = 1;
-                }
-                if (is_array($previous_logs)) {
-                    $new_log_entry['order'] = count($previous_logs) + 1;
-                } else {
-                    $previous_logs = [];
-                    $new_log_entry['order'] = 1;
-                }
-            }
-            $previous_logs[] = $new_log_entry;
-
-            try {
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                // If JSON encoding still fails, use fallback with invalid sequences replacement
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
+                $releaseHeldStderr();
             }
 
-            $this->application_deployment_queue->save();
-
-            $this->saveCommandOutput($sanitized_output, $append);
+            $handleOutput($type, $output);
         });
         $this->application_deployment_queue->update([
             'current_process_id' => $process->id(),
         ]);
 
-        $process_result = $process->wait();
+        try {
+            $process_result = $process->wait();
+        } finally {
+            $releaseHeldStderr();
+            foreach ($pending as $type => $output) {
+                $remaining_output = RunRemoteProcess::takeCompleteOutput($pending[$type], final: true);
+                if ($remaining_output !== '') {
+                    $addLogEntry($type, $remaining_output);
+                }
+            }
+        }
+        SshMultiplexingHelper::noticeHostKeyMismatch($this->server, $process_result);
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
                 // Check if deployment was cancelled while command was running
@@ -246,6 +256,8 @@ trait ExecuteRemoteCommand
                 // This prevents premature status changes during retryable SSH errors
                 $error = $process_result->errorOutput();
                 if (empty($error)) {
+                    // A silent exit 255 can be a refused SSH handshake or the remote command itself (a PHP fatal error in a
+                    // pre-deployment command), so it must not look like a retryable SSH error: a retry would run the command again.
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
@@ -268,7 +280,33 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error);
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->registryLoginHint($error).$this->sshConnectionLostHint($exitCode);
+    }
+
+    /**
+     * A registry that refuses a pull or push gives only a generic Docker error, which does not tell on which server
+     * the login is missing. With a build server or a Coolify host that is not the deployment server, users often log
+     * in on the wrong server, or as another user than the SSH user.
+     */
+    private function registryLoginHint(string $error): string
+    {
+        if (! preg_match('~pull access denied|requested access to the resource is denied|no basic auth credentials|unauthorized: authentication required|/v2/[^"\s]*": (?:unauthorized|denied)~i', $error)) {
+            return '';
+        }
+
+        return "\nThe registry refused access to the image. Deployments use the Docker registry logins of the SSH user ({$this->server->user}) on the server {$this->server->name}. Log in to the registry on the Registries page of this server, then deploy again. If a 'docker pull' of the image on the server also fails, the token cannot read the image: check its scopes.";
+    }
+
+    /**
+     * SSH exits with 255 when the connection closes, so the output of the remote command stops without an error.
+     */
+    private function sshConnectionLostHint(int $exitCode): string
+    {
+        if ($exitCode !== 255) {
+            return '';
+        }
+
+        return "\nExit code 255 usually means that the SSH connection to the server closed before the command finished. Check the network between Coolify and the server, and the sshd logs and memory usage of the server, then deploy again.";
     }
 
     /**
@@ -339,40 +377,10 @@ trait ExecuteRemoteCommand
     {
         $retryMessage = "SSH connection failed. Retrying... (Attempt {$attempt}/{$maxRetries}, waiting {$delay}s)\nError: {$errorMessage}";
 
-        $new_log_entry = [
-            'output' => $this->redact_sensitive_info($retryMessage),
-            'type' => 'stdout',
-            'timestamp' => Carbon::now('UTC'),
-            'hidden' => false,
-            'batch' => static::$batch_counter,
-        ];
-
-        if (! $this->application_deployment_queue->logs) {
-            $new_log_entry['order'] = 1;
-            $previous_logs = [];
-        } else {
-            try {
-                $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                $previous_logs = [];
-                $new_log_entry['order'] = 1;
-            }
-            if (is_array($previous_logs)) {
-                $new_log_entry['order'] = count($previous_logs) + 1;
-            } else {
-                $previous_logs = [];
-                $new_log_entry['order'] = 1;
-            }
-        }
-
-        $previous_logs[] = $new_log_entry;
-
-        try {
-            $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
-        }
-
-        $this->application_deployment_queue->save();
+        $this->registerRemoteSecretsForLogs();
+        $this->application_deployment_queue->addLogEntry(
+            message: $retryMessage,
+            batch: static::$batch_counter,
+        );
     }
 }

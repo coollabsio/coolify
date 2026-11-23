@@ -40,8 +40,13 @@ trait TracksDeliveryFailures
         });
     }
 
+    /**
+     * The reason must not contain a provider response body. It is shared with the
+     * team, the team admins, and the instance admins, so it is redacted once more.
+     */
     public function recordDeliveryFailure(string $reason): void
     {
+        $reason = remove_iip($reason);
         $this->increment('failure_count');
 
         Log::warning('Notification delivery failed', [
@@ -127,7 +132,7 @@ trait TracksDeliveryFailures
 
             $admins = $this->team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
             foreach ($admins as $admin) {
-                send_user_an_email($mail, $admin->email);
+                send_user_an_email($mail, $admin->email, asNotification: true);
             }
         } catch (Throwable $e) {
             Log::warning('Failed to send notification channel disabled email: '.$e->getMessage());

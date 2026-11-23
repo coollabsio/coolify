@@ -63,6 +63,7 @@ class SecretManagerLink extends BaseModel
                 data_get($metadata, 'base_url', 'https://app.infisical.com'),
                 (string) data_get($metadata, 'client_id'),
                 $token->token,
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'project_id'),
                 (string) data_get($settings, 'environment'),
@@ -72,6 +73,7 @@ class SecretManagerLink extends BaseModel
                 (string) data_get($metadata, 'base_url'),
                 $token->token,
                 data_get($metadata, 'namespace'),
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'mount', 'secret'),
                 (string) data_get($settings, 'path'),

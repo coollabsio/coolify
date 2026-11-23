@@ -142,17 +142,17 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
         $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
         $this->server->update(['private_key_id' => $privateKey->id]);
         Process::fake(function ($process) {
-            if (str_contains($process->command, 'docker ps -a')) {
+            if (str_contains(remoteProcessScript($process), 'docker ps -a')) {
                 return Process::result(output: json_encode([
                     'ID' => 'preview-container',
                     'Names' => "{$this->application->uuid}-pr-42",
                     'Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=42",
                 ]));
             }
-            if (str_contains($process->command, 'docker inspect')) {
+            if (str_contains(remoteProcessScript($process), 'docker inspect')) {
                 return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
             }
-            if (str_contains($process->command, 'docker logs')) {
+            if (str_contains(remoteProcessScript($process), 'docker logs')) {
                 return Process::result(output: 'preview runtime log');
             }
 
@@ -455,7 +455,7 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
         $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
         $this->server->update(['private_key_id' => $privateKey->id]);
         Process::fake(function ($process) {
-            if (str_contains($process->command, 'docker ps -a')) {
+            if (str_contains(remoteProcessScript($process), 'docker ps -a')) {
                 return Process::result(output: implode(PHP_EOL, [
                     json_encode([
                         'ID' => 'web-container',
@@ -469,11 +469,11 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
                     ]),
                 ]));
             }
-            if (str_contains($process->command, 'docker inspect')) {
+            if (str_contains(remoteProcessScript($process), 'docker inspect')) {
                 return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
             }
-            if (str_contains($process->command, 'docker logs')) {
-                return Process::result(output: str_contains($process->command, 'worker-container') ? 'worker log' : 'web log');
+            if (str_contains(remoteProcessScript($process), 'docker logs')) {
+                return Process::result(output: str_contains(remoteProcessScript($process), 'worker-container') ? 'worker log' : 'web log');
             }
 
             return Process::result();
@@ -498,7 +498,7 @@ describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
         $this->withHeaders(previewAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$this->application->uuid}/logs?service_name=work")
             ->assertNotFound()
-            ->assertJson(['message' => "No running container found for service_name 'work'."]);
+            ->assertJson(['message' => "No container found for service_name 'work'."]);
     });
 });
 
@@ -690,6 +690,72 @@ describe('POST /api/v1/applications/{uuid}/previews', function () {
         'read' => [['read']],
         'write' => [['write']],
     ]);
+
+    test('a deploy-only token cannot open a preview', function () {
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($this->user, $this->team, ['deploy'])))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 42,
+                'git_type' => 'github',
+            ])
+            ->assertForbidden();
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse()
+            ->and($this->application->deployment_queue()->exists())->toBeFalse();
+    });
+
+    test('a deploy-only token cannot change an existing preview', function (array $changes) {
+        $preview = createPreview($this->application, 42);
+        $preview->update(['git_type' => 'github']);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($this->user, $this->team, ['deploy'])))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", ['pull_request_id' => 42, ...$changes])
+            ->assertForbidden();
+
+        $preview->refresh();
+        expect($preview->git_type)->toBe('github')
+            ->and($preview->pull_request_html_url)->toBe('https://github.com/example/repo/pull/42')
+            ->and($this->application->deployment_queue()->exists())->toBeFalse();
+    })->with([
+        'git type' => [['git_type' => 'gitlab']],
+        'pull request url' => [['pull_request_html_url' => 'https://github.com/other/repo/pull/42']],
+        'commit' => [['commit' => 'abcdef1234567']],
+    ]);
+
+    test('a deploy-only token can redeploy an existing preview without changes', function () {
+        $preview = createPreview($this->application, 42);
+        $preview->update(['git_type' => 'github']);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($this->user, $this->team, ['deploy'])))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 42,
+                'git_type' => 'github',
+                'pull_request_html_url' => 'https://github.com/example/repo/pull/42',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Preview deployment queued.');
+
+        expect($this->application->deployment_queue()->latest('id')->first()->pull_request_id)->toBe(42);
+    });
+
+    test('a member with only a deploy grant cannot open a preview', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, [
+            'role' => 'member',
+            'access' => json_encode([
+                ['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['read', 'deploy']],
+            ]),
+        ]);
+
+        $this->withHeaders(previewAuthHeaders(createTeamApiToken($member, $this->team, ['read', 'write', 'deploy'])))
+            ->postJson("/api/v1/applications/{$this->application->uuid}/previews", [
+                'pull_request_id' => 42,
+                'git_type' => 'github',
+            ])
+            ->assertForbidden();
+
+        expect(ApplicationPreview::where('application_id', $this->application->id)->exists())->toBeFalse()
+            ->and($this->application->deployment_queue()->exists())->toBeFalse();
+    });
 
     test('returns 404 for an application of another team', function () {
         $otherTeam = Team::factory()->create();

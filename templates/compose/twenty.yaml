@@ -7,14 +7,14 @@
 
 services:
   twenty:
-    image: twentycrm/twenty:v1.15
+    image: twentycrm/twenty:v2.58
     environment:
       - SERVICE_URL_TWENTY_3000
       - SERVER_URL=${SERVICE_URL_TWENTY}
       - FRONT_BASE_URL=${SERVICE_URL_TWENTY}
       - APP_SECRET=${SERVICE_BASE64_32_SECRET}
+      - ENCRYPTION_KEY=${SERVICE_BASE64_32_ENCRYPTION}
       - ENABLE_DB_MIGRATIONS=true
-      - 'CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}'
       - 'REDIS_URL=redis://redis:6379'
       - 'API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}'
       - 'API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}'
@@ -30,7 +30,6 @@ services:
       - STORAGE_S3_ENDPOINT=$STORAGE_S3_ENDPOINT
       - STORAGE_S3_ACCESS_KEY_ID=$STORAGE_S3_ACCESS_KEY_ID
       - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
-      - 'MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}'
       - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
       - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
       - EMAIL_SYSTEM_ADDRESS=$EMAIL_SYSTEM_ADDRESS
@@ -57,9 +56,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   worker:
-    image: twentycrm/twenty:v1.15
+    image: twentycrm/twenty:v2.58
     command: ["yarn", "worker:prod"]
     volumes:
       - twenty-local-storage:/app/packages/twenty-server/.local-storage
@@ -67,8 +68,8 @@ services:
       - SERVER_URL=${SERVICE_URL_TWENTY}
       - FRONT_BASE_URL=${SERVICE_URL_TWENTY}
       - APP_SECRET=${SERVICE_BASE64_32_SECRET}
+      - ENCRYPTION_KEY=${SERVICE_BASE64_32_ENCRYPTION}
       - ENABLE_DB_MIGRATIONS=true
-      - 'CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}'
       - 'REDIS_URL=redis://redis:6379'
       - 'API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}'
       - 'API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}'
@@ -84,7 +85,6 @@ services:
       - STORAGE_S3_ENDPOINT=$STORAGE_S3_ENDPOINT
       - STORAGE_S3_ACCESS_KEY_ID=$STORAGE_S3_ACCESS_KEY_ID
       - STORAGE_S3_SECRET_ACCESS_KEY=$STORAGE_S3_SECRET_ACCESS_KEY
-      - 'MESSAGE_QUEUE_TYPE=${MESSAGE_QUEUE_TYPE:-pg-boss}'
       - EMAIL_FROM_ADDRESS=$EMAIL_FROM_ADDRESS
       - EMAIL_FROM_NAME=$EMAIL_FROM_NAME
       - EMAIL_SYSTEM_ADDRESS=$EMAIL_SYSTEM_ADDRESS

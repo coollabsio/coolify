@@ -49,11 +49,12 @@ class ConfigureCloudflared
                 'echo Stopping existing Cloudflare Tunnel container.',
                 'docker rm -f coolify-cloudflared || true',
                 'echo Starting new Cloudflare Tunnel container.',
-                'docker compose up --wait --wait-timeout 180 --remove-orphans || docker logs coolify-cloudflared',
+                'docker compose up --wait --wait-timeout 180 --remove-orphans || '.remoteCommandWithTimeout('docker logs coolify-cloudflared', 30),
             ]);
 
             return remote_process($commands, $server, callEventOnFinish: 'CloudflareTunnelChanged', callEventData: [
                 'server_id' => $server->id,
+                'team_id' => $server->team_id,
                 'ssh_domain' => $ssh_domain,
             ]);
         } catch (\Throwable $e) {

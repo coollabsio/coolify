@@ -71,13 +71,12 @@ it('returns 404 when the database backup index environment does not exist', func
     ]))->assertNotFound();
 });
 
-it('returns 404 when the database backup execution environment does not exist', function () {
-    $this->get(route('project.database.backup.execution', [
+it('returns 404 when the environment of an old database backup link does not exist', function () {
+    $this->followingRedirects()->get(route('project.database.backup.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => 'fbmlga1tumj9ndoy16lal93d',
         'database_uuid' => 'missing-database',
-        'backup_uuid' => 'missing-backup',
-    ]))->assertNotFound();
+    ]).'/missing-backup')->assertNotFound();
 });
 
 it('does not show a deployment of another application', function () {

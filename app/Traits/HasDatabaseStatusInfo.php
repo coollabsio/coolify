@@ -75,7 +75,6 @@ trait HasDatabaseStatusInfo
 
     public function mount(): void
     {
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
         $this->refresh();
     }
 
@@ -83,7 +82,8 @@ trait HasDatabaseStatusInfo
     {
         $this->database->refresh();
         $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
-        if ($this->isPasswordHiddenForMember) {
+        $isCredentialLocked = method_exists($this->database, 'isCredentialLocked') && $this->database->isCredentialLocked();
+        if ($this->isPasswordHiddenForMember || $isCredentialLocked) {
             $this->dbUrl = null;
             $this->dbUrlPublic = null;
         } else {

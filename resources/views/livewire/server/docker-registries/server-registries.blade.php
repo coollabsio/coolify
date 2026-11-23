@@ -38,11 +38,11 @@
     @else
         <div class="overflow-x-auto">
             <div
-                class="grid min-w-[760px] grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)_14rem] border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                class="grid min-w-[760px] grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)_4.5rem] border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
                 <div>Registry</div>
                 <div>Status</div>
                 <div>Used by</div>
-                <div></div>
+                <div class="text-right">Actions</div>
             </div>
             @foreach ($visibleRows as $row)
                 @php
@@ -53,7 +53,7 @@
                 @endphp
                 <div wire:key="{{ $server->uuid }}-{{ $row['registry'] }}" x-data="{ showUsers: false }"
                     class="min-w-[760px] border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                    <div class="grid min-h-11 grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)_14rem] items-center px-4 py-2 text-[12px]">
+                    <div class="grid min-h-11 grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)_4.5rem] items-center px-4 py-2 text-[12px]">
                         <div class="truncate font-mono">{{ $row['registry'] }}</div>
                         <div>
                             @if ($row['logged_in'] && ($loginChecks[$row['registry']]['ok'] ?? true) === false)
@@ -83,8 +83,34 @@
                                 </button>
                             @endif
                         </div>
-                        <div class="flex justify-end gap-2">
-                            @if ($row['logged_in'])
+                        <div class="flex justify-end">
+                            @if ($row['logged_in'] && $row['source'] === 'auths')
+                                <x-table.row-actions label="Registry actions">
+                                    <x-table.row-action wire:click="testLogin({{ \Illuminate\Support\Js::from($row['registry']) }})" wire:loading.attr="disabled"
+                                        wire:target="testLogin" title="Run docker login with the saved credentials">Test</x-table.row-action>
+                                    <x-modal-input title="Edit login for {{ $row['registry'] }}"
+                                        subtitle="Runs docker login on {{ $server->name }} again. The new values replace the old login.">
+                                        <x-slot:content>
+                                            <x-table.row-action>Edit</x-table.row-action>
+                                        </x-slot:content>
+                                        <livewire:server.docker-registries.login :server="$server" :editRegistry="$row['registry']"
+                                            :currentUsername="$row['username']"
+                                            :key="'registry-edit-'.$server->uuid.'-'.$row['registry']" />
+                                    </x-modal-input>
+                                    <x-slot:danger>
+                                        <x-modal-confirmation title="Delete the login for {{ $row['registry'] }}?" buttonFullWidth
+                                            submitAction="logout({{ $row['registry'] }})" :actions="[
+                                                'Runs docker logout on '.$server->name.' and removes the saved credentials.',
+                                                'The server can no longer pull private images from this registry.',
+                                                'Deployments that need this registry fail until you log in again.',
+                                            ]" :confirmWithText="false" :confirmWithPassword="false">
+                                            <x-slot:trigger>
+                                                <x-table.row-action>Delete</x-table.row-action>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
+                                    </x-slot:danger>
+                                </x-table.row-actions>
+                            @elseif ($row['logged_in'])
                                 <button type="button" wire:click="testLogin(@js($row['registry']))" wire:loading.attr="disabled"
                                     wire:target="testLogin" class="button w-fit"
                                     title="Run docker login with the saved credentials">Test</button>
@@ -94,20 +120,6 @@
                                     <livewire:server.docker-registries.login :server="$server" :presetRegistry="$row['registry']"
                                         :key="'registry-login-'.$server->uuid.'-'.$row['registry']" />
                                 </x-modal-input>
-                            @endif
-                            @if ($row['logged_in'] && $row['source'] === 'auths')
-                                <x-modal-input buttonTitle="Edit" title="Edit login for {{ $row['registry'] }}"
-                                    subtitle="Runs docker login on {{ $server->name }} again. The new values replace the old login.">
-                                    <livewire:server.docker-registries.login :server="$server" :editRegistry="$row['registry']"
-                                        :currentUsername="$row['username']"
-                                        :key="'registry-edit-'.$server->uuid.'-'.$row['registry']" />
-                                </x-modal-input>
-                                <x-modal-confirmation title="Delete the login for {{ $row['registry'] }}?" buttonTitle="Delete" isErrorButton
-                                    submitAction="logout({{ $row['registry'] }})" :actions="[
-                                        'Runs docker logout on '.$server->name.' and removes the saved credentials.',
-                                        'The server can no longer pull private images from this registry.',
-                                        'Deployments that need this registry fail until you log in again.',
-                                    ]" :confirmWithText="false" :confirmWithPassword="false" />
                             @endif
                         </div>
                     </div>

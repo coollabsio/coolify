@@ -7,6 +7,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -87,7 +88,7 @@ class Index extends Component
 
     public function mount()
     {
-        if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
+        if (auth()->user()?->isMember()) {
             return redirect()->route('dashboard');
         }
 
@@ -220,7 +221,7 @@ class Index extends Component
     {
         return [
             'remoteServerName' => 'required|string',
-            'remoteServerHost' => 'required|string',
+            'remoteServerHost' => ['required', 'string', new ValidServerIp],
             'remoteServerPort' => 'required|integer|min:1|max:65535',
             'remoteServerUser' => ValidationPatterns::serverUsernameRules(),
         ];
@@ -290,6 +291,7 @@ class Index extends Component
             ]);
 
             $this->createdPrivateKey = $privateKey;
+            $this->privateKey = null;
             $this->currentState = 'create-server';
         } catch (\Exception $e) {
             $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());
@@ -302,9 +304,8 @@ class Index extends Component
 
         $this->validate();
 
-        $foundServer = Server::whereIp(Server::normalizeIp($this->remoteServerHost))->first();
-        if ($foundServer) {
-            return $this->dispatch('error', 'A server with this IP/Domain already exists.');
+        if (Server::sshEndpointInUse($this->remoteServerHost, $this->remoteServerPort)) {
+            return $this->dispatch('error', 'A server with this IP/Domain and SSH port already exists.');
         }
         $privateKeyId = $this->createdPrivateKey?->id ?? $this->selectedExistingPrivateKey;
         $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($privateKeyId);

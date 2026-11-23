@@ -7,13 +7,14 @@
 
 services:
   imgcompress:
-    image: karimz1/imgcompress:0.6.0
+    image: karimz1/imgcompress:1.0.0
     environment:
       - SERVICE_URL_IMGCOMPRESS_5000
       - DISABLE_LOGO=${DISABLE_LOGO:-false}
       - DISABLE_STORAGE_MANAGEMENT=${DISABLE_STORAGE_MANAGEMENT:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000"]
+      test: ["CMD", "python", "/container/healthcheck.py"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s

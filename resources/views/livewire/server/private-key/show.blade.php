@@ -89,7 +89,7 @@
                                 @click.prevent="copyPublicKeyToClipboard({{ Js::from($privateKey->public_key) }})">
                                 Copy public key
                             </x-forms.button>
-                            @if (data_get($server, 'privateKey.uuid') !== $privateKey->uuid)
+                            @if (data_get($server, 'privateKey.uuid') !== $privateKey->uuid && ! $server->isTransferredAway())
                                 <x-forms.button canGate="update" :canResource="$server"
                                     wire:click="setPrivateKey({{ $privateKey->id }})">
                                     Use this key

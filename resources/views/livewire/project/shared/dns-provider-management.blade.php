@@ -25,9 +25,7 @@
                                     <div class="min-w-0 text-sm"><div class="truncate font-medium text-black dark:text-fg">{{ $proposal['hostname'] }}</div>
                                         <div class="text-xs text-neutral-500 dark:text-fg-dim">{{ $proposal['credential'] }} · {{ $proposal['zone'] }}@if (filled($proposal['target'])) · {{ $proposal['target'] }}@endif</div>
                                     </div>
-                                    @if ($proposal['managed'])
-                                        <x-status-badge status="Managed by Coolify" type="success" />
-                                    @elseif (isset($dnsProviderConflicts[$key]))
+                                    @if (isset($dnsProviderConflicts[$key]))
                                         @php($conflict = $dnsProviderConflicts[$key])
                                         <div class="flex flex-col items-end gap-2 text-xs"><span class="text-red-600 dark:text-red-400">Currently {{ $conflict['current'] }}</span>
                                             <x-modal-confirmation title="Replace conflicting DNS record?" isErrorButton buttonTitle="Replace record"
@@ -36,6 +34,8 @@
                                                 :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Replace record"
                                                 canGate="update" :canResource="$dnsAuthResource" />
                                         </div>
+                                    @elseif ($proposal['managed'])
+                                        <x-status-badge status="Managed by Coolify" type="success" />
                                     @elseif (blank($proposal['target']))
                                         <span class="text-xs text-neutral-500 dark:text-fg-dim">Add manually</span>
                                     @else

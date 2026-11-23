@@ -43,8 +43,9 @@ beforeEach(function () {
     $this->serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $this->service->id]);
 
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'readlink -f') => 'OK',
-        str_contains($process->command, 'test -') => 'NOK',
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -') => 'NOK',
         default => '',
     }));
 });
@@ -67,15 +68,15 @@ function relativePathFileVolume(string $fsPath, bool $isDirectory, ?string $cont
  */
 function assertNoRelativeRemotePath(): void
 {
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, "'./"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), "'./"));
 }
 
 test('a relative directory path is created inside the resource directory, not in the home directory', function () {
     $workdir = $this->service->workdir();
     relativePathFileVolume('./data/sub', isDirectory: true)->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$workdir}/data/sub'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$workdir}/data'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '{$workdir}/data/sub'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '{$workdir}/data'"));
     assertNoRelativeRemotePath();
 });
 
@@ -83,8 +84,8 @@ test('a relative file path without content gets its parent directory inside the 
     $workdir = $this->service->workdir();
     relativePathFileVolume('./config/app.conf', isDirectory: false)->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$workdir}/config'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "touch '{$workdir}/config/app.conf'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '{$workdir}/config'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "touch '{$workdir}/config/app.conf'"));
     assertNoRelativeRemotePath();
 });
 
@@ -92,7 +93,7 @@ test('a relative file path with content is written inside the resource directory
     $workdir = $this->service->workdir();
     relativePathFileVolume('./config/app.conf', isDirectory: false, content: 'listen 8080;')->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "| base64 -d | tee '{$workdir}/config/app.conf' > /dev/null"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "| base64 -d | tee '{$workdir}/config/app.conf' > /dev/null"));
     assertNoRelativeRemotePath();
 });
 
@@ -100,20 +101,21 @@ test('an absolute directory path keeps working unchanged', function () {
     $workdir = $this->service->workdir();
     relativePathFileVolume($workdir.'/data', isDirectory: true)->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$workdir}/data'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '{$workdir}/data'"));
     assertNoRelativeRemotePath();
 });
 
 test('deleting a relative path removes it from the resource directory', function () {
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'readlink -f') => 'OK',
-        str_contains($process->command, 'test -f') => 'OK',
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('file'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -f') => 'OK',
         default => 'NOK',
     }));
     $workdir = $this->service->workdir();
     relativePathFileVolume('./config/app.conf', isDirectory: false)->deleteStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "rm -rf '{$workdir}/config/app.conf'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "rm -rf '{$workdir}/config/app.conf'"));
     assertNoRelativeRemotePath();
 });
 

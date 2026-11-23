@@ -93,6 +93,38 @@ class GithubRunnerApi
     }
 
     /**
+     * Cancels the workflow run of a job that has not completed, so GitHub does not keep it in progress
+     * on a runner that is gone. GitHub has no API to cancel one job. A normal cancel (not force-cancel)
+     * still runs the `always()` steps of the other jobs. Needs the repository permission "Actions": write.
+     *
+     * @return bool whether Coolify asked GitHub to cancel the run
+     */
+    public function cancelUnfinishedWorkflowRun(string $repositoryFullName, int $workflowJobId): bool
+    {
+        $repository = implode('/', array_map('rawurlencode', explode('/', $repositoryFullName, 2)));
+        $job = $this->client()->get("/repos/{$repository}/actions/jobs/{$workflowJobId}");
+        if ($job->status() === 404 || $job->json('status') === 'completed') {
+            return false;
+        }
+        if (! $job->successful() || ! is_int($job->json('run_id'))) {
+            throw new RuntimeException('Could not read the workflow job: '.$this->errorMessage($job));
+        }
+
+        $response = $this->client()->post("/repos/{$repository}/actions/runs/{$job->json('run_id')}/cancel");
+        if ($response->status() === 409) {
+            return false;
+        }
+        if ($response->status() === 403) {
+            throw new RuntimeException('Could not cancel the workflow run: the GitHub App needs the repository permission "Actions": write ('.$this->errorMessage($response).').');
+        }
+        if (! $response->successful()) {
+            throw new RuntimeException('Could not cancel the workflow run: '.$this->errorMessage($response));
+        }
+
+        return true;
+    }
+
+    /**
      * Removes a runner from GitHub. GitHub removes JIT runners itself after their job, so 404 is not an error.
      */
     public function deleteRunner(int $runnerId): void

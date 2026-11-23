@@ -54,6 +54,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -63,6 +67,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -80,6 +86,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -157,6 +165,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -196,6 +206,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -216,14 +227,15 @@
           - coolify.service.subName=web
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.entryPoints=http
-          - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.middlewares=gzip-sse,reference-headers'
+          - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.middlewares=gzip-no-media,reference-headers'
           - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.rule=Host(`web-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.service=http-0-referenceservice00000001-web-2567
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -234,6 +246,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -257,6 +270,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -288,6 +302,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -329,15 +344,16 @@
           - coolify.service.subName=api
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.http-0-referenceservice00000001-api-8a5d-stripprefix.stripprefix.prefixes=/api
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.entryPoints=http
-          - 'traefik.http.routers.http-0-referenceservice00000001-api-8a5d.middlewares=http-0-referenceservice00000001-api-8a5d-stripprefix,gzip-sse'
+          - 'traefik.http.routers.http-0-referenceservice00000001-api-8a5d.middlewares=http-0-referenceservice00000001-api-8a5d-stripprefix,gzip-no-media'
           - 'traefik.http.routers.http-0-referenceservice00000001-api-8a5d.rule=Host(`api-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/api`)'
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -345,6 +361,7 @@
           - 'caddy_0=http://api-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -370,6 +387,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -389,14 +407,15 @@
           - coolify.service.subName=my-app
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.entryPoints=http
-          - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-sse
+          - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.rule=Host(`my_app-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -404,6 +423,7 @@
           - 'caddy_0=http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -429,6 +449,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -448,12 +469,13 @@
           - coolify.service.subName=www
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.entryPoints=http
-          - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=gzip-sse
+          - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -461,6 +483,7 @@
           - 'caddy_0=http://www-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -486,6 +509,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -508,16 +532,17 @@
           - 'caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.regexp=^/blog/(.*)'
           - caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.replacement=/$1
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - 'traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.regex=^/blog/(.*)'
           - traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.replacement=/$1
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.entryPoints=http
-          - 'traefik.http.routers.http-0-referenceservice00000001-blog-126a.middlewares=gzip-sse,redir-ghost-referenceservice00000001'
+          - 'traefik.http.routers.http-0-referenceservice00000001-blog-126a.middlewares=gzip-no-media,redir-ghost-referenceservice00000001'
           - 'traefik.http.routers.http-0-referenceservice00000001-blog-126a.rule=Host(`blog-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/blog`)'
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -525,6 +550,7 @@
           - 'caddy_0=http://blog-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -550,6 +576,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -569,12 +596,13 @@
           - coolify.service.subName=gateway
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.entryPoints=http
-          - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=gzip-sse
+          - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -582,6 +610,7 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -607,6 +636,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -626,13 +656,14 @@
           - coolify.service.subName=gateway-ws
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.http-0-referenceservice00000001-gateway-ws-d203-stripprefix.stripprefix.prefixes=/ws
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.entryPoints=http
-          - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=http-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-sse'
+          - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=http-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-no-media'
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/ws`)'
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -640,6 +671,7 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -667,6 +699,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -685,6 +718,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -710,6 +744,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -728,6 +763,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -754,6 +790,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -782,6 +819,49 @@
           - 'coolify.service.subUuid=<uuid:db>'
           - coolify.service.subType=database
           - coolify.service.subName=db
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
       sidecar:
@@ -822,6 +902,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
@@ -911,6 +992,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       required_port: 8080
       exclude_from_status: false
@@ -920,6 +1005,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -937,6 +1024,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -1014,6 +1103,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -1053,6 +1144,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -1073,14 +1165,14 @@
           - coolify.service.subName=web
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.service=http-0-referenceservice00000001-web-2567
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.middlewares=gzip-sse,reference-headers'
+          - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.middlewares=gzip-no-media,reference-headers'
           - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.service=https-0-referenceservice00000001-web-2567
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.tls.certresolver=letsencrypt
@@ -1088,6 +1180,7 @@
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1098,6 +1191,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -1121,6 +1215,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -1152,6 +1247,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -1193,7 +1289,7 @@
           - coolify.service.subName=api
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.https-0-referenceservice00000001-api-8a5d-stripprefix.stripprefix.prefixes=/api
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.entryPoints=http
@@ -1201,7 +1297,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-api-8a5d.rule=Host(`api.example.com`) && PathPrefix(`/api`)'
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.middlewares=https-0-referenceservice00000001-api-8a5d-stripprefix,gzip-sse'
+          - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.middlewares=https-0-referenceservice00000001-api-8a5d-stripprefix,gzip-no-media'
           - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.rule=Host(`api.example.com`) && PathPrefix(`/api`)'
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.service=https-0-referenceservice00000001-api-8a5d
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.tls.certresolver=letsencrypt
@@ -1209,6 +1305,7 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -1216,6 +1313,7 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1241,6 +1339,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -1260,14 +1359,14 @@
           - coolify.service.subName=my-app
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.rule=Host(`my_app.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.rule=Host(`my_app.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.service=https-0-referenceservice00000001-my-app-4dcb
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.tls.certresolver=letsencrypt
@@ -1275,6 +1374,7 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1282,6 +1382,7 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1307,6 +1408,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -1326,17 +1428,18 @@
           - coolify.service.subName=www
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-www-4eae.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-www-4eae.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-www-4eae.rule=Host(`www.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1344,6 +1447,7 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1369,6 +1473,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -1391,7 +1496,7 @@
           - 'caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.regexp=^/blog/(.*)'
           - caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.replacement=/$1
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - 'traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.regex=^/blog/(.*)'
           - traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.replacement=/$1
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
@@ -1400,7 +1505,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog`)'
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.middlewares=gzip-sse,redir-ghost-referenceservice00000001'
+          - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.middlewares=gzip-no-media,redir-ghost-referenceservice00000001'
           - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog`)'
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.service=https-0-referenceservice00000001-blog-126a
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.tls.certresolver=letsencrypt
@@ -1408,6 +1513,7 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -1415,6 +1521,7 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1440,6 +1547,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -1459,17 +1567,18 @@
           - coolify.service.subName=gateway
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -1477,6 +1586,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1502,6 +1612,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -1521,18 +1632,19 @@
           - coolify.service.subName=gateway-ws
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.https-0-referenceservice00000001-gateway-ws-d203-stripprefix.stripprefix.prefixes=/ws
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway.example.com`) && PathPrefix(`/ws`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.middlewares=https-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-sse'
+          - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.middlewares=https-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-no-media'
           - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway.example.com`) && PathPrefix(`/ws`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -1540,6 +1652,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1567,6 +1680,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -1585,6 +1699,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1610,6 +1725,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -1628,6 +1744,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1654,6 +1771,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -1682,6 +1800,49 @@
           - 'coolify.service.subUuid=<uuid:db>'
           - coolify.service.subType=database
           - coolify.service.subName=db
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
       sidecar:
@@ -1722,6 +1883,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
@@ -1813,6 +1975,10 @@
           fs_path: /data/coolify/services/referenceservice00000001/config
           mount_path: /etc/nginx/conf.d
           is_directory: true
+        -
+          fs_path: /srv/web/default/logs
+          mount_path: /var/log/web
+          is_directory: true
     worker:
       fqdn: 'https://worker-extra.example.com'
       required_port: 8080
@@ -1823,6 +1989,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -1840,6 +2008,8 @@
     HEX_32: '${SERVICE_HEX_32_WEB}'
     INTERPOLATED_HOST: null
     LOWERCASE_USER: '${SERVICE_LOWERCASEUSER_WEB}'
+    MAGIC_DEFAULT_HOST: null
+    MAGIC_DEFAULT_NO_BRACES_HOST: null
     MAP_NULL: null
     NESTED_INNER: null
     NESTED_NO_DEFAULT_INNER: null
@@ -1917,6 +2087,8 @@
           NO_BRACES: $NO_BRACES_VALUE
           NESTED: '${NESTED_OUTER:-${NESTED_INNER:-inner-default}}'
           NESTED_NO_DEFAULT: '${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}'
+          MAGIC_DEFAULT: '${MAGIC_DEFAULT_HOST:-${SERVICE_URL_WEB}}'
+          MAGIC_DEFAULT_NO_BRACES: '${MAGIC_DEFAULT_NO_BRACES_HOST:-$SERVICE_URL_WEB}'
           DASH_DEFAULT: '${DASH_DEFAULT_VAR-dash-default}'
           NO_BRACES_DEFAULT: '$NO_BRACES_DEFAULT_VAR:-no-braces-default'
           SHARED: shared-value
@@ -1956,6 +2128,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -1976,14 +2149,14 @@
           - coolify.service.subName=web
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-web-2567.service=http-0-referenceservice00000001-web-2567
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.middlewares=gzip-sse,reference-headers'
+          - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.middlewares=gzip-no-media,reference-headers'
           - 'traefik.http.routers.https-0-referenceservice00000001-web-2567.rule=Host(`web.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.service=https-0-referenceservice00000001-web-2567
           - traefik.http.routers.https-0-referenceservice00000001-web-2567.tls.certresolver=letsencrypt
@@ -1991,6 +2164,7 @@
           - traefik.http.services.http-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-web-2567.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2001,6 +2175,7 @@
           - 'referenceservice00000001_web-data:/usr/share/nginx/html'
           - '/data/coolify/services/referenceservice00000001/config:/etc/nginx/conf.d:ro'
           - '/var/run/docker.sock:/var/run/docker.sock:ro'
+          - '/srv/web/default/logs:/var/log/web'
           -
             type: bind
             source: /data/coolify/services/referenceservice00000001/web-init.sh
@@ -2024,6 +2199,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -2055,6 +2231,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -2096,7 +2273,7 @@
           - coolify.service.subName=api
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.https-0-referenceservice00000001-api-8a5d-stripprefix.stripprefix.prefixes=/api
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.entryPoints=http
@@ -2104,7 +2281,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-api-8a5d.rule=Host(`api.example.com`) && PathPrefix(`/api`)'
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.middlewares=https-0-referenceservice00000001-api-8a5d-stripprefix,gzip-sse'
+          - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.middlewares=https-0-referenceservice00000001-api-8a5d-stripprefix,gzip-no-media'
           - 'traefik.http.routers.https-0-referenceservice00000001-api-8a5d.rule=Host(`api.example.com`) && PathPrefix(`/api`)'
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.service=https-0-referenceservice00000001-api-8a5d
           - traefik.http.routers.https-0-referenceservice00000001-api-8a5d.tls.certresolver=letsencrypt
@@ -2112,6 +2289,7 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
           - 'caddy_0.handle_path=/api*'
           - caddy_0.header=-Server
@@ -2119,6 +2297,7 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2144,6 +2323,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -2163,14 +2343,14 @@
           - coolify.service.subName=my-app
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.rule=Host(`my_app.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.rule=Host(`my_app.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.service=https-0-referenceservice00000001-my-app-4dcb
           - traefik.http.routers.https-0-referenceservice00000001-my-app-4dcb.tls.certresolver=letsencrypt
@@ -2178,6 +2358,7 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 80}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2185,6 +2366,7 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2210,6 +2392,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -2229,17 +2412,18 @@
           - coolify.service.subName=www
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-www-4eae.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-www-4eae.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-www-4eae.rule=Host(`www.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2247,6 +2431,7 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2272,6 +2457,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -2294,7 +2480,7 @@
           - 'caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.regexp=^/blog/(.*)'
           - caddy_0.handle_path.0_redir-ghost-referenceservice00000001.rewrite.replacement=/$1
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - 'traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.regex=^/blog/(.*)'
           - traefik.http.middlewares.redir-ghost-referenceservice00000001.redirectregex.replacement=/$1
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
@@ -2303,7 +2489,7 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog`)'
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.middlewares=gzip-sse,redir-ghost-referenceservice00000001'
+          - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.middlewares=gzip-no-media,redir-ghost-referenceservice00000001'
           - 'traefik.http.routers.https-0-referenceservice00000001-blog-126a.rule=Host(`blog.example.com`) && PathPrefix(`/blog`)'
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.service=https-0-referenceservice00000001-blog-126a
           - traefik.http.routers.https-0-referenceservice00000001-blog-126a.tls.certresolver=letsencrypt
@@ -2311,6 +2497,7 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 2368}}'
           - 'caddy_0.handle_path=/blog*'
           - caddy_0.header=-Server
@@ -2318,6 +2505,7 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2343,6 +2531,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -2362,17 +2551,18 @@
           - coolify.service.subName=gateway
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2380,6 +2570,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2405,6 +2596,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -2424,18 +2616,19 @@
           - coolify.service.subName=gateway-ws
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.https-0-referenceservice00000001-gateway-ws-d203-stripprefix.stripprefix.prefixes=/ws
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway.example.com`) && PathPrefix(`/ws`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.entryPoints=https
-          - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.middlewares=https-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-sse'
+          - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.middlewares=https-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-no-media'
           - 'traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway.example.com`) && PathPrefix(`/ws`)'
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/ws*'
           - caddy_0.header=-Server
@@ -2443,6 +2636,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2472,6 +2666,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -2491,14 +2686,14 @@
           - coolify.service.subName=worker
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-worker-b618.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-worker-b618.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-worker-b618.rule=Host(`worker-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-worker-b618.service=http-0-referenceservice00000001-worker-b618
           - traefik.http.routers.https-0-referenceservice00000001-worker-b618.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-worker-b618.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-worker-b618.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-worker-b618.rule=Host(`worker-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-worker-b618.service=https-0-referenceservice00000001-worker-b618
           - traefik.http.routers.https-0-referenceservice00000001-worker-b618.tls.certresolver=letsencrypt
@@ -2506,6 +2701,7 @@
           - traefik.http.services.http-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2513,6 +2709,7 @@
           - 'caddy_0=https://worker-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2540,6 +2737,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -2559,14 +2757,14 @@
           - coolify.service.subName=scheduler
           - traefik.docker.network=referenceservice00000001
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-scheduler-499f.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-scheduler-499f.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-scheduler-499f.rule=Host(`scheduler-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.http-0-referenceservice00000001-scheduler-499f.service=http-0-referenceservice00000001-scheduler-499f
           - traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.rule=Host(`scheduler-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.service=https-0-referenceservice00000001-scheduler-499f
           - traefik.http.routers.https-0-referenceservice00000001-scheduler-499f.tls.certresolver=letsencrypt
@@ -2574,6 +2772,7 @@
           - traefik.http.services.http-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 8080}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2581,6 +2780,7 @@
           - 'caddy_0=https://scheduler-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2607,6 +2807,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -2637,6 +2838,49 @@
           - coolify.service.subName=db
         env_file:
           - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+        env_file:
+          - .env
       sidecar:
         image: busybox
         restart: 'no'
@@ -2659,17 +2903,18 @@
           - coolify.service.subType=application
           - coolify.service.subName=sidecar
           - traefik.enable=true
-          - traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
           - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
           - traefik.http.routers.http-0-referenceservice00000001-sidecar-9523.entryPoints=http
           - traefik.http.routers.http-0-referenceservice00000001-sidecar-9523.middlewares=redirect-to-https
           - 'traefik.http.routers.http-0-referenceservice00000001-sidecar-9523.rule=Host(`sidecar-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.entryPoints=https
-          - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.middlewares=gzip-sse
+          - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.middlewares=gzip-no-media
           - 'traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.rule=Host(`sidecar-extra.example.com`) && PathPrefix(`/`)'
           - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-sidecar-9523.tls=true
           - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
           - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
           - 'caddy_0.handle_path=/*'
           - caddy_0.header=-Server
@@ -2695,6 +2940,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env

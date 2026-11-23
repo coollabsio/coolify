@@ -39,12 +39,18 @@ class Add extends Component
 
     public int $timeout = 300;
 
+    public bool $useShell = true;
+
+    #[Locked]
+    public string $serverTimezone = 'UTC';
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
         'timeout' => 'required|integer|min:60|max:36000',
+        'useShell' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -53,6 +59,7 @@ class Add extends Component
         'frequency' => 'frequency',
         'container' => 'container',
         'timeout' => 'timeout',
+        'useShell' => 'run in a shell',
     ];
 
     public function mount()
@@ -73,6 +80,8 @@ class Add extends Component
             default:
                 throw new \Exception('Invalid resource type');
         }
+
+        $this->serverTimezone = getServerTimezone($this->resource->destination?->server);
 
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();
@@ -111,6 +120,7 @@ class Add extends Component
             $task->frequency = $this->frequency;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
+            $task->use_shell = $this->useShell;
             $task->team_id = $this->resource->team()->id;
 
             switch ($this->type) {
@@ -147,5 +157,6 @@ class Add extends Component
         $this->frequency = '';
         $this->container = '';
         $this->timeout = 300;
+        $this->useShell = true;
     }
 }

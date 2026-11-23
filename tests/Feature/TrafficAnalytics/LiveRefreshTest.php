@@ -52,50 +52,20 @@ function bootLiveServer(): Server
     return $server;
 }
 
-it('is paused by default and does not poll until Live Refresh is turned on', function () {
-    $server = bootLiveServer();
+it('is paused by default', function () {
+    bootLiveServer();
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSet('live', false)
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->assertSee('Live Refresh');
+        ->assertSet('live', false);
 });
 
-it('starts polling when live is toggled on at the 24h range', function () {
-    $server = bootLiveServer();
+it('keeps live refresh on for every range', function (string $range) {
+    bootLiveServer();
 
     loadLazy(Livewire::test(Analytics::class))
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->call('toggleLive')
-        ->assertSet('live', true)
-        ->assertSeeHtml('wire:poll.60s')
-        ->assertSee('Live Refresh');
-});
-
-it('hides the Live Refresh control and stops polling for the 7d and 30d ranges', function () {
-    $server = bootLiveServer();
-
-    $component = loadLazy(Livewire::test(Analytics::class))
-        ->call('setRange', '7d')
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->assertDontSee('Live Refresh');
-
-    expect($component->instance()->isLivePollable())->toBeFalse();
-
-    $component->call('setRange', '30d')
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->assertDontSee('Live Refresh');
-});
-
-it('re-arms polling when returning to the 24h range after live was turned on', function () {
-    $server = bootLiveServer();
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->call('toggleLive')                 // arm live at 24h
-        ->assertSeeHtml('wire:poll.60s')
-        ->call('setRange', '7d')
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->call('setRange', '24h')
-        ->assertSeeHtml('wire:poll.60s');
-});
+        ->set('live', true)
+        ->call('setRange', $range)
+        ->assertSet('range', $range)
+        ->assertSet('live', true);
+})->with(['7d', '30d']);

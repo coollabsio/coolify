@@ -19,7 +19,8 @@ class CloudFixSubscription extends Command
                             {--verify-all : Verify all active subscriptions against Stripe}
                             {--fix-verified : Fix discrepancies found during verification}
                             {--dry-run : Show what would be fixed without making changes}
-                            {--one : Only fix the first found subscription}';
+                            {--one : Only fix the first found subscription}
+                            {--csv= : Path of the CSV file that --verify-all writes (default: storage/app/subscription-verification-<date>.csv)}';
 
     /**
      * The console command description.
@@ -348,7 +349,16 @@ class CloudFixSubscription extends Command
         $this->info("Found {$totalCount} teams with active subscriptions in database");
         $this->newLine();
 
-        $out = fopen('php://output', 'w');
+        $csvPath = $this->option('csv') ?: storage_path('app/subscription-verification-'.now()->format('Y-m-d-His').'.csv');
+        $out = fopen($csvPath, 'w');
+        if ($out === false) {
+            $this->error("Cannot write the CSV file: {$csvPath}");
+
+            return 1;
+        }
+
+        // Details for each team only with -v; otherwise a progress bar.
+        $progressBar = $this->output->isVerbose() ? null : $this->output->createProgressBar($totalCount);
 
         // CSV header
         fputcsv($out, [
@@ -391,20 +401,20 @@ class CloudFixSubscription extends Command
             $action = 'none';
 
             if (! $subscription->stripe_subscription_id) {
-                $this->line("Team {$team->id}: Missing subscription ID, searching in Stripe...");
+                $this->detail("Team {$team->id}: Missing subscription ID, searching in Stripe...");
 
                 $foundResult = null;
                 $searchMethod = null;
 
                 // Search by customer ID
                 if ($subscription->stripe_customer_id) {
-                    $this->line("  → Searching by customer ID: {$subscription->stripe_customer_id}");
+                    $this->detail("  → Searching by customer ID: {$subscription->stripe_customer_id}");
                     $foundResult = $this->searchSubscriptionsByCustomer($stripe, $subscription->stripe_customer_id);
                     if ($foundResult) {
                         $searchMethod = $foundResult['method'];
                     }
                 } else {
-                    $this->line('  → No customer ID available');
+                    $this->detail('  → No customer ID available');
                 }
 
                 // Search by emails if not found
@@ -416,10 +426,10 @@ class CloudFixSubscription extends Command
                         // Update customer ID if different
                         if (isset($foundResult['customer_id']) && $subscription->stripe_customer_id !== $foundResult['customer_id']) {
                             if ($isDryRun) {
-                                $this->warn("  ⚠ Would update customer ID from {$subscription->stripe_customer_id} to {$foundResult['customer_id']}");
+                                $this->detail("  ⚠ Would update customer ID from {$subscription->stripe_customer_id} to {$foundResult['customer_id']}");
                             } elseif ($shouldFix) {
                                 $subscription->update(['stripe_customer_id' => $foundResult['customer_id']]);
-                                $this->info("  ✓ Updated customer ID to {$foundResult['customer_id']}");
+                                $this->detail("  ✓ Updated customer ID to {$foundResult['customer_id']}");
                             }
                         }
                     }
@@ -453,7 +463,7 @@ class CloudFixSubscription extends Command
                         ]);
                     } else {
                         // Found subscription but it's canceled/expired - needs to be deactivated
-                        $this->warn("  → Found {$foundResult['status']} subscription {$foundResult['subscription']->id} - needs deactivation");
+                        $this->detail("  → Found {$foundResult['status']} subscription {$foundResult['subscription']->id} - needs deactivation");
 
                         $result = $this->handleMissingSubscription($team, $subscription, $foundResult['status'], $isDryRun, $shouldFix, $stats);
 
@@ -472,7 +482,7 @@ class CloudFixSubscription extends Command
                     }
                 } else {
                     // No subscription found at all
-                    $this->line('  → No subscription found');
+                    $this->detail('  → No subscription found');
 
                     $stripeStatus = 'not_found';
                     $result = $this->handleMissingSubscription($team, $subscription, $stripeStatus, $isDryRun, $shouldFix, $stats);
@@ -493,7 +503,7 @@ class CloudFixSubscription extends Command
             } else {
                 // First validate the subscription ID format
                 if (! str_starts_with($subscription->stripe_subscription_id, 'sub_')) {
-                    $this->warn("  ⚠ Invalid subscription ID format (doesn't start with 'sub_')");
+                    $this->detail("  ⚠ Invalid subscription ID format (doesn't start with 'sub_')");
                 }
 
                 try {
@@ -516,7 +526,7 @@ class CloudFixSubscription extends Command
                             // Ensure past_due flag is set
                             if (! $subscription->stripe_past_due) {
                                 if ($isDryRun) {
-                                    $this->info("Would set stripe_past_due=true for Team {$team->id}");
+                                    $this->detail("Would set stripe_past_due=true for Team {$team->id}");
                                 } elseif ($shouldFix) {
                                     $subscription->update(['stripe_past_due' => true]);
                                 }
@@ -545,7 +555,7 @@ class CloudFixSubscription extends Command
                             ]);
 
                             if ($isDryRun) {
-                                $this->info("Would deactivate subscription for Team {$team->id} - status: {$stripeStatus}");
+                                $this->detail("Would deactivate subscription for Team {$team->id} - status: {$stripeStatus}");
                             } elseif ($shouldFix) {
                                 $this->fixSubscription($team, $subscription, $stripeStatus);
                                 $stats['fixed']++;
@@ -573,11 +583,11 @@ class CloudFixSubscription extends Command
                     }
 
                 } catch (InvalidRequestException $e) {
-                    $this->error('  → Error: '.$e->getMessage());
+                    $this->detail('  → Error: '.$e->getMessage());
 
                     if ($e->getStripeCode() === 'resource_missing' || $e->getHttpStatus() === 404) {
                         // Subscription doesn't exist, try to find by customer ID
-                        $this->warn("  → Subscription not found, checking customer's subscriptions...");
+                        $this->detail("  → Subscription not found, checking customer's subscriptions...");
 
                         $foundResult = null;
                         if ($subscription->stripe_customer_id) {
@@ -586,7 +596,7 @@ class CloudFixSubscription extends Command
 
                         if ($foundResult && isset($foundResult['subscription']) && in_array($foundResult['status'], ['active', 'past_due'])) {
                             // Found an active subscription with different ID
-                            $this->warn("  → ID mismatch! DB: {$subscription->stripe_subscription_id}, Stripe: {$foundResult['subscription']->id}");
+                            $this->detail("  → ID mismatch! DB: {$subscription->stripe_subscription_id}, Stripe: {$foundResult['subscription']->id}");
 
                             fputcsv($out, [
                                 $team->id,
@@ -602,7 +612,7 @@ class CloudFixSubscription extends Command
                             ]);
 
                             if ($isDryRun) {
-                                $this->warn("  → Would update subscription ID to {$foundResult['subscription']->id}");
+                                $this->detail("  → Would update subscription ID to {$foundResult['subscription']->id}");
                             } elseif ($shouldFix) {
                                 $subscription->update([
                                     'stripe_subscription_id' => $foundResult['subscription']->id,
@@ -610,7 +620,7 @@ class CloudFixSubscription extends Command
                                     'stripe_past_due' => $foundResult['status'] === 'past_due',
                                 ]);
                                 $stats['fixed']++;
-                                $this->info('  → Updated subscription ID');
+                                $this->detail('  → Updated subscription ID');
                             }
 
                             $stats[$foundResult['status'] === 'active' ? 'valid_active' : 'valid_past_due']++;
@@ -635,7 +645,7 @@ class CloudFixSubscription extends Command
                     } else {
                         // Other API error
                         $stats['errors']++;
-                        $this->error('  → API Error - not marking as deleted');
+                        $this->detail('  → API Error - not marking as deleted');
 
                         fputcsv($out, [
                             $team->id,
@@ -651,7 +661,7 @@ class CloudFixSubscription extends Command
                         ]);
                     }
                 } catch (\Exception $e) {
-                    $this->error('  → Unexpected error: '.$e->getMessage());
+                    $this->detail('  → Unexpected error: '.$e->getMessage());
                     $stats['errors']++;
 
                     fputcsv($out, [
@@ -670,11 +680,13 @@ class CloudFixSubscription extends Command
             }
 
             $processedCount++;
-            if ($processedCount % 100 === 0) {
-                $this->info("Processed {$processedCount}/{$totalCount} subscriptions...");
+            $progressBar?->advance();
+            if (! $progressBar && $processedCount % 100 === 0) {
+                $this->detail("Processed {$processedCount}/{$totalCount} subscriptions...");
             }
         }
 
+        $progressBar?->finish();
         fclose($out);
 
         // Print summary
@@ -710,7 +722,23 @@ class CloudFixSubscription extends Command
             $this->comment('Run with --fix-verified to fix the discrepancies');
         }
 
+        $this->newLine();
+        $this->info("Problem rows written to: {$csvPath}");
+        if (! $this->output->isVerbose()) {
+            $this->comment('Run with -v to see the details for each team.');
+        }
+
         return 0;
+    }
+
+    /**
+     * Print a detail line of the verification only in verbose mode (-v).
+     */
+    private function detail(string $message): void
+    {
+        if ($this->output->isVerbose()) {
+            $this->line($message);
+        }
     }
 
     /**
@@ -741,13 +769,13 @@ class CloudFixSubscription extends Command
                 'status' => 'all',
             ]);
 
-            $this->line('  → Found '.count($subscriptions->data).' subscription(s) for customer');
+            $this->detail('  → Found '.count($subscriptions->data).' subscription(s) for customer');
 
             // Look for active/past_due first
             foreach ($subscriptions->data as $sub) {
-                $this->line("    - Subscription {$sub->id}: status={$sub->status}");
+                $this->detail("    - Subscription {$sub->id}: status={$sub->status}");
                 if (in_array($sub->status, ['active', 'past_due'])) {
-                    $this->info("    ✓ Found active/past_due subscription: {$sub->id}");
+                    $this->detail("    ✓ Found active/past_due subscription: {$sub->id}");
 
                     return ['subscription' => $sub, 'status' => $sub->status, 'method' => 'customer_id'];
                 }
@@ -756,14 +784,14 @@ class CloudFixSubscription extends Command
             // If not requiring active and there are subscriptions, return first one
             if (! $requireActive && count($subscriptions->data) > 0) {
                 $sub = $subscriptions->data[0];
-                $this->warn("    ⚠ Only found {$sub->status} subscription: {$sub->id}");
+                $this->detail("    ⚠ Only found {$sub->status} subscription: {$sub->id}");
 
                 return ['subscription' => $sub, 'status' => $sub->status, 'method' => 'customer_id_first'];
             }
 
             return null;
         } catch (\Exception $e) {
-            $this->error('  → Error searching by customer ID: '.$e->getMessage());
+            $this->detail('  → Error searching by customer ID: '.$e->getMessage());
 
             return null;
         }
@@ -774,10 +802,10 @@ class CloudFixSubscription extends Command
      */
     private function searchSubscriptionsByEmails(StripeClient $stripe, $emails)
     {
-        $this->line('  → Searching by team member emails...');
+        $this->detail('  → Searching by team member emails...');
 
         foreach ($emails as $email) {
-            $this->line("    → Checking email: {$email}");
+            $this->detail("    → Checking email: {$email}");
 
             try {
                 $customers = $stripe->customers->all([
@@ -786,15 +814,15 @@ class CloudFixSubscription extends Command
                 ]);
 
                 if (count($customers->data) === 0) {
-                    $this->line('      - No customers found');
+                    $this->detail('      - No customers found');
 
                     continue;
                 }
 
-                $this->line('      - Found '.count($customers->data).' customer(s)');
+                $this->detail('      - Found '.count($customers->data).' customer(s)');
 
                 foreach ($customers->data as $customer) {
-                    $this->line("      - Checking customer {$customer->id}");
+                    $this->detail("      - Checking customer {$customer->id}");
 
                     $result = $this->searchSubscriptionsByCustomer($stripe, $customer->id, true);
                     if ($result) {
@@ -805,7 +833,7 @@ class CloudFixSubscription extends Command
                     }
                 }
             } catch (\Exception $e) {
-                $this->error("      - Error searching for email {$email}: ".$e->getMessage());
+                $this->detail("      - Error searching for email {$email}: ".$e->getMessage());
             }
         }
 
@@ -818,11 +846,11 @@ class CloudFixSubscription extends Command
     private function handleFoundSubscription($team, $subscription, $foundSub, $searchMethod, $isDryRun, $shouldFix, &$stats)
     {
         $stripeStatus = $foundSub->status;
-        $this->info("  ✓ FOUND active/past_due subscription {$foundSub->id} (status: {$stripeStatus})");
+        $this->detail("  ✓ FOUND active/past_due subscription {$foundSub->id} (status: {$stripeStatus})");
 
         // Only update if it's active or past_due
         if (! in_array($stripeStatus, ['active', 'past_due'])) {
-            $this->error("  ERROR: handleFoundSubscription called with {$stripeStatus} subscription!");
+            $this->detail("  ERROR: handleFoundSubscription called with {$stripeStatus} subscription!");
 
             return [
                 'id' => $foundSub->id,
@@ -833,7 +861,7 @@ class CloudFixSubscription extends Command
         }
 
         if ($isDryRun) {
-            $this->warn("  → Would update subscription ID to {$foundSub->id} (status: {$stripeStatus})");
+            $this->detail("  → Would update subscription ID to {$foundSub->id} (status: {$stripeStatus})");
         } elseif ($shouldFix) {
             $subscription->update([
                 'stripe_subscription_id' => $foundSub->id,
@@ -841,7 +869,7 @@ class CloudFixSubscription extends Command
                 'stripe_past_due' => $stripeStatus === 'past_due',
             ]);
             $stats['fixed']++;
-            $this->info("  → Updated subscription ID to {$foundSub->id}");
+            $this->detail("  → Updated subscription ID to {$foundSub->id}");
         }
 
         // Update stats
@@ -864,11 +892,11 @@ class CloudFixSubscription extends Command
 
         if ($isDryRun) {
             $statusMsg = $status !== 'not_found' ? "status: {$status}" : 'no subscription found in Stripe';
-            $this->warn("  → Would deactivate subscription - {$statusMsg}");
+            $this->detail("  → Would deactivate subscription - {$statusMsg}");
         } elseif ($shouldFix) {
             $this->fixSubscription($team, $subscription, $status);
             $stats['fixed']++;
-            $this->info('  → Deactivated subscription');
+            $this->detail('  → Deactivated subscription');
         }
 
         return [

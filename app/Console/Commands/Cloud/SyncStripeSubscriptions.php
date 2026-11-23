@@ -65,10 +65,11 @@ class SyncStripeSubscriptions extends Command
             foreach ($result['discrepancies'] as $discrepancy) {
                 $this->line("  - Subscription ID: {$discrepancy['subscription_id']}");
                 $this->line("    Team ID: {$discrepancy['team_id']}");
-                $this->line("    Stripe ID: {$discrepancy['stripe_subscription_id']}");
+                $this->line('    Stripe ID: '.($discrepancy['stripe_subscription_id'] ?? 'none'));
                 $this->line("    Stripe Status: {$discrepancy['stripe_status']}");
                 $resolution = match ($discrepancy['resolution']) {
                     'delete_stale' => 'Delete stale local row',
+                    'link_subscription' => 'Link the active Stripe subscription',
                     'manual_review' => 'Manual review required',
                     default => 'End local subscription',
                 };

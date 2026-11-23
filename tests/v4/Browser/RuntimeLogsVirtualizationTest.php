@@ -56,10 +56,11 @@ it('searches all loaded lines and highlights matches', function () {
         ->fill('email', 'test@example.com')
         ->fill('password', 'password')
         ->click('Login')
-        ->assertSee('Dashboard')
-        ->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs");
+        ->assertSee('Dashboard');
 
-    $page->assertSee('log line 00001')
+    $page->script('localStorage.setItem("coolify-log-text-view", "false")');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->assertSee('log line 00001')
         ->type('input[aria-label="Find in logs"]', 'line 4999')
         ->wait(0.6)
         ->assertSee('log line 49990')
@@ -145,35 +146,51 @@ it('falls back to the default level filters when the saved filters are invalid',
     $page->screenshot(filename: 'runtime-logs-invalid-saved-filters');
 });
 
-it('shows compact text lines in text view and remembers the choice', function () {
+it('opens runtime logs in text view and remembers the choice', function () {
     $page = visit('/login')
         ->fill('email', 'test@example.com')
         ->fill('password', 'password')
         ->click('Login')
-        ->assertSee('Dashboard')
-        ->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs");
+        ->assertSee('Dashboard');
 
-    $page->assertSee('log line 00001')
-        ->click('[title="View Options"]')
-        ->click('button:visible:has-text("Text view")')
-        ->wait(0.3);
+    $page->script('localStorage.removeItem("coolify-log-text-view")');
+    $page->navigate("/server/{$this->stack['server']->uuid}/sentinel/logs")
+        ->assertSee('log line 00001');
 
-    $page->screenshot(filename: 'runtime-logs-view-menu');
+    expect($page->script('document.getElementById("logs").classList.contains("runtime-log-text-view")'))->toBeTrue()
+        ->and($page->script('document.querySelector("[data-log-line]").getBoundingClientRect().height'))->toBeLessThan(24);
 
-    expect($page->script('document.querySelector("[data-log-line]").getBoundingClientRect().height'))->toBeLessThan(24);
-
-    // Rows rendered before the switch are measured again, so no gaps stay between lines.
+    // Rows rendered for the default view sit against each other.
     expect($page->script('(() => {
         const rows = [...document.querySelectorAll(".runtime-log-virtual-row")].sort((a, b) => a.dataset.index - b.dataset.index);
         return rows.slice(1).every((row, i) => row.getBoundingClientRect().top - rows[i].getBoundingClientRect().bottom < 1);
     })()'))->toBeTrue();
 
-    // Rows do not open details in text view.
-    $page->click('[title="View Options"]')
-        ->click('log line 00001')
+    $page->click('log line 00001')
         ->wait(0.3);
 
     expect($page->script('document.querySelectorAll(".runtime-log-detail").length'))->toBe(0);
+
+    // Turning text view off leaves the grid.
+    $page->click('[title="View Options"]')
+        ->click('button:visible:has-text("Text view")')
+        ->wait(0.3);
+
+    $page->screenshot(filename: 'runtime-logs-view-menu');
+
+    expect($page->script('document.getElementById("logs").classList.contains("runtime-log-text-view")'))->toBeFalse()
+        ->and($page->script('document.querySelector("[data-log-line]").getBoundingClientRect().height'))->toBeGreaterThan(24);
+
+    // A short line shows everything in the row, so it has nothing to expand.
+    $page->click('log line 00001')
+        ->wait(0.3);
+
+    expect($page->script('document.querySelectorAll(".runtime-log-detail").length'))->toBe(0)
+        ->and($page->script('document.querySelectorAll("[data-log-line][data-expandable]").length'))->toBe(0);
+
+    $page->click('[title="View Options"]')
+        ->click('button:visible:has-text("Text view")')
+        ->wait(0.3);
 
     $page->screenshot(filename: 'runtime-logs-text-view');
 
@@ -181,4 +198,83 @@ it('shows compact text lines in text view and remembers the choice', function ()
         ->assertSee('log line 00001');
 
     expect($page->script('document.getElementById("logs").classList.contains("runtime-log-text-view")'))->toBeTrue();
+});
+
+it('keeps log text left aligned and the first line against the top of the viewport', function () {
+    $application = createBrowserApplication($this->stack, ['uuid' => 'app-runtime-logs']);
+    $lines = implode("\n", array_map(
+        fn (int $i) => sprintf('2026-09-28T10:00:%02dZ layout line %05d', $i, $i),
+        range(1, 40),
+    ));
+    Process::fake(function (PendingProcess $process) use ($lines) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+        if (str_contains($command, 'docker logs')) {
+            return Process::result(output: $lines);
+        }
+        if (str_contains($command, 'docker ps')) {
+            return Process::result(output: json_encode([
+                'ID' => 'appcontainer',
+                'Names' => 'appcontainer',
+                'State' => 'running',
+                'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web',
+            ])."\n");
+        }
+
+        return Process::result();
+    });
+
+    $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $application).'/logs';
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertSee('Dashboard');
+
+    $page->script('localStorage.setItem("pageWidth", "full"); localStorage.removeItem("coolify-log-text-view");');
+    $page->resize(1800, 960)
+        ->navigate($url)
+        ->wait(1)
+        ->assertSee('layout line 00001');
+
+    expect($page->script(<<<'JS'
+        (() => {
+            const line = document.querySelector('[data-log-line]');
+            const viewport = document.getElementById('logsContainer');
+            const style = getComputedStyle(line);
+            const topGap = Math.abs(line.getBoundingClientRect().top - viewport.getBoundingClientRect().top);
+            const main = document.querySelector('main');
+            const workspace = document.querySelector('.runtime-logs-workspace');
+            const column = document.querySelector('.runtime-logs-column');
+            const padding = parseFloat(getComputedStyle(main).paddingBottom);
+            const bottomGap = main.getBoundingClientRect().bottom - workspace.getBoundingClientRect().bottom;
+            const widthGap = Math.abs(workspace.getBoundingClientRect().width - column.getBoundingClientRect().width);
+            return viewport.scrollTop === 0 && topGap < 2 && Math.abs(bottomGap - padding) < 2 && widthGap < 2
+                && style.textAlign !== 'center' && style.alignItems !== 'center';
+        })()
+    JS))->toBeTrue();
+
+    $fullWidth = $page->script('document.querySelector(".runtime-logs-workspace").getBoundingClientRect().width');
+
+    $page->script('localStorage.setItem("pageWidth", "centered")');
+    $page->navigate($url)
+        ->assertSee('layout line 00001');
+
+    expect($page->script('document.querySelector(".runtime-logs-workspace").getBoundingClientRect().width'))
+        ->toBeLessThan($fullWidth);
+
+    $page->resize(390, 844)
+        ->assertSee('layout line 00001');
+
+    expect($page->script(<<<'JS'
+        (() => {
+            const line = document.querySelector('[data-log-line]');
+            const style = getComputedStyle(line);
+            const viewport = document.getElementById('logsContainer');
+            const topGap = Math.abs(line.getBoundingClientRect().top - viewport.getBoundingClientRect().top);
+            return viewport.scrollTop === 0 && topGap < 2
+                && style.flexDirection === 'column'
+                && style.alignItems === 'flex-start'
+                && (style.textAlign === 'left' || style.textAlign === 'start');
+        })()
+    JS))->toBeTrue();
 });

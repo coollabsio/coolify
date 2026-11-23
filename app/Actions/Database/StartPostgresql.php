@@ -7,6 +7,7 @@ use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Support\PostgresUser;
 use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
@@ -107,7 +108,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
+                        'CMD', 'psql', ...$this->healthCheckHostArguments(), ...$this->database->healthCheckPortArguments($this->database->postgres_conf), '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -131,7 +132,7 @@ class StartPostgresql
         }
 
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
 
         if (count($this->database->ports_mappings_array) > 0) {
@@ -202,6 +203,11 @@ class StartPostgresql
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
         if (count($command) > 1) {
+            // The Supabase image keeps its config (listen_addresses, preloaded extensions) in /etc/postgresql and starts
+            // with "postgres -D /etc/postgresql". Keep that directory when this command replaces the image CMD.
+            if (blank($this->database->postgres_conf) && PostgresUser::isSupabaseImage($this->database->image)) {
+                array_splice($command, 1, 0, ['-D', '/etc/postgresql']);
+            }
             $docker_compose['services'][$container_name]['command'] = $command;
         }
 
@@ -214,11 +220,11 @@ class StartPostgresql
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name postgres:postgres /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt < /dev/null";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
@@ -256,6 +262,16 @@ class StartPostgresql
         }
 
         return $local_persistent_volumes_names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function healthCheckHostArguments(): array
+    {
+        $host = PostgresUser::clientHost($this->database->image);
+
+        return $host === null ? [] : ['-h', $host];
     }
 
     private function generate_environment_variables()
@@ -298,6 +314,14 @@ class StartPostgresql
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
 
+        // The image reads these only when it creates the data directory on the first start.
+        if (filled($this->database->postgres_initdb_args) && ! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_INITDB_ARGS')) {
+            $environment_variables->push("POSTGRES_INITDB_ARGS={$this->database->postgres_initdb_args}");
+        }
+        if (filled($this->database->postgres_host_auth_method) && ! $this->hasEnvironmentVariable($environment_variables, 'POSTGRES_HOST_AUTH_METHOD')) {
+            $environment_variables->push("POSTGRES_HOST_AUTH_METHOD={$this->database->postgres_host_auth_method}");
+        }
+
         $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
@@ -326,6 +350,8 @@ class StartPostgresql
             $escaped_target = escapeshellarg($target_path);
             $content_base64 = base64_encode($content);
             $this->commands[] = "echo '{$content_base64}' | base64 -d | tee {$escaped_target} > /dev/null";
+            // The entrypoint runs init scripts as the postgres user; a strict server umask leaves the file unreadable.
+            $this->commands[] = "chmod 644 {$escaped_target}";
             $this->init_scripts[] = $target_path;
         }
     }

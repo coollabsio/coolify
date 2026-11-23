@@ -24,8 +24,8 @@ class PopulateSshKeysDirectorySeeder extends Seeder
             });
 
             if (isDev()) {
-                Process::run('chown -R 9999:9999 '.storage_path('app/ssh/keys'));
-                Process::run('chown -R 9999:9999 '.storage_path('app/ssh/mux'));
+                Process::run('chown -R www-data:www-data '.storage_path('app/ssh/keys'));
+                Process::run('chown -R www-data:www-data '.storage_path('app/ssh/mux'));
             } else {
                 Process::run('chown -R 9999:root '.storage_path('app/ssh/keys'));
                 Process::run('chown -R 9999:root '.storage_path('app/ssh/mux'));

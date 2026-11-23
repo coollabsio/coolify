@@ -95,10 +95,10 @@ it('accepts every known dimension and rejects unknown ones', function () {
     $client = new FakeTrafficClient($server);
     $client->response = json_encode([]);
 
-    foreach (['status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot'] as $dimension) {
+    foreach (['status', 'method', 'country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot'] as $dimension) {
         $client->breakdown(null, $dimension, 'a', 'b');
     }
-    expect($client->captured)->toHaveCount(12);
+    expect($client->captured)->toHaveCount(13);
 
     expect(fn () => $client->breakdown(null, 'not-a-real-dimension', 'a', 'b'))
         ->toThrow(InvalidArgumentException::class);

@@ -3,6 +3,7 @@
 use App\Livewire\Project\Shared\Logs;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
@@ -14,6 +15,7 @@ uses(RefreshDatabase::class);
 
 function runtimeLogsApplication(): array
 {
+    InstanceSettings::forceCreate(['id' => 0]);
     $user = User::factory()->create();
     $team = Team::factory()->create();
     $user->teams()->attach($team, ['role' => 'owner']);
@@ -83,4 +85,77 @@ it('keeps the container lookup error instead of reporting no running containers'
     expect($html)->toContain('Could not load containers')
         ->and($html)->toContain('No query results for model [App\\Models\\PrivateKey]')
         ->and($html)->not->toContain('No containers are running');
+});
+
+it('selects the requested service for the selected deployment', function () {
+    [$team, $server, $application] = runtimeLogsApplication();
+    $edge = Server::factory()->create(['team_id' => $team->id, 'name' => 'Edge']);
+
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server, $edge]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+            ['ID' => 'preview-web', 'Names' => 'app-pr-12-web', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=web'],
+            ['ID' => 'preview-api', 'Names' => 'app-pr-12-api', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=12,com.docker.compose.service=api'],
+        ],
+        $edge->id => [
+            ['ID' => 'edge-app', 'Names' => 'edge-app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->pullRequestId = '12';
+    $component->updatedPullRequestId();
+
+    expect($component->service)->toBe('api');
+});
+
+it('clears the service selection when production is the only container', function () {
+    [, $server, $application] = runtimeLogsApplication();
+
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'app', 'Names' => 'app', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->syncLogSelection();
+
+    expect($component->service)->toBe('');
+});
+
+it('merges every container of a service across servers', function () {
+    [$team, $server, $application] = runtimeLogsApplication();
+    $server->update(['name' => 'Frankfurt']);
+    $edge = Server::factory()->create(['team_id' => $team->id, 'name' => 'Helsinki']);
+
+    $component = new Logs;
+    $component->resource = $application;
+    $component->type = 'application';
+    $component->servers = collect([$server, $edge]);
+    $component->serverContainers = [
+        $server->id => [
+            ['ID' => 'web-new', 'Names' => 'web-new', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+            ['ID' => 'web-old', 'Names' => 'web-old', 'State' => 'exited', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+        $edge->id => [
+            ['ID' => 'web-edge', 'Names' => 'web-edge', 'State' => 'running', 'Labels' => 'coolify.pullRequestId=0,com.docker.compose.service=web'],
+        ],
+    ];
+    $component->containersLoaded = true;
+    $component->syncLogSelection();
+
+    expect($component->service)->toBe('');
+
+    expect($component->render()->getData()['targets']['sources'])->toBe([
+        ['server' => $server->uuid, 'container' => 'web-new', 'label' => 'Frankfurt web-new'],
+        ['server' => $server->uuid, 'container' => 'web-old', 'label' => 'Frankfurt web-old'],
+        ['server' => $edge->uuid, 'container' => 'web-edge', 'label' => 'Helsinki'],
+    ]);
 });

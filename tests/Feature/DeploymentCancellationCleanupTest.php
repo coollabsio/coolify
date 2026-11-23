@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\DeleteResourceJob;
 use App\Livewire\Project\Application\DeploymentNavbar;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -68,7 +69,7 @@ beforeEach(function () {
 
     $this->remoteCommands = [];
     Process::fake(function (PendingProcess $process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $this->remoteCommands[] = $command;
 
         return Process::result(str_contains($command, 'docker ps -a') ? 'cancel-cleanup-uuid' : '');
@@ -178,4 +179,51 @@ test('cancelling after switching to another team still cleans up and starts the 
 
     assertCancelCleanupRanCorrectly($this->remoteCommands, $this->deployment);
     expect($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+});
+
+test('cancelling a Railpack deployment stops the idle Railpack builder on the build server', function (string $buildPack, bool $stopsBuilder) {
+    $this->application->update(['build_pack' => $buildPack]);
+    $this->actingAs($this->user);
+
+    Livewire::test(DeploymentNavbar::class, ['application_deployment_queue' => $this->deployment])
+        ->call('cancel');
+
+    expect(cancelCleanupCommandsOn($this->remoteCommands, '203.0.113.20', 'docker buildx stop coolify-railpack') !== [])->toBe($stopsBuilder);
+})->with([
+    'railpack' => ['railpack', true],
+    'nixpacks' => ['nixpacks', false],
+]);
+
+test('deleting an application removes the helper container of its running deployment', function () {
+    (new DeleteResourceJob($this->application))->handle();
+
+    // The deployment record goes with the application, and the helper cleanup job keeps helpers without a record.
+    expect(cancelCleanupCommandsOn($this->remoteCommands, '203.0.113.20', 'docker rm -f cancel-cleanup-uuid'))->not->toBeEmpty()
+        ->and(Application::query()->whereKey($this->application->id)->exists())->toBeFalse();
+});
+
+test('deleting an application starts the queued deployment of another application on the same server', function () {
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $this->server->settings->update(['concurrent_builds' => 1]);
+    $queued = ApplicationDeploymentQueue::create([
+        'application_id' => $otherApplication->id,
+        'deployment_uuid' => 'delete-next-uuid',
+        'server_id' => $this->server->id,
+        'destination_id' => $this->application->destination_id,
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+    ]);
+
+    (new DeleteResourceJob($this->application))->handle();
+
+    expect($queued->fresh()->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
+});
+
+test('deleting an application only from Coolify runs no remote commands', function () {
+    (new DeleteResourceJob($this->application, deleteFromCoolifyOnly: true))->handle();
+
+    expect($this->remoteCommands)->toBe([]);
 });

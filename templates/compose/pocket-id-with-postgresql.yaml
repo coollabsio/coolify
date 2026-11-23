@@ -7,15 +7,13 @@
 
 services:
   pocket-id:
-    image: ghcr.io/pocket-id/pocket-id:v1.13
+    image: ghcr.io/pocket-id/pocket-id:v2.19
     environment:
       - SERVICE_URL_POCKETID_1411
       - APP_URL=${SERVICE_URL_POCKETID}
       - TRUST_PROXY=${TRUST_PROXY:-true}
-      - DB_PROVIDER=postgres
       - DB_CONNECTION_STRING=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgresql:5432/${POSTGRES_DB:-pocketid}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_POCKETID}
-      - KEYS_STORAGE=${KEYS_STORAGE:-database}
       - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT:-587}

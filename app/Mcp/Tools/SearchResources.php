@@ -7,13 +7,14 @@ use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class SearchResources extends Tool
 {
     protected string $name = 'search_resources';
@@ -80,7 +81,7 @@ class SearchResources extends Tool
         }
 
         if (in_array('server', $typesList, true)) {
-            Server::whereTeamId($teamId)
+            $this->visibleServers($request, $teamId)
                 ->where(function ($q) use ($like, $needle) {
                     $q->whereRaw('LOWER(name) LIKE ?', [$like])
                         ->orWhere('uuid', $needle)

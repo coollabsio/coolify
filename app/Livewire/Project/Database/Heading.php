@@ -70,8 +70,9 @@ class Heading extends Component
     {
         $this->checkDeployments();
 
-        if ($this->database->destination->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->database->destination->server);
+        $server = $this->database->destination?->server;
+        if ($server?->isFunctional()) {
+            GetContainersStatus::dispatch($server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }

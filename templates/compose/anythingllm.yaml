@@ -7,7 +7,7 @@
 
 services:
   anything-llm:
-    image: mintplexlabs/anythingllm
+    image: mintplexlabs/anythingllm:1.19.0
     environment:
       - SERVICE_URL_ANYTHINGLLM_3001
       - STORAGE_DIR=/app/server/storage

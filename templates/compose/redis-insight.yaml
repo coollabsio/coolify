@@ -4,6 +4,7 @@
 # tags: redis,gui,database,monitoring,analytics
 # logo: svgs/redisinsight.png
 # port: 5540
+# outdated: true
 
 services:
   redisinsight:

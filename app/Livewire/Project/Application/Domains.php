@@ -9,6 +9,7 @@ use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
+use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
@@ -78,7 +79,10 @@ class Domains extends Component
 
     public ?string $editingGeneratedHost = null;
 
-    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
+    /** The internal port the edited domain uses when its Port field is empty. */
+    public ?int $editingInheritedPort = null;
+
+    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool, inherited_port?: ?int}> */
     #[Locked]
     public array $domainRows = [];
 
@@ -291,25 +295,10 @@ class Domains extends Component
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
 
-        $server = $this->application->destination?->server;
-        if ($server) {
-            if ($server->id === 0) {
-                $configured = data_get($settings, 'public_ipv4')
-                    ?: data_get($settings, 'public_ipv6')
-                    ?: $server->ip;
-            } else {
-                $configured = $server->ip;
-            }
-
-            $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
-            $this->serverIpConfigured = $resolved['configured'];
-            // Prefer real IP so users know what DNS record to set even when the
-            // server address is stored as a hostname (e.g. coolify-testing-host).
-            $this->serverIp = $resolved['ip'] ?? $resolved['configured'];
-        } else {
-            $this->serverIp = null;
-            $this->serverIpConfigured = null;
-        }
+        $addresses = ServerDnsAddresses::forServer($this->application->destination?->server);
+        $this->serverIpConfigured = $addresses->configured;
+        // Prefer the real IP so users know what DNS record to set when the server address is a hostname.
+        $this->serverIp = $addresses->address;
 
         $pendingRedirect = $this->pendingRedirectService !== null
             ? ($this->serviceRedirects[$this->serviceRedirectWireKey($this->pendingRedirectService)] ?? null)
@@ -318,16 +307,10 @@ class Domains extends Component
         if (! $this->isCompose) {
             $this->composeServices = [];
         } elseif ($parseCompose) {
-            try {
-                $parsed = $this->application->parse() ?? [];
-            } catch (\Throwable) {
-                $parsed = [];
-            }
             $this->composeServices = [];
-            $services = data_get($parsed, 'services', []);
-            foreach ($services as $serviceName => $service) {
+            foreach ($this->application->composeServicesWithoutParse() as $serviceName => $service) {
                 if (! isDatabaseImage(data_get($service, 'image'))) {
-                    $this->composeServices[] = $serviceName;
+                    $this->composeServices[] = (string) $serviceName;
                 }
             }
         }
@@ -561,7 +544,7 @@ class Domains extends Component
 
     /**
      * @param  array<string, array{status?: string, message?: string, expected_ip?: ?string, checked_at?: ?string}>  $stored
-     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool}
+     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool, inherited_port?: ?int}
      */
     protected function domainRowFromStored(string $url, ?string $service, array $stored): array
     {
@@ -574,6 +557,7 @@ class Domains extends Component
             'service' => $service,
             'internal_port' => $port['internal_port'],
             'has_port_override' => $port['has_port_override'],
+            'inherited_port' => $this->inheritedDomainInternalPort($service),
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
             'expected_ip' => $this->serverIp,
@@ -621,37 +605,35 @@ class Domains extends Component
             ];
         }
 
+        return [
+            'internal_port' => $this->inheritedDomainInternalPort($service),
+            'has_port_override' => false,
+        ];
+    }
+
+    /**
+     * The internal port a domain uses when it has no per-domain override.
+     */
+    protected function inheritedDomainInternalPort(?string $service = null): ?int
+    {
         $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
         if ($composePort !== null) {
-            return [
-                'internal_port' => $composePort,
-                'has_port_override' => false,
-            ];
+            return $composePort;
         }
 
         if ($this->isCompose && $service !== null) {
-            return [
-                'internal_port' => null,
-                'has_port_override' => false,
-            ];
+            return null;
         }
 
         if ($this->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
+            return 80;
         }
 
         $exposed = $this->application->ports_exposes_array;
-        $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
+
+        return isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
             ? (int) $exposed[0]
             : null;
-
-        return [
-            'internal_port' => $defaultPort,
-            'has_port_override' => false,
-        ];
     }
 
     /**
@@ -735,9 +717,9 @@ class Domains extends Component
         $this->authorize('update', $this->application);
     }
 
-    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    protected function dnsTargetServer(): ?Server
     {
-        return $this->application->destination?->server?->id === 0;
+        return $this->application->destination?->server;
     }
 
     public function checkAllDns(): void
@@ -1342,6 +1324,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = $this->editingRedirect;
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = $this->domainRows[$index]['inherited_port'] ?? null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
@@ -1432,6 +1415,7 @@ class Domains extends Component
         $this->editingOriginalRedirect = 'both';
         $this->editingDomainWasRegenerated = false;
         $this->editingGeneratedHost = null;
+        $this->editingInheritedPort = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         if ($this->pendingAction === 'update') {
@@ -1609,6 +1593,7 @@ class Domains extends Component
             $this->dispatch('edit-domain-saved');
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
+            $urlsToCheck = $this->configureDnsAfterDomainEdit($urlsToCheck, $previousDnsHostnames);
             if ($urlsToCheck !== []) {
                 $this->queueUrlsDns($urlsToCheck, $service);
             }

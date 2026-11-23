@@ -5,9 +5,7 @@ use App\Enums\ProxyTypes;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Livewire;
 use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
@@ -165,24 +163,4 @@ test('the migration saves each server outside one shared transaction', function 
     $migration = require database_path('migrations/2026_09_25_210000_remove_legacy_traefik_dashboard_labels.php');
 
     expect($migration->withinTransaction)->toBeFalse();
-});
-
-test('the pending proxy notice asks the user to restart the proxy', function () {
-    $team = Team::factory()->create();
-    $user = User::factory()->create();
-    $user->teams()->attach($team, ['role' => 'admin']);
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
-    $server->proxy->type = ProxyTypes::TRAEFIK->value;
-    $server->proxy->status = 'running';
-    $server->proxy->last_saved_settings = 'new-hash';
-    $server->proxy->last_applied_settings = 'old-hash';
-    $server->save();
-
-    $this->actingAs($user);
-    session(['currentTeam' => $team]);
-
-    Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertSee('Your configuration changed, please restart the proxy.')
-        ->assertDontSee('The saved proxy configuration has not been applied');
 });

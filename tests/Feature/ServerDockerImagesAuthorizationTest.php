@@ -23,7 +23,7 @@ beforeEach(function () {
     $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker image ls*' => Process::result(output: json_encode(['Repository' => 'nginx', 'Tag' => '1.27', 'ID' => 'sha256:'.str_repeat('a', 64), 'Size' => '1MB', 'CreatedSince' => 'now'])),
         '*' => Process::result(output: ''),
     ]);

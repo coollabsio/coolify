@@ -30,7 +30,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
      * race. Such processes are not masters, so ControlPersist never reaps them
      * and they hold an authenticated session until the container restarts.
      *
-     * Every `ssh -fN` for a server carries the same ControlPath, so the socket
+     * Every master for a server carries the same ControlPath, so the socket
      * file existing says nothing about which process owns it. Ownership is read
      * from the socket itself (`ssh -O check` reports the master pid); every
      * other process for that ControlPath is an orphan. When the socket file is
@@ -48,18 +48,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         $socketOwners = [];
 
         foreach ($this->listProcesses() as $process) {
-            // Backgrounded ssh master: current `ssh -fN` or legacy `ssh -fNM`.
-            if (! preg_match('#(^|/)ssh -fN#', $process['args'])) {
-                continue;
-            }
-
-            // Only ever touch ssh processes pointing at Coolify's mux directory.
-            if (! preg_match('#ControlPath=('.preg_quote($muxDir, '#').'/\S+)#', $process['args'], $pathMatch)) {
-                continue;
-            }
-
-            $muxSocket = $pathMatch[1];
-            if ($process['etimes'] < $minAge
+            $muxSocket = $this->masterMuxSocket($process['args'], $muxDir);
+            if ($muxSocket === null
+                || $process['etimes'] < $minAge
                 || SshMultiplexingHelper::isMuxProcessRetiring($process['pid'], $muxSocket)) {
                 continue;
             }
@@ -72,6 +63,24 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
     }
 
     /**
+     * ControlPath of a backgrounded ssh master in Coolify's mux directory, or
+     * null for any other process. ControlPersist retitles a master to
+     * `ssh: <ControlPath> [mux]`; masters started before the upgrade still run
+     * as `ssh -fN` or `ssh -fNM` with the ControlPath in their arguments.
+     */
+    private function masterMuxSocket(string $args, string $muxDir): ?string
+    {
+        $socket = preg_quote($muxDir, '#').'/\S+';
+
+        if (preg_match('#^ssh: ('.$socket.') \[mux\]#', $args, $matches)
+            || (preg_match('#(^|/)ssh -fN#', $args) && preg_match('#ControlPath=('.$socket.')#', $args, $matches))) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    /**
      * Pid of the master that owns a mux socket. Returns null when the socket
      * file does not exist, and false when it exists but its owner is unknown.
      */
@@ -81,9 +90,9 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             return null;
         }
 
-        $check = Process::run('timeout 10 ssh -O check -o ControlPath='.escapeshellarg($muxSocket).' localhost');
+        $check = SshMultiplexingHelper::runMuxSocketCommand($muxSocket, 'check');
 
-        return preg_match('/pid=(\d+)/', $check->output().$check->errorOutput(), $matches)
+        return $check && preg_match('/pid=(\d+)/', $check->output().$check->errorOutput(), $matches)
             ? $matches[1]
             : false;
     }
@@ -109,7 +118,8 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         $sshPids = [];
         foreach ($processes as $process) {
             // The ssh binary itself, not `cloudflared access ssh` (space before ssh).
-            if (preg_match('#(^|/)ssh\s#', $process['args'])) {
+            // A ControlPersist master is titled `ssh: <ControlPath> [mux]`.
+            if (preg_match('#(^|/)ssh[\s:]#', $process['args'])) {
                 $sshPids[$process['pid']] = true;
             }
         }
@@ -227,10 +237,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             }
 
             $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-            $checkCommand = "ssh -O check -o ControlPath={$muxSocket} {$server->user}@{$server->ip} 2>/dev/null";
-            $checkProcess = Process::run($checkCommand);
-
-            if ($checkProcess->exitCode() !== 0) {
+            if (! SshMultiplexingHelper::runMuxSocketCommand($muxSocket, 'check')?->successful()) {
                 $this->removeMultiplexFile($muxFile, 'connection_check_failed');
             }
         }
@@ -272,8 +279,8 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         }
 
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-        $checkProcess = Process::run("ssh -O check -o ControlPath={$muxSocket} localhost");
-        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+        $checkProcess = SshMultiplexingHelper::runMuxSocketCommand($muxSocket, 'check');
+        $pid = $checkProcess && preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
             ? $matches[1]
             : null;
 
@@ -281,9 +288,8 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
             SshMultiplexingHelper::markMuxProcessAsRetiring($pid, $muxSocket);
         }
 
-        $closeCommand = "ssh -O stop -o ControlPath={$muxSocket} localhost 2>/dev/null";
-        $stopProcess = Process::run($closeCommand);
-        if ($pid !== null && ! $stopProcess->successful()) {
+        $stopProcess = SshMultiplexingHelper::runMuxSocketCommand($muxSocket, 'stop');
+        if ($pid !== null && ! $stopProcess?->successful()) {
             SshMultiplexingHelper::unmarkMuxProcessAsRetiring($pid, $muxSocket);
         }
         Storage::disk('ssh-mux')->delete($muxFile);

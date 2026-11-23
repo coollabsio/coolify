@@ -4,10 +4,11 @@
 # tags: privacy, search engine
 # logo: svgs/whoogle.png
 # port: 5000
+# outdated: true
 
 services:
   whoogle:
-    image: benbusby/whoogle-search:latest
+    image: benbusby/whoogle-search:1.2.4
     environment:
       - SERVICE_URL_WHOOGLE_5000
     healthcheck:

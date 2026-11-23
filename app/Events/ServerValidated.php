@@ -20,11 +20,6 @@ class ServerValidated implements ShouldBroadcast
         $this->serverUuid = $serverUuid;
     }
 
-    public function broadcastAs(): string
-    {
-        return 'ServerValidated';
-    }
-
     public function broadcastWith(): array
     {
         return [

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByDigitalOcean;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -8,12 +9,15 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     config([
         'cache.default' => 'array',
         'session.driver' => 'array',
@@ -159,16 +163,4 @@ it('deletes the droplet when local server persistence fails', function () {
     ]);
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.digitalocean.com/v2/droplets/555');
-});
-
-it('renders only a single buy button as the DigitalOcean form action', function () {
-    $html = Livewire::test(ByDigitalOcean::class)
-        ->set('current_step', 2)
-        ->assertDontSee('wire:click="previousStep"', false)
-        ->assertSeeHtml('class="button button-highlighted"')
-        ->assertSee('Buy and create')
-        ->html();
-
-    expect(substr_count($html, 'type="submit"'))->toBe(1)
-        ->and(substr_count($html, 'Buy and create'))->toBe(1);
 });

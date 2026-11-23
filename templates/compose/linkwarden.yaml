@@ -7,7 +7,7 @@
 
 services:
   linkwarden:
-    image: ghcr.io/linkwarden/linkwarden:v2.16.1
+    image: ghcr.io/linkwarden/linkwarden:v2.17.0
     environment:
       - SERVICE_URL_LINKWARDEN_3000
       - NEXTAUTH_URL=${SERVICE_URL_LINKWARDEN_3000}/api/v1/auth
@@ -42,7 +42,7 @@ services:
       retries: 10
 
   meilisearch:
-    image: getmeili/meilisearch:v1.12.8
+    image: getmeili/meilisearch:v1.13.3
     environment:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
     volumes:
