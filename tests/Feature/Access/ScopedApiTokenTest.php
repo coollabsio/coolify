@@ -8,6 +8,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Models\Server;
@@ -563,6 +564,23 @@ describe('token scoped to servers', function () {
         scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertOk();
         scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->otherServer->uuid}")->assertForbidden();
         scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['description' => 'changed'])->assertForbidden();
+    });
+
+    test('a write token cannot move its server to another SSH endpoint or private key', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+        $teamToken = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], null);
+        $this->server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id]);
+        $otherKey = PrivateKey::factory()->create(['team_id' => $this->team->id, 'private_key' => PrivateKey::generateNewKeyPair()['private_key']]);
+        $before = $this->server->fresh()->only(['ip', 'port', 'private_key_id']);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => 'other-host.example.com'])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['port' => 2222])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertForbidden();
+        expect($this->server->fresh()->only(['ip', 'port', 'private_key_id']))->toBe($before);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => $before['ip'], 'port' => $before['port'], 'name' => 'renamed'])->assertSuccessful();
+        scopedTokenTestApi($teamToken, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertSuccessful();
+        expect($this->server->fresh()->private_key_id)->toBe($otherKey->id);
     });
 
     test('a write token can update its server but not create, delete, or read shared variables or team endpoints', function () {

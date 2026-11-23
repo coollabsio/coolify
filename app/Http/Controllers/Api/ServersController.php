@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
+use App\Enums\AccessLevel;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
@@ -834,6 +835,11 @@ class ServersController extends Controller
         $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
         $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
             || $newPort !== (int) $server->port;
+        $privateKeyChanged = $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid;
+        if (($endpointChanged || $privateKeyChanged)
+            && ! app(AccessResolver::class)->allowsTeamWide($request->user(), AccessLevel::Write, $teamId)) {
+            return response()->json(['message' => 'Changing the IP address, SSH port, or private key of a server needs write access on the whole team.'], 403);
+        }
         if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
             return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }
