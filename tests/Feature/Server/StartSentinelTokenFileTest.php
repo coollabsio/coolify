@@ -95,3 +95,45 @@ it('removes the env file with the Sentinel token after docker run succeeds or fa
     'docker run succeeds' => [0],
     'docker run fails' => [1],
 ]);
+
+it('gives Sentinel the push endpoint CA file only when the server has one', function (bool $hasCaFile) {
+    StartSentinel::run($this->server, latestVersion: '1.0.1');
+
+    $envFile = $this->workDirectory.'/sentinel.env';
+    $caFile = $this->workDirectory.'/'.StartSentinel::PUSH_ENDPOINT_CA_FILE;
+    $script = str_replace(
+        ['/data/coolify/sentinel.env', '/data/coolify/sentinel/'.StartSentinel::PUSH_ENDPOINT_CA_FILE],
+        [$envFile, $caFile],
+        sentinelTokenFileScript($this->remoteBatches),
+    );
+    if ($hasCaFile) {
+        file_put_contents($caFile, "-----BEGIN CERTIFICATE-----\n");
+    }
+
+    file_put_contents($this->workDirectory.'/bin/docker', <<<'SH'
+        #!/bin/sh
+        while [ $# -gt 0 ]; do
+            if [ "$1" = "--env-file" ]; then
+                cat "$2" > "$CAPTURE"
+            fi
+            shift
+        done
+        SH);
+    chmod($this->workDirectory.'/bin/docker', 0755);
+
+    $capture = $this->workDirectory.'/captured.env';
+    $process = new SymfonyProcess(['bash', '-c', $script], $this->workDirectory, [
+        'PATH' => $this->workDirectory.'/bin:'.getenv('PATH'),
+        'CAPTURE' => $capture,
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(0, $process->getErrorOutput());
+    $line = 'PUSH_ENDPOINT_CA_PATH=/app/db/'.StartSentinel::PUSH_ENDPOINT_CA_FILE."\n";
+    $hasCaFile
+        ? expect(file_get_contents($capture))->toEndWith($line)
+        : expect(file_get_contents($capture))->not->toContain('PUSH_ENDPOINT_CA_PATH');
+})->with([
+    'with a CA file' => [true],
+    'without a CA file' => [false],
+]);
