@@ -6,14 +6,12 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
-use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
@@ -6999,16 +6997,6 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'The server of this destination cannot host resources.'], 422);
         }
 
-        $deploymentRunsOnServer = ApplicationDeploymentQueue::query()
-            ->where('application_id', $application->id)
-            ->where('pull_request_id', 0)
-            ->where('server_id', $destination->server_id)
-            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
-            ->exists();
-        if ($deploymentRunsOnServer) {
-            return response()->json(['message' => 'A deployment of this application is already queued or in progress on the server of this destination.'], 409);
-        }
-
         $deploymentUuid = new_public_id();
 
         $result = queue_application_deployment(
@@ -7020,7 +7008,12 @@ class ApplicationsController extends Controller
             server: $destination->server,
             destination: $destination,
             only_this_server: true,
+            reject_if_server_busy: true,
         );
+
+        if ($result['status'] === 'server_busy') {
+            return response()->json(['message' => 'A deployment of this application is already queued or in progress on the server of this destination.'], 409);
+        }
 
         if ($result['status'] === 'queue_full') {
             return response()->json(['message' => $result['message']], 400);
