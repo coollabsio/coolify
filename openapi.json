@@ -100,9 +100,9 @@
                                 "properties": {
                                     "pull_request_id": {
                                         "type": "integer",
+                                        "example": 42,
                                         "maximum": 2147483647,
-                                        "minimum": 1,
-                                        "example": 42
+                                        "minimum": 1
                                     },
                                     "pull_request_html_url": {
                                         "type": [
@@ -12539,8 +12539,8 @@
                                     "network": {
                                         "description": "Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.",
                                         "type": "string",
-                                        "maxLength": 255,
-                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                                        "maxLength": 255
                                     },
                                     "type": {
                                         "type": "string",
@@ -31352,8 +31352,8 @@
                 "properties": {
                     "frequency": {
                         "type": "string",
-                        "maxLength": 255,
-                        "example": "0 2 * * *"
+                        "example": "0 2 * * *",
+                        "maxLength": 255
                     },
                     "enabled": {
                         "type": "boolean",
