@@ -69,6 +69,7 @@ RUN set -eux; \
     node --version; \
     npm --version; \
     composer --version; \
+    git config --global --add safe.directory /src; \
     rm -rf /var/lib/apt/lists/*
 
 COPY . /src
@@ -89,8 +90,7 @@ RUN set -eux; \
         storage/logs \
         storage/app \
         bootstrap/cache; \
-    chmod -R a+rwX storage bootstrap/cache; \
-    git config --global --add safe.directory /src
+    chmod -R a+rwX storage bootstrap/cache
 
 # post-autoload-dump runs `php artisan package:discover`. The testing env
 # uses sqlite :memory:, an array cache, and the sync queue, so this does not
