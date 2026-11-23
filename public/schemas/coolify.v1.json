@@ -5,8 +5,7 @@
     "type": "object",
     "required": [
         "version",
-        "resources",
-        "environments"
+        "resources"
     ],
     "additionalProperties": false,
     "patternProperties": {

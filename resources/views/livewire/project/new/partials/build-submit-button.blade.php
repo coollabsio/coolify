@@ -1,7 +1,7 @@
 {{-- Main button of the build configuration. With coolify.json selected, it creates the resources from the file. --}}
 @if ($this->usesConfigFile())
     @if ($configPlan && empty($configPlan['errors']))
-        <x-forms.button type="button" wire:click="useConfigFile" isHighlighted :disabled="! $this->canLinkConfigFile()">
+        <x-forms.button type="button" wire:click="{{ $configSource === 'template' ? 'useConfigTemplate' : 'useConfigFile' }}" isHighlighted :disabled="! $this->canCreateFromConfigFile()">
             Create resources
         </x-forms.button>
     @else

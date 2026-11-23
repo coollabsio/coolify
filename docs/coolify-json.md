@@ -9,7 +9,23 @@ A `coolify.json` file in a git repository defines the resources of a project env
 3. Link the environment: `Config as code` > `Connect repository` (repository, branch, file path, git source, and the server). Only a team admin can link. The server reads the file, and resources that name no server run on it.
 4. Push. Coolify plans the file. The first plan of an export only adopts the existing resources (`import`), so nothing changes.
 
-When you add a new repository that has a `coolify.json`, the add form offers `From coolify.json` (the default) or `Configure manually`. `From coolify.json` creates the resources from the file and links the environment in one step.
+## Use the file as a template
+
+When you add a new repository that has a `coolify.json`, the add form offers three choices:
+
+| Choice | Result |
+| --- | --- |
+| `Use coolify.json` (default) | Coolify creates the resources with the settings of the file one time. They are normal resources: you edit them in Coolify, and later changes of the file do not change them. |
+| `Config as code` | Coolify creates the resources and links the environment. The file manages them, and each push updates them. Only a team admin can link. |
+| `Configure manually` | Coolify does not use the file. |
+
+With `Use coolify.json`, a repository can give its own default settings (build pack, ports, health check, variables, a database) to everyone who deploys it:
+
+- `environments` is optional. When the file has an environment for the branch, or with the name of the Coolify environment, its overrides apply.
+- An application without `source.repository` builds the repository that you add, with its branch and git source. A fork or a copy of the repository builds itself.
+- Resources without `server` go to the server that you selected. `moved`, `unmanage`, and `import` are ignored.
+- `required` variables are created empty and marked required. `generate` values are generated one time. Nothing deploys until you deploy.
+- The user needs the right to create resources in the environment. An environment that is linked to a `coolify.json` cannot use a template: add the resources to its file instead.
 
 ## The file
 

@@ -22,9 +22,9 @@ class ConfigPlanner
 
     public function plan(ResolvedEnvironment $env, ApplyContext $ctx): ConfigPlan
     {
-        $errors = [];
+        $errors = $ctx->template ? $this->usedKeys($env, $ctx) : [];
         $changes = [];
-        $stored = $this->storedResources($ctx);
+        $stored = $ctx->template ? [] : $this->storedResources($ctx);
         $stateHash = $this->stateHash($stored, $ctx);
 
         foreach ($env->moved as $index => $move) {
@@ -143,7 +143,7 @@ class ConfigPlanner
         return new ConfigPlan(
             changes: $changes,
             errors: $errors,
-            warnings: [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds)],
+            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds)],
             stateHash: $stateHash,
             missingRequired: $missingRequired,
             removesAll: $env->resources === [],
@@ -194,6 +194,23 @@ class ConfigPlanner
      *
      * @return array<string, array{0: ResourceAdapter, 1: Model}>
      */
+    /**
+     * Keys stay unique in an environment. Resources of an earlier link can still use the keys of the file.
+     *
+     * @return list<ConfigError>
+     */
+    private function usedKeys(ResolvedEnvironment $env, ApplyContext $ctx): array
+    {
+        $errors = [];
+        foreach ($this->storedResources($ctx) as $key => [, $model]) {
+            if (array_key_exists($key, $env->resources)) {
+                $errors[] = new ConfigError("resources.{$key}", "\"{$model->name}\" in this environment already uses this key. Rename the key in the file.");
+            }
+        }
+
+        return $errors;
+    }
+
     private function storedResources(ApplyContext $ctx): array
     {
         $stored = [];

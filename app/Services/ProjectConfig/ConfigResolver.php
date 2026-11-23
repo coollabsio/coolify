@@ -18,6 +18,21 @@ class ConfigResolver
         throw ConfigException::at('environments', "No environment uses branch \"{$branch}\". Add it to \"environments\".");
     }
 
+    /**
+     * A template uses the environment of the branch, else the environment with the name of the Coolify environment,
+     * else only the resources.
+     */
+    public function forTemplate(ConfigDocument $doc, string $branch, string $environmentName): ResolvedEnvironment
+    {
+        foreach ($doc->environments as $name => $environment) {
+            if (($environment['branch'] ?? null) === $branch) {
+                return $this->resolve($doc, (string) $name);
+            }
+        }
+
+        return $this->resolve($doc, $environmentName);
+    }
+
     public function forEnvironment(ConfigDocument $doc, string $name): ResolvedEnvironment
     {
         if (! array_key_exists($name, $doc->environments)) {
@@ -29,7 +44,7 @@ class ConfigResolver
 
     private function resolve(ConfigDocument $doc, string $name): ResolvedEnvironment
     {
-        $environment = $doc->environments[$name];
+        $environment = $doc->environments[$name] ?? ['branch' => ''];
         $errors = [];
         $resources = $doc->resources;
 

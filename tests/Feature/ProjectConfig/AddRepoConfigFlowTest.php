@@ -76,6 +76,7 @@ it('shows the plan of the file before linking', function () {
 
 it('links the environment when an admin confirms', function () {
     addRepoForm($this, $this->fx['user'])
+        ->set('configSource', 'file')
         ->call('previewConfigFile')
         ->call('useConfigFile')
         ->assertRedirect(route('project.environment.configuration', ['project_uuid' => $this->fx['project']->uuid, 'environment_uuid' => $this->fx['environment']->uuid]));
@@ -102,7 +103,7 @@ it('shows the plan instead of creating an application when the form uses coolify
     addRepoForm($this, $this->fx['user'], AddRepoFormWithConfigFile::class)
         ->set('branchFound', true)
         ->call('fakeScan')
-        ->assertSet('configSource', 'file')
+        ->assertSet('configSource', 'template')
         ->call('submit')
         ->assertSet('configPlan.changes.0.key', 'web')
         ->assertSee('Create resources')

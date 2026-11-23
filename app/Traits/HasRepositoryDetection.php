@@ -13,9 +13,11 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Policies\ResourceCreatePolicy;
 use App\Rules\ValidGitBranch;
 use App\Services\ProjectConfig\ConfigLinkPreview;
 use App\Services\ProjectConfig\ConfigLinks;
+use App\Services\ProjectConfig\ConfigTemplate;
 use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Facades\Log;
@@ -81,9 +83,18 @@ trait HasRepositoryDetection
     public ?string $configPlanError = null;
 
     /**
-     * How to create the resources when the scan found coolify.json: 'file' or 'manual'.
+     * Plans of this scan by choice and form, so a switch between the choices does not read the repository again.
+     *
+     * @var array<string, array{plan: ?array, error: ?string}>
      */
-    public string $configSource = 'file';
+    #[Locked]
+    public array $configPlans = [];
+
+    /**
+     * How to create the resources when the scan found coolify.json: 'template' (the file sets the defaults one time),
+     * 'file' (the file manages the environment), or 'manual'.
+     */
+    public string $configSource = 'template';
 
     /**
      * Unsaved application with the repository, branch, and Git source or deploy key to scan.
@@ -130,14 +141,37 @@ trait HasRepositoryDetection
         }
         $this->detectionRan = true;
         if ($this->detectedConfigFile !== null) {
-            $this->configSource = 'file';
+            $this->configSource = 'template';
             $this->previewConfigFile();
         }
     }
 
     public function usesConfigFile(): bool
     {
-        return $this->detectedConfigFile !== null && $this->configSource === 'file';
+        return $this->detectedConfigFile !== null && in_array($this->configSource, ['template', 'file'], true);
+    }
+
+    public function updatedConfigSource(): void
+    {
+        $this->configSource = in_array($this->configSource, ['template', 'file', 'manual'], true) ? $this->configSource : 'template';
+        if ($this->usesConfigFile()) {
+            $this->previewConfigFile(fromScan: true);
+        }
+    }
+
+    /**
+     * A template needs only the right to create resources. A link needs a team admin.
+     */
+    public function canCreateFromConfigFile(): bool
+    {
+        if ($this->configSource !== 'template') {
+            return $this->canLinkConfigFile();
+        }
+        try {
+            return app(ResourceCreatePolicy::class)->createAny(auth()->user(), $this->detectionEnvironment());
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function canLinkConfigFile(): bool
@@ -152,41 +186,82 @@ trait HasRepositoryDetection
     /**
      * Reads the found coolify.json and shows its plan for this environment. Nothing is saved.
      */
-    public function previewConfigFile(): void
+    public function previewConfigFile(bool $fromScan = false): void
     {
         $this->authorize('create', Application::class);
         $this->configPlan = null;
         $this->configPlanError = null;
         try {
             $data = $this->configLinkData();
-            $environment = $this->detectionEnvironment();
-            $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
-                ?? throw new \RuntimeException('Destination not found.');
-            $link = new EnvironmentConfigLink([
-                'environment_id' => $environment->id,
-                'mode' => EnvironmentConfigLink::MODE_GIT,
-                'repository' => $data['repository'],
-                'branch' => $data['branch'],
-                'file_path' => $data['file_path'],
-            ]);
-            $application = $this->applicationForDetection();
-            $link->forceFill(['private_key_id' => $application->private_key_id]);
-            $source = $application->getRelation('source');
-            if ($source !== null && ! ($source instanceof GithubApp && (int) $source->id === 0)) {
-                $link->forceFill(['source_type' => $source::class, 'source_id' => $source->id]);
-                $link->setRelation('source', $source);
+            $cacheKey = $this->configSource.':'.hash('sha256', json_encode($data));
+            if (! $fromScan || ! isset($this->configPlans[$cacheKey])) {
+                $link = $this->unsavedConfigLink($data);
+                $result = $this->configSource === 'template'
+                    ? app(ConfigTemplate::class)->plan($link, auth()->user())
+                    : app(ConfigLinkPreview::class)->plan($link, auth()->user());
+                $this->configPlans[$cacheKey] = [
+                    'plan' => $result['plan'] === null ? null
+                        : $result['plan'] + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]],
+                    'error' => $result['error'],
+                ];
             }
-            $link->setRelation('environment', $environment);
-            $link->forceFill(['read_server_id' => $destination->server->id, 'destination_type' => $destination->getMorphClass(), 'destination_id' => $destination->id]);
-            $link->setRelation('readServer', $destination->server);
-            $link->setRelation('destination', $destination);
-
-            ['plan' => $plan, 'error' => $this->configPlanError] = app(ConfigLinkPreview::class)->plan($link, auth()->user());
-            $this->configPlan = $plan === null ? null
-                : $plan + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]];
+            ['plan' => $this->configPlan, 'error' => $this->configPlanError] = $this->configPlans[$cacheKey];
         } catch (\Throwable $e) {
             $this->configPlanError = $e instanceof \RuntimeException ? $e->getMessage() : 'Coolify could not read coolify.json.';
         }
+    }
+
+    /**
+     * Creates the resources from coolify.json one time. They are normal resources after that.
+     */
+    public function useConfigTemplate(): void
+    {
+        try {
+            $environment = $this->detectionEnvironment();
+            $created = app(ConfigTemplate::class)->create($this->unsavedConfigLink($this->configLinkData()), auth()->user(), $this->configPlan['commit'] ?? null);
+
+            $parameters = ['project_uuid' => $environment->project->uuid, 'environment_uuid' => $environment->uuid];
+            if (count($created) === 1 && $created[0] instanceof Application) {
+                $this->redirectRoute('project.application.configuration', $parameters + ['application_uuid' => $created[0]->uuid]);
+
+                return;
+            }
+            $this->redirectRoute('project.resource.index', $parameters);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * A link that is not saved, to read and plan the file of the form.
+     *
+     * @param  array{repository: string, branch: string, file_path: string}  $data
+     */
+    private function unsavedConfigLink(array $data): EnvironmentConfigLink
+    {
+        $environment = $this->detectionEnvironment();
+        $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
+            ?? throw new \RuntimeException('Destination not found.');
+        $link = new EnvironmentConfigLink([
+            'environment_id' => $environment->id,
+            'mode' => EnvironmentConfigLink::MODE_GIT,
+            'repository' => $data['repository'],
+            'branch' => $data['branch'],
+            'file_path' => $data['file_path'],
+        ]);
+        $application = $this->applicationForDetection();
+        $link->forceFill(['private_key_id' => $application->private_key_id]);
+        $source = $application->getRelation('source');
+        if ($source !== null && ! ($source instanceof GithubApp && (int) $source->id === 0)) {
+            $link->forceFill(['source_type' => $source::class, 'source_id' => $source->id]);
+            $link->setRelation('source', $source);
+        }
+        $link->setRelation('environment', $environment);
+        $link->forceFill(['read_server_id' => $destination->server->id, 'destination_type' => $destination->getMorphClass(), 'destination_id' => $destination->id]);
+        $link->setRelation('readServer', $destination->server);
+        $link->setRelation('destination', $destination);
+
+        return $link;
     }
 
     /**
@@ -302,6 +377,7 @@ trait HasRepositoryDetection
     protected function applyDetectionResult(RepositoryDetectionResult $result): void
     {
         $this->detectedConfigFile = $result->configFile;
+        $this->configPlans = [];
         $this->configPlan = null;
         $this->configPlanError = null;
         $this->detectedDockerfiles = $result->dockerfiles;

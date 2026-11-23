@@ -19,9 +19,10 @@
 @endphp
 
 @if ($detectedConfigFile)
-    <div role="radiogroup" aria-label="How to create the resources" class="grid gap-2 sm:grid-cols-2">
+    <div role="radiogroup" aria-label="How to create the resources" class="grid gap-2 sm:grid-cols-3">
         @foreach ([
-            'file' => ['From coolify.json', 'The file defines the resources. Each push to the branch updates them.'],
+            'template' => ['Use coolify.json', 'Create the resources with the settings of the file. You edit them in Coolify after that.'],
+            'file' => ['Config as code', 'The file manages the resources. Each push to the branch updates them.'],
             'manual' => ['Configure manually', 'Set the build pack and settings below. The file is not used.'],
         ] as $value => [$title, $description])
             <label wire:key="config-source-{{ $value }}" @class([
@@ -80,7 +81,7 @@
                 </ul>
             @elseif ($configPlan)
                 <p class="px-4 pt-3 pb-1 text-[12px] text-neutral-500 dark:text-fg-dim">
-                    Creating this environment from the file adds:
+                    {{ $configSource === 'template' ? 'Coolify creates:' : 'Creating this environment from the file adds:' }}
                 </p>
                 <x-project-config.plan-groups :changes="$configPlan['changes'] ?? []" compact :values="$canLinkConfigFile" />
             @else
@@ -89,12 +90,23 @@
             @endif
         </div>
 
-        @if ($configPlan && empty($configPlan['errors']))
+        @if ($configPlan && empty($configPlan['errors']) && $configSource === 'template')
             <div class="border-t border-neutral-200 px-4 py-3 text-[12px] text-neutral-500 dark:border-white/[0.06] dark:text-fg-dim">
-                Anyone who can push to <code>{{ $configPlan['link']['branch'] }}</code> of
-                <code>{{ $configPlan['link']['repository'] }}</code> can change these resources and use the team's shared variables.
+                Nothing deploys yet. Set the values that the file needs, then deploy. Later changes of the file do not change these resources.
+                @unless ($this->canCreateFromConfigFile())
+                    <span class="mt-1 block text-amber-600 dark:text-amber-400">You cannot create resources in this environment.</span>
+                @endunless
+            </div>
+        @elseif ($configPlan && empty($configPlan['errors']))
+            <div class="flex flex-col gap-2 border-t border-neutral-200 p-3 dark:border-white/[0.06]">
+                <x-callout type="warning" title="Protect the branch">
+                    Anyone who can push to <code>{{ $configPlan['link']['branch'] }}</code> of
+                    <code>{{ $configPlan['link']['repository'] }}</code> can change these resources and use the team's shared variables.
+                </x-callout>
                 @unless ($canLinkConfigFile)
-                    <span class="mt-1 block text-amber-600 dark:text-amber-400">Only a team admin can link coolify.json. Ask an admin, or configure it manually.</span>
+                    <x-callout type="danger" title="Team admin needed">
+                        Only a team admin can link coolify.json. Ask an admin, or configure it manually.
+                    </x-callout>
                 @endunless
             </div>
         @endif

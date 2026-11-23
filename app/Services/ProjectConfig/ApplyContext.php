@@ -19,6 +19,7 @@ final class ApplyContext
         public readonly Environment $environment,
         public readonly int $teamId,
         public readonly ?User $actor = null,
+        public readonly bool $template = false,
     ) {}
 
     public static function for(EnvironmentConfigLink $link, ?User $actor = null): self
@@ -26,5 +27,15 @@ final class ApplyContext
         $environment = $link->environment;
 
         return new self($link, $environment, (int) $environment->project->team_id, $actor);
+    }
+
+    /**
+     * A one-time import: every resource of the file is new, and nothing stays managed.
+     */
+    public static function forTemplate(EnvironmentConfigLink $link, User $actor): self
+    {
+        $environment = $link->environment;
+
+        return new self($link, $environment, (int) $environment->project->team_id, $actor, template: true);
     }
 }

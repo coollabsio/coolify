@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentConfigRevision;
 use App\Models\EnvironmentVariable;
+use App\Services\ProjectConfig\Adapters\ResourceAdapter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -193,12 +194,7 @@ class ConfigApplier
                 $adapter->update($model, $desired, $ctx);
                 $changedKeys[$key] = true;
             }
-            foreach (['internal_url', 'host', 'port'] as $property) {
-                $value = $adapter->referenceValue($model, $property);
-                if ($value !== null) {
-                    $ctx->resolvedRefs["resource.{$key}.{$property}"] = $value;
-                }
-            }
+            $this->collectRefs($adapter, $model, $key, $ctx);
             if (isset($changedKeys[$key]) && $model instanceof Application) {
                 $deploy[] = $model;
             } elseif (isset($changedKeys[$key])) {
@@ -207,6 +203,52 @@ class ConfigApplier
         }
 
         return $deploy;
+    }
+
+    /**
+     * Creates every resource of a template plan as a normal resource: no key, and no variable that the file manages.
+     * Nothing deploys or starts.
+     *
+     * @return list<Model>
+     */
+    public function createFromTemplate(ResolvedEnvironment $resolved, ApplyContext $ctx): array
+    {
+        return ManagedResources::whileApplying(fn () => DB::transaction(function () use ($resolved, $ctx): array {
+            $created = [];
+            foreach ($resolved->resources as $key => $desired) {
+                $adapter = $this->registry->for($desired['type']);
+                $model = $adapter->create($key, $desired, $ctx);
+                $this->collectRefs($adapter, $model, $key, $ctx);
+                $created[] = $model;
+            }
+            foreach ($created as $model) {
+                $this->setKey($model, null);
+                $variables = EnvironmentVariable::query()
+                    ->where('resourceable_type', $model->getMorphClass())
+                    ->where('resourceable_id', $model->getKey())
+                    ->whereNotNull('config_meta')
+                    ->get();
+                foreach ($variables as $variable) {
+                    // A value that the file requires stays required in Coolify.
+                    $variable->forceFill([
+                        'is_required' => $variable->is_required || ($variable->config_meta['form'] ?? null) === 'required',
+                        'config_meta' => null,
+                    ])->saveQuietly();
+                }
+            }
+
+            return $created;
+        }));
+    }
+
+    private function collectRefs(ResourceAdapter $adapter, Model $model, string $key, ApplyContext $ctx): void
+    {
+        foreach (['internal_url', 'host', 'port'] as $property) {
+            $value = $adapter->referenceValue($model, $property);
+            if ($value !== null) {
+                $ctx->resolvedRefs["resource.{$key}.{$property}"] = $value;
+            }
+        }
     }
 
     /**

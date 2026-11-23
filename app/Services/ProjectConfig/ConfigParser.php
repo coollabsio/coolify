@@ -34,7 +34,10 @@ class ConfigParser
     /** @var list<ConfigError> */
     private array $errors = [];
 
-    public function parse(string $raw): ConfigDocument
+    /**
+     * @param  bool  $template  A template file can have no environments: it is used one time, on any branch.
+     */
+    public function parse(string $raw, bool $template = false): ConfigDocument
     {
         $this->errors = [];
 
@@ -62,7 +65,7 @@ class ConfigParser
         $this->checkProject($data);
 
         $resources = $this->checkResources($data['resources'] ?? null, 'resources', isOverride: false, required: true);
-        $environments = $this->checkEnvironments($data['environments'] ?? null);
+        $environments = $template && ! array_key_exists('environments', $data) ? [] : $this->checkEnvironments($data['environments'] ?? null);
         $moved = $this->checkMoved($data['moved'] ?? [], $resources);
         $unmanage = $this->checkUnmanage($data['unmanage'] ?? [], $resources);
 

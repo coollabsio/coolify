@@ -77,7 +77,7 @@ class AdapterRegistry
             '$id' => 'https://coolify.io/schemas/coolify.v1.json',
             'title' => 'coolify.json',
             'type' => 'object',
-            'required' => ['version', 'resources', 'environments'],
+            'required' => ['version', 'resources'],
             'additionalProperties' => false,
             'patternProperties' => ['^x-' => true],
             'properties' => [

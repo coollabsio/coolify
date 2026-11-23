@@ -48,4 +48,28 @@ final readonly class ResolvedEnvironment
 
         return new self($this->name, $this->branch, $resources, $this->moved, $this->unmanage, $this->imports, $this->formatVersion, $this->fileHash);
     }
+
+    /**
+     * The file as a one-time template: only its resources. Applications without a repository use the
+     * repository that the user adds, so a fork or a copy of the repository builds itself.
+     *
+     * @param  array{repository: string, branch: string, github_app?: string, gitea_app?: string, deploy_key?: string}  $source
+     */
+    public function asTemplate(array $source): self
+    {
+        $resources = array_map(function (array $resource) use ($source): array {
+            if ($resource['type'] !== 'application' || ($resource['build']['pack'] ?? null) === 'dockerimage' || isset($resource['source']['repository'])) {
+                return $resource;
+            }
+            $current = (array) ($resource['source'] ?? []);
+            $credential = array_intersect_key($current, array_flip(['github_app', 'gitlab_app', 'gitea_app', 'deploy_key'])) === []
+                ? array_diff_key($source, array_flip(['repository', 'branch']))
+                : [];
+            $resource['source'] = ['repository' => $source['repository'], 'branch' => $current['branch'] ?? $source['branch']] + $credential + $current;
+
+            return $resource;
+        }, $this->resources);
+
+        return new self($this->name, $this->branch, $resources, [], [], [], $this->formatVersion, $this->fileHash);
+    }
 }
