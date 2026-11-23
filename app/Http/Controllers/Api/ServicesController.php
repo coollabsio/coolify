@@ -271,7 +271,7 @@ class ServicesController extends Controller
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function services(Request $request)
+    public function services(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -307,7 +307,7 @@ class ServicesController extends Controller
 
         if (isset($validated['status'])) {
             [$total, $services] = Service::pageByStatus($query, $validated['status'], $offset, $perPage);
-            $services->each(fn (Service $service) => $service->unsetRelation('applications')->unsetRelation('databases'));
+            $services->load(['applications', 'databases']);
         } else {
             $query->orderBy('name')->orderBy('id');
             $total = $paginate ? (clone $query)->count() : null;
