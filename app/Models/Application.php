@@ -7,6 +7,7 @@ use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
+use App\Rules\ValidIpAllowlist;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -140,6 +141,7 @@ use Symfony\Component\Yaml\Yaml;
         'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+        'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
@@ -255,6 +257,7 @@ class Application extends BaseModel
         'http_basic_auth_bcrypt_cost',
         'http_basic_auth_argon2id_memory_cost',
         'http_basic_auth_argon2id_time_cost',
+        'ip_allowlist',
         'connect_to_docker_network',
         'force_domain_override',
         'is_container_label_escape_enabled',
@@ -1104,6 +1107,16 @@ class Application extends BaseModel
     public function realStatus()
     {
         return $this->getRawOriginal('status');
+    }
+
+    /**
+     * Stores the allowlist as comma-separated unique entries, or null when empty.
+     */
+    protected function ipAllowlist(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => implode(',', ValidIpAllowlist::entries($value)) ?: null,
+        );
     }
 
     protected function serverStatus(): Attribute

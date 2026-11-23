@@ -60,8 +60,11 @@ class UploadStorageService
                 }
                 $rules = [];
             }
-            $rules = array_values(array_filter($rules, fn (array $rule) => ($rule['ID'] ?? null) !== self::CORS_RULE_ID));
-            $rules[] = ['ID' => self::CORS_RULE_ID, 'AllowedOrigins' => [$origin], 'AllowedMethods' => ['PUT'], 'AllowedHeaders' => ['*'], 'MaxAgeSeconds' => 3600];
+            $ownRule = ['AllowedOrigins' => [$origin], 'AllowedMethods' => ['PUT'], 'AllowedHeaders' => ['*']];
+            // Some providers drop the rule ID, so an equal rule also counts as the rule of Coolify.
+            $rules = array_values(array_filter($rules, fn (array $rule) => ($rule['ID'] ?? null) !== self::CORS_RULE_ID
+                && array_intersect_key($rule, $ownRule) != $ownRule));
+            $rules[] = ['ID' => self::CORS_RULE_ID, ...$ownRule, 'MaxAgeSeconds' => 3600];
             $client->putBucketCors(['Bucket' => $storage->bucket, 'CORSConfiguration' => ['CORSRules' => $rules]]);
         } catch (Throwable $e) {
             $problems[] = 'Coolify could not add the CORS rule to bucket "'.$storage->bucket.'". Add a rule that allows PUT from '.$origin.' in the settings of your S3 provider. Error: '.$e->getMessage();

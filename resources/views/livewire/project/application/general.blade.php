@@ -8,7 +8,7 @@
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit"
-            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
+            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,ipAllowlist,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-project-config.readonly-notice :resource="$application" />
             @if (app(\App\Services\ProjectConfig\UnlinkedConfigFileHint::class)->shows($application))
@@ -107,8 +107,8 @@
             @if ($buildPack !== 'dockercompose')
                 <x-application.settings-subsection id="security-section" title="Authentication" first class="border-b border-neutral-200 py-5 dark:border-white/[0.07]">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
-                    <x-empty size="sm" title="Authentication is managed through labels"
-                        description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here."
+                    <x-empty size="sm" title="Access control is managed through labels"
+                        description="Authentication and IP allowlists are managed via manual proxy labels. Switch label management back to Coolify to configure them here."
                         icon-name="admin">
                         <x-slot:contents>
                             <button type="button" class="button"
@@ -170,6 +170,11 @@
                             </div>
                         </div>
                     @endif
+                    <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                        <x-forms.input id="ipAllowlist" label="IP allowlist" placeholder="203.0.113.5, 10.0.0.0/8, 2001:db8::/32"
+                            helper="Only these IP addresses or CIDR ranges (IPv4 or IPv6, separated by commas or spaces) can reach the application. Other clients get HTTP 403. Leave empty to allow everyone. Redeploy to apply.<br><br>The proxy checks the IP that connects to it. If a CDN or another proxy (for example Cloudflare) is in front of Coolify, restrict access there instead."
+                            x-bind:disabled="!canUpdate" />
+                    </div>
                     @endif
                 </x-application.settings-subsection>
             @endif
