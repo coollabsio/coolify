@@ -119,7 +119,9 @@ trait HandlesTerminalApi
 
         try {
             // Build the SSH command only inside a slot: it can open an SSH connection to scan the host key.
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+            // The SSH timeout ends after the process timeout: the remote timeout must stop the command first
+            // (exit code 124), and BusyBox `timeout` returns 255 for a stopped SSH client.
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $this->terminalProcessTimeout($timeout) + 1);
 
             return $this->runTerminalProcess($sshCommand, $timeout);
         } finally {

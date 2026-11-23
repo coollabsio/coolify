@@ -162,7 +162,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             'stderr' => 'timed out',
         ]);
 
-        Process::assertRan(fn ($process) => str($process->command)->contains('timeout 3 ssh')
+        Process::assertRan(fn ($process) => str($process->command)->contains('timeout 9 ssh')
             && str($process->command)->contains("docker exec 'app-container'")
             && str($process->command)->contains('exec timeout 3 "$s"')
             && $process->timeout === 8);
