@@ -313,7 +313,7 @@
                         <div class="application-settings-section-body grid min-h-0 flex-1 gap-6 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
                             <div>
                                 <div class="mb-2 text-xs font-medium text-neutral-500 dark:text-fg-dim">Presets</div>
-                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                <div class="grid grid-cols-3 gap-2 sm:gap-3">
                                     <template x-for="preset in presets" :key="preset.name">
                                         <button type="button" @click="setDraft(preset.theme && { ...preset.theme })"
                                             :aria-pressed="isDraftPreset(preset)"
@@ -321,7 +321,7 @@
                                             <x-theme-controls.swatch theme="(preset.theme ?? preset.swatch)"
                                                 class="h-14 w-full transition-shadow group-hover:shadow-md"
                                                 ::class="isDraftPreset(preset) && 'ring-2 ring-coollabs ring-offset-2 ring-offset-white dark:ring-brand-light dark:ring-offset-panel'" />
-                                            <span class="truncate text-xs text-neutral-600 dark:text-fg-dim" x-text="preset.name"></span>
+                                            <span class="truncate text-xs text-neutral-600 dark:text-fg-dim" x-text="preset.name" :title="preset.name"></span>
                                         </button>
                                     </template>
                                 </div>
@@ -415,12 +415,17 @@
                                             <x-reicon name="copy" x-show="!shareCodeCopied" class="size-4" />
                                             <x-reicon name="check" x-show="shareCodeCopied" x-cloak class="size-4 text-success" />
                                         </button>
+                                        <button type="button" @click="$refs.itermFile.click()" class="button shrink-0 normal-case">
+                                            Import iTerm2
+                                        </button>
+                                        <input x-ref="itermFile" type="file" accept=".itermcolors,.xml,.plist" class="hidden"
+                                            aria-label="iTerm2 color file" @change="importItermFile($event.target)" />
                                     </div>
                                     <p class="mt-1.5 text-xs"
                                         :class="shareCodeInvalid ? 'text-error' : 'text-neutral-500 dark:text-fg-dim'"
                                         x-text="shareCodeInvalid
-                                            ? 'Enter four hex colors, separated by commas.'
-                                            : 'Paste a code that someone shared, or copy yours.'"></p>
+                                            ? 'Enter four hex colors, separated by commas, or an iTerm2 color file.'
+                                            : 'Paste a code that someone shared or an iTerm2 .itermcolors file, or copy your code.'"></p>
                                 </div>
                             </div>
                         </div>

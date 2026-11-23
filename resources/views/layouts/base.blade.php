@@ -124,9 +124,20 @@
             { name: 'Slate', theme: { sidebar: '#2b3038', selected: '#4a5361', accent: '#6cc4f5', background: '#353b45' } },
             { name: 'Nord', theme: { sidebar: '#2e3440', selected: '#4c566a', accent: '#88c0d0', background: '#3b4252' } },
             { name: 'Dracula', theme: { sidebar: '#21222c', selected: '#44475a', accent: '#bd93f9', background: '#282a36' } },
+            { name: 'Catppuccin Mocha', theme: { sidebar: '#181825', selected: '#45475a', accent: '#cba6f7', background: '#1e1e2e' } },
+            { name: 'Gruvbox Dark', theme: { sidebar: '#282828', selected: '#504945', accent: '#fe8019', background: '#32302f' } },
+            { name: 'One Dark', theme: { sidebar: '#21252b', selected: '#3e4451', accent: '#61afef', background: '#282c34' } },
+            { name: 'Rosé Pine', theme: { sidebar: '#1f1d2e', selected: '#403d52', accent: '#c4a7e7', background: '#26233a' } },
+            { name: 'Solarized Dark', theme: { sidebar: '#002b36', selected: '#144956', accent: '#268bd2', background: '#073642' } },
+            { name: 'Tokyo Night', theme: { sidebar: '#1a1b26', selected: '#414868', accent: '#7aa2f7', background: '#1f2335' } },
             { name: 'GitHub Dark', theme: { sidebar: '#010409', selected: '#21262d', accent: '#2f81f7', background: '#0d1117' } },
             { name: 'Aubergine', theme: { sidebar: '#3f0e40', selected: '#1164a3', accent: '#1164a3', background: '#ffffff' } },
             { name: 'GitHub Light', theme: { sidebar: '#f6f8fa', selected: '#dde4ec', accent: '#0969da', background: '#ffffff' } },
+            { name: 'Catppuccin Latte', theme: { sidebar: '#e6e9ef', selected: '#bcc0cc', accent: '#8839ef', background: '#eff1f5' } },
+            { name: 'Gruvbox Light', theme: { sidebar: '#fbf1c7', selected: '#d5c4a1', accent: '#af3a03', background: '#f2e5bc' } },
+            { name: 'Rosé Pine Dawn', theme: { sidebar: '#fffaf3', selected: '#dfdad9', accent: '#907aa9', background: '#f2e9e1' } },
+            // Selected is base2 (#eee8d5) mixed 30% toward base1 (#93a1a1); Solarized has no color between them.
+            { name: 'Solarized Light', theme: { sidebar: '#eee8d5', selected: '#d3d3c5', accent: '#268bd2', background: '#fdf6e3' } },
             { name: 'Paper', theme: { sidebar: '#ebe6da', selected: '#d9d1bf', accent: '#c2410c', background: '#f7f4ec' } },
             { name: 'Blossom', theme: { sidebar: '#fde8f1', selected: '#f9c4dc', accent: '#d61f69', background: '#fff7fa' } },
         ];
@@ -286,13 +297,21 @@
                     this.setDraft(theme);
                 }
             },
+            // A share code, or the content of an iTerm2 .itermcolors file.
             readShareCode(code) {
-                const theme = window.parseCustomTheme(code);
+                const theme = window.parseCustomTheme(code) ?? window.parseItermColors?.(code);
                 if (theme) {
                     this.setDraft(theme);
                     return;
                 }
                 this.shareCodeInvalid = code.trim() !== '';
+            },
+            async importItermFile(input) {
+                const file = input.files?.[0];
+                input.value = '';
+                if (file) {
+                    this.readShareCode(file.size > 1024 * 1024 ? 'too large' : await file.text());
+                }
             },
             async copyShareCode() {
                 try {
