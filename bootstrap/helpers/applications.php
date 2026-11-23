@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null, bool $reject_if_server_busy = false)
 {
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
@@ -48,7 +48,7 @@ function queue_application_deployment(Application $application, string $deployme
     $is_mcp = $is_mcp || request()->attributes->get('mcp_rest_bridge') === true;
     $is_api = $is_api && ! $is_mcp;
 
-    $admission = DB::transaction(function () use ($application, $application_id, $cancel_previous, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_mcp, $is_webhook, $no_questions_asked, $only_this_server, $parent_deployment_uuid, $pull_request_id, $restart_only, $rollback, $scan_gate_bypassed_by, $scan_gate_pinned_image, $server_id, $server_name) {
+    $admission = DB::transaction(function () use ($application, $application_id, $cancel_previous, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_mcp, $is_webhook, $no_questions_asked, $only_this_server, $parent_deployment_uuid, $pull_request_id, $reject_if_server_busy, $restart_only, $rollback, $scan_gate_bypassed_by, $scan_gate_pinned_image, $server_id, $server_name) {
         // Lock stable rows because an empty deployment queue has no row to lock.
         Application::query()->whereKey($application_id)->lockForUpdate()->firstOrFail();
         $serverForQueueCheck = Server::query()->whereKey($server_id)->lockForUpdate()->firstOrFail();
@@ -61,6 +61,18 @@ function queue_application_deployment(Application $application, string $deployme
             return [
                 'status' => 'queue_full',
                 'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
+            ];
+        }
+
+        // Checked under the row locks, so two requests cannot both see an idle server.
+        if ($reject_if_server_busy && ApplicationDeploymentQueue::where('application_id', $application_id)
+            ->where('pull_request_id', $pull_request_id)
+            ->where('server_id', $server_id)
+            ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
+            ->exists()) {
+            return [
+                'status' => 'server_busy',
+                'message' => 'A deployment of this application is already queued or in progress on this server.',
             ];
         }
 
@@ -512,6 +524,10 @@ function clone_application(Application $source, $destination, array $overrides =
         throw new RuntimeException('The application, the target environment, and the destination must belong to the same team.');
     }
 
+    foreach ($source->persistentStorages()->get() as $volume) {
+        $volume->ensureCloneTargetIsAvailable($source->destination->server, $server);
+    }
+
     // Prepare name and URL
     $name = $overrides['name'] ?? 'clone-of-'.str($source->name)->limit(20).'-'.$uuid;
     $applicationSettings = $source->settings;
@@ -594,7 +610,9 @@ function clone_application(Application $source, $destination, array $overrides =
     $persistentVolumes = $source->persistentStorages()->get();
     foreach ($persistentVolumes as $volume) {
         $newName = '';
-        if ($volume->standalone_sqlite_id !== null) {
+        if ($volume->is_external) {
+            $newName = $volume->name;
+        } elseif ($volume->standalone_sqlite_id !== null) {
             // A mounted SQLite database volume stays connected to the source only; the clone gets its own volume.
             $newName = $newApplication->uuid.'-'.$volume->name;
         } elseif (str_starts_with($volume->name, $source->uuid)) {
@@ -615,7 +633,7 @@ function clone_application(Application $source, $destination, array $overrides =
         ]);
         $newPersistentVolume->save();
 
-        if ($cloneVolumeData) {
+        if ($volume->shouldCopyDataWhenCloning($cloneVolumeData)) {
             $pendingVolumeClones[] = new VolumeCloneJob(
                 $volume->name,
                 $newPersistentVolume->name,

@@ -9,6 +9,7 @@ use App\Exceptions\DatabaseStartException;
 use App\Jobs\DatabaseStartJob;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -36,7 +37,7 @@ class StartDatabase
      * @param  string|null  $reservation  The token from reserveOperation(). The request that queued
      *                                    this action holds the reservation; this action releases it.
      */
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): Activity|string
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, ?string $reservation = null): Activity|string
     {
         if ($reservation === null) {
             $reservation = DatabaseOperationReservation::acquire($database->uuid);
@@ -54,12 +55,12 @@ class StartDatabase
         }
     }
 
-    public function asJob(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): Activity|string
+    public function asJob(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, ?string $reservation = null): Activity|string
     {
         return self::runQueued($database, 'Database start failed.', fn (): Activity|string => $this->handle($database, $reservation));
     }
 
-    private function queueStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $reservation): Activity|string
+    private function queueStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, string $reservation): Activity|string
     {
         $server = $database->destination->server;
         if (! $server->isFunctional()) {
@@ -106,7 +107,7 @@ class StartDatabase
         return $activity;
     }
 
-    private static function logQueuedStartActivity(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?Activity
+    private static function logQueuedStartActivity(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database): ?Activity
     {
         $server = $database->destination->server;
 
@@ -129,7 +130,7 @@ class StartDatabase
      * may have run in the meantime. If another operation is in progress, that one reports its
      * own result; otherwise the caller must record the expired request as failed.
      */
-    private static function expiredReservationError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): string
+    private static function expiredReservationError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database): string
     {
         return self::operationInProgressError($database) ?? DatabaseOperationReservation::EXPIRED_MESSAGE;
     }
@@ -142,7 +143,7 @@ class StartDatabase
      *
      * @param  callable(): (Activity|string|null)  $operation
      */
-    public static function runQueued(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $failureMessage, callable $operation): mixed
+    public static function runQueued(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, string $failureMessage, callable $operation): mixed
     {
         $lastStartActivityId = self::latestStartActivityId($database);
 
@@ -165,7 +166,7 @@ class StartDatabase
         return $result;
     }
 
-    public static function recordFailedStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $message): void
+    public static function recordFailedStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, string $message): void
     {
         try {
             $activity = self::logQueuedStartActivity($database);
@@ -177,7 +178,7 @@ class StartDatabase
         }
     }
 
-    private static function latestStartActivityId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?int
+    private static function latestStartActivityId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database): ?int
     {
         if (blank($database->uuid)) {
             return null;
@@ -198,7 +199,7 @@ class StartDatabase
      *
      * @return string|null The reservation token, or null when another operation is in progress.
      */
-    public static function reserveOperation(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?string
+    public static function reserveOperation(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database): ?string
     {
         $reservation = DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {
@@ -220,7 +221,7 @@ class StartDatabase
      *
      * @param  class-string<StartDatabase|RestartDatabase>  $action
      */
-    public static function dispatchReserved(string $action, StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $reservation): void
+    public static function dispatchReserved(string $action, StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, string $reservation): void
     {
         try {
             $action::dispatch($database, $reservation);
@@ -239,7 +240,7 @@ class StartDatabase
      *
      * @param  string|null  $reservation  The token of the caller's own reservation, which does not block.
      */
-    public static function operationInProgressError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): ?string
+    public static function operationInProgressError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database, ?string $reservation = null): ?string
     {
         if (blank($database->uuid)) {
             return null;
@@ -265,7 +266,7 @@ class StartDatabase
      * Check prerequisites that would make the queued start fail, so the user gets the
      * error immediately instead of a queued start that can only fail later.
      */
-    public static function prerequisiteError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?string
+    public static function prerequisiteError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $database): ?string
     {
         if ($database instanceof StandaloneClickhouse && ($volumeName = $database->anonymousDataVolume()) !== null) {
             return DatabaseStartException::clickhouseDataInAnonymousVolume($volumeName)->getMessage();

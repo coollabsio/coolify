@@ -1304,6 +1304,7 @@ class ServerTransferExporter
                 'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'preserve_compose_null' => (bool) $variable->preserve_compose_null,
                 'comment' => $variable->comment,
+                'compose_services' => $variable->compose_services,
                 'order' => $variable->order,
                 // The Coolify version that created the variable.
                 'version' => $variable->version,

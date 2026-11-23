@@ -5,7 +5,6 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -41,7 +40,7 @@ class GetServerDomains extends Tool
             return $this->mcpError($request, 'uuid argument is required.');
         }
 
-        $server = Server::whereTeamId($teamId)->whereUuid($uuid)->first();
+        $server = $this->visibleServers($request, $teamId)->whereUuid($uuid)->first();
         if (! $server) {
             return $this->mcpError($request, "Server [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }

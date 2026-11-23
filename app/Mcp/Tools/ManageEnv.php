@@ -20,7 +20,7 @@ class ManageEnv extends RestActionTool
                 'application' => 'applications/{uuid}/envs',
                 'database' => 'databases/{uuid}/envs',
                 'service' => 'services/{uuid}/envs',
-            ], 'ability' => 'write', 'description' => 'create a variable (data: key, value, is_literal, is_multiline, is_shown_once, comment; applications also is_preview, is_runtime, is_buildtime)'],
+            ], 'ability' => 'write', 'description' => 'create a variable (data: key, value, is_literal, is_multiline, is_shown_once, comment; applications also is_preview, is_runtime, is_buildtime; Docker Compose applications and services also compose_services)'],
             'update' => ['method' => 'PATCH', 'paths' => [
                 'application' => 'applications/{uuid}/envs',
                 'database' => 'databases/{uuid}/envs',
@@ -49,6 +49,6 @@ class ManageEnv extends RestActionTool
 
     protected function dataDescription(): string
     {
-        return 'Request body, same fields as the REST API: key, value, is_literal, is_multiline, is_shown_once, comment; applications also is_preview, is_runtime, is_buildtime. bulk_update: {"data": [ ...variables ]}.';
+        return 'Request body, same fields as the REST API: key, value, is_literal, is_multiline, is_shown_once, comment; applications also is_preview, is_runtime, is_buildtime; Docker Compose applications and services also compose_services (list of Compose service names that get the variable, null for all). bulk_update: {"data": [ ...variables ]}.';
     }
 }

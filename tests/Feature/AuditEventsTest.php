@@ -19,6 +19,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -744,6 +745,7 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneInfluxdb::class,
     StandaloneSqlite::class,
 ]);
 
@@ -776,7 +778,7 @@ test('status-only database updates do not record last online audit changes', fun
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
 
-    foreach ([StandaloneClickhouse::class, StandaloneRedis::class] as $model) {
+    foreach ([StandaloneClickhouse::class, StandaloneInfluxdb::class, StandaloneRedis::class] as $model) {
         $attributes = [
             'uuid' => fake()->uuid(),
             'name' => 'Status test database',
@@ -787,6 +789,10 @@ test('status-only database updates do not record last online audit changes', fun
         ];
         if ($model === StandaloneClickhouse::class) {
             $attributes['clickhouse_admin_password'] = 'password';
+        }
+        if ($model === StandaloneInfluxdb::class) {
+            $attributes['influxdb_admin_password'] = 'password';
+            $attributes['influxdb_admin_token'] = 'token';
         }
 
         $database = $model::create($attributes);
@@ -1026,15 +1032,15 @@ test('team admins can query only their team audit events through the api', funct
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events?source=api&action=updated')
         ->assertOk()
-        ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.description', 'Visible event')
-        ->assertJsonMissingPath('data.0.actor_email')
-        ->assertJsonMissingPath('data.0.actor_token_id')
-        ->assertJsonMissingPath('data.0.actor_token_name')
-        ->assertJsonMissingPath('data.0.metadata')
-        ->assertJsonMissingPath('data.0.changes')
-        ->assertJsonMissingPath('data.0.ip_address')
-        ->assertJsonMissingPath('data.0.user_agent');
+        ->assertJsonCount(1)
+        ->assertJsonPath('0.description', 'Visible event')
+        ->assertJsonMissingPath('0.actor_email')
+        ->assertJsonMissingPath('0.actor_token_id')
+        ->assertJsonMissingPath('0.actor_token_name')
+        ->assertJsonMissingPath('0.metadata')
+        ->assertJsonMissingPath('0.changes')
+        ->assertJsonMissingPath('0.ip_address')
+        ->assertJsonMissingPath('0.user_agent');
 });
 
 test('team admins with sensitive read access can query full audit event details', function () {
@@ -1057,13 +1063,13 @@ test('team admins with sensitive read access can query full audit event details'
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events')
         ->assertOk()
-        ->assertJsonPath('data.0.actor_email', 'owner@example.com')
-        ->assertJsonPath('data.0.actor_token_name', 'production token')
-        ->assertJsonPath('data.0.metadata.changed_fields.0', 'name')
-        ->assertJsonPath('data.0.changes.name.old', 'Old project')
-        ->assertJsonPath('data.0.changes.name.new', 'New project')
-        ->assertJsonPath('data.0.ip_address', '192.0.2.1')
-        ->assertJsonPath('data.0.user_agent', 'Sensitive user agent');
+        ->assertJsonPath('0.actor_email', 'owner@example.com')
+        ->assertJsonPath('0.actor_token_name', 'production token')
+        ->assertJsonPath('0.metadata.changed_fields.0', 'name')
+        ->assertJsonPath('0.changes.name.old', 'Old project')
+        ->assertJsonPath('0.changes.name.new', 'New project')
+        ->assertJsonPath('0.ip_address', '192.0.2.1')
+        ->assertJsonPath('0.user_agent', 'Sensitive user agent');
 });
 
 test('tokens without sensitive read access cannot search private audit fields', function () {
@@ -1081,7 +1087,7 @@ test('tokens without sensitive read access cannot search private audit fields', 
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events?search=private-audit@example.com')
         ->assertOk()
-        ->assertJsonCount(0, 'data');
+        ->assertJsonCount(0);
 });
 
 test('team members cannot query audit events through the api', function () {
@@ -1141,9 +1147,9 @@ test('audit events api accepts valid pagination and filter values', function () 
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events?per_page=1&source=api&action=updated&search=Visible')
         ->assertOk()
-        ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.description', 'Visible event')
-        ->assertJsonPath('per_page', 1);
+        ->assertJsonCount(1)
+        ->assertJsonPath('0.description', 'Visible event')
+        ->assertHeader('X-Total-Count', '1');
 });
 
 test('audit action filter includes actions recorded for the current team', function () {

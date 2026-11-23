@@ -279,6 +279,12 @@ class Select extends Component
                 'logo' => resource_logo_url('clickhouse'),
             ],
             [
+                'id' => 'influxdb',
+                'name' => 'InfluxDB',
+                'description' => 'A time series database for metrics, events, and real-time analytics.',
+                'logo' => resource_logo_url('influxdb'),
+            ],
+            [
                 'id' => 'sqlite',
                 'name' => 'SQLite',
                 'description' => 'A lightweight relational database stored in a single file.',
@@ -422,6 +428,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'influxdb':
             case 'mongodb':
             case 'sqlite':
                 $this->isDatabase = true;

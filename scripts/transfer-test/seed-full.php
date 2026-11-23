@@ -146,7 +146,7 @@ $serviceApp->forceFill([
 ])->save();
 $serviceDb = $service->databases()->firstOrFail();
 $serviceDb->forceFill(['public_port' => 26379, 'is_public' => false, 'custom_type' => 'redis', 'human_name' => 'Legacy Cache'])->save();
-EnvironmentVariable::create(['key' => 'SERVICE_EXTRA', 'value' => 'service-extra', 'resourceable_type' => $service->getMorphClass(), 'resourceable_id' => $service->id]);
+EnvironmentVariable::create(['key' => 'SERVICE_EXTRA', 'value' => 'service-extra', 'compose_services' => [$serviceApp->name], 'resourceable_type' => $service->getMorphClass(), 'resourceable_id' => $service->id]);
 ScheduledTask::create(['name' => 'service-task', 'command' => 'echo service', 'frequency' => '0 2 * * *', 'container' => 'cache', 'service_id' => $service->id, 'team_id' => $teamId]);
 $service->tags()->attach(Tag::firstOrCreate(['name' => 'legacy', 'team_id' => $teamId])->id);
 
