@@ -22,6 +22,7 @@ use App\Models\Server as ModelsServer;
 use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\Access\AccessResolver;
 use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
@@ -153,12 +154,15 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
-            $server['is_reachable'] = $server->settings->is_reachable;
-            $server['is_usable'] = $server->settings->is_usable;
+        $scopedServerUuids = app(AccessResolver::class)->scopedServerUuids($request->user(), (int) $teamId);
+        $servers = ModelsServer::whereTeamId($teamId)
+            ->when($scopedServerUuids !== null, fn ($query) => $query->whereIn('uuid', $scopedServerUuids))
+            ->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
+                $server['is_reachable'] = $server->settings->is_reachable;
+                $server['is_usable'] = $server->settings->is_usable;
 
-            return $server;
-        });
+                return $server;
+            });
         $servers = $servers->map(function ($server) {
             $settings = $this->removeSensitiveDataFromSettings($server->settings);
             $server = $this->removeSensitiveData($server);
