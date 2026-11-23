@@ -3,9 +3,13 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Support\StaticSiteArchive;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class StaticArchive extends Component
@@ -23,6 +27,35 @@ class StaticArchive extends Component
     }
 
     /**
+     * The S3 storages that the dropzone can upload to.
+     *
+     * @return Collection<int, S3Storage>
+     */
+    #[Computed]
+    public function s3Storages(): Collection
+    {
+        return StaticSiteArchive::s3Storages((int) currentTeam()->id);
+    }
+
+    /**
+     * Returns a presigned URL that uploads the archive straight to an S3 storage of the team.
+     *
+     * @return array{upload_id: string, url: string, headers: array<string, string>, expires_at: string}|null
+     */
+    public function prepareS3Upload(string $s3StorageUuid): ?array
+    {
+        try {
+            $environment = $this->environment();
+
+            return StaticSiteArchive::prepareS3Upload((int) $environment->project->team_id, $s3StorageUuid);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
+        }
+    }
+
+    /**
      * Creates the site from an archive that the dropzone staged for the current team, and deploys it.
      */
     public function createFromUpload(string $uploadId)
@@ -32,13 +65,10 @@ class StaticArchive extends Component
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
-            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
-            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
-            $this->authorize('create', [Application::class, $environment]);
+            $environment = $this->environment();
+            $project = $environment->project;
             $teamId = (int) $project->team_id;
-            if (! StaticSiteArchive::hasStagedUpload($teamId, $uploadId)) {
-                throw new \Exception('The upload was not found or has expired. Upload the archive again.');
-            }
+            StaticSiteArchive::verifyStagedUpload($teamId, $uploadId);
 
             $application = StaticSiteArchive::createApplication($environment, $destination);
             $this->authorize('deploy', $application);
@@ -57,6 +87,18 @@ class StaticArchive extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * The environment of the new site. The user must be able to create applications in it.
+     */
+    private function environment(): Environment
+    {
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
+
+        return $environment;
     }
 
     public function render()

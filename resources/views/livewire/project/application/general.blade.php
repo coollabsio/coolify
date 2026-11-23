@@ -230,7 +230,8 @@
                             </p>
                         </div>
                         @if (auth()->user()->can('update', $application) && auth()->user()->can('deploy', $application))
-                            <x-static-archive-dropzone action="deployUpload" :applicationUuid="$application->uuid"
+                            <x-static-archive-dropzone action="deployUpload" prepareS3Action="prepareS3ArchiveUpload"
+                                :storages="$this->archiveS3Storages" :applicationUuid="$application->uuid"
                                 message="Drop a new .tar / .tar.gz / .tgz to deploy" />
                         @endif
                         <div class="flex w-full flex-col gap-1 sm:w-96">

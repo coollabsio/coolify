@@ -290,6 +290,7 @@ Route::group([
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
     Route::post('/applications/archive/uploads', [StaticSiteArchivesController::class, 'upload'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive/uploads/s3', [StaticSiteArchivesController::class, 'prepareS3Upload'])->middleware(['api.ability:write']);
     Route::post('/applications/archive', [StaticSiteArchivesController::class, 'create'])->middleware(['api.ability:write']);
     Route::post('/applications/{uuid}/archive', [StaticSiteArchivesController::class, 'deploy'])->middleware(['api.ability:write']);
 

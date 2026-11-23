@@ -23,7 +23,7 @@ class StaticSiteArchivesController extends Controller
         path: '/applications/archive/uploads',
         operationId: 'upload-static-site-archive',
         summary: 'Upload static site archive',
-        description: 'Upload a .tar, .tar.gz, or .tgz archive of a static site in DropZone chunks (dzuuid, dzchunkindex, dztotalchunkcount, dzchunkbyteoffset, dztotalfilesize). Send the same upload_id with every chunk. The last chunk validates the archive: at most 1 GiB, 5 GiB extracted, 100,000 entries, and only regular files and directories with relative paths. The upload is kept for 24 hours. Without application_uuid, the token user must be able to create applications.',
+        description: 'Upload a .tar, .tar.gz, or .tgz archive of a static site in DropZone chunks (dzuuid, dzchunkindex, dztotalchunkcount, dzchunkbyteoffset, dztotalfilesize). Send the same upload_id with every chunk. The last chunk validates the archive: at most 1 GiB, 5 GiB extracted, 100,000 entries, and only regular files and directories with relative paths. The upload is kept for 24 hours, and a team keeps its 3 newest uploads. A team can upload 5 GiB in an hour; more returns 429. Without application_uuid, the token user must be able to create applications.',
         security: [['bearerAuth' => []]],
         tags: ['Applications'],
         requestBody: new OA\RequestBody(
@@ -59,6 +59,7 @@ class StaticSiteArchivesController extends Controller
             new OA\Response(response: 403, description: 'The token user cannot create applications or update and deploy the application.'),
             new OA\Response(response: 404, description: 'Application not found.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, description: 'The team uploaded more than 5 GiB of archives in the last hour.'),
         ],
     )]
     public function upload(Request $request): JsonResponse
@@ -80,6 +81,76 @@ class StaticSiteArchivesController extends Controller
         }
 
         return StaticSiteArchive::receiveUpload($request, $teamId);
+    }
+
+    #[OA\Post(
+        path: '/applications/archive/uploads/s3',
+        operationId: 'prepare-static-site-archive-s3-upload',
+        summary: 'Prepare static site archive upload to S3',
+        description: 'Return a presigned URL that uploads an archive straight to an S3 storage of the team, so the archive does not use the disk of the Coolify instance. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                type: 'object',
+                required: ['s3_storage_uuid'],
+                properties: [
+                    's3_storage_uuid' => ['type' => 'string', 'description' => 'The UUID of a usable S3 storage of the team.'],
+                    'application_uuid' => ['type' => 'string', 'description' => 'The archive site that this upload is a new version of.'],
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Presigned upload URL.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        'upload_id' => ['type' => 'string'],
+                        'url' => ['type' => 'string', 'description' => 'The presigned PUT URL.'],
+                        'headers' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Headers to send with the PUT request.'],
+                        'expires_at' => ['type' => 'string', 'format' => 'date-time'],
+                    ],
+                ),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token user cannot create applications or update and deploy the application.'),
+            new OA\Response(response: 404, description: 'Application not found.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function prepareS3Upload(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $validator = customApiValidator($request->all(), [
+            's3_storage_uuid' => ['required', 'string'],
+            'application_uuid' => ['nullable', 'string'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+        $applicationUuid = $request->input('application_uuid');
+        if (filled($applicationUuid)) {
+            $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
+            $this->authorize('update', $application);
+            $this->authorize('deploy', $application);
+        } else {
+            $this->authorize('create', Application::class);
+        }
+
+        try {
+            return response()->json(StaticSiteArchive::prepareS3Upload((int) $teamId, (string) $request->input('s3_storage_uuid')), 201);
+        } catch (ValidationException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+        }
     }
 
     #[OA\Post(
@@ -214,6 +285,13 @@ class StaticSiteArchivesController extends Controller
         }
         if (filled($uploadId) && ! StaticSiteArchive::hasStagedUpload($teamId, $uploadId)) {
             return response()->json(['message' => 'Upload not found. Upload the archive again.'], 404);
+        }
+        if (filled($uploadId)) {
+            try {
+                StaticSiteArchive::verifyStagedUpload($teamId, $uploadId);
+            } catch (ValidationException $exception) {
+                return response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+            }
         }
 
         $application = StaticSiteArchive::createApplication(
