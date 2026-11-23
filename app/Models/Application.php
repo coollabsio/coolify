@@ -2731,6 +2731,14 @@ class Application extends BaseModel
         $this->syncOriginalAttribute('docker_compose_image_overrides');
     }
 
+    /**
+     * Tells if the Compose file is parsed by an older parser. A clone uses the latest parser.
+     */
+    public function usesLegacyComposeParser(): bool
+    {
+        return $this->build_pack === 'dockercompose' && (int) $this->compose_parsing_version < (int) self::$parserVersion;
+    }
+
     public function parse(int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {

@@ -12,6 +12,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalPersistentVolume;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
@@ -22,7 +23,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null, bool $reject_if_server_busy = false)
 {
@@ -644,6 +647,19 @@ function clone_application(Application $source, $destination, array $overrides =
         }
     }
 
+    if ($cloneVolumeData) {
+        // A legacy parser creates no storage rows, so the clone gets its data from the legacy volume names.
+        foreach (legacyComposeVolumeClones($source, $newApplication) as [$legacyVolumeName, $newPersistentVolume]) {
+            $pendingVolumeClones[] = new VolumeCloneJob(
+                $legacyVolumeName,
+                $newPersistentVolume->name,
+                $source->destination->server,
+                $newApplication->destination->server,
+                $newPersistentVolume,
+            );
+        }
+    }
+
     CloneVolumeDataWithSourceStopped::run($source, $pendingVolumeClones);
 
     // Clone file storages
@@ -709,6 +725,61 @@ function clone_application(Application $source, $destination, array $overrides =
     $dnsRecords->queueAutomaticRecords($newApplication, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newApplication;
+}
+
+/**
+ * The named volumes that a legacy Compose parser (version 1 or 2) gave an application, paired with
+ * the volumes that the latest parser gives its clone. The legacy parsers create no storage rows, so
+ * this reads the volumes from the Compose file. It creates the storage rows of the clone with the
+ * names that the parser uses, so the first deployment of the clone mounts the copied data.
+ *
+ * External and network (CIFS, NFS) volumes are skipped: the latest parser uses them as written.
+ *
+ * @return array<int, array{0: string, 1: LocalPersistentVolume}> [legacy Docker volume name, storage row of the clone]
+ */
+function legacyComposeVolumeClones(Application $source, Application $clone): array
+{
+    if ($source->build_pack !== 'dockercompose' || (int) $source->compose_parsing_version >= 3 || blank($source->docker_compose_raw)) {
+        return [];
+    }
+
+    $compose = Yaml::parse($source->docker_compose_raw);
+    $topLevelVolumes = collect(data_get($compose, 'volumes', []));
+    $clones = [];
+    foreach (data_get($compose, 'services', []) as $service) {
+        foreach (data_get($service, 'volumes', []) as $volume) {
+            if (is_string($volume)) {
+                $parsed = parseDockerVolumeString($volume);
+                $name = (string) $parsed['source'];
+                $target = (string) $parsed['target'];
+                if ($name === '' || $target === '' || sourceIsLocal(str($name))) {
+                    continue;
+                }
+            } elseif (data_get($volume, 'type') === 'volume') {
+                $name = (string) data_get($volume, 'source');
+                $target = (string) data_get($volume, 'target');
+            } else {
+                continue;
+            }
+
+            $declaration = $topLevelVolumes->get($name);
+            if ($name === '' || str_contains($name, '$') || isComposeExternalVolume($declaration)
+                || in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+                continue;
+            }
+
+            $newName = "{$clone->uuid}_".Str::slug($name, '-');
+            $clones[$newName] ??= [
+                legacyApplicationComposeVolumeName($source, $name, 0),
+                LocalPersistentVolume::updateOrCreate(
+                    ['name' => $newName, 'resource_id' => $clone->id, 'resource_type' => $clone->getMorphClass()],
+                    ['mount_path' => $target],
+                ),
+            ];
+        }
+    }
+
+    return array_values($clones);
 }
 
 /**

@@ -152,6 +152,49 @@
     $watch('selectedMoveProject', () => selectedMoveEnvironment = null);
 " class="flex flex-col gap-6">
     @can('update', $resource)
+        @if (($resource instanceof \App\Models\Application || $resource instanceof \App\Models\Service) && $resource->usesLegacyComposeParser())
+            <x-application.settings-section id="migrate-parser-section" title="Migrate to the latest parser"
+                helper="Coolify parses the Compose file of this resource with an older parser. A new resource uses the latest parser.">
+                <x-slot:actions>
+                    <x-status-badge label="Parser {{ $resource->compose_parsing_version }}" type="warning" />
+                </x-slot:actions>
+                <ol class="grid gap-4 text-[13px] sm:grid-cols-3">
+                    @foreach ([
+                        ['copy', 'Migrate', 'Coolify copies this resource and its volume data. This resource stops for the copy, then starts again.'],
+                        ['globe', 'Check and deploy the copy', 'The copy uses the same domains. Change them, or stop this resource first.'],
+                        ['trash', 'Delete this resource', 'When the copy works, you do not need this resource.'],
+                    ] as $index => [$icon, $title, $text])
+                        <li class="flex gap-3">
+                            <span class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <x-reicon :name="$icon" class="size-3.5" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="font-medium text-black dark:text-fg">{{ $index + 1 }}. {{ $title }}</p>
+                                <p class="mt-0.5 text-[12px] leading-4 text-neutral-500 dark:text-fg-dim">{{ $text }}</p>
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <div class="mt-4 flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                    @can('deploy', $resource)
+                        <x-modal-confirmation title="Migrate to the latest parser?" submitAction="migrateParser"
+                            :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Migrate"
+                            warningMessage="This resource is unavailable while Coolify copies its volume data. Coolify does not change or delete it."
+                            :actions="[
+                                'Coolify makes a copy of this resource with the latest parser, on the same server and in the same environment.',
+                                'Data that this resource writes after the copy is not in the copy.',
+                                'The copy uses the same domains. Change them, or stop this resource before you deploy the copy.',
+                            ]">
+                            <x-slot:trigger>
+                                <x-forms.button>Migrate</x-forms.button>
+                            </x-slot:trigger>
+                        </x-modal-confirmation>
+                    @endcan
+                </div>
+            </x-application.settings-section>
+        @endif
+
         <x-application.settings-section id="clone-resource-section" title="Clone resource"
             helper="Create a copy of this resource. Choose where it runs and where it belongs. The current values are selected by default.">
             <x-callout type="info" title="What is copied">

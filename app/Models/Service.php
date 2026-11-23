@@ -1840,6 +1840,14 @@ class Service extends BaseModel
         return $environmentVariable->key.'='.$this->resolveSecretManagerDotenvValue($environmentVariable);
     }
 
+    /**
+     * Tells if the Compose file is parsed by an older parser. A clone uses the latest parser.
+     */
+    public function usesLegacyComposeParser(): bool
+    {
+        return (int) $this->compose_parsing_version < (int) self::$parserVersion;
+    }
+
     public function parse(bool $isNew = false): Collection
     {
         if ((int) $this->compose_parsing_version >= 3) {

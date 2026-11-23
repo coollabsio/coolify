@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -286,6 +287,25 @@ class ResourceOperations extends Component
 
                 return redirect()->to($route);
             }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Clones an application or service that uses an older Compose parser into the same destination
+     * and environment, with its volume data. The clone uses the latest parser.
+     */
+    public function migrateParser()
+    {
+        try {
+            $this->authorize('deploy', $this->resource);
+            if (! ($this->resource instanceof Application || $this->resource instanceof Service) || ! $this->resource->usesLegacyComposeParser()) {
+                throw new RuntimeException('This resource already uses the latest parser.');
+            }
+            $this->cloneVolumeData = true;
+
+            return $this->cloneTo($this->resource->destination->uuid, $this->resource->environment_id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

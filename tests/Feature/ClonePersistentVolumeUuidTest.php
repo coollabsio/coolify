@@ -117,7 +117,7 @@ test('cloning application reassigns settings to the cloned application', functio
         ->and($clonedSettings?->is_build_server_enabled)->toBeTrue();
 });
 
-test('cloning application reassigns scheduled tasks and previews to the cloned application', function () {
+test('cloning application reassigns scheduled tasks and does not copy previews', function () {
     $scheduledTask = ScheduledTask::create([
         'uuid' => 'scheduled-task-original',
         'application_id' => $this->application->id,
@@ -153,10 +153,8 @@ test('cloning application reassigns scheduled tasks and previews to the cloned a
         ->and($clonedTask?->uuid)->not->toBe($scheduledTask->uuid)
         ->and($clonedTask?->application_id)->toBe($newApp->id)
         ->and($clonedTask?->team_id)->toBe($this->team->id)
-        ->and($clonedPreview)->not->toBeNull()
-        ->and($clonedPreview?->uuid)->not->toBe($preview->uuid)
-        ->and($clonedPreview?->application_id)->toBe($newApp->id)
-        ->and($clonedPreview?->status)->toBe('exited');
+        ->and($clonedPreview)->toBeNull()
+        ->and($preview->fresh()?->application_id)->toBe($this->application->id);
 });
 
 test('cloning application gives the cloned volume the Compose driver options', function () {
