@@ -26,7 +26,7 @@ class Index extends Component
 
     public bool $is_mcp_server_enabled = true;
 
-    public bool $is_terminal_api_enabled = true;
+    public bool $is_terminal_api_enabled = false;
 
     public bool $is_build_server_fallback_enabled = true;
 
@@ -85,7 +85,7 @@ class Index extends Component
             $this->is_mcp_server_enabled = (bool) ($this->team->is_mcp_server_enabled ?? true);
             $this->is_build_server_fallback_enabled = (bool) ($this->team->is_build_server_fallback_enabled ?? true);
             $this->is_two_factor_required = (bool) $this->team->is_two_factor_required;
-            $this->is_terminal_api_enabled = (bool) ($this->team->is_terminal_api_enabled ?? true);
+            $this->is_terminal_api_enabled = (bool) ($this->team->is_terminal_api_enabled ?? false);
         }
     }
 

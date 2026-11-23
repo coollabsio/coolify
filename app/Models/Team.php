@@ -71,7 +71,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
         'scan_images_on_new_servers' => false,
-        'is_terminal_api_enabled' => true,
+        'is_terminal_api_enabled' => false,
     ];
 
     protected $casts = [

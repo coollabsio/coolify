@@ -40,6 +40,9 @@ class PersonalAccessTokenSeeder extends Seeder
             return;
         }
 
+        // The Terminal API is off by default; turn it on so the dev terminal token works.
+        $team->update(['is_terminal_api_enabled' => true]);
+
         // Define test tokens with different scopes
         $testTokens = [
             [

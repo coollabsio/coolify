@@ -4560,7 +4560,7 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Terminal command rate or concurrency limit exceeded."
+                        "$ref": "#\/components\/responses\/TerminalRateLimited"
                     }
                 },
                 "security": [
@@ -23822,7 +23822,7 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Terminal command rate or concurrency limit exceeded."
+                        "$ref": "#\/components\/responses\/TerminalRateLimited"
                     }
                 },
                 "security": [
@@ -33003,6 +33003,36 @@
                                 "message": {
                                     "type": "string",
                                     "example": "Rate limit exceeded. Please try again later."
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "TerminalRateLimited": {
+                "description": "Terminal command rate or concurrency limit exceeded.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Number of seconds to wait before retrying.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 42
+                        }
+                    }
+                },
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Too many terminal command requests. Please retry in 42 seconds."
+                                },
+                                "retry_after": {
+                                    "description": "Number of seconds to wait before retrying.",
+                                    "type": "integer",
+                                    "example": 42
                                 }
                             },
                             "type": "object"

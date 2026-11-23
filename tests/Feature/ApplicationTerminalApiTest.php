@@ -25,7 +25,7 @@ beforeEach(function () {
     RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
     Cache::flush();
 
-    $this->team = Team::factory()->create();
+    $this->team = Team::factory()->create(['is_terminal_api_enabled' => true]);
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 

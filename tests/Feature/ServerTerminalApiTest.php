@@ -22,7 +22,7 @@ beforeEach(function () {
     RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
     Cache::flush();
 
-    $this->team = Team::factory()->create();
+    $this->team = Team::factory()->create(['is_terminal_api_enabled' => true]);
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
 
@@ -196,6 +196,19 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
 
         $response->assertStatus(403);
         $response->assertJson(['message' => 'Terminal API is disabled for this team.']);
+    });
+
+    test('keeps the terminal API disabled for new teams by default', function () {
+        $team = Team::factory()->create();
+        $team->members()->attach($this->user->id, ['role' => 'owner']);
+        $token = createServerTerminalApiToken($this->user, $team, ['terminal']);
+
+        $this->withHeaders(serverTerminalAuthHeaders($token))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
+                'command' => 'whoami',
+            ])
+            ->assertForbidden()
+            ->assertJson(['message' => 'Terminal API is disabled for this team.']);
     });
 
     test('runs commands exactly as provided on non-root servers', function () {

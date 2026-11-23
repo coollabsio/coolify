@@ -272,6 +272,23 @@ use OpenApi\Attributes as OA;
                 ]
             )),
         new OA\Response(
+            response: 'TerminalRateLimited',
+            description: 'Terminal command rate or concurrency limit exceeded.',
+            headers: [
+                new OA\Header(
+                    header: 'Retry-After',
+                    description: 'Number of seconds to wait before retrying.',
+                    schema: new OA\Schema(type: 'integer', example: 42)
+                ),
+            ],
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many terminal command requests. Please retry in 42 seconds.'),
+                    new OA\Property(property: 'retry_after', type: 'integer', description: 'Number of seconds to wait before retrying.', example: 42),
+                ]
+            )),
+        new OA\Response(
             response: 502,
             description: 'The cloud provider API rejected the request.',
             content: new OA\JsonContent(
