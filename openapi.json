@@ -25062,7 +25062,7 @@
                                         "output": {
                                             "type": "string",
                                             "nullable": true,
-                                            "description": "Combined output of the executed commands. Null unless the token has the read:sensitive ability."
+                                            "description": "Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team."
                                         },
                                         "created_at": {
                                             "type": "string",

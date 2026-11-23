@@ -119,3 +119,26 @@ test('requires the read ability to show an activity', function () {
 
     $this->withToken($deployOnly->plainTextToken)->getJson("/api/v1/services/{$this->service->uuid}/activities/{$activity->id}")->assertForbidden();
 });
+
+test('start and restart refuse a run while another run of the service is in progress', function (string $action) {
+    Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $this->service->uuid, 'status' => 'in_progress']]);
+    $startService = Mockery::mock(StartService::class);
+    $startService->shouldNotReceive('handle');
+    app()->instance(StartService::class, $startService);
+
+    $this->withHeaders($this->headers)->postJson("/api/v1/services/{$this->service->uuid}/{$action}")
+        ->assertStatus(400)
+        ->assertJson(['message' => 'There is a deployment in progress.']);
+})->with(['start', 'restart']);
+
+test('restart ignores a stale run of the service', function () {
+    $stale = Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $this->service->uuid, 'status' => 'in_progress']]);
+    Activity::query()->whereKey($stale->id)->update(['updated_at' => now()->subHour(), 'created_at' => now()->subHour()]);
+    $activity = Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['status' => 'queued']]);
+    Activity::query()->whereKey($activity->id)->update(['created_at' => now()->subHours(2)]);
+    mockStartService($activity);
+
+    $this->withHeaders($this->headers)->postJson("/api/v1/services/{$this->service->uuid}/restart")
+        ->assertOk()
+        ->assertJson(['activity_id' => $activity->id]);
+});

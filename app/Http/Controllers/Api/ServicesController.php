@@ -2181,6 +2181,9 @@ class ServicesController extends Controller
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
+        if ($service->isStarting()) {
+            return response()->json(['message' => 'There is a deployment in progress.'], 400);
+        }
         $activity = StartService::run($service);
 
         auditLog('api.service.deployed', [
@@ -2374,6 +2377,9 @@ class ServicesController extends Controller
 
         $this->authorize('deploy', $service);
 
+        if ($service->isStarting()) {
+            return response()->json(['message' => 'There is a deployment in progress.'], 400);
+        }
         $pullLatest = $request->boolean('latest');
         $activity = RestartService::run($service, $pullLatest);
 
@@ -2436,7 +2442,7 @@ class ServicesController extends Controller
                                 'id' => ['type' => 'integer', 'example' => 1234],
                                 'status' => ['type' => 'string', 'description' => 'One of queued, in_progress, finished, error, killed, cancelled, closed.', 'example' => 'finished'],
                                 'exit_code' => ['type' => 'integer', 'nullable' => true, 'example' => 0],
-                                'output' => ['type' => 'string', 'nullable' => true, 'description' => 'Combined output of the executed commands. Null unless the token has the read:sensitive ability.'],
+                                'output' => ['type' => 'string', 'nullable' => true, 'description' => 'Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team.'],
                                 'created_at' => ['type' => 'string', 'format' => 'date-time'],
                                 'updated_at' => ['type' => 'string', 'format' => 'date-time'],
                                 'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'Null while the activity is still running.'],
