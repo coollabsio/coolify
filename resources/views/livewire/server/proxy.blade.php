@@ -62,13 +62,15 @@
                 <x-application.settings-section id="server-proxy-routing-section" title="Routing behavior"
                     helper="Control generated labels and requests that do not match a running resource.">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.listbox id="generateExactLabels" label="Generated labels"
+                        <x-forms.listbox canGate="update" :canResource="$server" id="generateExactLabels"
+                            label="Generated labels"
                             helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
                             onChange="instantSave" :options="[
                                 ['value' => false, 'label' => 'Labels for all supported proxies'],
                                 ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
-                        <x-forms.listbox id="redirectEnabled" label="Unknown requests"
+                        <x-forms.listbox canGate="update" :canResource="$server" id="redirectEnabled"
+                            label="Unknown requests"
                             helper="Custom request handling shows an error page or redirects to a URL. The default proxy response is 404 for all requests."
                             onChange="instantSaveRedirect" :options="[
                                 ['value' => false, 'label' => 'Return the default proxy response'],
@@ -88,7 +90,8 @@
                     </div>
                     @if ($redirectEnabled)
                         <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
-                            <x-forms.listbox id="unknownHostStatus" label="Status for unknown hosts"
+                            <x-forms.listbox canGate="update" :canResource="$server" id="unknownHostStatus"
+                                label="Status for unknown hosts"
                                 helper="The status for domains that no resource on this server uses, when the Redirect URL is empty. With 404, search engines remove the URLs of deleted resources. The domains of resources on this server always get 503 while the resource is stopped, deploying or unhealthy, so they keep their search ranking."
                                 onChange="instantSaveUnknownHostStatus" :options="[
                                     ['value' => 404, 'label' => '404 Not Found (recommended)'],
