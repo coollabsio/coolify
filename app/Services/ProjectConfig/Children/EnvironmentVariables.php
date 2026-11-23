@@ -44,6 +44,7 @@ class EnvironmentVariables implements ChildRecords
             Field::managed('is_runtime', 'env.*.runtime'),
             Field::managed('is_literal', 'env.*.literal'),
             Field::managed('is_multiline', 'env.*.multiline'),
+            Field::managed('compose_services', 'env.*.containers'),
             Field::state('is_shown_once', 'A display choice made in Coolify when the value is set there.'),
             Field::state('comment', 'A note shown in Coolify. It does not change the running configuration.'),
             Field::derived('is_required', 'Coolify sets it from Compose required-variable syntax.'),
@@ -200,6 +201,7 @@ class EnvironmentVariables implements ChildRecords
         foreach (self::FLAG_COLUMNS as $flag => $column) {
             $row->{$column} = $entry[$flag] ?? self::FLAG_DEFAULTS[$flag];
         }
+        $row->compose_services = $entry['containers'] ?? null;
         $row->order = $order;
         $created = ! $row->exists;
         $previewQuery = fn () => EnvironmentVariable::query()
@@ -251,6 +253,7 @@ class EnvironmentVariables implements ChildRecords
         foreach (self::FLAG_COLUMNS as $column) {
             $preview->{$column} = $production->{$column};
         }
+        $preview->compose_services = $production->compose_services;
         $preview->order = $production->order;
         $preview->withoutAuditLogging(fn () => $preview->save());
         if (! $keepsValue) {
@@ -327,6 +330,9 @@ class EnvironmentVariables implements ChildRecords
                 $entry[$flag] = (bool) $row->{$column};
             }
         }
+        if (filled($row->compose_services)) {
+            $entry['containers'] = $row->compose_services;
+        }
 
         return $this->canonicalEntry($entry);
     }
@@ -341,6 +347,15 @@ class EnvironmentVariables implements ChildRecords
             if (array_key_exists($flag, $entry) && $entry[$flag] === $default) {
                 unset($entry[$flag]);
             }
+        }
+        // No containers means all containers, and the order does not matter.
+        if (isset($entry['containers'])) {
+            $containers = array_values(array_unique($entry['containers']));
+            sort($containers);
+            $entry['containers'] = $containers;
+        }
+        if (($entry['containers'] ?? null) === []) {
+            unset($entry['containers']);
         }
         if (isset($entry['generate'])) {
             if (($entry['rotation'] ?? 0) === 0) {

@@ -75,7 +75,7 @@ A variable never holds a secret value. Each variable uses exactly one form:
 | `generate` | Coolify generates `password`, `base64`, or `uuid` once. Increase `rotation` to generate a new one. |
 | `ref` | `team.X`, `project.X`, `environment.X`, `server.X`, `vault.X` (secret manager), or `resource.<key>.internal_url`, `host`, or `port`. |
 
-Flags: `buildtime`, `runtime`, `literal`, `multiline`. A `preview` object sets the value for preview deployments. Without it, previews follow production. Variables that are not in the file are removed after approval.
+Flags: `buildtime`, `runtime`, `literal`, `multiline`. For a Docker Compose application or service, `containers` (for example `["app", "worker"]`) limits the variable to these Compose services. Without it, every container gets the variable. A `preview` object sets the value for preview deployments. Without it, previews follow production. Variables that are not in the file are removed after approval.
 
 ### Renames, hand-offs, and adoption
 

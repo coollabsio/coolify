@@ -41,7 +41,12 @@
                     @endif
                 </span>
                 <span class="flex min-w-0 flex-col gap-0.5">
-                    <span class="text-[13px] font-medium text-black dark:text-fg">{{ $title }}</span>
+                    <span class="flex items-center gap-2 text-[13px] font-medium text-black dark:text-fg">
+                        {{ $title }}
+                        @if ($value !== 'manual')
+                            <x-experimental-icon label="Beta" class="shrink-0" />
+                        @endif
+                    </span>
                     <span class="text-[12px] text-neutral-500 dark:text-fg-dim">{{ $description }}</span>
                 </span>
             </label>

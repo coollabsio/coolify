@@ -145,6 +145,16 @@ it('checks generate kinds, length, and rotation', function () {
         ->and(parserTestPaths($env(['value' => 'x', 'rotation' => 1])))->toContain('resources.api.env.A.rotation');
 });
 
+it('checks the containers of a variable', function () {
+    $env = fn (mixed $containers) => parserTestFile(['resources' => ['api' => ['type' => 'application', 'env' => ['A' => ['value' => 'x', 'containers' => $containers]]]]]);
+
+    expect(parserTestErrors($env(['app', 'worker-1'])))->toBe([])
+        ->and(parserTestPaths($env('app')))->toContain('resources.api.env.A.containers')
+        ->and(parserTestPaths($env(['app' => 'x'])))->toContain('resources.api.env.A.containers')
+        ->and(parserTestPaths($env(['bad name'])))->toContain('resources.api.env.A.containers')
+        ->and(parserTestPaths($env([1])))->toContain('resources.api.env.A.containers');
+});
+
 it('checks ref namespaces', function (string $ref, bool $valid) {
     $raw = parserTestFile(['resources' => ['api' => ['type' => 'application', 'env' => ['A' => ['ref' => $ref]]]]]);
 

@@ -6,7 +6,10 @@
     <div class="w-full max-w-none">
         <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Config as code</h1>
+                <div class="flex items-center gap-3">
+                    <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Config as code</h1>
+                    <x-experimental-icon label="Beta" class="shrink-0 [&>svg]:size-4" />
+                </div>
                 @if ($link)
                     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                         <x-project-config.sync-badge :status="$status" />

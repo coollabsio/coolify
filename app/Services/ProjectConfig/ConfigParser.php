@@ -29,7 +29,9 @@ class ConfigParser
 
     private const ENV_FORMS = ['value', 'required', 'generate', 'ref'];
 
-    private const ENV_KEYS = ['value', 'required', 'generate', 'ref', 'length', 'rotation', 'buildtime', 'runtime', 'literal', 'multiline', 'preview'];
+    private const CONTAINER_NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._-]*\z/';
+
+    private const ENV_KEYS = ['value', 'required', 'generate', 'ref', 'length', 'rotation', 'buildtime', 'runtime', 'literal', 'multiline', 'containers', 'preview'];
 
     /** @var list<ConfigError> */
     private array $errors = [];
@@ -267,6 +269,10 @@ class ConfigParser
             if (array_key_exists($flag, $entry) && ! is_bool($entry[$flag])) {
                 $this->error("{$path}.{$flag}", 'Use true or false.');
             }
+        }
+        if (array_key_exists('containers', $entry) && (! is_array($entry['containers']) || ! array_is_list($entry['containers'])
+            || array_filter($entry['containers'], fn (mixed $container): bool => ! is_string($container) || ! preg_match(self::CONTAINER_NAME_PATTERN, $container)) !== [])) {
+            $this->error("{$path}.containers", 'Use a list of Docker Compose service names.');
         }
         if ($allowPreview && array_key_exists('preview', $entry)) {
             $this->checkEnvEntry($name, $entry['preview'], "{$path}.preview", allowNull: false, allowPreview: false);

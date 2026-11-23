@@ -123,6 +123,7 @@ class AdapterRegistry
                 'runtime' => ['type' => 'boolean'],
                 'literal' => ['type' => 'boolean'],
                 'multiline' => ['type' => 'boolean'],
+                'containers' => ['type' => 'array', 'items' => ['type' => 'string', 'pattern' => '^[A-Za-z0-9][A-Za-z0-9._-]*$'], 'uniqueItems' => true],
             ],
             'oneOf' => [['required' => ['value']], ['required' => ['required']], ['required' => ['generate']], ['required' => ['ref']]],
         ];

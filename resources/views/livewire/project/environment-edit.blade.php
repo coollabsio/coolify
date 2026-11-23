@@ -42,6 +42,7 @@
         <x-application.settings-section title="Config as code"
             helper="Manage the resources of this environment with a coolify.json file in a git repository.">
             <x-slot:actions>
+                <x-experimental-icon label="Beta" />
                 <a href="{{ $configUrl }}" {{ wireNavigate() }} class="button">{{ $configStatus ? 'Open' : 'Set Up' }}</a>
             </x-slot:actions>
             <div class="flex items-center gap-3 text-[13px]">

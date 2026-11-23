@@ -147,6 +147,19 @@ it('reads back what it wrote for every child group', function () {
     expect($this->adapter->read($app, $this->ctx))->not->toHaveKeys(['env', 'storages', 'files', 'scheduled_tasks', 'tags', 'secret_manager', 'additional_servers']);
 });
 
+it('limits a variable to the containers that the file lists, also its preview', function () {
+    $app = childWrite(['env' => ['QUEUE' => ['value' => 'redis', 'containers' => ['worker', 'app', 'worker']]]]);
+    $rows = EnvironmentVariable::where('resourceable_id', $app->id)->where('key', 'QUEUE')->get();
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows->pluck('compose_services')->unique()->values()->all())->toBe([['worker', 'app']])
+        ->and($this->adapter->read($app, $this->ctx)['env']['QUEUE'])->toBe(['containers' => ['app', 'worker'], 'value' => 'redis']);
+
+    $app = childWrite(['env' => ['QUEUE' => ['value' => 'redis']]]);
+
+    expect(EnvironmentVariable::where('resourceable_id', $app->id)->where('key', 'QUEUE')->pluck('compose_services')->unique()->all())->toBe([null]);
+});
+
 it('does not use tags of another team', function () {
     $other = projectConfigFixture();
     $foreign = Tag::create(['name' => 'web', 'team_id' => $other['team']->id]);
