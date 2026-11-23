@@ -341,7 +341,7 @@ class ApplicationsController extends Controller
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function applications(Request $request)
+    public function applications(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
