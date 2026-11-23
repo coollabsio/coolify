@@ -12,23 +12,24 @@ For UI/UX design specifications, principles, and visual standards, consult the l
 
 ## Development Environment
 
-Docker Compose-based dev setup with services: coolify (app), postgres, redis, soketi (WebSockets), vite, testing-host, mailpit, minio.
+Docker Compose-based dev setup with services: coolify (app, which also runs Reverb WebSockets and the terminal server), postgres, redis, vite, testing-host, mailpit, minio.
 
 ```bash
-# Start dev environment (uses docker-compose.dev.yml)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down                        # stop services
+# One dev instance per git branch (containers, volumes, VMs named after the branch)
+./scripts/dev start [qemu-profile]           # localhost VM: KVM (Linux, /dev/kvm + root/sudo) or Lima (macOS, limactl), else testing-host
+./scripts/dev stop                           # stop containers and VMs; data is kept for the next start
+./scripts/dev run                            # start + follow logs, stop on exit (Jean run script)
+./scripts/dev urls                           # all instances, URLs, ports, and checkouts
+./scripts/dev exec php artisan migrate       # run a command in this branch's Coolify container
+./scripts/dev destroy <name>                 # delete containers, volumes, VMs, and the port slot
+./scripts/dev teardown                       # destroy this worktree's instance (Jean teardown before worktree deletion)
+# Compose: docker-compose.dev-multi.yml  Env + slots: <main checkout>/.dev-instances/ (gitignored)
 
-# Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
-./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
-./scripts/dev-instances up a --with vite     # HMR only when starting a single instance
-./scripts/dev-instances urls
-./scripts/dev-instances down
-# Compose: docker-compose.dev-multi.yml  Env: .dev-instances/{a,b}.env (gitignored)
-# Note: dual Vite HMR is unsupported (shared public/hot); multi-instance always uses public/build.
+# Legacy fixed-name stack (not used by scripts/dev)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The app runs at `localhost:8000` by default. Instance **b** is on `8001` (db `5433`, redis `6380`, …); see `./scripts/dev-instances`.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. To pass the host NVIDIA GPU through to the KVM localhost VM (`ubuntu-root` only), start with `COOLIFY_DEV_GPU=1 ./scripts/dev start` (or `php artisan dev:qemu ubuntu-root --as-localhost --gpu`). This attaches every PCI function of the GPU, gives the VM 4 GiB, stops `nvidia-persistenced` on the host, and installs the NVIDIA driver and container toolkit in the VM. The host cannot use the GPU while the VM runs. Remove it with `--fresh` without `--gpu`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 
@@ -37,7 +38,7 @@ Use the following workflow to test a self-hosted upgrade:
 1. Install the source version with the upgrade script:
 
    ```bash
-   bash upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
+   bash scripts/upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
    ```
 
 2. Set the current Coolify version and rebuild the cached configuration:
@@ -65,9 +66,25 @@ npm run dev                     # vite dev server
 npm run build                   # production build
 ```
 
+## Testing the Service Parser
+
+`tests/Feature/ServiceParserReferenceTest.php` is a golden test for both compose parsers (`serviceParser` with `updateCompose`, and `applicationParser`) and the proxy label and magic-variable helpers. It parses `tests/Fixtures/parser/service-reference.yaml` and `application-reference.yaml` (one service per parser feature, with setting variations and error fixtures) and every template in `templates/compose`, then compares the output with `tests/Fixtures/parser/expected/`. Only the reference expected files are committed. Template expected files are gitignored, so CI checks only that each template parses.
+
+```bash
+./scripts/parser-snapshot-diff save       # before a parser change: save the output of all cases (~90 s)
+./scripts/parser-snapshot-diff baseline   # after the change: one line per changed case, full diff in storage/framework/testing/parser-snapshot-diff.diff
+php artisan test --compact tests/Feature/ServiceParserReferenceTest.php    # before you commit
+UPDATE_PARSER_SNAPSHOTS=1 php artisan test --compact tests/Feature/ServiceParserReferenceTest.php   # accept an intended change, then review git diff tests/Fixtures/parser/
+```
+
+- A refactor must give "No differences". For an intended change, check every changed line in the diff file.
+- When you add a parser feature, add a small service that uses it to `service-reference.yaml` or `application-reference.yaml` and regenerate the expected files.
+- `./scripts/parser-snapshot-diff <git-ref>` compares with a commit instead of a saved baseline.
+- It covers only the latest compose parsing version. Older parsing versions are not covered.
+
 ## Browser Tests (Pest Browser Plugin)
 
-Uses `pestphp/pest-plugin-browser` with Laravel Dusk 8. New browser tests go in `tests/v4/Browser/`.
+Uses `pestphp/pest-plugin-browser` (Playwright). Browser tests go in `tests/v4/Browser/`.
 
 ```bash
 # Run all browser tests
@@ -82,7 +99,7 @@ php artisan test --compact --filter='can login with valid credentials'
 
 ### Writing Browser Tests
 
-- Place new tests in `tests/v4/Browser/` — legacy Dusk tests in `tests/Browser/` should not be used as reference.
+- Place new tests in `tests/v4/Browser/`.
 - Use `RefreshDatabase` and seed required data (at minimum `InstanceSettings::create(['id' => 0])`) in `beforeEach`.
 - Key API: `visit()`, `fill(field, value)`, `click(text)`, `assertSee()`, `assertDontSee()`, `assertPathIs()`, `screenshot()`.
 - Always call `screenshot()` at the end of each test for debugging.
@@ -99,14 +116,34 @@ function loginAsRoot(): mixed
 ```
 
 - See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
-- Chrome driver runs on `localhost:4444`, app on `localhost:8000` (configured in `tests/DuskTestCase.php`).
-- Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
+
+### How Browser Tests Actually Run (no Docker, no display needed)
+
+`visit()` does NOT hit the dev app on `localhost:8000`. Instead the Pest Browser Plugin:
+
+1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `npm install && npx playwright install chromium`).
+2. Boots an **in-process amphp HTTP server** on a random port that serves the Laravel app from the test process itself.
+
+Because the "server" and the test share one PHP process, they share the phpunit env (sqlite `:memory:`, array cache) — so `config()->set(...)`, model writes, and `Cache` calls in the test are visible to browser-issued requests, and `RefreshDatabase` never touches the dev Postgres.
+
+`->screenshot(filename: '...')` writes real PNGs to `tests/Browser/Screenshots/` — read them to visually verify UI state (toasts, modals, stray elements).
+
+### Browser Test Gotchas
+
+- **`Class "Redis" not found` thrown by the HTTP server**: host PHP has no phpredis, and the maintenance-mode store is hard-wired to redis (`config/app.php` → `'maintenance' => ['store' => 'redis']`). Add `config()->set('app.maintenance.store', 'array');` in `beforeEach`.
+- **Every path redirects to onboarding** for a fresh user (`DecideWhatToDoWithUser` + `showBoarding()`). Finish boarding before navigating: `Team::query()->update(['show_boarding' => false]); Cache::flush();` — the `Cache::flush()` is required because `User::currentTeam()` caches the Team for an hour and the in-process server shares that cache.
+- **`->navigate('/path')` races form-submit redirects.** After `->click('Login')`, assert something on the destination page (e.g. `->assertSee('Welcome to Coolify')`) before calling `navigate()`.
+- **Failure messages print the *initial* `visit()` URL**, not the current URL. Read the auto-saved screenshot in `tests/Browser/Screenshots/` to see where the browser actually ended up.
+- **Runs hang forever**: stale Playwright servers from a previously killed run. Fix: `pkill -f "playwright run-server"` and rerun. Healthy runs take seconds.
+- **Guest pages miss `DOMPurify`** (`public/js/purify.min.js` loads only `@auth` in `layouts/base.blade.php`), so toast descriptions fail on unauthenticated pages — log in first for toast-related assertions.
+- Layouts that call `@livewireScripts` manually must also call `@livewireStyles`, otherwise Livewire's asset auto-injection is disabled and `[wire\:loading]`/`[x-cloak]` elements render visible.
+- Run browser test files in their own `php artisan test` invocation — combining them with non-browser test paths in one command can hang the runner.
 
 ## Architecture
 
 ### Backend Structure (app/)
 - **Actions/** — Domain actions organized by area (Application, Database, Docker, Proxy, Server, Service, Shared, Stripe, User, CoolifyTask, Fortify). Uses `lorisleiva/laravel-actions` with `AsAction` trait — actions can be called as objects, dispatched as jobs, or used as controllers.
-- **Livewire/** — All UI components (Livewire 3). Pages organized by domain: Server, Project, Settings, Security, Notifications, Terminal, Subscription, SharedVariables. This is the primary UI layer — no traditional Blade controllers. Components listen to private team channels for real-time status updates via Soketi.
+- **Livewire/** — All UI components (Livewire 3). Pages organized by domain: Server, Project, Settings, Security, Notifications, Terminal, Subscription, SharedVariables. This is the primary UI layer — no traditional Blade controllers. Components listen to private team channels for real-time status updates via Laravel Reverb.
 - **Jobs/** — Queue jobs for deployments (`ApplicationDeploymentJob`), backups, Docker cleanup, server management, proxy configuration. Uses Redis queue with Horizon for monitoring.
 - **Models/** — Eloquent models extending `BaseModel` which provides auto-CUID2 UUID generation. Key models: `Server`, `Application`, `Service`, `Project`, `Environment`, `Team`, plus standalone database models (`StandalonePostgresql`, `StandaloneMysql`, etc.). Common traits: `HasConfiguration`, `HasMetrics`, `HasSafeStringAttribute`, `ClearsGlobalSearchCache`.
 - **Services/** — Business logic services (ConfigurationGenerator, DockerImageParser, ContainerStatusAggregator, HetznerService, etc.). Use Services for complex orchestration; use Actions for single-purpose domain operations.
@@ -127,9 +164,44 @@ function loginAsRoot(): mixed
 - Custom gates: `createAnyResource`, `canAccessTerminal`
 - Role hierarchy: `Role::MEMBER` (1) < `Role::ADMIN` (2) < `Role::OWNER` (3) with `lt()`/`gt()` comparison methods
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
+- Authorize every server-side read and mutation where access can vary by user, role, team, or resource. Use policies, gates, or `$this->authorize(...)`; never rely on hidden Blade/Livewire controls such as `@can` for security.
+- Scope queries to the current team before returning records. Treat route and model identifiers as untrusted, and prevent users from reading or changing resources owned by another team.
+- Use the session team (`currentTeam()`, `Model::ownedByCurrentTeam()`) only to find or open records, for "my team" lists, to create new top-level records, and on team pages. A user can switch teams in another tab while a page stays open, and every user owns a personal team.
+- Once a component, action, or controller works on a loaded resource, use that resource's team for everything after it:
+  - Roles and redaction: use the policy (`$this->authorize('update', $resource)`) or `auth()->user()->isAdminOfTeam($resource->team()->id)`. Never use `isMember()`, `isAdmin()`, or `role()` for resource permissions; they read the role in the session team.
+  - Related records the user can pick (S3 storages, keys, servers, sources, tags, tokens): query with `->where('team_id', $resource->team()->id)` and validate submitted IDs against that team.
+  - New rows that belong to the resource: set `team_id` from the resource's team, not `currentTeam()->id`.
+- Test this with a user who is a member of the resource's team and the owner of another team, with the session switched to the other team after mount.
+- Apply authorization consistently across Livewire actions, API and web controllers, actions, downloads, exports, search, event listeners, and any other path that exposes or changes protected data.
+- Default to denying access when a policy or ownership relationship is missing or ambiguous. Members must not gain access to administrative, credential, security, billing, or instance-wide data merely because they belong to the team.
+- Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
+- Do not add a `TRUSTED_PROXIES` setting or change `TrustProxies` to use one. This caused problems in supported Coolify deployments. Fix IP-based rate limits and allow-lists at their call sites instead of changing proxy trust as a shortcut.
+
+### Security threat model (read before you report or rate a vulnerability)
+
+Before you rate a vulnerability or write an advisory, find the security boundary that the attack crosses. The boundary decides the severity. A finding that crosses no boundary is still a valid finding, but its severity is low. The full scope is in [`SECURITY.md`](SECURITY.md).
+
+- Trusted by design (attacks that need these roles are low severity):
+  - A team admin or owner, and an API token with `write` or `root` ability, already has root on every server of that team (terminal, any Compose file with host mounts, scheduled commands, all team secrets).
+  - An instance admin (admin or owner of the root team) already controls the Coolify instance and its host.
+  - A member with write access on a resource (an access grant) already has root on the server of that resource. In the root team, this includes the Coolify host when the resource runs on localhost.
+  - Repository, Dockerfile, and Compose content that a team admin deploys is trusted for that deployment.
+- Real boundaries:
+  - No login -> any access.
+  - Team member (read-only) -> write, command execution, or secrets in the own team.
+  - Member with access grants -> resources, servers, or credentials outside the grants (use `ServerPolicy::placeResource` for servers and `useTeamCredentials` for team credentials).
+  - One team -> another team.
+  - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
+  - Token -> more than its abilities allow.
+- Rate with the real role that the attack needs, not the role that the reporter claims. Read the policy or gate that protects the path. Admin needed means `PR:H`. Use `S:C` only when the impact reaches another team, the Coolify instance, or a server that the attacker does not manage.
+- If a path is reachable by a member only because of a different missing authorization check, report that check as the main issue, with high severity. Rate each injection behind it by the role it needs when the check works.
+- Always fix low-severity findings (escape shell arguments, validate input, confine paths) when you find them. Do not dismiss them because the attacker is an admin.
+- Do not put exploit details, payloads, or unreleased advisory IDs in commits, PR descriptions, code comments, or this file.
+- To reply on a security advisory, add a comment. Do not edit the advisory description. Comments API (public preview): `gh api repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments` lists comments, and `gh api -X POST repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments -F body=@comment.md` adds one. The API cannot delete comments. `gh api -X PATCH repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments/<comment-id> -F body=@comment.md` edits one. Advisory comments do not link bare commit SHAs: write `[<short-sha>](https://github.com/coollabsio/coolify/commit/<full-sha>)`.
 
 ### Event Broadcasting
-- Soketi WebSocket server for real-time updates (ports 6001-6002 in dev)
+- Laravel Reverb WebSocket server for real-time updates (port 6001) and a Node terminal WebSocket server (port 6002), both run inside the `coolify` container as s6 services
+- Server-side broadcasts use `PUSHER_BACKEND_HOST`/`PUSHER_BACKEND_PORT` (defaults `127.0.0.1:6001`); `PUSHER_HOST`/`PUSHER_PORT` are browser-facing only
 - Status change events: `ApplicationStatusChanged`, `ServiceStatusChanged`, `DatabaseStatusChanged`, `ProxyStatusChanged`
 - Livewire components subscribe to private team channels via `getListeners()`
 
@@ -137,9 +209,25 @@ function loginAsRoot(): mixed
 - **Server** — A managed host connected via SSH. Has settings, proxy config, and destinations.
 - **Application** — A deployed app (from Git or Docker image) with environment variables, previews, deployment queue.
 - **Service** — A pre-configured service stack from templates (`templates/service-templates-latest.json`).
-- **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly).
+- **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly, SQLite).
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
+
+### Server transfer (keep it complete)
+
+A server transfer moves a server and every record that belongs to it to another Coolify instance: `ServerTransferExporter` writes the bundle, `ServerTransferImporter` reads it (`app/Services/ServerTransfer/`). `ServerTransferCoverage` records the transfer decision for every model and every column.
+
+- When you add a model, a column, or a relation that belongs to a server or to a resource on a server (application, preview, database, service, volume, environment variable, backup, scheduled task, tag, or setting), decide whether a transfer moves it:
+  - **Moved:** export and import it, and add a round-trip assertion to `tests/Unit/ServerTransfer/ServerTransferExporterImporterTest.php`. For a new model, also add it to `ServerTransferCoverage::TRANSFERRED`.
+  - **Not moved:** add the model to `ServerTransferCoverage::NOT_TRANSFERRED`, or the column to `NOT_EXPORTED_COLUMNS`, with the reason. If the data is lost for the user, also add an export warning.
+- `tests/Unit/ServerTransfer/ServerTransferCoverageTest.php` exports a server with one record of every transferred model. It fails when a model or a column has no decision. When you add a transferred model, add a record of it to the fixture of that test.
+- `docs/server-transfer-full-coverage.md` lists what to set up on a source server for a manual transfer test that covers every transferred model and setting. Add new transferred models and settings to it.
+- `scripts/transfer-test/` has live end-to-end transfer tests between two dev instances (see its README). Run them after a change to the transfer flow. When you add transferred data that the unit tests cannot prove (remote commands, provider calls, queue behavior), add a check to `extras-e2e.sh`.
+- Application, Service, and the standalone databases export their `$fillable` columns, plus hand-written lists for hidden columns. A column that is not fillable is lost unless you add it to those lists.
+- Do not copy a foreign key as a raw ID. IDs are different on the target. Link the record by UUID, or leave the column out with a reason.
+- Team credentials that a moved record needs (integration tokens, S3 storages, git sources, private keys, cloud provider tokens) move with it.
+- When the user must do a step after the transfer (for example, change a webhook URL at GitHub), add an item type to `TransferFinishChecklist`: the "Finish the transfer" list on the server page of the instance that manages the server now. Give it a check where Coolify can verify the step, and a fix where it can do the step. Also add it to the `post_transfer_checklist` of the bundle (`{target_url}` stands for the URL of the target), which the source shows as text.
+- On the source, a transferred server (`Server::isTransferredAway()`) is only an archive, because another instance manages the host. Do not run remote commands, cloud provider calls, or DNS provider calls for it, also not when the archive is deleted.
 
 ### Instance sentinels (`id = 0`)
 
@@ -170,6 +258,23 @@ Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentin
 - Exception handler: `app/Exceptions/Handler.php`
 - Service providers in `app/Providers/`
 
+## Livewire conventions
+
+### Dynamic lists and snapshot errors
+
+When an add, delete, or conversion leaves controls unresponsive and the browser reports `Snapshot missing on Livewire component`, inspect both component keys and refresh events. Stable keys alone may not fix it.
+
+- Give every Livewire component rendered in a loop a stable key based on the record ID, UUID, filename, or another immutable identity. Never include a collection count, `$loop->index`, or a reindexed array position in the key.
+- Pass the same stable identity to edit/delete actions. A keyed row can survive reordering while a `wire:ignore` or teleported Alpine modal keeps its original `submitAction`; an action such as `removeItem($index)` then targets a stale position after the first deletion. Resolve the current row server-side from an ID, UUID, or stable row hash instead.
+- Do not broadcast one refresh event to both a parent list component and children that the parent may insert, remove, or hide during the same operation. This can queue a child update after its snapshot has been removed from the DOM.
+- Split refresh responsibilities into targeted events. Refresh the parent for counts and tab visibility, and refresh an existing child list with a separate event. Use `$this->dispatch('event')->to(Component::class)` instead of a page-wide event when possible.
+- Before targeting a child list, confirm that it existed before the mutation, still exists afterward, and is on the active tab. A newly inserted child loads current data during `mount()` and does not need an immediate refresh. A removed or hidden child must not receive one.
+- A child that deletes itself should finish its own update, then target only the parent to refresh counts. The parent should not send a refresh back to that child when the list became empty.
+- Apply the same pattern to file, directory, conversion, and external reload paths such as Compose edits. One remaining broad event can reproduce the race.
+- Add regression tests that assert the scoped event names, assert the old broad event is not dispatched, and verify that keys do not depend on counts or positions. Manually repeat add/delete operations while watching the browser console.
+
+The persistent-storage implementation is the reference pattern: `Project\Service\Storage` handles `storageCountsChanged`, while `Project\Shared\Storages\All` handles `refreshVolumeList`.
+
 ## Key Conventions
 
 - Use `php artisan make:*` commands with `--no-interaction` to create files
@@ -179,13 +284,84 @@ Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentin
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- Nixpacks is deprecated. Never recommend it to users (issue replies, docs, UI copy, workarounds). Recommend the Dockerfile build pack, or Railpack where it fits.
 - When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
-- Production branch: `main`
-- Development branch: `next`
-- Fix PRs should target the current production branch; feature PRs should target `next`
+- Production branch: `main`. It takes fixes only. A new minor or major version gets to `main` as a merge of `next` or a release branch.
+- Merge `next` or a release branch into `main` only right before its release, on the same day. To freeze a minor for longer, publish an RC on `next` or cut a `release/v*` branch.
+- Development branch: `next`. It takes features and publishes prereleases only.
+- Fix PRs target `main`. Feature PRs target `next`.
+- Name a branch after its change: `fix/<topic>` or `feat/<topic>`. Name a backport branch after the version that releases it: `fix/<topic>-v4.4.8`.
+- Merge `next`, `release/v*` branches, and patch branches (`v4.x`, `v4.4.x`) with a merge commit. Never squash merge them, because their commits then come back as conflicts in each later merge.
+- Create `release/v*` and patch branches only when the user asks.
+
+## Change Files
+
+Each change that users of Coolify can see gets a file in `.changes/`, in the same commit as the change. `scripts/release.sh` writes the files into `CHANGELOG.md`, and the release notes come from there.
+
+Write a file with `scripts/change.sh` and its flags:
+
+```bash
+scripts/change.sh --type fixed --summary 'Ignored concurrent build limit of build servers' --detail 'Each build counts on the server that runs it'
+scripts/change.sh --type changed --breaking --summary 'Required the `delete` ability for every delete through the API'
+scripts/change.sh --notes   # the entries of the next release
+```
+
+- Write one file for each change. When a commit changes something that an unreleased change file describes, edit that file instead of adding a second one.
+- Pass `--commit <commit>` only to describe a commit that exists already.
+- Tests, documentation, refactors, and CI, scripts, or release tooling that users do not see need no file. Use `maintenance` only for a change that matters to people who build or release Coolify.
+
+| Type | For | Next release |
+| --- | --- | --- |
+| `added` | Something new for users | minor |
+| `changed` | Existing behavior that works differently | minor |
+| `deprecated` | A feature that is going away | minor |
+| `removed` | A feature that is gone | minor |
+| `fixed` | A bug that users can see | patch |
+| `security` | A closed vulnerability or hardening | patch |
+| `maintenance` | A notable change that only maintainers see | patch |
+
+Add `--breaking` when users must act after the upgrade. The entry moves to `Breaking Changes`, and the next release is a major.
+
+The summary reads as one sentence with the heading of its section, never in the imperative of a commit subject:
+
+| Section | The summary | Example |
+| --- | --- | --- |
+| `Added`, `Changed`, `Deprecated`, `Removed` | What the heading acts on | Added `Automatic cancelling of the older queued webhook deployments` |
+| `Fixed` | The bug, not the fix | Fixed `Ignored concurrent build limit of build servers`, not `Apply the concurrent build limit` |
+| `Breaking Changes`, `Security`, `Maintenance` | Starts with a verb in the past tense | `Compressed the layers with zstd instead of gzip` |
+| A `--detail` under any section | How it works now, in the present tense | `The default is none` |
+
+- Start with a capital letter or a code span, and end without a period. A reason follows after a comma.
+- Write for the person who runs Coolify. Name the page, setting, or API field that changes, not the class or the file.
+- Link the issues that a change fixes or closes at the end of the summary, for example `([#1234](https://github.com/coollabsio/coolify/issues/1234))`. Do not link pull requests.
+- Do not use bold. Put each UI name, such as a page, tab, button, setting, or label, in its own code span, for example `Advanced` > `Deployment`.
+- Do not put exploit details, payloads, or unreleased advisory IDs in a change file.
+
+## Releases
+
+[`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
+
+- Do not edit `CHANGELOG.md`. Describe each change in a change file (see [Change Files](#change-files)).
+- A push that changes `release.json` publishes a release.
+- NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
+- `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.
+- `scripts/release.sh` is interactive and makes a signed commit, or an unsigned commit when git cannot sign. Do not run it, push a release commit, or start the release or nightly workflow yourself. Give the user the commands from `RELEASE.md` for the release type:
+
+| Release | Branch | Command |
+| --- | --- | --- |
+| Alpha, beta, or RC of the next minor or major | `next` | `scripts/release.sh`, then select the stage and the version |
+| Prerelease of one minor or major | `release/v4.6`, `release/v5.0` | `scripts/release.sh` |
+| Stable patch or minor | `main` | Merge `next` or the release branch with a merge commit when needed, then `scripts/release.sh` |
+| Stable major | `main` | Do the steps in "Release a major version" of `RELEASE.md`, then `scripts/release.sh` |
+| Backport or hotfix | `v4.4.x` | Merge `fix/<topic>-v4.4.8` with a merge commit, then `scripts/release.sh` |
+| Nightly | `next`, or the release branch in progress | Automatic, two times each day |
+| Pull request image `pr-<number>` | PR from a branch of this repository | Automatic, on each push |
+
+- `upstream.json` pins the helper, Sentinel, and Traefik versions. A change of `upstream.json` releases nothing. `RELEASE.md` tells how to ship it.
+- The helper image is in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). Change it there, not in this repository.
 
 <laravel-boost-guidelines>
 === foundation rules ===
@@ -196,26 +372,11 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 
 ## Foundational Context
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
-- php - 8.5
-- laravel/fortify (FORTIFY) - v1
-- laravel/framework (LARAVEL) - v12
-- laravel/horizon (HORIZON) - v5
-- laravel/mcp (MCP) - v0
-- laravel/nightwatch (NIGHTWATCH) - v1
-- laravel/pail (PAIL) - v1
-- laravel/prompts (PROMPTS) - v0
-- laravel/sanctum (SANCTUM) - v4
-- laravel/socialite (SOCIALITE) - v5
-- livewire/livewire (LIVEWIRE) - v3
-- laravel/boost (BOOST) - v2
-- laravel/dusk (DUSK) - v8
-- laravel/pint (PINT) - v1
-- pestphp/pest (PEST) - v4
-- phpunit/phpunit (PHPUNIT) - v12
-- rector/rector (RECTOR) - v2
-- tailwindcss (TAILWINDCSS) - v4
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
 
 ## Skills Activation
 
@@ -262,7 +423,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Searching Documentation (IMPORTANT)
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
 - Pass a `packages` array to scope results when you know which packages are relevant.
 - Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
 - Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
@@ -273,6 +434,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
 3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
 4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+- Record a rule with `record-rule` only when the user explicitly asks for one. Instructions for the work at hand are not rules, no matter how emphatic: "remove this typo", "use X here" are work to do, not rules to record. Never record a rule on your own initiative, as a byproduct of a change, or to summarize what you just did. When the user does ask, pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Use `record-rule` rather than your native memory or notes tool, because native memory is personal and session-scoped, while only `.ai/rules` is shared with the team and persists in the repo.
 
 ## Artisan
 
@@ -302,13 +468,17 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 # Deployment
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
 
 === tests rules ===
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Add or update tests for behavior and logic changes when a test provides meaningful regression coverage.
+- Pure copy, styling, and layout-only changes do not require new or updated tests.
+- When test coverage applies, run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 
@@ -360,6 +530,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 ## Database
 
 - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
+
 - Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
@@ -370,7 +541,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Livewire
 
-- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
+- Livewire allows you to build dynamic, reactive interfaces in PHP without writing JavaScript.
 - You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
 - Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
 
@@ -383,11 +554,18 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 === pest/core rules ===
 
-## Pest
+# Pest
 
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
 
 </laravel-boost-guidelines>

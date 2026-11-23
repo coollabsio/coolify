@@ -65,6 +65,7 @@
     <section class="{{ $selected_uuid === 'default' ? 'w-full' : 'terminal-page-console min-h-0 w-full flex-1 overflow-hidden' }}"
         x-on:terminal-theme-selected="setTheme($event.detail.theme)"
         x-on:terminal-starting.window="syncTheme()"
+        x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
         x-data="{
             targets: @js($terminalOptions),
             multipleServers: @js($servers->count() > 1),
@@ -76,6 +77,10 @@
             themeAccents: @js($consoleThemeAccents),
             consoleTheme: 'system',
             themeOpen: false,
+            attachAvailable: false,
+            hasShell: true,
+            terminalMode: 'shell',
+            modeOpen: false,
             get filteredTargetGroups() {
                 const query = this.targetSearch.trim().toLowerCase();
                 const targets = query
@@ -97,6 +102,15 @@
                 this.themeOpen = false;
                 localStorage.setItem('coolify-console-theme', theme);
                 window.dispatchEvent(new CustomEvent('terminal-theme-change', { detail: { theme } }));
+            },
+            setTerminalMode(mode) {
+                this.modeOpen = false;
+                if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
+                    return;
+                }
+                this.terminalMode = mode;
+                window.dispatchEvent(new CustomEvent('terminal-starting'));
+                Livewire.dispatch('set-terminal-mode', { mode });
             },
             syncTheme() {
                 const savedTheme = localStorage.getItem('coolify-console-theme');
@@ -176,11 +190,11 @@
             </div>
         @else
         <div wire:key="terminal-session-canvas" data-terminal-session-canvas
-            class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
+            class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
             :data-console-theme="consoleTheme"
             :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
             <header
-                class="terminal-session-toolbar absolute top-3 right-3 left-3 z-20 flex items-center gap-3 text-white select-none">
+                class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
                 <div class="relative flex min-w-0 flex-1 items-center gap-2"
                     x-on:click.outside="targetOpen = false">
                     @if ($isLoadingContainers)
@@ -215,7 +229,7 @@
                         </button>
 
                         <div x-cloak x-show="targetOpen" x-transition.origin.top.left
-                            class="terminal-target-picker absolute top-11 left-0 z-50 w-80 overflow-hidden rounded-lg border shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                            class="terminal-target-picker absolute top-11 left-0 z-50 w-80 overflow-hidden rounded-lg border shadow-[var(--shadow-dropdown)]">
                             <div class="border-b border-white/[0.08] p-1.5">
                                 <div class="relative">
                                     <x-reicon name="search"
@@ -260,11 +274,14 @@
                     @endif
                 </div>
 
-                <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                <div class="ml-auto flex items-center gap-2">
+                    <x-terminal.mode-selector />
+                    <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
                         :theme-accents="$consoleThemeAccents" />
+                </div>
             </header>
 
-            <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
             <div class="application-console-block min-h-0 flex-1 overflow-hidden">
                 @if ($isLoadingContainers)
                     <div class="flex h-full min-h-0 items-center justify-center">
@@ -287,7 +304,7 @@
                 @else
                     <div x-cloak x-show="!targetChosen" data-terminal-target-picker="launcher"
                         class="absolute inset-0 z-20 flex items-start justify-start p-6 sm:p-10">
-                        <div class="terminal-target-picker w-full max-w-md overflow-hidden rounded-lg border shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                        <div class="terminal-target-picker w-full max-w-md overflow-hidden rounded-lg border shadow-[var(--shadow-dropdown)]">
                             <div class="border-b border-white/[0.08] p-2">
                                 <div class="px-1 pb-2">
                                     <div class="text-sm font-semibold text-white/80">Start a terminal session</div>

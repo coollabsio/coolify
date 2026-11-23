@@ -6,7 +6,7 @@
     <x-security.settings-layout>
         <div class="application-settings-form">
             <x-application.settings-section title="Integration tokens"
-                description="Credentials used by third-party integrations such as DNS providers." flush>
+                description="Credentials used by third-party integrations such as DNS providers and secret managers." flush>
                 <x-slot:actions>
                     @can('create', App\Models\IntegrationToken::class)
                         <x-modal-input title="New Integration Token">
@@ -56,18 +56,30 @@
                                             </h3>
                                         </div>
                                         <div class="text-center text-[12px] text-neutral-500 dark:text-fg-dim">
-                                            {{ ucfirst($savedToken->provider) }}
+                                            {{ $savedToken->providerName() }}
                                         </div>
                                         <div class="flex flex-wrap gap-1">
                                             <template x-for="capability in tokenCapabilities" :key="capability">
                                                 <span x-text="capability"
                                                     class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim"></span>
                                             </template>
+                                            @if ($savedToken->provider === 'cloudflare')
+                                                @if ($savedToken->automaticDnsEnabled())
+                                                    <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium uppercase text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                                                        Auto DNS
+                                                    </span>
+                                                @endif
+                                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                                                    {{ $savedToken->dns_zones_count }} {{ Str::plural('zone', $savedToken->dns_zones_count) }}
+                                                </span>
+                                            @endif
                                         </div>
-                                        <button type="button" class="icon-button" title="Edit integration token"
-                                            :aria-label="`Edit ${tokenName}`" @click="modalOpen=true">
-                                            <x-reicon name="settings" class="size-3.5" />
-                                        </button>
+                                        <div class="flex justify-end">
+                                            <button type="button" class="icon-button" title="Edit integration token"
+                                                :aria-label="`Edit ${tokenName}`" @click="modalOpen=true">
+                                                <x-reicon name="settings" class="size-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </x-slot:content>
                                 <livewire:security.integration-token-editor

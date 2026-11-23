@@ -59,7 +59,7 @@ function buildSecretsGithubPrivateKey(): string
 
 describe('PATCH /api/v1/applications/{uuid} use_build_secrets', function () {
     test('updates the application setting', function () {
-        expect($this->application->settings->use_build_secrets)->toBeFalse();
+        $this->application->settings->update(['use_build_secrets' => false]);
 
         $this->withHeaders(buildSecretsApiHeaders($this->bearerToken))
             ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -88,7 +88,7 @@ describe('PATCH /api/v1/applications/{uuid} use_build_secrets', function () {
     });
 
     test('does not change the setting when omitted', function () {
-        $this->application->settings->update(['use_build_secrets' => true]);
+        $this->application->settings->update(['use_build_secrets' => false]);
 
         $this->withHeaders(buildSecretsApiHeaders($this->bearerToken))
             ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -96,7 +96,7 @@ describe('PATCH /api/v1/applications/{uuid} use_build_secrets', function () {
             ])
             ->assertOk();
 
-        expect($this->application->fresh()->settings->use_build_secrets)->toBeTrue();
+        expect($this->application->fresh()->settings->use_build_secrets)->toBeFalse();
     });
 });
 
@@ -140,6 +140,33 @@ describe('POST /api/v1/applications/public use_build_secrets', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('use_build_secrets');
     });
+});
+
+describe('application creation endpoints without use_build_secrets', function () {
+    test('turn build secrets on for the new application', function (string $endpoint, array $payload) {
+        if ($endpoint === 'private-deploy-key') {
+            $payload['private_key_uuid'] = PrivateKey::factory()->create(['team_id' => $this->team->id])->uuid;
+        }
+
+        $response = $this->withHeaders(buildSecretsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/applications/{$endpoint}", [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'autogenerate_domain' => false,
+                ...$payload,
+            ])
+            ->assertCreated();
+
+        $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($application->settings->use_build_secrets)->toBeTrue();
+    })->with([
+        'public' => ['public', ['git_repository' => 'https://gitlab.com/coolify/build-secrets-test', 'git_branch' => 'main', 'build_pack' => 'nixpacks', 'ports_exposes' => '3000']],
+        'private deploy key' => ['private-deploy-key', ['git_repository' => 'git@gitlab.com:coolify/build-secrets-test.git', 'git_branch' => 'main', 'build_pack' => 'dockerfile', 'ports_exposes' => '3000']],
+        'dockerfile' => ['dockerfile', ['dockerfile' => base64_encode("FROM nginx:alpine\nEXPOSE 80")]],
+        'docker image' => ['dockerimage', ['docker_registry_image_name' => 'nginx', 'docker_registry_image_tag' => 'alpine', 'ports_exposes' => '80']],
+    ]);
 });
 
 describe('other application creation endpoints use_build_secrets', function () {
@@ -224,9 +251,6 @@ describe('other application creation endpoints use_build_secrets', function () {
         ]);
 
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'github-installation-token',
             ], 201),
@@ -253,5 +277,56 @@ describe('other application creation endpoints use_build_secrets', function () {
         $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
 
         expect($application->settings->use_build_secrets)->toBeTrue();
+    });
+
+    test('creates an application from a system-wide GitHub App owned by another team', function () {
+        $ownerTeam = Team::factory()->create();
+        $privateKey = PrivateKey::create([
+            'name' => 'System-wide GitHub App Key',
+            'private_key' => buildSecretsGithubPrivateKey(),
+            'team_id' => $ownerTeam->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'System-wide GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 54321,
+            'installation_id' => 9876,
+            'client_id' => 'system-wide-client-id',
+            'client_secret' => 'system-wide-client-secret',
+            'webhook_secret' => 'system-wide-webhook-secret',
+            'private_key_id' => $privateKey->id,
+            'team_id' => $ownerTeam->id,
+            'is_system_wide' => true,
+            'is_public' => false,
+        ]);
+
+        Http::fake([
+            'https://api.github.com/app/installations/9876/access_tokens' => Http::response([
+                'token' => 'github-installation-token',
+            ], 201),
+            'https://api.github.com/repos/coolify/system-wide-test' => Http::response([
+                'id' => 654321,
+            ]),
+        ]);
+
+        $response = $this->withHeaders(buildSecretsApiHeaders($this->bearerToken))
+            ->postJson('/api/v1/applications/private-github-app', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'github_app_uuid' => $githubApp->uuid,
+                'git_repository' => 'coolify/system-wide-test',
+                'git_branch' => 'main',
+                'build_pack' => 'nixpacks',
+                'ports_exposes' => '3000',
+                'autogenerate_domain' => false,
+            ])
+            ->assertCreated();
+
+        $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($application->source_id)->toBe($githubApp->id)
+            ->and($application->environment_id)->toBe($this->environment->id);
     });
 });

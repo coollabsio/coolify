@@ -6,16 +6,28 @@
 
 @php
     $serverReady = $server->isFunctional();
-    $proxyUpdateAvailable = $server->proxySet()
-        && ($server->hasCurrentTraefikOutdatedInfo() || $server->hasPendingProxyConfiguration());
+    $proxyConfigurationPending = $server->proxySet() && $server->hasPendingProxyConfiguration();
+    $traefikUpdateAvailable = $server->proxySet() && $server->hasCurrentTraefikOutdatedInfo();
+    $proxyUpdateAvailable = $proxyConfigurationPending || $traefikUpdateAvailable;
     $proxyNeedsAttention = $server->proxySet()
         && (! in_array($proxyStatus, ['running'], true) || $proxyUpdateAvailable);
-    $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
+    $proxyStatusLabel = match (true) {
+        $proxyConfigurationPending => 'Restart required',
+        $traefikUpdateAvailable => 'Update available',
+        default => str($proxyStatus ?: 'unknown')->headline(),
+    };
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelNeedsAttention = $showSentinelStatus && $sentinelStatus === 'out_of_sync';
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
 
     [$summaryLabel, $summaryType] = match (true) {
         ! $serverReady => ['Unavailable', 'error'],
         $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-        default => ['Ready', 'success'],
+        default => ['Operational', 'success'],
     };
 @endphp
 
@@ -35,11 +47,11 @@
         </span>
     </x-status-badge>
 
-    <div x-cloak x-show="open" x-transition.origin.top.right
-        class="listbox-panel top-8! right-0! left-auto! z-[90]! w-64! min-w-64!" role="menu">
+    <div x-cloak x-show="open" x-transition.origin.top.left
+        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-64! min-w-64!" role="menu">
         <div class="flex items-center gap-1 px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">
             <span>System status</span>
-            @if ($server->proxySet())
+            @if ($server->proxySet() && auth()->user()?->can('manageProxy', $server))
                 <button type="button" wire:click="checkProxyStatus" wire:loading.attr="disabled"
                     wire:target="checkProxyStatus" aria-label="Refresh status" title="Refresh status"
                     class="inline-flex size-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 disabled:cursor-wait dark:text-fg-faint dark:hover:bg-white/10 dark:hover:text-fg">
@@ -54,7 +66,7 @@
                 'bg-error' => ! $serverReady,
             ])></span>
             <span class="flex-1">Server</span>
-            <span>{{ $serverReady ? 'Ready' : 'Unavailable' }}</span>
+            <span>{{ $serverReady ? 'Operational' : 'Unavailable' }}</span>
         </div>
         @if ($server->proxySet())
             <a href="{{ route('server.proxy', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
@@ -66,7 +78,7 @@
                     'bg-error' => $proxyNeedsAttention && ! $proxyUpdateAvailable && ! in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
                 ])></span>
                 <span class="flex-1">Proxy</span>
-                <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
+                <span>{{ $proxyStatusLabel }}</span>
             </a>
         @endif
         @if ($showSentinelStatus)
@@ -74,11 +86,12 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => ! $sentinelNeedsAttention,
-                    'bg-warning' => $sentinelNeedsAttention,
+                    'bg-success' => $sentinelStatus === 'in_sync',
+                    'bg-neutral-400 dark:bg-fg-faint' => $sentinelStatus === 'waiting',
+                    'bg-warning' => $sentinelStatus === 'out_of_sync',
                 ])></span>
                 <span class="flex-1">Sentinel</span>
-                <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
+                <span>{{ $sentinelStatusLabel }}</span>
             </a>
         @endif
     </div>

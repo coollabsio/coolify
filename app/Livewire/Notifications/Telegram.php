@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Jobs\SendMessageToTelegramJob;
 use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
@@ -26,10 +27,10 @@ class Telegram extends Component
     #[Validate(['boolean'])]
     public bool $telegramEnabled = false;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:telegramEnabled,true', 'nullable', 'string'])]
     public ?string $telegramToken = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['required_if:telegramEnabled,true', 'nullable', 'string'])]
     public ?string $telegramChatId = null;
 
     #[Validate(['boolean'])]
@@ -40,6 +41,9 @@ class Telegram extends Component
 
     #[Validate(['boolean'])]
     public bool $statusChangeTelegramNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedTelegramNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $backupSuccessTelegramNotifications = false;
@@ -72,7 +76,13 @@ class Telegram extends Component
     public bool $serverPatchTelegramNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateTelegramNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedTelegramNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesTelegramNotifications = false;
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsDeploymentSuccessThreadId = null;
@@ -82,6 +92,9 @@ class Telegram extends Component
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsStatusChangeThreadId = null;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $telegramNotificationsRestartLimitReachedThreadId = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsBackupSuccessThreadId = null;
@@ -114,7 +127,13 @@ class Telegram extends Component
     public ?string $telegramNotificationsServerPatchThreadId = null;
 
     #[Validate(['nullable', 'string'])]
+    public ?string $telegramNotificationsServerAutoUpdateThreadId = null;
+
+    #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsTraefikOutdatedThreadId = null;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $telegramNotificationsImageVulnerabilitiesThreadId = null;
 
     public function mount()
     {
@@ -128,11 +147,10 @@ class Telegram extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->telegram_enabled = $this->telegramEnabled;
             $this->settings->telegram_token = $this->telegramToken;
             $this->settings->telegram_chat_id = $this->telegramChatId;
@@ -140,6 +158,7 @@ class Telegram extends Component
             $this->settings->deployment_success_telegram_notifications = $this->deploymentSuccessTelegramNotifications;
             $this->settings->deployment_failure_telegram_notifications = $this->deploymentFailureTelegramNotifications;
             $this->settings->status_change_telegram_notifications = $this->statusChangeTelegramNotifications;
+            $this->settings->restart_limit_reached_telegram_notifications = $this->restartLimitReachedTelegramNotifications;
             $this->settings->backup_success_telegram_notifications = $this->backupSuccessTelegramNotifications;
             $this->settings->backup_failure_telegram_notifications = $this->backupFailureTelegramNotifications;
             $this->settings->scheduled_task_success_telegram_notifications = $this->scheduledTaskSuccessTelegramNotifications;
@@ -150,11 +169,14 @@ class Telegram extends Component
             $this->settings->server_reachable_telegram_notifications = $this->serverReachableTelegramNotifications;
             $this->settings->server_unreachable_telegram_notifications = $this->serverUnreachableTelegramNotifications;
             $this->settings->server_patch_telegram_notifications = $this->serverPatchTelegramNotifications;
+            $this->settings->server_auto_update_telegram_notifications = $this->serverAutoUpdateTelegramNotifications;
             $this->settings->traefik_outdated_telegram_notifications = $this->traefikOutdatedTelegramNotifications;
+            $this->settings->image_vulnerabilities_telegram_notifications = $this->imageVulnerabilitiesTelegramNotifications;
 
             $this->settings->telegram_notifications_deployment_success_thread_id = $this->telegramNotificationsDeploymentSuccessThreadId;
             $this->settings->telegram_notifications_deployment_failure_thread_id = $this->telegramNotificationsDeploymentFailureThreadId;
             $this->settings->telegram_notifications_status_change_thread_id = $this->telegramNotificationsStatusChangeThreadId;
+            $this->settings->telegram_notifications_restart_limit_reached_thread_id = $this->telegramNotificationsRestartLimitReachedThreadId;
             $this->settings->telegram_notifications_backup_success_thread_id = $this->telegramNotificationsBackupSuccessThreadId;
             $this->settings->telegram_notifications_backup_failure_thread_id = $this->telegramNotificationsBackupFailureThreadId;
             $this->settings->telegram_notifications_scheduled_task_success_thread_id = $this->telegramNotificationsScheduledTaskSuccessThreadId;
@@ -165,14 +187,35 @@ class Telegram extends Component
             $this->settings->telegram_notifications_server_reachable_thread_id = $this->telegramNotificationsServerReachableThreadId;
             $this->settings->telegram_notifications_server_unreachable_thread_id = $this->telegramNotificationsServerUnreachableThreadId;
             $this->settings->telegram_notifications_server_patch_thread_id = $this->telegramNotificationsServerPatchThreadId;
+            $this->settings->telegram_notifications_server_auto_update_thread_id = $this->telegramNotificationsServerAutoUpdateThreadId;
             $this->settings->telegram_notifications_traefik_outdated_thread_id = $this->telegramNotificationsTraefikOutdatedThreadId;
+            $this->settings->telegram_notifications_image_vulnerabilities_thread_id = $this->telegramNotificationsImageVulnerabilitiesThreadId;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
         } else {
             $this->telegramEnabled = $this->settings->telegram_enabled;
             if (auth()->user()->can('update', $this->settings)) {
                 $this->telegramToken = $this->settings->telegram_token;
                 $this->telegramChatId = $this->settings->telegram_chat_id;
+                $this->telegramNotificationsDeploymentSuccessThreadId = $this->settings->telegram_notifications_deployment_success_thread_id;
+                $this->telegramNotificationsDeploymentFailureThreadId = $this->settings->telegram_notifications_deployment_failure_thread_id;
+                $this->telegramNotificationsStatusChangeThreadId = $this->settings->telegram_notifications_status_change_thread_id;
+                $this->telegramNotificationsRestartLimitReachedThreadId = $this->settings->telegram_notifications_restart_limit_reached_thread_id;
+                $this->telegramNotificationsBackupSuccessThreadId = $this->settings->telegram_notifications_backup_success_thread_id;
+                $this->telegramNotificationsBackupFailureThreadId = $this->settings->telegram_notifications_backup_failure_thread_id;
+                $this->telegramNotificationsScheduledTaskSuccessThreadId = $this->settings->telegram_notifications_scheduled_task_success_thread_id;
+                $this->telegramNotificationsScheduledTaskFailureThreadId = $this->settings->telegram_notifications_scheduled_task_failure_thread_id;
+                $this->telegramNotificationsDockerCleanupSuccessThreadId = $this->settings->telegram_notifications_docker_cleanup_success_thread_id;
+                $this->telegramNotificationsDockerCleanupFailureThreadId = $this->settings->telegram_notifications_docker_cleanup_failure_thread_id;
+                $this->telegramNotificationsServerDiskUsageThreadId = $this->settings->telegram_notifications_server_disk_usage_thread_id;
+                $this->telegramNotificationsServerReachableThreadId = $this->settings->telegram_notifications_server_reachable_thread_id;
+                $this->telegramNotificationsServerUnreachableThreadId = $this->settings->telegram_notifications_server_unreachable_thread_id;
+                $this->telegramNotificationsServerPatchThreadId = $this->settings->telegram_notifications_server_patch_thread_id;
+                $this->telegramNotificationsServerAutoUpdateThreadId = $this->settings->telegram_notifications_server_auto_update_thread_id;
+                $this->telegramNotificationsTraefikOutdatedThreadId = $this->settings->telegram_notifications_traefik_outdated_thread_id;
+                $this->telegramNotificationsImageVulnerabilitiesThreadId = $this->settings->telegram_notifications_image_vulnerabilities_thread_id;
             } else {
                 $this->telegramToken = null;
                 $this->telegramChatId = null;
@@ -181,6 +224,7 @@ class Telegram extends Component
             $this->deploymentSuccessTelegramNotifications = $this->settings->deployment_success_telegram_notifications;
             $this->deploymentFailureTelegramNotifications = $this->settings->deployment_failure_telegram_notifications;
             $this->statusChangeTelegramNotifications = $this->settings->status_change_telegram_notifications;
+            $this->restartLimitReachedTelegramNotifications = $this->settings->restart_limit_reached_telegram_notifications;
             $this->backupSuccessTelegramNotifications = $this->settings->backup_success_telegram_notifications;
             $this->backupFailureTelegramNotifications = $this->settings->backup_failure_telegram_notifications;
             $this->scheduledTaskSuccessTelegramNotifications = $this->settings->scheduled_task_success_telegram_notifications;
@@ -191,28 +235,17 @@ class Telegram extends Component
             $this->serverReachableTelegramNotifications = $this->settings->server_reachable_telegram_notifications;
             $this->serverUnreachableTelegramNotifications = $this->settings->server_unreachable_telegram_notifications;
             $this->serverPatchTelegramNotifications = $this->settings->server_patch_telegram_notifications;
+            $this->serverAutoUpdateTelegramNotifications = $this->settings->server_auto_update_telegram_notifications;
             $this->traefikOutdatedTelegramNotifications = $this->settings->traefik_outdated_telegram_notifications;
+            $this->imageVulnerabilitiesTelegramNotifications = $this->settings->image_vulnerabilities_telegram_notifications;
 
-            $this->telegramNotificationsDeploymentSuccessThreadId = $this->settings->telegram_notifications_deployment_success_thread_id;
-            $this->telegramNotificationsDeploymentFailureThreadId = $this->settings->telegram_notifications_deployment_failure_thread_id;
-            $this->telegramNotificationsStatusChangeThreadId = $this->settings->telegram_notifications_status_change_thread_id;
-            $this->telegramNotificationsBackupSuccessThreadId = $this->settings->telegram_notifications_backup_success_thread_id;
-            $this->telegramNotificationsBackupFailureThreadId = $this->settings->telegram_notifications_backup_failure_thread_id;
-            $this->telegramNotificationsScheduledTaskSuccessThreadId = $this->settings->telegram_notifications_scheduled_task_success_thread_id;
-            $this->telegramNotificationsScheduledTaskFailureThreadId = $this->settings->telegram_notifications_scheduled_task_failure_thread_id;
-            $this->telegramNotificationsDockerCleanupSuccessThreadId = $this->settings->telegram_notifications_docker_cleanup_success_thread_id;
-            $this->telegramNotificationsDockerCleanupFailureThreadId = $this->settings->telegram_notifications_docker_cleanup_failure_thread_id;
-            $this->telegramNotificationsServerDiskUsageThreadId = $this->settings->telegram_notifications_server_disk_usage_thread_id;
-            $this->telegramNotificationsServerReachableThreadId = $this->settings->telegram_notifications_server_reachable_thread_id;
-            $this->telegramNotificationsServerUnreachableThreadId = $this->settings->telegram_notifications_server_unreachable_thread_id;
-            $this->telegramNotificationsServerPatchThreadId = $this->settings->telegram_notifications_server_patch_thread_id;
-            $this->telegramNotificationsTraefikOutdatedThreadId = $this->settings->telegram_notifications_traefik_outdated_thread_id;
         }
     }
 
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -225,6 +258,7 @@ class Telegram extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -244,7 +278,7 @@ class Telegram extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->telegramEnabled = false;
+            $this->telegramEnabled = (bool) $this->settings->refresh()->telegram_enabled;
 
             return handleError($e, $this);
         } finally {
@@ -282,6 +316,8 @@ class Telegram extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
@@ -291,7 +327,25 @@ class Telegram extends Component
     {
         try {
             $this->authorize('sendTest', $this->settings);
-            $this->team->notify(new Test(channel: 'telegram'));
+
+            // Send synchronously so that the user sees the error from Telegram (a queued test always "succeeds").
+            $message = (new Test(channel: 'telegram'))->toTelegram();
+            $response = (new SendMessageToTelegramJob(
+                text: $message['message'],
+                buttons: $message['buttons'],
+                token: (string) $this->settings->telegram_token,
+                chatId: (string) $this->settings->telegram_chat_id,
+            ))->sendMessage();
+
+            if ($response->failed()) {
+                $reason = in_array($response->status(), [401, 404], true)
+                    ? 'The Bot API token is not valid. Copy it again from @BotFather.'
+                    : ($response->json('description') ?? "HTTP {$response->status()}");
+                $this->dispatch('error', 'Telegram rejected the test notification.', e($reason));
+
+                return;
+            }
+
             $this->dispatch('success', 'Test notification sent.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -301,5 +355,12 @@ class Telegram extends Component
     public function render()
     {
         return view('livewire.notifications.telegram');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.telegram.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

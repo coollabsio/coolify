@@ -7,7 +7,7 @@
 
 services:
   emqx:
-    image: emqx/emqx-enterprise:6.2.0
+    image: emqx/emqx-enterprise:6.2.2
     environment:
       - SERVICE_URL_EMQX_18083
       - EMQX_DASHBOARD__DEFAULT_PASSWORD=${SERVICE_PASSWORD_EMQX}

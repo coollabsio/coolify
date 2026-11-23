@@ -10,7 +10,11 @@ use Illuminate\Support\Facades\Http;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
+#[IsOpenWorld]
 class ListGithubBranches extends Tool
 {
     protected string $name = 'list_github_branches';

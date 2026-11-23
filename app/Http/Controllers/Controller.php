@@ -8,12 +8,15 @@ use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -30,7 +33,7 @@ class Controller extends BaseController
         if (auth()->user()?->currentTeam()->id !== 0) {
             return redirect(RouteServiceProvider::HOME);
         }
-        TestEvent::dispatch();
+        TestEvent::dispatch(currentTeam()->id);
 
         return 'Look at your other tab.';
     }
@@ -95,61 +98,112 @@ class Controller extends BaseController
         return response()->json(['message' => 'Transactional emails are not active'], 400);
     }
 
-    public function link()
+    public function link(): View|RedirectResponse
     {
         $token = request()->get('token');
-        if (is_string($token) && $token !== '') {
-            try {
-                $decrypted = Crypt::decryptString($token);
-            } catch (DecryptException) {
-                return redirect()->route('login')->with('error', 'Invalid credentials.');
-            }
-
-            if (! str_contains($decrypted, '@@@')) {
-                return redirect()->route('login')->with('error', 'Invalid credentials.');
-            }
-
-            $payload = explode('@@@', $decrypted, 3);
-            if (count($payload) === 3) {
-                [$email, $invitationUuid, $password] = $payload;
-            } else {
-                [$email, $password] = $payload;
-                $invitationUuid = null;
-            }
-
-            $email = Str::lower($email);
-            $user = User::whereEmail($email)->first();
-            if (! $user) {
-                return redirect()->route('login');
-            }
-
-            $invitation = TeamInvitation::query()
-                ->where('email', $email)
-                ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
-                ->first();
-            if (! $invitation || ! $this->invitationLinkMatchesToken($invitation, $token) || ! $invitation->isValid()) {
-                return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
-            }
-
-            if (Hash::check($password, $user->password)) {
-                $team = $invitation->team;
-                if (! $user->teams()->where('team_id', $team->id)->exists()) {
-                    $user->teams()->attach($team->id, ['role' => $invitation->role]);
-                }
-                $invitation->delete();
-
-                $user->forceFill([
-                    'password' => Hash::make(Str::random(64)),
-                ])->save();
-
-                Auth::login($user);
-                session(['currentTeam' => $team]);
-
-                return redirect()->route('dashboard');
-            }
+        $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
+        if (! $credentials) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        return redirect()->route('login')->with('error', 'Invalid credentials.');
+        [$user, $invitation] = $credentials;
+
+        return view('invitation.accept', [
+            'invitation' => $invitation,
+            'team' => $invitation->team,
+            'alreadyMember' => $user->teams()->where('team_id', $invitation->team_id)->exists(),
+            'formAction' => route('auth.link.accept'),
+            'token' => $token,
+        ]);
+    }
+
+    public function acceptLink(Request $request): RedirectResponse
+    {
+        $token = $request->input('token');
+        if (! is_string($token)) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        $acceptedInvitation = DB::transaction(function () use ($token) {
+            $credentials = $this->magicLinkCredentials($token, lockForUpdate: true);
+            if (! $credentials) {
+                return null;
+            }
+
+            [$user, $invitation] = $credentials;
+            $team = $invitation->team;
+            $alreadyMember = $user->teams()->where('team_id', $team->id)->exists();
+            if (! $alreadyMember) {
+                $user->teams()->attach($team->id, $invitation->membershipAttributes());
+            }
+
+            $user->forceFill([
+                'password' => Hash::make(Str::random(64)),
+            ]);
+            // Only an emailed token proves the address. A copied link can be used by the inviting admin.
+            if ($invitation->via === 'email' && ! $user->hasVerifiedEmail()) {
+                $user->forceFill(['email_verified_at' => now()]);
+            }
+            $user->save();
+            $invitation->delete();
+
+            return [$user, $team, $invitation, $alreadyMember];
+        });
+
+        if (! $acceptedInvitation) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        [$user, $team, $invitation, $alreadyMember] = $acceptedInvitation;
+
+        Auth::login($user);
+        session(['currentTeam' => $team]);
+        $this->auditInvitationAccepted($user, $invitation, $alreadyMember);
+
+        return redirect()->route('dashboard');
+    }
+
+    /**
+     * @return array{0: User, 1: TeamInvitation}|null
+     */
+    private function magicLinkCredentials(string $token, bool $lockForUpdate = false): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        try {
+            $decrypted = Crypt::decryptString($token);
+        } catch (DecryptException) {
+            return null;
+        }
+
+        $payload = explode('@@@', $decrypted, 3);
+        if (count($payload) === 3) {
+            [$email, $invitationUuid, $password] = $payload;
+        } elseif (count($payload) === 2) {
+            [$email, $password] = $payload;
+            $invitationUuid = null;
+        } else {
+            return null;
+        }
+
+        $email = Str::lower($email);
+        $user = User::query()->where('email', $email)->first();
+        $invitationQuery = TeamInvitation::query()
+            ->where('email', $email)
+            ->when($lockForUpdate, fn ($query) => $query->lockForUpdate());
+        $invitation = $invitationUuid
+            ? $invitationQuery->where('uuid', $invitationUuid)->first()
+            : $invitationQuery->get()->first(
+                fn (TeamInvitation $invitation) => $this->invitationLinkMatchesToken($invitation, $token)
+            );
+
+        if (! $user || ! $invitation || $invitation->hasExpired() || ! $this->invitationLinkMatchesToken($invitation, $token)) {
+            return null;
+        }
+
+        return Hash::check($password, $user->password) ? [$user, $invitation] : null;
     }
 
     private function invitationLinkMatchesToken(TeamInvitation $invitation, string $token): bool
@@ -175,6 +229,11 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
@@ -185,6 +244,7 @@ class Controller extends BaseController
             'invitation' => $invitation,
             'team' => $invitation->team,
             'alreadyMember' => $alreadyMember,
+            'formAction' => route('team.invitation.accept', $invitation->uuid),
         ]);
     }
 
@@ -199,20 +259,44 @@ class Controller extends BaseController
             abort(400, 'You are not allowed to accept this invitation.');
         }
 
+        // A magic link session accepts only the invitation of its own link, until the user sets a password.
+        if ($user->force_password_reset) {
+            abort(400, 'Set your password before you accept another invitation.');
+        }
+
         if (! $invitation->isValid()) {
             abort(400, 'Invitation expired.');
         }
 
         if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
             $invitation->delete();
+            $this->auditInvitationAccepted($user, $invitation, alreadyMember: true);
 
             return redirect()->route('team.index');
         }
-        $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+        $user->teams()->attach($invitation->team->id, $invitation->membershipAttributes());
         $invitation->delete();
+        $this->auditInvitationAccepted($user, $invitation, alreadyMember: false);
 
         refreshSession($invitation->team);
 
         return redirect()->route('team.index');
+    }
+
+    private function auditInvitationAccepted(User $user, TeamInvitation $invitation, bool $alreadyMember): void
+    {
+        auditLog('ui.team_invitation.accepted', [
+            'team_id' => $invitation->team_id,
+            'invitation_uuid' => $invitation->uuid,
+            'invitation_email' => $invitation->email,
+            'role' => $invitation->role,
+            'via' => $invitation->via,
+            'already_member' => $alreadyMember,
+            'member_id' => $user->id,
+            'member_name' => $user->name,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+        ]);
     }
 }

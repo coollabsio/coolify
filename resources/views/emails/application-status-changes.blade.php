@@ -1,7 +1,7 @@
 <x-emails.layout>
-{{ $name }} has been stopped.
+{{ $name }} has stopped.
 
-If it was your intention to stop this application, you can ignore this email.
+If it was your intention to stop this resource, you can ignore this email.
 
-If not, [check what is going on]({{ $application_url }}).
+If not, [check what is going on]({{ $resource_url }}).
 </x-emails.layout>

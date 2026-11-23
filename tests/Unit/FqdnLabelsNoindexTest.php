@@ -62,7 +62,7 @@ describe('Traefik noindex middleware', function () {
             ->toBe(middlewaresOf($labels, 'https-0-testuuid'))
             ->toContain(
                 'https-0-testuuid-stripprefix',
-                'gzip',
+                'gzip-sse',
                 '0-testuuid-to-www',
                 'http-basic-auth-testuuid',
                 '0-testuuid-noindex',
@@ -155,6 +155,15 @@ describe('Traefik noindex middleware', function () {
         expect(middlewaresOf($labels, 'https-0-testuuid'))->toContain('0-testuuid-noindex');
     });
 
+    test('a port in the configured domain does not silently drop the header', function () {
+        $labels = traefikLabels(
+            domains: ['https://app.example.com:3000'],
+            noindex: ['https://app.example.com'],
+        );
+
+        expect(middlewaresOf($labels, 'https-0-testuuid'))->toContain('0-testuuid-noindex');
+    });
+
     test('a domain that is not configured is ignored', function () {
         $labels = traefikLabels(
             domains: ['https://example.com'],
@@ -221,6 +230,15 @@ describe('Caddy noindex header', function () {
         expect(collect($labels)->filter(fn ($l) => str_contains($l, 'caddy_0.header.'))->all())->toBeEmpty();
     });
 
+    test('a port in the configured domain does not silently drop the header', function () {
+        $labels = caddyLabels(
+            domains: ['https://app.example.com:3000'],
+            noindex: ['https://app.example.com'],
+        );
+
+        expect($labels)->toContain('caddy_0.header.1_X-Robots-Tag="noindex, nofollow"');
+    });
+
     test('no flags means byte-identical output to before the feature', function () {
         $domains = ['https://example.com', 'https://other.example.com'];
 
@@ -231,4 +249,56 @@ describe('Caddy noindex header', function () {
             fn ($l) => str_contains($l, 'X-Robots-Tag')
         )->all())->toBeEmpty();
     });
+});
+
+test('fqdnLabelsForCaddy routes each portless domain to its override port', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://one.example.com', 'https://two.example.com']),
+        onlyPort: 80,
+        is_force_https_enabled: true,
+        domainPortOverrides: [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://one.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}')
+        ->toContain('caddy_1=https://two.example.com')
+        ->toContain('caddy_1.handle_path.1_reverse_proxy={{upstreams 8080}}')
+        ->not->toContain('caddy_0=https://one.example.com:3000')
+        ->not->toContain('caddy_1=https://two.example.com:8080');
+});
+
+test('fqdnLabelsForCaddy uses onlyPort when a portless domain has no override', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://plain.example.com']),
+        onlyPort: 4000,
+        is_force_https_enabled: true,
+        domainPortOverrides: [],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://plain.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 4000}}');
+});
+
+test('fqdnLabelsForCaddy keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://legacy.example.com:9090']),
+        onlyPort: 80,
+        is_force_https_enabled: true,
+        domainPortOverrides: [],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://legacy.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
 });

@@ -33,5 +33,6 @@ test('creating a team sets is_mcp_server_enabled to true on the model', function
     $created = Team::query()->where('name', 'MCP Safe Team')->first();
 
     expect($created)->not->toBeNull()
-        ->and($created->is_mcp_server_enabled)->toBeTrue();
+        ->and($created->is_mcp_server_enabled)->toBeTrue()
+        ->and($this->user->fresh()->roleInTeam($created->id))->toBe('owner');
 });

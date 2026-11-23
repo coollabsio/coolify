@@ -22,5 +22,6 @@ class UserSeeder extends Seeder
             'name' => 'Normal User (not in root team)',
             'email' => 'test3@example.com',
         ]);
+
     }
 }

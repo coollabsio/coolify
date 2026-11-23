@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -158,6 +159,8 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('view', $project);
+
         $environment = $project->environments()->whereName($request->environment_name_or_uuid)->first();
         if (! $environment) {
             $environment = $project->environments()->whereUuid($request->environment_name_or_uuid)->first();
@@ -165,12 +168,17 @@ class ProjectController extends Controller
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
-        $environment = $environment->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);
-        collect(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'])
-            ->flatMap(fn (string $relation) => $environment->{$relation})
-            ->each(fn ($resource) => exposeSensitiveFields($resource));
+        // Redis connection URLs read REDIS_PASSWORD and REDIS_USERNAME; load the variables once, not per database.
+        $relations = ['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services'];
+        $environment = $environment->load([...$relations, 'redis.runtime_environment_variables']);
+        $payload = $environment->withoutRelations()->toArray();
+        foreach ($relations as $relation) {
+            $payload[$relation] = $environment->{$relation}
+                ->map(fn ($resource) => Arr::except(serializeApiResource($resource), 'runtime_environment_variables'))
+                ->all();
+        }
 
-        return response()->json(serializeApiResponse($environment));
+        return response()->json(serializeApiResponse($payload));
     }
 
     #[OA\Post(
@@ -267,12 +275,6 @@ class ProjectController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
-        ]);
-
-        auditLog('api.project.created', [
-            'team_id' => $teamId,
-            'project_uuid' => $project->uuid,
-            'project_name' => $project->name,
         ]);
 
         return response()->json([
@@ -394,13 +396,6 @@ class ProjectController extends Controller
 
         $project->update($request->only($allowedFields));
 
-        auditLog('api.project.updated', [
-            'team_id' => $teamId,
-            'project_uuid' => $project->uuid,
-            'project_name' => $project->name,
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
-        ]);
-
         return response()->json([
             'uuid' => $project->uuid,
             'name' => $project->name,
@@ -480,15 +475,7 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Project has resources, so it cannot be deleted.'], 400);
         }
 
-        $projectUuid = $project->uuid;
-        $projectName = $project->name;
         $project->delete();
-
-        auditLog('api.project.deleted', [
-            'team_id' => $teamId,
-            'project_uuid' => $projectUuid,
-            'project_name' => $projectName,
-        ]);
 
         return response()->json(['message' => 'Project deleted.']);
     }

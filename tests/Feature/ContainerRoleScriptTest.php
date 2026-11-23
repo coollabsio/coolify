@@ -12,9 +12,8 @@ it('matches comma separated container roles and lets all override every service'
     ['worker,flux', 'flux'],
     ['web, all', 'flux'],
     ['flux,all,worker', 'worker'],
-    ['horizon,scheduler,nightwatch,flux', 'horizon'],
-    ['horizon,scheduler,nightwatch,flux', 'scheduler'],
-    ['horizon,scheduler,nightwatch,flux', 'nightwatch'],
+    ['horizon,scheduler,flux', 'horizon'],
+    ['horizon,scheduler,flux', 'scheduler'],
 ]);
 
 it('rejects services missing from the comma separated container roles', function () {
@@ -36,7 +35,7 @@ it('falls back to the container role from the local env file', function () {
 it('keeps container roles out of the production image', function () {
     expect(base_path('docker/production/etc/s6-overlay/scripts/container-role'))->not->toBeFile();
 
-    foreach (['horizon', 'nightwatch-agent', 'scheduler-worker'] as $service) {
+    foreach (['horizon', 'scheduler-worker'] as $service) {
         $runScript = file_get_contents(base_path("docker/production/etc/s6-overlay/s6-rc.d/{$service}/run"));
 
         expect($runScript)

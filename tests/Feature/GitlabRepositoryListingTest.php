@@ -13,11 +13,20 @@ afterEach(function () {
     Model::encryptUsing(null);
 });
 
+/**
+ * Http::GitSource() pins DNS before Http::fake() answers, so use a public IP
+ * literal that needs no DNS lookup. No request leaves the test.
+ */
+function gitlabListingApiUrl(): string
+{
+    return 'https://1.1.1.1/api/v4';
+}
+
 it('returns a stable shape with has_more false when GitLab repo listing fails', function () {
     Http::fake(['*' => Http::response(['message' => '401 Unauthorized'], 401)]);
 
     $source = new GitlabApp([
-        'api_url' => 'https://gitlab.example.test/api/v4',
+        'api_url' => gitlabListingApiUrl(),
         'access_token' => str_repeat('t', 20), // ggignore
         'refresh_token' => str_repeat('r', 20), // ggignore
         'expires_at' => time() + 3600,
@@ -38,7 +47,7 @@ it('limits GitLab repositories to the exact group and its descendants', function
     ], 200)]);
 
     $source = new GitlabApp([
-        'api_url' => 'https://gitlab.example.test/api/v4',
+        'api_url' => gitlabListingApiUrl(),
         'access_token' => str_repeat('t', 20), // ggignore
         'refresh_token' => str_repeat('r', 20), // ggignore
         'expires_at' => time() + 3600,

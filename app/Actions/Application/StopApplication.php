@@ -3,8 +3,11 @@
 namespace App\Actions\Application;
 
 use App\Actions\Server\CleanupDocker;
+use App\Events\ApplicationStopFailed;
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\Application;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
@@ -13,60 +16,87 @@ class StopApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainers = true): ?string
     {
+        NotifyResourceStoppedJob::expectStop($application, $application->settings->stopGracePeriodSeconds());
+        $containerPresent = ! $removeContainers;
         $servers = collect([$application->destination->server]);
         if ($application?->additional_servers?->count() > 0) {
             $servers = $servers->merge($application->additional_servers);
         }
+        $errors = [];
         foreach ($servers as $server) {
             try {
                 if (! $server->isFunctional()) {
-                    return 'Server is not functional';
+                    $errors[] = "Server {$server->name} is not functional.";
+
+                    continue;
                 }
 
                 if ($server->isSwarm()) {
-                    instant_remote_process(["docker stack rm {$application->uuid}"], $server);
+                    $containerPresent = false;
+                    instant_remote_process(['docker stack rm '.escapeshellarg($application->uuid)], $server);
 
                     continue;
                 }
 
                 $containers = $previewDeployments
-                    ? getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true)
-                    : getCurrentApplicationContainerStatus($server, $application->id, 0);
+                    ? getCurrentApplicationContainerStatus($server, $application, includePullrequests: true)
+                    : getCurrentApplicationContainerStatus($server, $application, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
                 $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
-                    instant_remote_process(command: [
-                        dockerStopCommand($timeout, $containerName, $server),
-                        "docker rm -f $containerName",
-                    ], server: $server, throwError: false);
+                    $escapedContainerName = escapeshellarg($containerName);
+                    $commands = [dockerStopCommand($timeout, $escapedContainerName, $server)];
+                    if ($removeContainers) {
+                        $commands[] = "docker rm -f {$escapedContainerName}";
+                    }
+
+                    try {
+                        instant_remote_process(command: $commands, server: $server);
+                    } catch (\Exception $e) {
+                        $errors[] = $e->getMessage();
+                    }
                 }
 
-                if ($application->build_pack === 'dockercompose') {
+                if ($removeContainers && $application->build_pack === 'dockercompose') {
                     $application->deleteConnectedNetworks();
                 }
 
                 if ($dockerCleanup) {
-                    CleanupDocker::dispatch($server, false, false);
+                    CleanupDocker::dispatchAfterStop($server);
                 }
             } catch (\Exception $e) {
-                return $e->getMessage();
+                $errors[] = $e->getMessage();
             }
         }
+        $teamId = $application->environment->project->team->id;
+        if ($errors !== []) {
+            $message = implode(' ', $errors);
+            Log::warning('Failed to stop application', ['application_uuid' => $application->uuid, 'error' => $message]);
+            ApplicationStopFailed::dispatch($teamId, $application->uuid, $message);
 
-        $status = ['status' => 'exited'];
+            return $message;
+        }
+
+        $status = [
+            'status' => 'exited',
+            'container_present' => $containerPresent,
+        ];
         if ($resetRestartCount) {
             $status = array_merge($status, [
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,
+                'restart_limit_reached' => false,
             ]);
         }
         $application->update($status);
 
-        ServiceStatusChanged::dispatch($application->environment->project->team->id);
+        ServiceStatusChanged::dispatch($teamId);
+
+        return null;
     }
 }

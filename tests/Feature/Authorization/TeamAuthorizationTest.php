@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Team\DangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member as TeamMember;
 use App\Models\InstanceSettings;
@@ -60,11 +61,11 @@ test('owner can delete team', function () {
     expect(auth()->user()->can('delete', $this->team))->toBeTrue();
 });
 
-test('admin can delete team', function () {
+test('admin cannot delete team', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    expect(auth()->user()->can('delete', $this->team))->toBeTrue();
+    expect(auth()->user()->can('delete', $this->team))->toBeFalse();
 });
 
 test('member cannot delete team', function () {
@@ -141,6 +142,18 @@ test('owner can update team MCP setting', function () {
     expect($this->team->fresh()->is_mcp_server_enabled)->toBeFalse();
 });
 
+test('owner can update team build server fallback policy', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TeamIndex::class)
+        ->set('is_build_server_fallback_enabled', false)
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeFalse();
+});
+
 test('team index mounts when is_mcp_server_enabled is null on the session team', function () {
     $this->actingAs($this->owner);
 
@@ -156,24 +169,41 @@ test('team index mounts when is_mcp_server_enabled is null on the session team',
         ->assertSet('is_mcp_server_enabled', true);
 });
 
-// --- Team Index Livewire: delete ---
+// --- Team Danger Zone Livewire: delete ---
 
-test('member cannot delete team via index', function () {
+test('member cannot open the team danger zone', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(TeamIndex::class)
-        ->call('delete', 'password')
-        ->assertDispatched('error');
+    Livewire::test(DangerZone::class)->assertForbidden();
 
     expect(Team::find($this->team->id))->not->toBeNull();
 });
 
-test('admin can delete team via policy', function () {
+test('owner can open the team danger zone', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(DangerZone::class)->assertSuccessful();
+});
+
+test('team settings show the danger zone link only to the team owner', function () {
+    session(['currentTeam' => $this->team]);
+
+    $this->actingAs($this->owner);
+    Livewire::test(TeamIndex::class)->assertSee('Danger Zone');
+
+    foreach ([$this->admin, $this->member] as $user) {
+        $this->actingAs($user);
+        Livewire::test(TeamIndex::class)->assertDontSee('Danger Zone');
+    }
+});
+
+test('admin cannot delete team via policy', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    expect(auth()->user()->can('delete', $this->team))->toBeTrue();
+    expect(auth()->user()->can('delete', $this->team))->toBeFalse();
 });
 
 // --- Team Member Livewire: role changes ---
@@ -354,4 +384,25 @@ test('member cannot update an existing team at model level', function () {
 
     expect(fn () => $this->team->update(['name' => 'Hacked']))
         ->toThrow(Exception::class, 'You are not allowed to update this team.');
+});
+
+test('member cannot update a team at model level while the session is on a team they own', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    expect(fn () => $this->team->update(['name' => 'Hacked']))
+        ->toThrow(Exception::class, 'You are not allowed to update this team.');
+});
+
+test('owner can update their team at model level while the session is on a team where they are a member', function () {
+    $otherTeam = Team::factory()->create();
+    $this->owner->teams()->attach($otherTeam, ['role' => 'member']);
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->team->update(['name' => 'Renamed']);
+
+    expect($this->team->fresh()->name)->toBe('Renamed');
 });

@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Team\Invitations;
-use App\Livewire\Team\InviteLink;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -22,48 +21,60 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows generate link with loading state targeting viaLink', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/invite-link.blade.php'));
-
-    expect($view)
-        ->toContain('wire:submit="viaLink"')
-        ->toContain('wire:target="viaLink"')
-        ->toContain('<x-forms.button type="submit" wire:target="viaLink"')
-        ->toContain('Generate link');
-
-    Livewire::test(InviteLink::class)
-        ->assertSee('Generate link')
-        ->assertSeeHtml('wire:target="viaLink"')
-        ->assertSeeHtml('wire:loading.attr="disabled"')
-        ->assertSeeHtml('wire:loading.class="is-loading"');
-});
-
-it('renders a real copy button for pending invitation links', function () {
+it('preserves a provisional user when revoking their invitation fails', function () {
+    $provisionalUser = User::factory()->create([
+        'email' => 'provisional@example.com',
+        'email_verified_at' => null,
+        'force_password_reset' => true,
+    ]);
     $invitation = TeamInvitation::create([
         'team_id' => $this->team->id,
-        'uuid' => 'test-invitation-uuid-123456789012',
-        'email' => 'invitee@example.com',
+        'uuid' => 'failing-invitation-delete',
+        'email' => $provisionalUser->email,
         'role' => 'member',
-        'link' => 'http://example.test/invitations/test-invitation-uuid-123456789012',
+        'link' => 'http://example.test/invitations/failing-invitation-delete',
         'via' => 'link',
     ]);
 
-    $view = file_get_contents(resource_path('views/livewire/team/invitations.blade.php'));
-
-    expect($view)
-        ->toContain('<x-copy-button :value="$invite->link" label="Copy invitation link" />');
+    TeamInvitation::deleting(function (): void {
+        throw new RuntimeException('Invitation deletion failed.');
+    });
 
     Livewire::test(Invitations::class, [
-        'invitations' => TeamInvitation::ownedByCurrentTeam()->get(),
+        'invitations' => collect([$invitation]),
     ])
-        ->assertSee($invitation->link)
-        ->assertSeeHtml('aria-label="Copy invitation link"')
-        ->assertSeeHtml('x-data="copyButton"')
-        ->assertSeeHtml('type="button"');
+        ->call('deleteInvitation', $invitation->id)
+        ->assertDispatched('error');
+
+    $this->assertDatabaseHas('users', ['id' => $provisionalUser->id]);
+    $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
 });
 
-it('keeps clipboard logic in the shared copy button instead of a global helper', function () {
-    $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
+it('sorts pending invitations by the chosen column and ignores unknown sort values', function () {
+    $invite = fn (string $email, string $role, string $via) => TeamInvitation::create([
+        'team_id' => $this->team->id,
+        'uuid' => $email,
+        'email' => $email,
+        'role' => $role,
+        'link' => "http://example.test/invitations/{$email}",
+        'via' => $via,
+    ]);
+    $invitations = collect([
+        $invite('carol@example.com', 'member', 'email'),
+        $invite('alice@example.com', 'owner', 'link'),
+        $invite('bob@example.com', 'admin', 'email'),
+    ]);
 
-    expect($layout)->not->toContain('copyToClipboard');
+    Livewire::test(Invitations::class, ['invitations' => $invitations])
+        ->assertSeeInOrder(['carol@example.com', 'alice@example.com', 'bob@example.com'])
+        ->call('setSort', 'email-asc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-asc')
+        ->assertSeeInOrder(['carol@example.com', 'bob@example.com', 'alice@example.com'])
+        ->call('setSort', 'via-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'link-asc')
+        ->assertSet('sort', 'via-desc');
 });

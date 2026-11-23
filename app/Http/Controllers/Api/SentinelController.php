@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\StopSentinel;
+use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
 use Exception;
@@ -31,12 +34,18 @@ class SentinelController extends Controller
         }
         $naked_token = str_replace('Bearer ', '', $token);
         try {
-            $decrypted = decrypt($naked_token);
+            // Tokens are encrypt(json) values, so the payload is a serialized string.
+            // Unserialize it without classes: the endpoint has no login yet.
+            $decrypted = unserialize(decrypt($naked_token, false), ['allowed_classes' => false]);
+            if (! is_string($decrypted)) {
+                throw new Exception('Sentinel token payload is not a string.');
+            }
             $decrypted_token = json_decode($decrypted, true);
         } catch (Exception $e) {
             auditLogWebhookFailure('sentinel', 'decrypt_failed');
 
-            return response()->json(['message' => 'Invalid token'], 401);
+            // Usually a Sentinel of another instance or of an old APP_KEY: it cannot recover, so it waits one hour.
+            return response()->json(['message' => 'Invalid token'], 401, ['Retry-After' => 3600]);
         }
         $server_uuid = data_get($decrypted_token, 'server_uuid');
         if (! $server_uuid) {
@@ -50,7 +59,8 @@ class SentinelController extends Controller
                 'server_uuid' => $server_uuid,
             ]);
 
-            return response()->json(['message' => 'Server not found'], 404);
+            // 410 and Retry-After make Sentinel wait one day before it pushes again.
+            return response()->json(['message' => 'Server not found'], 410, ['Retry-After' => 86400]);
         }
 
         if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
@@ -58,8 +68,13 @@ class SentinelController extends Controller
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the subscription of this team is not active.');
+            // Remove the Sentinel container of the unpaid server once a day. Server validation starts it again after payment.
+            if (Cache::add("sentinel:stop-unpaid:{$server->id}", true, now()->addDay())) {
+                StopSentinel::dispatch($server);
+            }
 
-            return response()->json(['message' => 'Unauthorized'], 401);
+            return response()->json(['message' => 'Subscription is not active'], 402, ['Retry-After' => 3600]);
         }
 
         if ($server->isFunctional() === false) {
@@ -67,15 +82,18 @@ class SentinelController extends Controller
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the server is marked unreachable, not usable, or disabled. Validate the server connection.');
 
-            return response()->json(['message' => 'Server is not functional'], 401);
+            // SSH checks mark the server reachable again, so pushes can wait 5 minutes.
+            return response()->json(['message' => 'Server is not functional'], 401, ['Retry-After' => 300]);
         }
 
-        if ($server->settings->sentinel_token !== $naked_token) {
+        if (! hash_equals((string) $server->settings->sentinel_token, (string) $naked_token)) {
             auditLogWebhookFailure('sentinel', 'token_mismatch', [
                 'server_uuid' => $server->uuid,
                 'team_id' => $server->team_id,
             ]);
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the Sentinel token does not match. Sync Sentinel to apply the current token.');
 
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -84,6 +102,8 @@ class SentinelController extends Controller
         ]);
 
         if ($validator->fails()) {
+            $server->rememberSentinelPushProblem('Coolify rejected the push: the payload is not valid.');
+
             return response()->json(serializeApiResponse([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -92,14 +112,48 @@ class SentinelController extends Controller
 
         $data = $request->all();
 
+        $wasSentinelLive = $server->sentinel_updated_at !== null && $server->isSentinelLive();
+
         // Heartbeat MUST update on every push — drives isSentinelLive() and SSH-check skipping.
+        $server->sentinel_waiting_since = null;
         $server->sentinelHeartbeat();
+
+        if (! $wasSentinelLive) {
+            $server->rememberSentinelPushProblem(null);
+            SentinelSynchronized::dispatch($server);
+        }
+
+        $this->updateSentinelIfOutdated($server, $request->header('X-Sentinel-Version'));
 
         if ($this->shouldDispatchUpdate($server, $data)) {
             PushServerUpdateJob::dispatch($server, $data);
         }
 
         return response()->json(['message' => 'ok'], 200);
+    }
+
+    /**
+     * Sentinel sends its version on every push, so an outdated Sentinel is found without SSH.
+     * The reported version also tells ServerManagerJob to skip its hourly SSH version check.
+     * Old Sentinel versions do not send the header and keep the hourly SSH check.
+     */
+    private function updateSentinelIfOutdated(Server $server, ?string $runningVersion): void
+    {
+        if (! is_string($runningVersion) || preg_match('/^\d+\.\d+\.\d+$/', $runningVersion) !== 1) {
+            return;
+        }
+
+        Cache::put(Server::sentinelReportedVersionCacheKey($server->id), $runningVersion, now()->addHours(2));
+
+        $latestVersion = data_get(get_versions_data(), 'sentinel.version');
+        if (blank($latestVersion) || version_compare($runningVersion, $latestVersion, '>=')) {
+            return;
+        }
+
+        // Retry at most hourly if an update fails.
+        if (Cache::add("sentinel:update-dispatched:{$server->id}", true, 3600)) {
+            CheckAndStartSentinelJob::dispatch($server);
+        }
     }
 
     /**
@@ -138,14 +192,14 @@ class SentinelController extends Controller
     /**
      * Build a stable hash of container state.
      *
-     * Covers [name, state] only — metrics, filesystem_usage_root, and
-     * health_status are excluded on purpose. Disk % churns constantly, and
-     * health checks can flap between starting/healthy/unhealthy while the
-     * container lifecycle state remains unchanged. Both would otherwise defeat
-     * the hash and dispatch DB-heavy PushServerUpdateJob instances too often.
-     * The snapshot completeness flag is included so a complete snapshot always
-     * dispatches after a partial snapshot. Sorted by name so container ordering
-     * from Sentinel does not affect the hash.
+     * Covers [name, state, health_status, restart_count] only — metrics and
+     * filesystem_usage_root are excluded on purpose because disk % churns
+     * constantly and would dispatch PushServerUpdateJob on every push. Health is
+     * included so a healthy/unhealthy change reaches the UI on the next push
+     * instead of after the force window. The snapshot completeness flag is
+     * included so a complete snapshot always dispatches after a partial
+     * snapshot. Sorted by name so container ordering from Sentinel does not
+     * affect the hash.
      */
     private function containerStateHash(array $data): string
     {
@@ -153,6 +207,8 @@ class SentinelController extends Controller
             ->map(fn ($c) => [
                 'name' => data_get($c, 'name'),
                 'state' => data_get($c, 'state'),
+                'health_status' => data_get($c, 'health_status'),
+                'restart_count' => data_get($c, 'restart_count'),
             ])
             ->sortBy('name')
             ->values()

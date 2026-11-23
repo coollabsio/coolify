@@ -3,6 +3,8 @@
 namespace App\Actions\Service;
 
 use App\Models\ServiceApplication;
+use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ServiceComposeUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +14,9 @@ class UpdateServiceApplicationFromApi
     public function execute(ServiceApplication $serviceApplication, Request $request, string $teamId, array $payload): ?JsonResponse
     {
         $forceDomainOverride = $request->boolean('force_domain_override');
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($serviceApplication->fresh() ?? $serviceApplication);
+        $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($serviceApplication->service));
 
         if (array_key_exists('url', $payload)) {
             $urlRaw = $payload['url'];
@@ -56,12 +61,22 @@ class UpdateServiceApplicationFromApi
                 }
             }
 
-            $serviceApplication->fqdn = $parsed['normalized'];
+            $serviceApplication->setEditableUrls($parsed['normalized']);
         }
 
         if (array_key_exists('noindex_domains', $payload)) {
             // Must run after fqdn is set above: flags are kept only for current domains.
             $serviceApplication->setNoindexDomains($payload['noindex_domains'] ?? []);
+        }
+
+        if (array_key_exists('redirect', $payload)) {
+            if (in_array($payload['redirect'], ['www', 'non-www'], true) && ! $this->hasWwwAndNonWwwDomains($serviceApplication->fqdn)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['redirect' => ['The www and non-www redirects need both a www and a non-www domain in url.']],
+                ], 422);
+            }
+            $serviceApplication->redirect = $payload['redirect'];
         }
 
         if (array_key_exists('human_name', $payload)) {
@@ -84,12 +99,25 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_gzip_enabled = filter_var($payload['is_gzip_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('traefik_certificate_resolver', $payload)) {
+            $serviceApplication->traefik_certificate_resolver = filled($payload['traefik_certificate_resolver']) ? $payload['traefik_certificate_resolver'] : null;
+        }
+
         if (array_key_exists('is_stripprefix_enabled', $payload)) {
             $serviceApplication->is_stripprefix_enabled = filter_var($payload['is_stripprefix_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('is_force_https_enabled', $payload)) {
             $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (array_key_exists('is_permanent_redirect_enabled', $payload)) {
+            $serviceApplication->is_permanent_redirect_enabled = filter_var($payload['is_permanent_redirect_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (array_key_exists('max_restart_count', $payload)) {
+            $serviceApplication->max_restart_count = $payload['max_restart_count'];
+            $serviceApplication->restart_limit_reached = false;
         }
 
         if (array_key_exists('is_log_drain_enabled', $payload)) {
@@ -108,9 +136,21 @@ class UpdateServiceApplicationFromApi
 
         $serviceApplication->save();
         $serviceApplication->refresh();
+        $dnsCleanup->queueReleaseOfRemovedHostnames($serviceApplication, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($serviceApplication->service, $previousServiceDnsHostnames);
 
         updateCompose($serviceApplication);
 
         return null;
+    }
+
+    private function hasWwwAndNonWwwDomains(?string $fqdn): bool
+    {
+        $hosts = str($fqdn ?? '')->explode(',')
+            ->map(fn (string $url) => strtolower((string) parse_url(trim($url), PHP_URL_HOST)))
+            ->filter();
+
+        return $hosts->contains(fn (string $host) => str_starts_with($host, 'www.'))
+            && $hosts->contains(fn (string $host) => ! str_starts_with($host, 'www.'));
     }
 }

@@ -77,6 +77,8 @@ class CleanupUnverifiedUsers extends Command
                     ->orWhereHas('projects.keydbs')
                     ->orWhereHas('projects.dragonflies')
                     ->orWhereHas('projects.clickhouses')
+                    ->orWhereHas('projects.influxdbs')
+                    ->orWhereHas('projects.sqlites')
                     ->orWhereHas('projects.services');
             });
     }

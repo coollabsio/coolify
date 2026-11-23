@@ -13,9 +13,9 @@ use OpenApi\Attributes as OA;
 
 class GitlabController extends Controller
 {
-    private function removeSensitiveData(GitlabApp $gitlabApp)
+    private function removeSensitiveData(GitlabApp $gitlabApp, int $teamId)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (request()->attributes->get('can_read_sensitive', false) === true && $gitlabApp->team_id === $teamId) {
             $gitlabApp->makeVisible([
                 'client_secret',
                 'webhook_token',
@@ -108,8 +108,8 @@ class GitlabController extends Controller
                 ->orWhere('is_system_wide', true);
         })->get();
 
-        $gitlabApps = $gitlabApps->map(function ($app) {
-            return $this->removeSensitiveData($app);
+        $gitlabApps = $gitlabApps->map(function ($app) use ($teamId) {
+            return $this->removeSensitiveData($app, $teamId);
         });
 
         return response()->json($gitlabApps);
@@ -247,6 +247,10 @@ class GitlabController extends Controller
             ], 422);
         }
 
+        if (! isCloud() && $request->boolean('is_system_wide')) {
+            $this->authorize('makeSystemWide', GitlabApp::class);
+        }
+
         try {
             $htmlUrl = rtrim((string) $request->input('html_url'), '/');
             $apiUrl = filled($request->input('api_url'))
@@ -280,7 +284,7 @@ class GitlabController extends Controller
                 'gitlab_app_name' => $gitlabApp->name,
             ]);
 
-            return response()->json($this->removeSensitiveData($gitlabApp->fresh()), 201);
+            return response()->json($this->removeSensitiveData($gitlabApp->fresh(), $teamId), 201);
         } catch (\Throwable $e) {
             return handleError($e);
         }
@@ -420,6 +424,10 @@ class GitlabController extends Controller
                 ], 422);
             }
 
+            if (! isCloud() && filter_var($payload['is_system_wide'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $gitlabApp->is_system_wide) {
+                $this->authorize('makeSystemWide', GitlabApp::class);
+            }
+
             if (isset($payload['html_url'])) {
                 $payload['html_url'] = rtrim((string) $payload['html_url'], '/');
                 if (! filled($payload['api_url'] ?? null)) {
@@ -441,7 +449,7 @@ class GitlabController extends Controller
 
             return response()->json([
                 'message' => 'GitLab app updated successfully',
-                'data' => $this->removeSensitiveData($gitlabApp->fresh()),
+                'data' => $this->removeSensitiveData($gitlabApp->fresh(), $teamId),
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([

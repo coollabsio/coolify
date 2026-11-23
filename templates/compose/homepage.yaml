@@ -11,8 +11,10 @@ services:
     environment:
       - SERVICE_URL_HOMEPAGE_3000
       - HOMEPAGE_VAR_BASE=${SERVICE_URL_HOMEPAGE}
+      - HOMEPAGE_ALLOWED_HOSTS=${SERVICE_FQDN_HOMEPAGE}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Optional: uncomment to enable Docker integrations. Docker socket access gives full control of the host.
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./images:/app/public/images
 
       - type: bind

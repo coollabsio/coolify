@@ -100,3 +100,27 @@ test('subscriptionEnded is called for canceled status', function () {
     expect($this->subscription->stripe_invoice_paid)->toBeFalsy();
     expect($this->subscription->stripe_subscription_id)->toBeNull();
 });
+
+test('a row without a subscription ID is ended when the customer has only canceled subscriptions', function () {
+    $this->subscription->update(['stripe_subscription_id' => null]);
+
+    $mockStripe = Mockery::mock(StripeClient::class);
+    $mockSubscriptions = Mockery::mock(SubscriptionService::class);
+    $mockStripe->subscriptions = $mockSubscriptions;
+
+    // Stripe lists canceled subscriptions only with status "all".
+    $mockSubscriptions->shouldReceive('all')
+        ->with(Mockery::on(fn (array $parameters) => ($parameters['status'] ?? null) === 'all'))
+        ->andReturn((object) ['data' => [(object) ['id' => 'sub_gone', 'status' => 'canceled']]]);
+    $mockSubscriptions->shouldReceive('retrieve')->with('sub_gone')->andReturn((object) [
+        'status' => 'canceled',
+        'cancel_at_period_end' => false,
+    ]);
+
+    app()->bind(StripeClient::class, fn () => $mockStripe);
+
+    (new VerifyStripeSubscriptionStatusJob($this->subscription))->handle();
+
+    $this->subscription->refresh();
+    expect($this->subscription->stripe_invoice_paid)->toBeFalsy();
+});

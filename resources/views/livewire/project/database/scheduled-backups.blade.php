@@ -3,7 +3,7 @@
     backups: @js($database->scheduledBackups->map(fn ($backup) => [
         'name' => strtolower($database->name),
         'frequency' => strtolower($backup->frequency),
-        's3_storage' => strtolower($backup->s3?->name ?? ''),
+        's3_storage' => strtolower(($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name')->join(', ')),
     ])->values()),
     hasMatches() {
         const query = this.search.toLowerCase();
@@ -56,17 +56,18 @@
                 description="Create a schedule to start protecting this database."
                 icon-name="storages" />
         @else
-            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div class="data-table-header scheduled-backups-table-grid">
                     <span>Schedule</span>
                     <span>Latest run</span>
                     <span>S3 storage</span>
                     <span>Executions</span>
-                    <span class="text-right">Action</span>
+                    <span class="text-right">Actions</span>
                 </div>
                 @foreach ($database->scheduledBackups as $backup)
                     @php
                         $latestStatus = data_get($backup->latest_log, 'status');
+                        $s3StorageNames = ($backup->s3Storages->isNotEmpty() ? $backup->s3Storages : collect([$backup->s3])->filter())->pluck('name')->join(', ');
                         [$statusLabel, $statusType] = match ($latestStatus) {
                             'success' => ['Success', 'success'],
                             'running' => ['In progress', 'warning'],
@@ -83,12 +84,16 @@
                     <div x-show="search === ''
                         || @js(strtolower($database->name)).includes(search.toLowerCase())
                         || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
-                        || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())"
+                        || @js(strtolower($s3StorageNames)).includes(search.toLowerCase())"
                         class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
-                        <div class="min-w-0">
-                            <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <a {{ wireNavigate() }} href="{{ $backupRoute }}"
+                                class="block truncate text-[12px] font-semibold text-black hover:underline dark:text-fg">
                                 {{ $backup->frequency }}
-                            </span>
+                            </a>
+                            @unless ($backup->enabled)
+                                <x-status-badge status="Disabled" />
+                            @endunless
                         </div>
                         <div class="flex items-center gap-2">
                             <x-status-badge :status="$statusLabel" :type="$statusType" />
@@ -96,17 +101,20 @@
                                 <x-loading />
                             @endif
                         </div>
-                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
-                            {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
+                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim" title="{{ $backup->save_s3 ? $s3StorageNames : '' }}">
+                            {{ $backup->save_s3 ? ($s3StorageNames ?: 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            <a wire:navigate href="{{ $backupExecutionsRoute }}"
+                            <a {{ wireNavigate() }} href="{{ $backupExecutionsRoute }}"
                                 class="font-medium hover:underline hover:text-black dark:hover:text-fg">
                                 {{ $backup->executions_count ?? $backup->executions()->count() }}
                             </a>
                         </div>
                         <div class="flex justify-end">
-                            <a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>
+                            <a class="icon-button" {{ wireNavigate() }} href="{{ $backupRoute }}"
+                                title="Manage backup schedule" aria-label="Manage backup schedule">
+                                <x-reicon name="settings" class="size-3.5" />
+                            </a>
                         </div>
                     </div>
                 @endforeach

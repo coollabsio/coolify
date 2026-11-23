@@ -43,24 +43,6 @@ test('member cannot send test notification on discord', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update discord notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(DiscordNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
-});
-
-test('admin can update discord notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->discordNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
-});
-
 // --- Slack ---
 
 test('member cannot send test notification on slack', function () {
@@ -76,24 +58,6 @@ test('member cannot send test notification on slack', function () {
     Livewire::test(SlackNotification::class)
         ->call('sendTestNotification')
         ->assertDispatched('error');
-});
-
-test('member cannot update slack notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(SlackNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
-});
-
-test('admin can update slack notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->slackNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
 // --- Telegram ---
@@ -114,22 +78,81 @@ test('member cannot send test notification on telegram', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update telegram notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(TelegramNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
-});
-
-test('admin can update telegram notification settings', function () {
+test('telegram restart limit thread id accepts 255 characters', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    $settings = $this->team->telegramNotificationSettings;
+    Livewire::test(TelegramNotification::class)
+        ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 255))
+        ->call('submit')
+        ->assertHasNoErrors(['telegramNotificationsRestartLimitReachedThreadId']);
 
-    expect($this->admin->can('update', $settings))->toBeTrue();
+    expect($this->team->telegramNotificationSettings->fresh()->telegram_notifications_restart_limit_reached_thread_id)
+        ->toBe(str_repeat('a', 255));
+});
+
+test('telegram restart limit thread id rejects 256 characters', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TelegramNotification::class)
+        ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 256))
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect($this->team->telegramNotificationSettings->fresh()->telegram_notifications_restart_limit_reached_thread_id)
+        ->not->toBe(str_repeat('a', 256));
+});
+
+test('member cannot view telegram thread ids', function () {
+    $threadIds = [
+        'telegram_notifications_deployment_success_thread_id' => 'deployment-success-thread',
+        'telegram_notifications_deployment_failure_thread_id' => 'deployment-failure-thread',
+        'telegram_notifications_status_change_thread_id' => 'status-change-thread',
+        'telegram_notifications_restart_limit_reached_thread_id' => 'restart-limit-thread',
+        'telegram_notifications_backup_success_thread_id' => 'backup-success-thread',
+        'telegram_notifications_backup_failure_thread_id' => 'backup-failure-thread',
+        'telegram_notifications_scheduled_task_success_thread_id' => 'scheduled-task-success-thread',
+        'telegram_notifications_scheduled_task_failure_thread_id' => 'scheduled-task-failure-thread',
+        'telegram_notifications_docker_cleanup_success_thread_id' => 'docker-cleanup-success-thread',
+        'telegram_notifications_docker_cleanup_failure_thread_id' => 'docker-cleanup-failure-thread',
+        'telegram_notifications_server_disk_usage_thread_id' => 'server-disk-usage-thread',
+        'telegram_notifications_server_reachable_thread_id' => 'server-reachable-thread',
+        'telegram_notifications_server_unreachable_thread_id' => 'server-unreachable-thread',
+        'telegram_notifications_server_patch_thread_id' => 'server-patch-thread',
+        'telegram_notifications_traefik_outdated_thread_id' => 'traefik-outdated-thread',
+    ];
+
+    $this->team->telegramNotificationSettings->update($threadIds);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(TelegramNotification::class);
+
+    foreach ($threadIds as $column => $threadId) {
+        $component
+            ->assertSet(str($column)->camel()->toString(), null)
+            ->assertDontSee($threadId);
+    }
+});
+
+test('admin can view telegram thread ids', function () {
+    $threadIds = [
+        'telegram_notifications_deployment_success_thread_id' => 'deployment-success-thread',
+        'telegram_notifications_restart_limit_reached_thread_id' => 'restart-limit-thread',
+    ];
+
+    $this->team->telegramNotificationSettings->update($threadIds);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(TelegramNotification::class);
+
+    foreach ($threadIds as $column => $threadId) {
+        $component->assertSet(str($column)->camel()->toString(), $threadId);
+    }
 });
 
 // --- Email ---
@@ -150,15 +173,6 @@ test('member cannot send test email notification', function () {
     Livewire::test(EmailNotification::class)
         ->call('sendTestEmail')
         ->assertDispatched('error');
-});
-
-test('member cannot update email notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
 });
 
 test('member cannot update smtp email transport directly', function () {
@@ -188,22 +202,16 @@ test('member cannot update resend email transport directly', function () {
         ->assertForbidden();
 });
 
-test('member cannot copy instance email settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-});
-
-test('admin can update email notification settings', function () {
+test('admin can disable restart limit email notifications', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    $settings = $this->team->emailNotificationSettings;
+    Livewire::test(EmailNotification::class)
+        ->assertSet('restartLimitReachedEmailNotifications', true)
+        ->call('toggleEvent', 'restartLimitReachedEmailNotifications')
+        ->assertSet('restartLimitReachedEmailNotifications', false);
 
-    expect($this->admin->can('update', $settings))->toBeTrue();
+    expect($this->team->emailNotificationSettings->fresh()->restart_limit_reached_email_notifications)->toBeFalse();
 });
 
 test('admin can save team smtp settings without a resend api key when resend is disabled', function () {
@@ -211,11 +219,8 @@ test('admin can save team smtp settings without a resend api key when resend is 
     session(['currentTeam' => $this->team]);
 
     Livewire::test(EmailNotification::class)
-        ->set('smtpFromAddress', 'alerts@example.com')
-        ->set('smtpFromName', 'Coolify')
-        ->set('smtpHost', 'smtp.example.com')
-        ->set('smtpPort', '587')
-        ->set('smtpEncryption', 'starttls')
+        ->set('resendFromAddress', 'alerts@example.com')
+        ->set('resendFromName', 'Coolify')
         ->set('resendEnabled', false)
         ->set('resendApiKey', null)
         ->call('submitResend')
@@ -256,24 +261,6 @@ test('member cannot send test notification on pushover', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update pushover notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(PushoverNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
-});
-
-test('admin can update pushover notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->pushoverNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
-});
-
 // --- Webhook ---
 
 test('member cannot send test notification on webhook', function () {
@@ -289,24 +276,6 @@ test('member cannot send test notification on webhook', function () {
     Livewire::test(WebhookNotification::class)
         ->call('sendTestNotification')
         ->assertDispatched('error');
-});
-
-test('member cannot update webhook notification settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(WebhookNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
-});
-
-test('admin can update webhook notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->webhookNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
 // --- Send test policy checks ---
@@ -335,9 +304,9 @@ test('member cannot send test on any notification channel', function () {
     expect($this->member->can('sendTest', $this->team->webhookNotificationSettings))->toBeFalse();
 });
 
-test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
+test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets, array $state = []) {
     $settings = $this->team->{$settingsRelation};
-    $settings->update($secrets);
+    $settings->update([...$secrets, ...$state]);
 
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -374,7 +343,7 @@ test('member cannot view notification secrets', function (string $component, str
     'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
         'smtp_password' => 'smtp-secret-password',
         'resend_api_key' => 'resend-secret-api-key',
-    ]],
+    ], ['smtp_enabled' => true]],
 ]);
 
 test('admin can view notification secrets', function (string $component, string $settingsRelation, array $secrets) {

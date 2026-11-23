@@ -77,6 +77,47 @@ it('reports noindex domain changes as requiring a redeploy', function () {
         ->and($change['impact'])->toBe('redeploy');
 });
 
+it('reports domain port-only changes as requiring a redeploy', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com',
+        'domain_port_overrides' => ['https://app.example.com' => 3000],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => ['https://app.example.com' => 8080],
+    ]);
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('key', 'domains.domain_port_overrides');
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($change)->not->toBeNull()
+        ->and($change['impact'])->toBe('redeploy');
+});
+
+it('keeps application deployment snapshots stable when port overrides are reordered', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://two.example.com' => 8080,
+            'https://one.example.com' => 3000,
+        ],
+    ]);
+
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});
+
 it('does not flag applications whose older snapshot omitted noindex domains', function () {
     $application = configurationChangedTestApplication([
         'fqdn' => 'https://app.example.com',
@@ -94,13 +135,12 @@ it('does not flag applications whose older snapshot omitted noindex domains', fu
     expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
 });
 
-it('checks legacy preview deployment configuration hash using preview environment variable query', function () {
+it('does not report changes for applications deployed before configuration snapshots existed', function () {
     $application = configurationChangedTestApplication();
 
     EnvironmentVariable::create([
-        'key' => 'APP_ENV',
-        'value' => 'preview',
-        'is_preview' => true,
+        'key' => 'APP_SECRET',
+        'value' => 'secret',
         'is_multiline' => false,
         'is_literal' => false,
         'is_buildtime' => true,
@@ -109,29 +149,28 @@ it('checks legacy preview deployment configuration hash using preview environmen
         'resourceable_id' => $application->id,
     ]);
 
-    $application->forceFill([
-        'config_hash' => 'legacy-hash',
-        'pull_request_id' => 123,
-    ]);
+    configurationChangedDeployment($application);
+    $application->forceFill(['config_hash' => md5('hash written by an older Coolify version')])->save();
 
-    $diff = $application->pendingDeploymentConfigurationDiff();
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
 
-    expect($diff->isChanged())->toBeTrue()
-        ->and($diff->count())->toBeGreaterThan(0);
+    expect($diff->isChanged())->toBeFalse()
+        ->and($diff->count())->toBe(0)
+        ->and($diff->isLegacyFallback())->toBeTrue()
+        ->and($diff->requiresBuild())->toBeTrue();
 });
 
-it('falls back to real diff against empty snapshot when no deployment snapshot exists', function () {
+it('compares with the deployment snapshot once an application without one is deployed again', function () {
     $application = configurationChangedTestApplication();
-    $application->isConfigurationChanged(save: true);
+    configurationChangedDeployment($application);
+    $application->forceFill(['config_hash' => md5('hash written by an older Coolify version')])->save();
 
-    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
-
+    $application->markDeploymentConfigurationApplied(configurationChangedDeployment($application));
     $application->update(['build_command' => 'pnpm build']);
 
     $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
 
-    expect($diff->isChanged())->toBeTrue()
-        ->and($diff->isLegacyFallback())->toBeFalse()
-        ->and($diff->count())->toBeGreaterThan(0)
-        ->and(collect($diff->changes())->pluck('label')->toArray())->toContain('Build command');
+    expect($diff->isLegacyFallback())->toBeFalse()
+        ->and(collect($diff->changes())->pluck('label')->all())->toBe(['Build command'])
+        ->and($diff->requiresBuild())->toBeTrue();
 });

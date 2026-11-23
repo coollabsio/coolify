@@ -25,18 +25,7 @@ class InstallDocker
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-            $base64Cert = base64_encode($serverCert->ssl_certificate);
-
-            $commands = collect([
-                "mkdir -p $caCertPath",
-                "chown -R 9999:root $caCertPath",
-                "chmod -R 700 $caCertPath",
-                "rm -rf $caCertPath/coolify-ca.crt",
-                "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-                "chmod 644 $caCertPath/coolify-ca.crt",
-            ]);
+            $commands = SslHelper::caCertificateFileCommands($serverCert->ssl_certificate);
             remote_process($commands, $server);
         }
 
@@ -118,16 +107,40 @@ class InstallDocker
     {
         return 'curl -fsSL https://get.docker.com | sh || ('.
             '. /etc/os-release && '.
+            'DOCKER_CODENAME="${UBUNTU_CODENAME:-$VERSION_CODENAME}" && '.
+            // Docker has no repository for Ubuntu derivatives (Pop!_OS, Linux Mint) and none for Raspbian Trixie.
+            'case "$ID:$DOCKER_CODENAME: $ID_LIKE " in raspbian:trixie:*) DOCKER_REPO=debian ;; *" ubuntu "*) DOCKER_REPO=ubuntu ;; *) DOCKER_REPO=$ID ;; esac && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
-            'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
+            'curl -fsSL https://download.docker.com/linux/${DOCKER_REPO}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${DOCKER_REPO} ${DOCKER_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
     }
 
+    /**
+     * Amazon Linux is not supported by get.docker.com or the CentOS repo, so use its own docker package.
+     * validateOS() returns the whole RHEL family group, so check the real distro ID at runtime.
+     */
     private function getRhelDockerInstallCommand(): string
+    {
+        return 'if (. /etc/os-release && [ "$ID" = "amzn" ]); then '.
+            $this->getAmazonLinuxDockerInstallCommand().
+            '; else '.
+            $this->getRhelDockerCeInstallCommand().
+            '; fi';
+    }
+
+    private function getAmazonLinuxDockerInstallCommand(): string
+    {
+        return 'dnf install -y docker && '.
+            'mkdir -p /usr/local/lib/docker/cli-plugins && '.
+            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && '.
+            'chmod +x /usr/local/lib/docker/cli-plugins/docker-compose';
+    }
+
+    private function getRhelDockerCeInstallCommand(): string
     {
         return 'curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.

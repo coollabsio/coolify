@@ -14,7 +14,9 @@
         <template x-if="!isMultiline">
             <div wire:key="env-value-input">
                 <x-forms.env-var-input placeholder="production" id="value" label="Value" required
+                    canGate="manageEnvironment" :canResource="$resource"
                     :availableVars="$shared ? [] : $this->availableSharedVariables"
+                    :hasVaultSource="$this->hasSecretManagerSource()"
                     :projectUuid="data_get($parameters, 'project_uuid')"
                     :environmentUuid="data_get($parameters, 'environment_uuid')"
                     :serverUuid="data_get($parameters, 'server_uuid')" />
@@ -23,7 +25,7 @@
         @if (!$shared)
             <div x-cloak x-show="!isMultiline" wire:key="env-value-tip"
                 class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
-                Tip: Type <span class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference a
+                Tip: Type <span class="font-mono text-coollabs dark:text-brand-light">{{ '{{' }}</span> to reference a
                 shared environment variable
             </div>
         @endif
@@ -49,6 +51,13 @@
                 ['value' => true, 'label' => 'Available in the container'],
                 ['value' => false, 'label' => 'Not available in the container'],
             ]" helper="Make this variable available in the running container at runtime." />
+            @if ($canLeavePreviewValueEmpty)
+                <x-forms.listbox id="copy_value_to_preview" label="Preview value" :options="[
+                    ['value' => true, 'label' => 'Copy production value'],
+                    ['value' => false, 'label' => 'Leave empty'],
+                ]"
+                    helper="Coolify also adds this variable to Preview Deployments. Copy production value gives the preview the same value. Leave empty adds only the name, so previews do not get this production value and you can give them their own value." />
+            @endif
         @endif
     </div>
 

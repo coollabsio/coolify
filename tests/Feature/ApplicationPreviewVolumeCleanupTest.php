@@ -1,0 +1,166 @@
+<?php
+
+use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
+
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $privateKey->id,
+        'user' => 'deploy',
+    ]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = $project->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $project->id]);
+
+    $this->application = Application::factory()->create([
+        'build_pack' => 'dockerfile',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $this->preview = ApplicationPreview::create([
+        'uuid' => 'preview-volume-cleanup-test',
+        'application_id' => $this->application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/example/repository/pull/42',
+    ]);
+});
+
+it('deletes only named volumes that have the preview suffix enabled', function () {
+    $this->application->persistentStorages()->create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    $this->application->persistentStorages()->create([
+        'name' => 'shared-cache',
+        'mount_path' => '/cache',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => false,
+    ]);
+    $this->application->persistentStorages()->create([
+        'name' => 'seed-data',
+        'mount_path' => '/seed',
+        'host_path' => '/srv/seed',
+        'is_preview_suffix_enabled' => true,
+    ]);
+    Process::fake(['*' => Process::result(output: '')]);
+
+    $this->preview->forceDelete();
+
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'docker volume rm'), 1);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'app-data-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo docker volume rm -f 'app-data-pr-42'"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'shared-cache'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'seed-data'));
+});
+
+it('reports Docker volume removal failures and keeps the preview record', function () {
+    $this->application->persistentStorages()->create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    Process::fake(['*' => Process::result(errorOutput: 'volume is in use', exitCode: 1)]);
+
+    expect(fn () => $this->preview->forceDelete())
+        ->toThrow(RuntimeException::class, 'volume is in use');
+
+    expect(ApplicationPreview::find($this->preview->id))->not->toBeNull();
+});
+
+it('continues removing preview volumes when an earlier volume is already absent', function () {
+    $this->application->persistentStorages()->create([
+        'name' => 'already-removed',
+        'mount_path' => '/removed',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    $this->application->persistentStorages()->create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    Process::fake(function ($process) {
+        if (str_contains(remoteProcessScript($process), "docker volume rm -f 'already-removed-pr-42'")) {
+            return Process::result(
+                errorOutput: 'Error response from daemon: volume already-removed-pr-42 not found',
+                exitCode: 1,
+            );
+        }
+
+        return Process::result(output: 'app-data-pr-42');
+    });
+
+    $this->preview->forceDelete();
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'already-removed-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f 'app-data-pr-42'"));
+    expect(ApplicationPreview::find($this->preview->id))->toBeNull();
+});
+
+it('deletes the persistent storage records of a docker compose preview', function () {
+    Queue::fake();
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '5',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx:alpine
+    volumes:
+      - files:/app/files
+      - db:/var/lib/mysql
+volumes:
+  files:
+  db:
+YAML,
+    ]);
+    $this->application->refresh();
+    $uuid = $this->application->uuid;
+
+    // Deploying the application, this preview and another preview creates the storage records
+    $this->application->parse();
+    $this->application->parse(pull_request_id: 42);
+    $this->application->parse(pull_request_id: 43);
+    expect($this->application->persistentStorages()->pluck('name')->sort()->values()->all())->toBe([
+        "{$uuid}_db",
+        "{$uuid}_db-pr-42",
+        "{$uuid}_db-pr-43",
+        "{$uuid}_files",
+        "{$uuid}_files-pr-42",
+        "{$uuid}_files-pr-43",
+    ]);
+    Process::fake(['*' => Process::result(output: '')]);
+
+    $this->preview->forceDelete();
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "docker volume rm -f '{$uuid}_db-pr-42'"));
+    expect($this->application->persistentStorages()->pluck('name')->sort()->values()->all())->toBe([
+        "{$uuid}_db",
+        "{$uuid}_db-pr-43",
+        "{$uuid}_files",
+        "{$uuid}_files-pr-43",
+    ]);
+});

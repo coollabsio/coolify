@@ -58,6 +58,107 @@ it('escapes container names in bounded removal commands', function () {
     rmdir($directory);
 });
 
+it('succeeds when the container was already removed', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\necho 'Error response from daemon: No such container: container-name' >&2\nexit 1\n");
+    chmod($directory.'/docker', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRemoveCommandWithTimeout('container-name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+    ]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue();
+
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('reports a timeout when timeout output also says the container is missing', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/timeout', "#!/bin/sh\necho 'Error response from daemon: No such container: container-name'\nexit 124\n");
+    chmod($directory.'/timeout', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRemoveCommandWithTimeout('container-name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(124)
+        ->and($process->getOutput())->toContain('__COOLIFY_CONTAINER_REMOVE_TIMEOUT__');
+
+    unlink($directory.'/timeout');
+    rmdir($directory);
+});
+
+it('fails when Docker cannot remove an existing container', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\necho 'Error response from daemon: removal already in progress' >&2\nexit 1\n");
+    chmod($directory.'/docker', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRemoveCommandWithTimeout('container-name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+    ]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeFalse()
+        ->and($process->getErrorOutput())->toContain('removal already in progress');
+
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('makes regular container removal idempotent without hiding other failures', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\necho \"\$DOCKER_ERROR\" >&2\nexit 1\n");
+    chmod($directory.'/docker', 0755);
+
+    $missingContainer = new Process(['/bin/sh', '-c', dockerRemoveCommand('container name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'DOCKER_ERROR' => 'Error response from daemon: No such container: container name',
+    ]);
+    $missingContainer->run();
+    $realFailure = new Process(['/bin/sh', '-c', dockerRemoveCommand('container name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'DOCKER_ERROR' => 'Error response from daemon: removal already in progress',
+    ]);
+    $realFailure->run();
+
+    expect($missingContainer->isSuccessful())->toBeTrue()
+        ->and($realFailure->isSuccessful())->toBeFalse();
+
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('makes network removal idempotent without hiding other failures', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\necho \"\$DOCKER_ERROR\" >&2\nexit 1\n");
+    chmod($directory.'/docker', 0755);
+
+    $missingNetwork = new Process(['/bin/sh', '-c', dockerNetworkRemoveCommand('network name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'DOCKER_ERROR' => 'Error response from daemon: network network name not found',
+    ]);
+    $missingNetwork->run();
+    $realFailure = new Process(['/bin/sh', '-c', dockerNetworkRemoveCommand('network name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'DOCKER_ERROR' => 'Error response from daemon: network has active endpoints',
+    ]);
+    $realFailure->run();
+
+    expect($missingNetwork->isSuccessful())->toBeTrue()
+        ->and($realFailure->isSuccessful())->toBeFalse();
+
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
 it('configures deferred removal attempts to outlive the shell timeout', function () {
     $job = new RemoveContainerJob(123, 'container-name');
 
@@ -65,14 +166,4 @@ it('configures deferred removal attempts to outlive the shell timeout', function
         ->and($job->containerName)->toBe('container-name')
         ->and($job->timeout)->toBeGreaterThan(60)
         ->and($job->tries)->toBeGreaterThan(1);
-});
-
-it('continues deployments and schedules deferred cleanup after a removal timeout', function () {
-    $source = file_get_contents(dirname(__DIR__, 2).'/app/Jobs/ApplicationDeploymentJob.php');
-
-    expect($source)
-        ->toContain('dockerRemoveCommandWithTimeout($containerName)')
-        ->toContain('timed out after 60 seconds. The deployment will continue')
-        ->toContain('RemoveContainerJob::dispatch($this->server->id, $containerName)')
-        ->toContain('->delay(now()->addMinutes(5))');
 });

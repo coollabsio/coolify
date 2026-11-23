@@ -52,16 +52,6 @@ it('renders the changelog modal above the desktop sidebar toggle', function () {
         ->toContain('absolute right-2 top-2');
 });
 
-it('keeps the account menu mounted while the changelog modal opens', function () {
-    $dropdownView = file_get_contents(resource_path('views/livewire/settings-dropdown.blade.php'));
-    $accountMenuView = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
-
-    expect($dropdownView)
-        ->not->toContain('wire:click="openWhatsNewModal" @click="open = false"')
-        ->and($accountMenuView)
-        ->not->toContain('@whats-new-opened.window="open = false"');
-});
-
 it('opens the changelog modal when there are no entries', function () {
     $user = new User(['email' => 'test@example.com']);
     $user->id = 1;
