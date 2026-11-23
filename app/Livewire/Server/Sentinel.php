@@ -31,6 +31,8 @@ class Sentinel extends Component
 
     public bool $isContainerLogArchiveEnabled = true;
 
+    public bool $isSentinelPullEnabled = false;
+
     public ?string $sentinelCustomDockerImage = null;
 
     #[Validate(['required', 'integer', 'min:1', 'max:1024'])]
@@ -73,6 +75,7 @@ class Sentinel extends Component
             $this->server->settings->log_archive_max_file_mb = $this->logArchiveMaxFileMb;
             $this->server->settings->log_archive_max_total_mb = $this->logArchiveMaxTotalMb;
             $this->server->settings->log_archive_retention_days = $this->logArchiveRetentionDays;
+            $this->server->settings->is_sentinel_pull_enabled = $this->isSentinelPullEnabled;
             $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
 
@@ -86,6 +89,7 @@ class Sentinel extends Component
             $this->logArchiveMaxFileMb = $this->server->settings->log_archive_max_file_mb;
             $this->logArchiveMaxTotalMb = $this->server->settings->log_archive_max_total_mb;
             $this->logArchiveRetentionDays = $this->server->settings->log_archive_retention_days;
+            $this->isSentinelPullEnabled = $this->server->settings->is_sentinel_pull_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->sentinelStatus = $this->server->sentinelStatus();
         }
@@ -224,10 +228,11 @@ class Sentinel extends Component
     /**
      * Sentinel sends its token in the Authorization header of every push. Over plain HTTP the token
      * is readable on the network. Only the known local internal endpoint stays on the coolify Docker network.
+     * In pull mode Sentinel does not push, so the URL is not used.
      */
     public function isPushUrlInsecure(): bool
     {
-        if (($this->server->isLocalhost() && $this->sentinelCustomUrl === 'http://coolify:8080') || ! str_starts_with(strtolower((string) $this->sentinelCustomUrl), 'http://')) {
+        if ($this->isSentinelPullEnabled || ($this->server->isLocalhost() && $this->sentinelCustomUrl === 'http://coolify:8080') || ! str_starts_with(strtolower((string) $this->sentinelCustomUrl), 'http://')) {
             return false;
         }
 

@@ -233,6 +233,14 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             CheckAndStartSentinelJob::dispatch($server);
         }
 
+        if ($server->settings->is_sentinel_pull_enabled
+            && $server->isSentinelEnabled()
+            && $server->isFunctional()
+            && Cache::add(self::sentinelPullDueCacheKey($server), true, self::sentinelPullSpacingSeconds($server))
+        ) {
+            PullSentinelReportJob::dispatch($server);
+        }
+
         // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
         // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
         if ($sentinelOutOfSync) {
@@ -292,6 +300,22 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     public static function autoSecurityUpdatesCheckCron(Server $server): string
     {
         return sprintf('%d * * * *', ($server->id + 30) % 60);
+    }
+
+    /**
+     * Pull mode reads one report per push interval. This job runs once a minute, so a shorter interval
+     * pulls once a minute. The 10 seconds of slack keep a 60 second interval from skipping a run when
+     * this job starts a little early.
+     */
+    public static function sentinelPullSpacingSeconds(Server $server): int
+    {
+        return max(60, (int) $server->settings->sentinel_push_interval_seconds) - 10;
+    }
+
+    /** Set while the next scheduled pull is not due yet. */
+    public static function sentinelPullDueCacheKey(Server $server): string
+    {
+        return "sentinel:pull-due:{$server->id}";
     }
 
     /**

@@ -14065,6 +14065,7 @@ paths:
                   sentinel_metrics_history_days: { type: integer }
                   sentinel_push_interval_seconds: { type: integer }
                   sentinel_custom_url: { description: 'Only present with read:sensitive.', type: string }
+                  is_sentinel_pull_enabled: { description: 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them to the Coolify URL.', type: boolean }
                   sentinel_updated_at: { type: [string, 'null'] }
                   traffic_topn: { type: integer }
                   traffic_sample_threshold: { type: integer }
@@ -14125,6 +14126,9 @@ paths:
                   minimum: 10
                 sentinel_custom_url:
                   type: [string, 'null']
+                is_sentinel_pull_enabled:
+                  description: 'Coolify reads Sentinel reports over SSH. Use it when the server cannot reach Coolify. Restarts Sentinel.'
+                  type: boolean
                 traffic_topn:
                   type: integer
                   maximum: 1000
@@ -20576,6 +20580,9 @@ components:
           description: 'SHA256 fingerprints of the host key that did not match.'
         is_sentinel_enabled:
           type: boolean
+        is_sentinel_pull_enabled:
+          type: boolean
+          description: 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'
         is_swarm_manager:
           type: boolean
         is_swarm_worker:
