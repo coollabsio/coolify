@@ -595,7 +595,8 @@ class Application extends BaseModel
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
-        if (str($workdir)->endsWith($this->uuid)) {
+        // A uuid such as ".." would point the folder at its parent.
+        if (preg_match('/\A[a-zA-Z0-9_-]+\z/', (string) $this->uuid) === 1) {
             $workdirs = $this->previews()->withTrashed()->pluck('pull_request_id')
                 ->map(fn (int $pullRequestId): string => $this->deploymentWorkdir($pullRequestId))
                 ->prepend($workdir)

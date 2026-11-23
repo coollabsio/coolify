@@ -54,3 +54,11 @@ it('deletes the preview folders when the application configuration is deleted', 
         'rm -rf '.escapeshellarg($mainDirectory).' '.escapeshellarg($mainDirectory.'-pr-7')
     ));
 });
+
+it('does not delete any folder when the application uuid is not a plain name', function (string $uuid) {
+    $this->application->uuid = $uuid;
+
+    $this->application->deleteConfigurations();
+
+    Process::assertDidntRun(fn ($process) => str_contains((string) $process->input, 'rm -rf'));
+})->with(['..', '.', '', 'abc/..', 'abc def']);
