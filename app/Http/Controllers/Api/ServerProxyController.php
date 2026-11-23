@@ -94,7 +94,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true, example: 'running'),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true, example: 'https://example.com'),
-                        new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], example: 404, description: 'Status of the catch-all for hosts that no resource on the server uses. The domains of resources on the server get 503 while the resource is down.'),
+                        new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], example: 404, description: 'Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.'),
                         new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean', example: false),
                         new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, example: 'letsencrypt', description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'),
@@ -141,7 +141,7 @@ class ServerProxyController extends Controller
                 properties: [
                     new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                     new OA\Property(property: 'redirect_url', type: 'string', nullable: true, description: 'Public http(s) redirect URL, or null to clear.'),
-                    new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], description: 'Status of the catch-all for hosts that no resource on the server uses (when redirect_url is empty). The domains of resources on the server get 503 while the resource is down.'),
+                    new OA\Property(property: 'unknown_host_status', type: 'integer', enum: [404, 503], description: 'Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.'),
                     new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true, description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'),
                     new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                     new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'),

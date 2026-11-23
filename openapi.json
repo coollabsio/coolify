@@ -20766,7 +20766,7 @@
                                             "example": "https:\/\/example.com"
                                         },
                                         "unknown_host_status": {
-                                            "description": "Status of the catch-all for hosts that no resource on the server uses. The domains of resources on the server get 503 while the resource is down.",
+                                            "description": "Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
                                             "type": "integer",
                                             "example": 404,
                                             "enum": [
@@ -20856,7 +20856,7 @@
                                         ]
                                     },
                                     "unknown_host_status": {
-                                        "description": "Status of the catch-all for hosts that no resource on the server uses (when redirect_url is empty). The domains of resources on the server get 503 while the resource is down.",
+                                        "description": "Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
                                         "type": "integer",
                                         "enum": [
                                             404,
