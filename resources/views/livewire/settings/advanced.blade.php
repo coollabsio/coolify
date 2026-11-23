@@ -206,7 +206,7 @@
                     </x-callout>
                 </x-application.settings-subsection>
                 <x-application.settings-subsection id="upload-storage-section" title="Uploads"
-                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Uploads through the API still go to this instance.">
+                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Database imports through the API still go to this instance. Static site archives through the API use POST /api/v1/applications/archive/uploads/s3.">
                     <div class="flex max-w-md flex-col gap-4">
                         <x-forms.listbox id="upload_storage" label="Upload storage" onChange="instantSave"
                             :options="[
