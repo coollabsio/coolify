@@ -92,27 +92,24 @@
                         </div>
                         <div class="flex items-center justify-end gap-1">
                             @unless ($isCurrent)
-                                <button type="button" class="icon-button shrink-0" title="Compare with current"
-                                    aria-label="Compare version {{ substr($version->hash, 0, 8) }} with the current configuration"
-                                    @click="openDiff(@js($version->uuid))">
-                                    <x-reicon name="compare" class="size-3.5" />
-                                </button>
-                                <x-modal-confirmation title="Restore Proxy Configuration?"
-                                    submitAction="restoreConfigurationVersion('{{ $version->uuid }}')" :actions="[
-                                        'Save the version from ' . $version->created_at->format('Y-m-d H:i') . ' as the current proxy configuration.',
-                                        'The current configuration stays in the history.',
-                                        'Restart the proxy to apply it.',
-                                    ]"
-                                    warningMessage="The proxy uses the restored configuration after the next restart. You can restore the current configuration again from this history."
-                                    step2ButtonText="Restore Configuration" :confirmWithText="false"
-                                    :confirmWithPassword="false">
-                                    <x-slot:trigger>
-                                        <button type="button" class="icon-button shrink-0" title="Restore"
-                                            aria-label="Restore version {{ substr($version->hash, 0, 8) }}">
-                                            <x-reicon name="time-back" class="size-3.5" />
-                                        </button>
-                                    </x-slot:trigger>
-                                </x-modal-confirmation>
+                                <x-table.row-actions label="Version actions">
+                                    <x-table.row-action @click="openDiff('{{ $version->uuid }}')">
+                                        Compare with current
+                                    </x-table.row-action>
+                                    <x-modal-confirmation title="Restore Proxy Configuration?" buttonFullWidth
+                                        submitAction="restoreConfigurationVersion('{{ $version->uuid }}')" :actions="[
+                                            'Save the version from ' . $version->created_at->format('Y-m-d H:i') . ' as the current proxy configuration.',
+                                            'The current configuration stays in the history.',
+                                            'Restart the proxy to apply it.',
+                                        ]"
+                                        warningMessage="The proxy uses the restored configuration after the next restart. You can restore the current configuration again from this history."
+                                        step2ButtonText="Restore Configuration" :confirmWithText="false"
+                                        :confirmWithPassword="false">
+                                        <x-slot:trigger>
+                                            <x-table.row-action>Restore</x-table.row-action>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                </x-table.row-actions>
                             @endunless
                         </div>
                     </div>
