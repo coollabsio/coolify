@@ -765,17 +765,16 @@ class Server extends BaseModel
             "# Disable the default redirect to customize (only if you know what are you doing).\n\n";
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
-        if ($proxy_type === ProxyTypes::TRAEFIK->value) {
-            $default_redirect_file = "$dynamic_conf_path/default_redirect_404.yaml";
-        } elseif ($proxy_type === ProxyTypes::CADDY->value) {
-            $default_redirect_file = "$dynamic_conf_path/default_redirect_404.caddy";
-        }
+        // The file is named after the status, so servers that keep the legacy 503 keep their file.
+        $status = $this->unknownHostStatus();
+        $otherStatus = $status === 404 ? 503 : 404;
+        $extension = $proxy_type === ProxyTypes::CADDY->value ? 'caddy' : 'yaml';
+        $default_redirect_file = "$dynamic_conf_path/default_redirect_$status.$extension";
 
-        // Older Coolify versions wrote a catch-all with a 503 status to these files.
         instant_remote_process([
             "mkdir -p $dynamic_conf_path",
-            "rm -f $dynamic_conf_path/default_redirect_503.yaml",
-            "rm -f $dynamic_conf_path/default_redirect_503.caddy",
+            "rm -f $dynamic_conf_path/default_redirect_$otherStatus.yaml",
+            "rm -f $dynamic_conf_path/default_redirect_$otherStatus.caddy",
         ], $this);
         // The error page container must run before the catch-all points to it.
         $this->setupProxyErrorPageContainer();
@@ -802,13 +801,15 @@ class Server extends BaseModel
     }
 
     /**
-     * Whether the catch-all on the running Traefik or Caddy proxy is outdated: an older Coolify
-     * version wrote it, or a resource domain was added or removed after it was written.
+     * Whether the catch-all on the running Traefik or Caddy proxy is outdated: the status was saved
+     * in another Coolify version, or a resource domain was added or removed after it was written.
      * Claims the refresh for 10 minutes, so that the frequent server checks queue only one.
      */
     public function claimOutdatedDefaultRedirectRefresh(): bool
     {
-        if (! in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+        // Servers from before the 404 option keep their catch-all until the status is saved.
+        if ($this->proxy->get('unknown_host_status') === null
+            || ! in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
             return false;
         }
 

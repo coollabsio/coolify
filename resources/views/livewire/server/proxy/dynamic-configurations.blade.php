@@ -39,6 +39,8 @@
                                     'coolify.caddy',
                                     'default_redirect_404.yaml',
                                     'default_redirect_404.caddy',
+                                    'default_redirect_503.yaml',
+                                    'default_redirect_503.caddy',
                                 ]);
                             @endphp
                             <x-application.settings-section :title="$displayName"

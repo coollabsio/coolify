@@ -10,4 +10,4 @@ A `Status for unknown hosts` setting on the proxy page, so that the proxy can an
 - The API has the `unknown_host_status` field (404 or 503) on `GET` and `PATCH /api/v1/servers/{uuid}/proxy`
 - The error page has a 404 version and a 503 version. A custom error page is used for both
 - With 404, Coolify writes the catch-all again on the next server check when a resource domain is added or removed
-- The catch-all file is now `default_redirect_404.yaml` or `default_redirect_404.caddy`. Coolify removes the old `default_redirect_503` file on the next server check after the upgrade
+- The name of the catch-all file follows the status: `default_redirect_404.yaml` or `.caddy` for 404, and `default_redirect_503.yaml` or `.caddy` for 503. Existing servers keep their file until the status is changed
