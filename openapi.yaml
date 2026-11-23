@@ -71,9 +71,9 @@ paths:
               properties:
                 pull_request_id:
                   type: integer
+                  example: 42
                   maximum: 2147483647
                   minimum: 1
-                  example: 42
                 pull_request_html_url:
                   type: [string, 'null']
                   example: 'https://github.com/org/repo/pull/42'
@@ -8246,8 +8246,8 @@ paths:
                 network:
                   description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'
                   type: string
-                  maxLength: 255
                   pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+                  maxLength: 255
                 type:
                   type: string
                   enum: [standalone, swarm]
@@ -10584,6 +10584,36 @@ paths:
       summary: 'Export coolify.json'
       description: 'Export an environment as a coolify.json file. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
       operationId: export-environment-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The coolify.json file.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token cannot read sensitive data.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/config/export':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'Export application as coolify.json'
+      description: 'Export one application as a coolify.json file for its environment. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
+      operationId: export-application-config
       parameters:
         -
           name: uuid
@@ -19585,8 +19615,8 @@ components:
       properties:
         frequency:
           type: string
-          maxLength: 255
           example: '0 2 * * *'
+          maxLength: 255
         enabled:
           type: boolean
           default: true

@@ -261,6 +261,7 @@ Route::group([
     Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/environments/{uuid}/config/export', [ProjectConfigController::class, 'export'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/config/export', [ProjectConfigController::class, 'exportApplication'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/plan', [ProjectConfigController::class, 'plan'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/template/plan', [ProjectConfigController::class, 'templatePlan'])->middleware(['api.ability:write']);
     Route::post('/environments/{uuid}/config/template', [ProjectConfigController::class, 'templateCreate'])->middleware(['api.ability:write']);
