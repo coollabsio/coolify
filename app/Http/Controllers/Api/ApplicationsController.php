@@ -4269,6 +4269,7 @@ class ApplicationsController extends Controller
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                            'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                         ],
                     ),
                 ),
@@ -4303,7 +4304,7 @@ class ApplicationsController extends Controller
     )]
     public function update_env_by_uuid(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -4338,6 +4339,7 @@ class ApplicationsController extends Controller
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($application),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -4367,7 +4369,7 @@ class ApplicationsController extends Controller
         if ($request->has('value')) {
             $env->value = $request->value;
         }
-        $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']));
+        $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services']));
         // One audit row with the application context, instead of a second row from the model.
         $env->withoutAuditLogging(fn () => $env->save());
         $changedFields = auditSavedFields($env);
@@ -4428,6 +4430,7 @@ class ApplicationsController extends Controller
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                         'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
+                                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                                     ],
                                 ),
                             ],
@@ -4493,7 +4496,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview']);
+            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview', 'compose_services']);
 
             if ($item->has('key')) {
                 $item->put('key', ValidationPatterns::normalizeEnvironmentVariableKey((string) $item->get('key')));
@@ -4514,6 +4517,7 @@ class ApplicationsController extends Controller
                 'is_buildtime' => 'boolean',
                 'comment' => 'string|nullable|max:256',
                 'copy_value_to_preview' => 'boolean|nullable',
+                ...composeServicesValidationRules($application),
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -4532,7 +4536,7 @@ class ApplicationsController extends Controller
                     if ($item->has('value')) {
                         $env->value = $item->get('value');
                     }
-                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'])->all());
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -4545,6 +4549,7 @@ class ApplicationsController extends Controller
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
                         'comment' => $item->get('comment'),
+                        'compose_services' => $item->get('compose_services'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -4555,7 +4560,7 @@ class ApplicationsController extends Controller
                     if ($item->has('value')) {
                         $env->value = $item->get('value');
                     }
-                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'])->all());
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->make([
@@ -4568,6 +4573,7 @@ class ApplicationsController extends Controller
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
                         'comment' => $item->get('comment'),
+                        'compose_services' => $item->get('compose_services'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -4624,6 +4630,7 @@ class ApplicationsController extends Controller
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
+                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                     ],
                 ),
             ),
@@ -4660,7 +4667,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview', 'compose_services'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -4691,6 +4698,7 @@ class ApplicationsController extends Controller
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
             'copy_value_to_preview' => 'boolean|nullable',
+            ...composeServicesValidationRules($application),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -4727,6 +4735,7 @@ class ApplicationsController extends Controller
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
                     'comment' => $request->comment ?? null,
+                    'compose_services' => $request->compose_services,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -4760,6 +4769,7 @@ class ApplicationsController extends Controller
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
                     'comment' => $request->comment ?? null,
+                    'compose_services' => $request->compose_services,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);

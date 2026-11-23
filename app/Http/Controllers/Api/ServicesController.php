@@ -1494,6 +1494,7 @@ class ServicesController extends Controller
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                            'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                         ],
                     ),
                 ),
@@ -1555,6 +1556,7 @@ class ServicesController extends Controller
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($service),
         ]);
 
         if ($validator->fails()) {
@@ -1584,6 +1586,9 @@ class ServicesController extends Controller
         }
         if ($request->has('comment')) {
             $env->comment = $request->comment;
+        }
+        if ($request->has('compose_services')) {
+            $env->compose_services = $request->compose_services;
         }
         // One audit row with the service context, instead of a second row from the model.
         $env->withoutAuditLogging(fn () => $env->save());
@@ -1642,6 +1647,7 @@ class ServicesController extends Controller
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                                     ],
                                 ),
                             ],
@@ -1703,7 +1709,7 @@ class ServicesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
-            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment', 'compose_services']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
@@ -1715,6 +1721,7 @@ class ServicesController extends Controller
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
                 'comment' => 'string|nullable|max:256',
+                ...composeServicesValidationRules($service),
             ]);
 
             if ($validator->fails()) {
@@ -1774,6 +1781,7 @@ class ServicesController extends Controller
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                     ],
                 ),
             ),
@@ -1837,6 +1845,7 @@ class ServicesController extends Controller
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($service),
         ]);
 
         if ($validator->fails()) {
@@ -1861,6 +1870,7 @@ class ServicesController extends Controller
             'is_multiline' => $request->is_multiline ?? false,
             'is_shown_once' => $request->is_shown_once ?? false,
             'comment' => $request->comment ?? null,
+            'compose_services' => $request->compose_services,
         ]);
 
         auditLog('api.service.env_created', [
