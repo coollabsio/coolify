@@ -127,7 +127,7 @@ test('the candidate query filters by repository before applications are loaded',
 
     DB::enableQueryLog();
     sendManualLookupPush($this, $provider, $application->{"manual_webhook_secret_{$provider}"})->assertOk();
-    $candidateQuery = collect(DB::getQueryLog())->first(fn (array $query): bool => str_contains($query['query'], 'from "applications" where "git_branch" = ?'));
+    $candidateQuery = collect(DB::getQueryLog())->first(fn (array $query): bool => preg_match('/from "applications" where "git_branch" (= \?|in \(\?\))/', $query['query']) === 1);
 
     expect($candidateQuery['query'])->toContain('LOWER(git_repository) LIKE ?')
         ->and($candidateQuery['bindings'])->toContain('%acme/app%')
