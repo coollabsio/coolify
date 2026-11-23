@@ -61,8 +61,8 @@ class DatabaseImportCleanup
         'containerName',
         'serverTmpPath',
         'credentialTmpPath',
-        'uploadStorageId',
-        'uploadKey',
+        'uploadTeamId',
+        'uploadId',
     ];
 
     /**

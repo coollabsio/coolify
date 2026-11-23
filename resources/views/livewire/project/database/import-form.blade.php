@@ -7,16 +7,11 @@
     s3FileSize: $wire.entangle('s3FileSize'),
     s3StorageId: $wire.entangle('s3StorageId'),
     s3Path: $wire.entangle('s3Path'),
-    s3UploadStorageId: $wire.entangle('s3UploadStorageId'),
     s3Uploading: false,
     s3Progress: 0,
     s3Cancel: null,
     restoreType: null,
-    {{-- The bucket CORS rule that lets this browser page PUT the upload parts. --}}
-    s3CorsRule() {
-        return JSON.stringify([{ AllowedOrigins: [window.location.origin], AllowedMethods: ['PUT'], AllowedHeaders: ['*'] }], null, 2);
-    },
-    {{-- Uploads the file in parts directly to the S3 storage, with presigned URLs from the server. --}}
+    {{-- Uploads the file in parts directly to the instance's import storage, with presigned URLs from the server. --}}
     async uploadToS3(file) {
         if (! file || this.s3Uploading) {
             return;
@@ -35,7 +30,7 @@
         this.filesize = null;
         let started = false;
         try {
-            started = await wire.startS3Upload(Number(this.s3UploadStorageId), file.name, file.size);
+            started = await wire.startS3Upload(file.name, file.size);
             if (! started) {
                 return;
             }
@@ -77,7 +72,7 @@
             request.onload = () => request.status >= 200 && request.status < 300
                 ? resolve()
                 : reject(new Error(`The storage rejected the upload (HTTP ${request.status}).`));
-            request.onerror = () => reject(new Error('The browser could not upload to the storage. The bucket probably needs a CORS rule that allows PUT from ' + window.location.origin + ' (see "Bucket CORS rule"), or the storage endpoint is not reachable from this browser.'));
+            request.onerror = () => reject(new Error('The browser could not upload to the upload storage. Its bucket probably needs a CORS rule that allows PUT from ' + window.location.origin + ', or the storage is not reachable from this browser. Ask the administrator of this Coolify instance to check the storage.'));
             request.onabort = () => reject(new Error('The upload was cancelled.'));
             request.onloadend = () => requests.delete(request);
             request.send(blob);
@@ -292,49 +287,26 @@
                         <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
                     </div>
 
-                    @can('uploadBackup', $this->resource)
-                        @if (count($this->s3UploadStorages) > 0)
-                            <div class="mb-3 max-w-sm">
-                                <x-forms.listbox id="s3UploadStorageId" label="Upload to"
-                                    helper="Upload the file directly from your browser to an S3 storage, so it does not use disk space on the Coolify instance. Coolify deletes the uploaded file after the import, or after one day when it is not imported."
-                                    :options="collect([['value' => 0, 'label' => 'Coolify instance']])
-                                        ->concat(collect($this->s3UploadStorages)->map(fn ($storage) => ['value' => $storage['id'], 'label' => 'S3 storage: '.$storage['name']]))
-                                        ->all()" />
-                            </div>
-                            <div x-cloak x-show="Number(s3UploadStorageId) > 0">
-                                <label
-                                    class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-center text-sm dark:border-white/[0.12] dark:bg-white/[0.05]"
-                                    :class="s3Uploading ? 'pointer-events-none opacity-60' : ''"
-                                    @dragover.prevent @drop.prevent="uploadToS3($event.dataTransfer.files[0])">
-                                    <span>Select or drop a backup file here.</span>
-                                    <span class="text-[11px] text-neutral-500 dark:text-fg-faint">The file goes directly to the S3 storage. Maximum 10 GiB.</span>
-                                    <input type="file" class="hidden" @change="uploadToS3($event.target.files[0]); $event.target.value = ''">
-                                </label>
-                                <div x-show="s3Uploading" class="mt-3 flex items-center gap-3">
-                                    <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
-                                        <div class="h-full rounded-full bg-coollabs dark:bg-brand" :style="`width: ${s3Progress}%`"></div>
-                                    </div>
-                                    <span class="text-[11px] tabular-nums text-neutral-500 dark:text-fg-faint" x-text="`${s3Progress}%`"></span>
-                                    <x-forms.button @click="s3Cancel && s3Cancel()">Cancel</x-forms.button>
+                    @if ($this->uploadsToS3)
+                        <div>
+                            <label
+                                class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-center text-sm dark:border-white/[0.12] dark:bg-white/[0.05]"
+                                :class="s3Uploading ? 'pointer-events-none opacity-60' : ''"
+                                @dragover.prevent @drop.prevent="uploadToS3($event.dataTransfer.files[0])">
+                                <span>Select or drop a backup file here.</span>
+                                <span class="text-[11px] text-neutral-500 dark:text-fg-faint">Maximum 10 GiB. Coolify deletes the uploaded file after the import, or after one day when it is not imported.</span>
+                                <input type="file" class="hidden" @change="uploadToS3($event.target.files[0]); $event.target.value = ''">
+                            </label>
+                            <div x-show="s3Uploading" class="mt-3 flex items-center gap-3">
+                                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                                    <div class="h-full rounded-full bg-coollabs dark:bg-brand" :style="`width: ${s3Progress}%`"></div>
                                 </div>
-                                <div x-data="{ showCors: false }" class="mt-3">
-                                    <button type="button" @click="showCors = !showCors" :aria-expanded="showCors"
-                                        class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
-                                        <x-reicon name="chevron-down" class="size-3.5 transition-transform"
-                                            ::class="showCors ? '' : '-rotate-90'" />
-                                        Bucket CORS rule
-                                    </button>
-                                    <div x-cloak x-show="showCors" class="mt-2 text-xs text-neutral-500 dark:text-fg-dim">
-                                        <p>The browser uploads to the bucket, so the bucket needs a CORS rule that allows <code>PUT</code> from this Coolify URL. Add it in the settings of your S3 provider:</p>
-                                        <pre class="mt-2 overflow-x-auto rounded-lg bg-neutral-100 p-2 font-mono text-[11px] dark:bg-white/[0.05]" x-text="s3CorsRule()"></pre>
-                                    </div>
-                                </div>
+                                <span class="text-[11px] tabular-nums text-neutral-500 dark:text-fg-faint" x-text="`${s3Progress}%`"></span>
+                                <x-forms.button @click="s3Cancel && s3Cancel()">Cancel</x-forms.button>
                             </div>
-                        @endif
-                    @endcan
-
+                        </div>
+                    @else
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
-                        x-show="! (Number(s3UploadStorageId) > 0)"
                         class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
                         x-init="mountDropzone($el)" wire:ignore>
                         @csrf
@@ -343,6 +315,7 @@
                         <div class="h-full rounded-full bg-coollabs dark:bg-brand"
                             :style="`width: ${progress}%`"></div>
                     </div>
+                    @endif
 
                     <div x-cloak x-show="filename && !error"
                         class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">

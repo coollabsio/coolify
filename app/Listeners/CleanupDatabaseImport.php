@@ -114,8 +114,8 @@ SH;
             }
 
             // After the remote cleanup: the restore helper no longer reads the uploaded file.
-            if (is_int($event->data['uploadStorageId'] ?? null) && is_string($event->data['uploadKey'] ?? null)) {
-                DatabaseImportS3Upload::discardImported($event->data['uploadStorageId'], $event->data['uploadKey']);
+            if (is_int($event->data['uploadTeamId'] ?? null)) {
+                DatabaseImportS3Upload::find($event->data['uploadTeamId'], $event->data['uploadId'] ?? null)?->discard();
             }
 
             // A failed import task keeps blocking the database until its restore is stopped.

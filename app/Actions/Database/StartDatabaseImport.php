@@ -66,12 +66,11 @@ class StartDatabaseImport
 
     /**
      * True when the server path or S3 key can be imported into the database. Without write access on the whole
-     * team, a user can import only the backups of this database and the files uploaded for it, not the files of
-     * other resources.
+     * team, a user can import only the backups of this database, not the files of other resources.
      */
     public static function allowsSourcePath(Model $resource, string $path): bool
     {
-        if (Gate::allows('useTeamCredentials', $resource) || DatabaseImportS3Upload::isUploadKeyFor($resource, $path)) {
+        if (Gate::allows('useTeamCredentials', $resource)) {
             return true;
         }
 
@@ -180,6 +179,8 @@ class StartDatabaseImport
             }
             $magic = (string) instant_remote_process(['head -c 6 -- '.escapeshellarg($source->path).' | od -An -tx1'], $server);
             $commandList = [...$commandList, ...$this->copyIntoContainer($source->path, $magic, $server, $operation, $container, $containerPath, $cleanup)];
+        } elseif ($source->type === 's3-upload') {
+            $commandList = $this->downloadBrowserUpload($resource, $source, $teamId, $server, $operation, $network, $container, $containerPath, $cleanup);
         } else {
             $storage = S3Storage::ownedByCurrentTeamAPI($teamId)
                 ->where(fn ($query) => $query->whereUuid($source->s3StorageUuid)->orWhere('id', ctype_digit((string) $source->s3StorageUuid) ? (int) $source->s3StorageUuid : -1))
@@ -217,11 +218,6 @@ class StartDatabaseImport
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];
             $cleanup['containerName'] = $helper;
-            // A file that the browser uploaded for this import is temporary: the cleanup deletes it after the import.
-            if (str_starts_with($key, DatabaseImportS3Upload::KEY_PREFIX)) {
-                $cleanup['uploadStorageId'] = $storage->id;
-                $cleanup['uploadKey'] = $key;
-            }
         }
 
         if ($safety = $this->commands->buildPostgresSafetyCommand($resource, $container, $containerPath)) {
@@ -246,6 +242,46 @@ class StartDatabaseImport
             'operation_uuid' => $operation,
             DatabaseImportCleanup::PROPERTY => DatabaseImportCleanup::storable($cleanup),
         ]);
+    }
+
+    /**
+     * Downloads a file that the browser uploaded to the instance's import storage. That storage belongs to the root
+     * team, so the server gets only a presigned URL of the one object, never the keys of the storage.
+     *
+     * @param  array<string, mixed>  $cleanup
+     * @return list<string>
+     */
+    private function downloadBrowserUpload(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $operation, string $network, string $container, string $containerPath, array &$cleanup): array
+    {
+        $upload = DatabaseImportS3Upload::find($teamId, $source->uploadId);
+        $storage = $upload?->storage();
+        if (! $upload || ! $storage || ! $upload->belongsTo($resource) || ! $upload->isCompleted()) {
+            throw new DatabaseImportException('The uploaded file was not found. Please upload it again.');
+        }
+
+        $helper = "s3-restore-{$operation}";
+        try {
+            instant_remote_process([
+                'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
+                'docker run -d --network '.escapeshellarg($network).' --name '.escapeshellarg($helper).' '.escapeshellarg(coolifyHelperImage().':'.getHelperVersion()).' sleep 86400',
+            ], $server);
+            $downloadCommand = $storage->prepareCurlDownload($server, $helper, $upload->marker['key'], '/tmp/restore');
+        } catch (Throwable) {
+            instant_remote_process(['docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true'], $server, throwError: false);
+
+            throw new DatabaseImportException('Unable to start the S3 restore helper.');
+        }
+        $cleanup['containerName'] = $helper;
+        $cleanup['uploadTeamId'] = $teamId;
+        $cleanup['uploadId'] = $upload->marker['upload_id'];
+        // The cleanup deletes the file after the import; the marker stays as a fallback for the cleanup command.
+        $upload->touch();
+
+        return [
+            $downloadCommand,
+            ...$this->streamFromHelper($helper, $container, $containerPath),
+            'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
+        ];
     }
 
     private function target(Model $resource): array

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\DatabaseBackupFileValidator;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -28,6 +29,11 @@ class UploadController extends BaseController
         }
 
         $this->authorize('uploadBackup', $resource);
+
+        // The instance admin sent uploads to an S3 storage, so they must not use disk space on this instance.
+        if (DatabaseImportS3Upload::configuredStorage() !== null) {
+            return response()->json(['error' => 'Uploads go to an S3 storage on this instance. Reload the page.'], 409);
+        }
 
         $chunk = $request->file('file');
         $originalName = $chunk instanceof UploadedFile ? $chunk->getClientOriginalName() : null;
