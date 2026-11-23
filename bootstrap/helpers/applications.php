@@ -82,7 +82,10 @@ function queue_application_deployment(Application $application, string $deployme
             ->where('commit', $commit)
             ->where('pull_request_id', $pull_request_id)
             ->where('docker_registry_image_tag', $docker_registry_image_tag)
-            ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
+            // A deployment with finished_at only cleans up (for example, it stopped for a fork approval),
+            // so it does not deploy this commit anymore.
+            ->where(fn ($query) => $query->where('status', ApplicationDeploymentStatus::QUEUED->value)
+                ->orWhere(fn ($query) => $query->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->whereNull('finished_at')))
             ->first();
 
         if ($existing_deployment && ! $force_rebuild && ! $rollback && ! $no_questions_asked) {

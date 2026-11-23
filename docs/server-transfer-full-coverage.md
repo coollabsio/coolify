@@ -110,6 +110,8 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout + "Run in a shell" off; an auto-disabled task keeps its disabled reason |
 | ✅ | Tag | |
 | ✅ | Preview deployment | PR preview with domain port overrides + max restart count + keeps production values (previews from before v4.5.1) (needs the GitHub App, or create it in the database) |
+| ✅ | Fork PR approval off | on a git application (the seed uses `deploykey-app`, `gitlab-app`, `static-site`): fork PR approval not required (`is_pr_deployments_public_approval_required` off). Expected: still off on the target |
+| ✅ | Fork PR preview approval | on another application with PR deployments public and fork PR approval required, the default (the seed uses `whoami2`). Do not use an application of the row above, because there a new commit does not wait. A fork PR preview with an approved commit and a newer commit that waits for approval (`is_fork_pull_request`, `approved_commit`, `approved_at`, `pending_approval_commit`). Expected: on the target the approved commit still deploys and the pending one still waits |
 | ✅ | Secret manager link | the app loads variables from the secret manager token |
 | ✅ | Managed DNS record | owned record in the Cloudflare zone for the app domain. Expected: the target takes ownership (provider comment changes) |
 
